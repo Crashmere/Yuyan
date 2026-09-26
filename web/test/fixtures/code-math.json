@@ -1,0 +1,13 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "codeBlock", "attrs": { "language": "java" }, "content": [{ "type": "text", "text": "if (a < b) {\n  return \"x\";\n}" }] },
+    { "type": "codeBlock", "attrs": { "language": null }, "content": [{ "type": "text", "text": "plain" }] },
+    { "type": "codeBlock", "attrs": { "language": "mermaid" }, "content": [{ "type": "text", "text": "graph TD\n  A-->B" }] },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "行内 " }, { "type": "inlineMath", "attrs": { "latex": "a^2 + b^2 < c" } }]
+    },
+    { "type": "blockMath", "attrs": { "latex": "\\sum_{i=1}^{n} i" } }
+  ]
+}

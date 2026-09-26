@@ -1,0 +1,33 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "bulletList",
+      "content": [
+        {
+          "type": "listItem",
+          "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": "一" }] },
+            {
+              "type": "orderedList",
+              "attrs": { "start": 3, "type": null },
+              "content": [{ "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "三" }] }] }]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "orderedList",
+      "attrs": { "start": 1, "type": null },
+      "content": [{ "type": "listItem", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "第一" }] }] }]
+    },
+    {
+      "type": "taskList",
+      "content": [
+        { "type": "taskItem", "attrs": { "checked": true }, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "完成" }] }] },
+        { "type": "taskItem", "attrs": { "checked": false }, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "未完成" }] }] }
+      ]
+    }
+  ]
+}

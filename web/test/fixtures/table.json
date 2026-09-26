@@ -1,0 +1,24 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "table",
+      "content": [
+        {
+          "type": "tableRow",
+          "content": [
+            { "type": "tableHeader", "attrs": { "colspan": 1, "rowspan": 1, "colwidth": null, "align": "left" }, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "名称" }] }] },
+            { "type": "tableHeader", "attrs": { "colspan": 1, "rowspan": 1, "colwidth": null, "align": null }, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "说明" }] }] }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            { "type": "tableCell", "attrs": { "colspan": 1, "rowspan": 1, "colwidth": null, "align": "right" }, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "1" }] }] },
+            { "type": "tableCell", "attrs": { "colspan": 1, "rowspan": 1, "colwidth": null, "align": null }, "content": [{ "type": "paragraph" }] }
+          ]
+        }
+      ]
+    }
+  ]
+}

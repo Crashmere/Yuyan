@@ -1,0 +1,5 @@
+{{define "title"}}编辑：{{.Data.Doc.Title}} - 语燕{{end}}
+{{define "bodyClass"}}yy-editing{{end}}
+{{define "main"}}
+<div id="editor-app" data-doc-id="{{.Data.Doc.ID}}" data-book-id="{{.Data.Doc.BookID}}" data-book-name="{{.Data.Doc.BookName}}"></div>
+{{end}}

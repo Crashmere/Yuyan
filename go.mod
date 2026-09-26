@@ -5,11 +5,14 @@ go 1.26.0
 toolchain go1.26.8
 
 require (
+	github.com/alecthomas/chroma/v2 v2.27.0
 	golang.org/x/image v0.46.0
+	golang.org/x/net v0.59.0
 	modernc.org/sqlite v1.59.0
 )
 
 require (
+	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect

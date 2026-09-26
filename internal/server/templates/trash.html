@@ -1,0 +1,13 @@
+{{define "title"}}回收站 - 语燕{{end}}
+{{define "main"}}
+<main class="yy-main yy-narrow">
+  <h1 class="yy-title">回收站</h1>
+  <ul class="yy-list">
+    {{range .Data.Items}}<li>
+      <strong>{{.Title}}</strong>
+      <span>{{if eq .Kind "book"}}知识库{{else}}{{.BookName}}{{end}} · 删除于 {{when .DeletedAt}}</span>
+      <button data-action="restore-{{.Kind}}" data-id="{{.ID}}">恢复</button>
+    </li>{{else}}<li class="yy-empty">回收站是空的</li>{{end}}
+  </ul>
+</main>
+{{end}}

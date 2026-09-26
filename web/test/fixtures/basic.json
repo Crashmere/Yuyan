@@ -1,0 +1,28 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "heading", "attrs": { "level": 1 }, "content": [{ "type": "text", "text": "标题一" }] },
+    { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "Heading <3>" }] },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "普通 " },
+        { "type": "text", "text": "粗体", "marks": [{ "type": "bold" }] },
+        { "type": "text", "text": " " },
+        { "type": "text", "text": "斜粗", "marks": [{ "type": "bold" }, { "type": "italic" }] },
+        { "type": "text", "text": " " },
+        { "type": "text", "text": "删除", "marks": [{ "type": "strike" }] },
+        { "type": "text", "text": " " },
+        { "type": "text", "text": "a < b & c", "marks": [{ "type": "code" }] },
+        { "type": "hardBreak" },
+        { "type": "text", "text": "下划线", "marks": [{ "type": "underline" }] },
+        { "type": "text", "text": "高亮", "marks": [{ "type": "highlight" }] },
+        { "type": "text", "text": "外链", "marks": [{ "type": "link", "attrs": { "href": "https://example.com/?a=1&b=\"2\"" } }] },
+        { "type": "text", "text": "内链", "marks": [{ "type": "link", "attrs": { "href": "/docs/12" } }] }
+      ]
+    },
+    { "type": "paragraph" },
+    { "type": "horizontalRule" },
+    { "type": "blockquote", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "引用" }] }] }
+  ]
+}

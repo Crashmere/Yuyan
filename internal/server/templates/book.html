@@ -1,0 +1,17 @@
+{{define "title"}}{{.Data.Book.Name}} - 语燕{{end}}
+{{define "main"}}
+<div class="yy-layout">
+  {{template "sidebar" .Data}}
+  <main class="yy-main">
+    <h1 class="yy-title">{{.Data.Book.Name}}</h1>
+    {{with .Data.Book.Description}}<p class="yy-desc">{{.}}</p>{{end}}
+    <div class="yy-actions">
+      <button class="primary" data-action="create-doc" data-book="{{.Data.Book.ID}}">新建文档</button>
+      <button data-action="create-group" data-book="{{.Data.Book.ID}}">新建分组</button>
+      <button data-action="rename-book" data-book="{{.Data.Book.ID}}" data-name="{{.Data.Book.Name}}">重命名</button>
+      <button class="danger" data-action="delete-book" data-book="{{.Data.Book.ID}}">删除知识库</button>
+    </div>
+    {{if .Data.Tree}}{{template "tree" dict "Nodes" .Data.Tree "Current" 0}}{{else}}<p class="yy-empty">这个知识库还没有文档</p>{{end}}
+  </main>
+</div>
+{{end}}

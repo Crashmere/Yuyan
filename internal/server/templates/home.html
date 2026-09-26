@@ -1,0 +1,21 @@
+{{define "main"}}
+<main class="yy-home">
+  <section>
+    <div class="yy-section-head">
+      <h2>知识库</h2>
+      <button data-action="create-book">新建知识库</button>
+    </div>
+    <ul class="yy-books">
+      {{range .Data.Books}}<li><a href="{{link "books/" .ID}}"><strong>{{.Name}}</strong><span>{{.DocCount}} 篇</span></a></li>
+      {{else}}<li class="yy-empty">还没有知识库</li>{{end}}
+    </ul>
+  </section>
+  <section>
+    <h2>最近编辑</h2>
+    <ul class="yy-list">
+      {{range .Data.Recent}}<li><a href="{{link "docs/" .ID}}">{{.Title}}</a><span>{{.BookName}} · {{when .UpdatedAt}}</span></li>
+      {{else}}<li class="yy-empty">暂无</li>{{end}}
+    </ul>
+  </section>
+</main>
+{{end}}

@@ -1,0 +1,16 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "image", "attrs": { "src": "/assets/0123456789abcdef0123456789abcdef.png", "alt": "示意图", "title": null, "width": null, "height": 150 } },
+        { "type": "image", "attrs": { "src": "/assets/fedcba9876543210fedcba9876543210.gif", "alt": null, "title": "动画", "width": 300, "height": null } }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [{ "type": "text", "text": "图后文字" }]
+    }
+  ]
+}

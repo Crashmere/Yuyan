@@ -1,0 +1,16 @@
+{{define "title"}}搜索：{{.Data.Q}} - 语燕{{end}}
+{{define "main"}}
+<main class="yy-main yy-narrow">
+  <h1 class="yy-title">搜索</h1>
+  {{if .Data.Q}}
+    <p class="yy-meta">“{{.Data.Q}}”共 {{len .Data.Hits}} 条结果{{if eq (len .Data.Hits) 50}}（只显示前 50 条）{{end}}</p>
+    <ul class="yy-results">
+      {{range .Data.Hits}}<li>
+        <a href="{{link "docs/" .ID}}">{{.Title}}</a>
+        <span class="yy-meta">{{.BookName}}</span>
+        <p>{{.Snippet}}</p>
+      </li>{{end}}
+    </ul>
+  {{else}}<p class="yy-empty">在顶部输入要搜索的内容</p>{{end}}
+</main>
+{{end}}
