@@ -243,6 +243,8 @@ test('Cmd/Ctrl+K opens the search panel: recent documents, titles, pinyin initia
   await expect(panel.locator('.yy-search-item').first()).toContainText('长文档示例')
   await input.fill('ksks')
   await expect(panel.locator('.yy-search-item').first()).toContainText('快速开始')
+  await input.fill('zdl')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('最短路')
   await input.fill('Bellman')
   await expect(panel.locator('.yy-search-item', { hasText: '最短路' }).locator('.yy-search-snippet mark')).toHaveText('Bellman')
   await page.keyboard.press('Enter')
