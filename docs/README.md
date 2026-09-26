@@ -4,4 +4,4 @@
 - [OPERATIONS.md](OPERATIONS.md)：安装、发布与回退、正式导入、备份与恢复、诊断。
 - [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md)：已停止的 Obsidian 方案讨论记录，其中第 3 节的笔记库调查仍作为导入依据。
 
-已部署到 ali 并正式导入全部笔记（阶段 C，见 DESIGN.md 11.2），用户已在电脑和手机上确认可以正常使用。界面与编辑体验改版（阶段 D）的方案见 DESIGN.md 第 12 节，其中 D1（单页应用、新界面与目录管理）已发布，结果见 12.10。
+已部署到 ali 并正式导入全部笔记（阶段 C，见 DESIGN.md 11.2），用户已在电脑和手机上确认可以正常使用。界面与编辑体验改版（阶段 D，DESIGN.md 第 12 节）已全部发布，用户已验收。阶段 E 第一批（搜索面板、版本对比、图片预留尺寸、固定 CI 运行环境）已发布，结果见 DESIGN.md 13.6，待用户验收。
