@@ -16,7 +16,7 @@ const emit = defineEmits<{ open: [boolean] }>()
       <ContextMenuContent class="yy-menu">
         <template v-for="(item, i) in items" :key="i">
           <ContextMenuSeparator v-if="!item" class="yy-menu-sep" />
-          <ContextMenuItem v-else class="yy-menu-item" :class="{ danger: item.danger }" :disabled="item.disabled" @select="item.run()">
+          <ContextMenuItem v-else class="yy-menu-item" :class="{ danger: item.danger }" :disabled="item.disabled" @select="item.run?.()">
             <component :is="item.icon" v-if="item.icon" :size="16" />
             <span>{{ item.label }}</span>
             <kbd v-if="item.hint">{{ item.hint }}</kbd>

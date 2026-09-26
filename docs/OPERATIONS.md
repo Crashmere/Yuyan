@@ -48,6 +48,10 @@ npm --prefix web run seed -- --server http://127.0.0.1:18084/yuyan/   # 可选�
 
 本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。测试只写 .local；仓库只放合成样例。
 
+`make e2e` 在临时目录启动新实例、写入合成示例数据，再用 Playwright + Chromium 跑浏览器端到端测试（`web/e2e`：冒烟测试和编辑器交互测试，含中文输入法模拟和长文档检查）；首次运行前执行一次 `npx --prefix web playwright install chromium`。CI 中这些测试不通过就不发布。
+
+`make e2e` 构建程序后，在临时目录启动实例、写入合成数据，运行 `web/e2e` 中的浏览器测试（首页、目录、回收站，以及编辑器交互、中文输入法、长文档和编辑后的导出）；首次运行前执行 `npx --prefix web playwright install chromium`。CI 中这一步不通过就不发布。
+
 ## 正式导入
 
 导入只做一次，目标必须是空实例；工具在开发电脑上运行，通过 HTTP 上传。
@@ -58,6 +62,10 @@ npm --prefix web run import -- --source <笔记仓库副本> --server http://<�
 # 去掉 --dry 正式导入，完成后检查每篇文档都能被编辑器原样接受：
 npm --prefix web run roundtrip -- --server http://<服务器>/yuyan/
 ```
+
+`roundtrip` 只读取服务器。它也检查编辑表格时不会改动任何现有表格（编辑器会保持 Markdown 表格的形状，见 DESIGN.md 12.12）；修改编辑器配置后，发布前对正式实例运行一次。2026-09-26 D3 发布前运行：315 篇文档、185 个表格全部通过。
+
+`roundtrip` 只读取服务器。它检查每篇文档能被编辑器 schema 原样接受，并且编辑表格时不会调整现有表格的表头或列对齐。修改编辑器配置后，发布前对线上实例运行一次；2026-09-26 D3 发布前的结果：315 篇文档、185 个表格全部通过。
 
 overrides 文件记录需要人工选择的项（同名不同图），不入库。2026-09-26 的正式导入只有一项：`{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`；本地文件已删除，重新导入空实例时按此重建。
 

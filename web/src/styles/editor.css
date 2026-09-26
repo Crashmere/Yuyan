@@ -1,10 +1,114 @@
 /* Editing-only styles; the document itself is styled by content.css. Loaded with the editor chunk. */
 
-.yy-editor-main {
+/* Layout ------------------------------------------------------------------------------------ */
+
+.yy-toolbar {
+  position: sticky;
+  top: var(--yy-topbar);
+  z-index: 15;
+  border-bottom: 1px solid var(--yy-border);
+  background: var(--yy-bg);
+}
+.yy-toolbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.yy-toolbar-inner::-webkit-scrollbar {
+  display: none;
+}
+.yy-toolbar .yy-icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.yy-toolbar .yy-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+}
+.yy-toolbar .yy-icon-btn.active {
+  background: var(--yy-primary-soft);
+  color: var(--yy-primary);
+}
+.yy-toolbar-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--yy-border-strong);
+}
+.yy-toolbar-select {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--yy-radius);
+  background: none;
+  color: var(--yy-text);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.yy-toolbar-select:hover,
+.yy-toolbar-select[data-state='open'] {
+  background: var(--yy-bg-hover);
+}
+.yy-toolbar-select:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.yy-toolbar-select > span {
+  min-width: 3em;
+  text-align: left;
+}
+
+.yy-editor-banner {
   max-width: var(--yy-content-width);
+  margin: 16px auto 0;
+}
+
+.yy-editor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: center;
+  padding: 32px 40px 0;
+}
+.yy-editor-body.has-outline {
+  grid-template-columns: minmax(0, var(--yy-content-width)) 220px;
+  gap: 48px;
+}
+.yy-editor-main {
+  width: 100%;
+  max-width: var(--yy-content-width);
+  min-width: 0;
   margin: 0 auto;
   padding-bottom: 50vh;
 }
+.yy-editor-outline {
+  top: calc(var(--yy-topbar) + 44px + 24px);
+  max-height: calc(100vh - var(--yy-topbar) - 44px - 48px);
+}
+.yy-toc-empty {
+  margin: 0;
+  color: var(--yy-text-3);
+  font-size: 13px;
+}
+@media (max-width: 1180px) {
+  .yy-editor-body.has-outline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .yy-editor-outline {
+    display: none;
+  }
+}
+
 .yy-title-input {
   width: 100%;
   margin: 0 0 16px;
@@ -24,6 +128,9 @@
   min-height: 60vh;
   outline: none;
 }
+.yy-content .ProseMirror :where(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: calc(var(--yy-topbar) + 44px + 16px);
+}
 .ProseMirror p.is-empty::before,
 .ProseMirror h1.is-empty::before,
 .ProseMirror h2.is-empty::before,
@@ -38,9 +145,6 @@
   outline: 2px solid var(--yy-primary);
   outline-offset: 2px;
 }
-.ProseMirror img.ProseMirror-selectednode {
-  outline-offset: 0;
-}
 .ProseMirror .selectedCell {
   background: var(--yy-primary-soft);
 }
@@ -48,16 +152,469 @@
 .ProseMirror [data-type='block-math'] {
   cursor: pointer;
 }
-.ProseMirror [data-type='block-math']:empty::before {
+.ProseMirror [data-type='block-math']:empty::before,
+.ProseMirror [data-type='inline-math']:empty::before {
   content: '点击输入公式';
   color: var(--yy-text-3);
 }
-/* The editor keeps a trailing break in empty titles, so :empty from content.css never matches. */
-.ProseMirror .callout-title:has(> .ProseMirror-trailingBreak:only-child)::before {
-  content: '标题（可留空）';
-  color: var(--yy-text-4);
-  font-weight: 400;
+
+/* Find matches */
+.yy-find-match {
+  border-radius: 2px;
+  background: var(--yy-mark);
 }
+.yy-find-match.current {
+  background: light-dark(#ffb74d, #b86e00);
+  box-shadow: 0 0 0 1px light-dark(#f57c00, #ffa726);
+}
+
+/* Floating panels ---------------------------------------------------------------------------- */
+
+.yy-float {
+  position: fixed;
+  z-index: 60;
+  padding: 12px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-bg-elevated);
+  box-shadow: var(--yy-shadow-popover);
+  animation: yy-pop 0.12s ease-out;
+}
+.yy-float-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.yy-float-hint {
+  margin-right: auto;
+  color: var(--yy-text-3);
+  font-size: 12px;
+}
+.yy-float-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.yy-float-field + .yy-float-field {
+  margin-top: 8px;
+}
+.yy-float-field > span {
+  flex: none;
+  width: 32px;
+  color: var(--yy-text-2);
+  font-size: 13px;
+}
+.yy-float .yy-input {
+  height: 32px;
+}
+
+.yy-link-panel {
+  width: 380px;
+}
+
+.yy-math-panel {
+  width: 440px;
+}
+.yy-math-input {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--yy-border-strong);
+  border-radius: var(--yy-radius);
+  background: var(--yy-bg);
+  color: var(--yy-text);
+  font: 13px/1.6 var(--yy-mono);
+  resize: vertical;
+  outline: none;
+}
+.yy-math-input:focus {
+  border-color: var(--yy-primary);
+}
+.yy-math-preview {
+  min-height: 52px;
+  margin-top: 8px;
+  padding: 10px;
+  overflow-x: auto;
+  border-radius: var(--yy-radius);
+  background: var(--yy-bg-muted);
+  text-align: center;
+}
+.yy-math-preview p {
+  margin: 6px 0;
+  font-size: 13px;
+}
+.yy-math-error {
+  color: var(--yy-danger);
+  text-align: left;
+}
+.yy-math-placeholder {
+  color: var(--yy-text-4);
+}
+
+.yy-table-grid {
+  padding: 10px;
+}
+.yy-table-grid-cells {
+  display: grid;
+  gap: 3px;
+}
+.yy-table-grid-cells button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--yy-border-strong);
+  border-radius: 3px;
+  background: var(--yy-bg);
+  cursor: pointer;
+}
+.yy-table-grid-cells button.on {
+  border-color: var(--yy-primary);
+  background: var(--yy-primary-soft);
+}
+.yy-table-grid-label {
+  margin-top: 8px;
+  color: var(--yy-text-2);
+  font-size: 12px;
+  text-align: center;
+}
+
+.yy-find {
+  position: fixed;
+  top: calc(var(--yy-topbar) + 44px + 10px);
+  right: 24px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 400px;
+  padding: 10px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-bg-elevated);
+  box-shadow: var(--yy-shadow-popover);
+}
+.yy-find-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.yy-find-row .yy-input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  margin-right: 4px;
+}
+.yy-find-status {
+  min-width: 52px;
+  color: var(--yy-text-3);
+  font-size: 12px;
+  text-align: center;
+}
+.yy-find .yy-icon-btn.active {
+  background: var(--yy-primary-soft);
+  color: var(--yy-primary);
+}
+
+/* Bubbles ------------------------------------------------------------------------------------ */
+
+.yy-bubble,
+.yy-link-card {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-bg-elevated);
+  box-shadow: var(--yy-shadow-popover);
+}
+.yy-bubble-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--yy-radius-sm);
+  background: transparent;
+  color: var(--yy-text-2);
+  cursor: pointer;
+}
+.yy-bubble-btn:hover {
+  background: var(--yy-bg-hover);
+  color: var(--yy-text);
+}
+.yy-bubble-btn.active {
+  background: var(--yy-primary-soft);
+  color: var(--yy-primary);
+}
+.yy-bubble-btn.danger:hover {
+  color: var(--yy-danger);
+}
+.yy-bubble-text {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--yy-radius-sm);
+  background: transparent;
+  color: var(--yy-text-2);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.yy-bubble-text:hover {
+  background: var(--yy-bg-hover);
+  color: var(--yy-text);
+}
+.yy-bubble-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--yy-border-strong);
+}
+.yy-bubble-styles {
+  position: relative;
+}
+.yy-bubble-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 6px 0 8px;
+  border: 0;
+  border-radius: var(--yy-radius-sm);
+  background: none;
+  color: var(--yy-text);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.yy-bubble-select:hover {
+  background: var(--yy-bg-hover);
+}
+.yy-bubble-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -4px;
+  min-width: 132px;
+  padding: 4px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-bg-elevated);
+  box-shadow: var(--yy-shadow-popover);
+}
+.yy-bubble-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--yy-radius);
+  background: none;
+  color: var(--yy-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.yy-bubble-list button .lucide {
+  color: var(--yy-text-2);
+}
+.yy-bubble-list button:hover {
+  background: var(--yy-bg-hover);
+}
+.yy-bubble-list button.active {
+  color: var(--yy-primary);
+}
+.yy-link-card-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 300px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--yy-radius-sm);
+  background: none;
+  color: var(--yy-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.yy-link-card-url span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.yy-link-card-url:hover {
+  background: var(--yy-bg-hover);
+}
+
+/* Block handle -------------------------------------------------------------------------------- */
+
+.yy-block-handle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding-right: 6px;
+}
+.yy-handle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--yy-radius-sm);
+  background: none;
+  color: var(--yy-text-4);
+  cursor: pointer;
+}
+.yy-handle-btn:hover,
+.yy-handle-btn[data-state='open'] {
+  background: var(--yy-bg-hover);
+  color: var(--yy-text-2);
+}
+.yy-handle-btn.grip {
+  cursor: grab;
+}
+
+/* Slash menu ---------------------------------------------------------------------------------- */
+
+.yy-slash {
+  position: fixed;
+  z-index: 50;
+  width: 300px;
+  max-height: 380px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-bg-elevated);
+  box-shadow: var(--yy-shadow-popover);
+  font: 14px var(--yy-font);
+}
+.yy-slash-group {
+  padding: 8px 10px 4px;
+  color: var(--yy-text-3);
+  font-size: 12px;
+}
+.yy-slash button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--yy-radius);
+  background: transparent;
+  color: var(--yy-text);
+  text-align: left;
+  cursor: pointer;
+}
+.yy-slash button.active {
+  background: var(--yy-bg-hover);
+}
+.yy-slash-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius);
+  background: var(--yy-bg);
+  color: var(--yy-text-2);
+}
+.yy-slash-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.yy-slash-title {
+  font-size: 14px;
+  line-height: 1.4;
+}
+.yy-slash-desc {
+  overflow: hidden;
+  color: var(--yy-text-3);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.yy-slash kbd {
+  flex: none;
+  color: var(--yy-text-3);
+}
+.yy-slash-empty {
+  padding: 8px;
+  color: var(--yy-text-3);
+}
+
+/* Shortcuts dialog ---------------------------------------------------------------------------- */
+
+.yy-shortcuts {
+  top: 8vh;
+  width: min(820px, calc(100vw - 32px));
+  max-height: 84vh;
+  overflow: auto;
+}
+.yy-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 28px;
+}
+.yy-shortcuts h3 {
+  margin: 8px 0 6px;
+  color: var(--yy-text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.yy-shortcuts dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.yy-shortcuts dt {
+  color: var(--yy-text);
+}
+.yy-shortcuts dd {
+  margin: 0;
+  color: var(--yy-text-2);
+  text-align: right;
+}
+.yy-shortcuts-md {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+.yy-shortcuts-md dl {
+  grid-template-columns: repeat(3, max-content minmax(0, 1fr));
+  column-gap: 16px;
+}
+.yy-shortcuts-md dd {
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .yy-shortcuts-md dl {
+    grid-template-columns: max-content minmax(0, 1fr);
+  }
+}
+.yy-shortcuts kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-sm);
+  background: var(--yy-bg-muted);
+  white-space: nowrap;
+}
+
+/* Node views ---------------------------------------------------------------------------------- */
 
 .yy-codeblock {
   position: relative;
@@ -77,16 +634,12 @@
   justify-content: space-between;
   gap: 8px;
 }
-.yy-codeblock-bar select,
-.yy-callout-bar select {
-  height: 24px;
-  border: 1px solid var(--yy-border);
-  border-radius: var(--yy-radius-sm);
-  background: var(--yy-bg);
-  color: var(--yy-text-2);
-  font-size: 12px;
-}
-.yy-codeblock-bar button {
+.yy-lang-trigger,
+.yy-codeblock-btn,
+.yy-callout-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   height: 24px;
   padding: 0 8px;
   border: 1px solid var(--yy-border);
@@ -96,106 +649,332 @@
   font-size: 12px;
   cursor: pointer;
 }
-.yy-mermaid-preview {
-  padding: 12px;
-  border: 1px dashed var(--yy-border-strong);
-  border-top: 0;
-  border-radius: 0 0 var(--yy-radius-lg) var(--yy-radius-lg);
-  text-align: center;
-  overflow-x: auto;
+.yy-lang-trigger:hover,
+.yy-codeblock-btn:hover,
+.yy-callout-trigger:hover {
+  border-color: var(--yy-border-strong);
+  color: var(--yy-text);
+}
+.yy-lang-panel {
+  z-index: 70;
+  width: 250px;
+  padding: 8px;
+}
+.yy-lang-panel .yy-input {
+  width: 100%;
+  height: 30px;
+  margin-bottom: 6px;
+}
+.yy-lang-list {
+  max-height: 260px;
+  overflow: auto;
+}
+.yy-lang-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--yy-radius);
+  background: none;
+  color: var(--yy-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.yy-lang-list button.active {
+  background: var(--yy-bg-hover);
+}
+.yy-lang-id {
+  color: var(--yy-text-3);
+  font: 12px var(--yy-mono);
+}
+.yy-lang-check {
+  margin-left: auto;
+  color: var(--yy-primary);
+}
+.yy-lang-empty {
+  margin: 6px 8px;
+  color: var(--yy-text-3);
+  font-size: 12px;
 }
 
+/* Line numbers: a transparent copy of the code (CodeBlockView.vue) with a number before each line. */
+.yy-codeblock pre.has-numbers {
+  padding-left: calc(16px + 3em);
+}
+.yy-code-lines {
+  position: absolute;
+  top: 38px;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.yy-code-lines > div {
+  position: relative;
+  min-height: 1.65em;
+  padding-left: 3em;
+  color: transparent;
+  white-space: pre;
+}
+.yy-code-wrap .yy-code-lines > div {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.yy-code-lines > div::before {
+  position: absolute;
+  left: 0;
+  width: 2.2em;
+  color: var(--yy-text-4);
+  text-align: right;
+  content: attr(data-n);
+}
+
+/* Mermaid: source and preview side by side. */
+.yy-codeblock.is-mermaid .yy-codeblock-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+}
+.yy-codeblock.is-mermaid pre {
+  border: 0;
+  border-right: 1px solid var(--yy-border);
+  border-radius: 0;
+}
+.yy-codeblock.is-mermaid .yy-codeblock-bar {
+  right: calc(50% + 8px);
+}
+.yy-mermaid-preview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 120px;
+  padding: 12px;
+  overflow: auto;
+  background: var(--yy-bg);
+  text-align: center;
+}
+.yy-mermaid-svg.stale {
+  opacity: 0.45;
+}
+.yy-mermaid-empty {
+  margin: 0;
+  color: var(--yy-text-3);
+  font-size: 13px;
+}
+.yy-mermaid-preview .yy-mermaid-error {
+  margin: 8px 0 0;
+  font: 12px/1.5 var(--yy-mono);
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .yy-codeblock.is-mermaid .yy-codeblock-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .yy-codeblock.is-mermaid pre {
+    border-right: 0;
+    border-bottom: 1px solid var(--yy-border);
+  }
+  .yy-codeblock.is-mermaid .yy-codeblock-bar {
+    right: 8px;
+  }
+}
+
+/* Images: node view with resize handles, and upload placeholders. */
+.yy-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  vertical-align: middle;
+}
+.ProseMirror img {
+  cursor: default;
+}
+.ProseMirror .yy-image.ProseMirror-selectednode {
+  outline: none;
+}
+.yy-image.ProseMirror-selectednode img {
+  outline: 2px solid var(--yy-primary);
+  outline-offset: 1px;
+}
+.yy-image-handle {
+  position: absolute;
+  bottom: -5px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--yy-bg);
+  border-radius: 3px;
+  background: var(--yy-primary);
+  touch-action: none;
+}
+.yy-image-handle.left {
+  left: -5px;
+  cursor: nesw-resize;
+}
+.yy-image-handle.right {
+  right: -5px;
+  cursor: nwse-resize;
+}
+.yy-image-size {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.yy-image-alt {
+  display: flex;
+  gap: 6px;
+  padding: 2px;
+}
+.yy-image-alt .yy-input {
+  width: 260px;
+  height: 28px;
+}
+.yy-bubble-note {
+  padding: 0 6px;
+  color: var(--yy-text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.yy-upload {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: min(320px, 100%);
+  padding: 6px;
+  border: 1px dashed var(--yy-border-strong);
+  border-radius: var(--yy-radius);
+  background: var(--yy-bg-muted);
+  line-height: 1.5;
+  vertical-align: middle;
+}
+.yy-upload img {
+  max-width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  opacity: 0.6;
+}
+.yy-upload-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--yy-text-2);
+  font-size: 12px;
+}
+.yy-upload-bar {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--yy-border);
+}
+.yy-upload-bar > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--yy-primary);
+  transition: width 0.2s;
+}
+.yy-upload.failed {
+  border-color: var(--yy-danger);
+}
+.yy-upload.failed .yy-upload-text {
+  flex: 1;
+  color: var(--yy-danger);
+}
+.yy-upload-status button {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-sm);
+  background: var(--yy-bg);
+  color: var(--yy-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Callouts */
 .callout {
   position: relative;
 }
 .yy-callout-bar {
   position: absolute;
-  top: 8px;
-  right: 10px;
+  top: 6px;
+  right: 8px;
   display: flex;
   gap: 6px;
   opacity: 0;
   transition: opacity 0.15s;
 }
 .callout:hover > .yy-callout-bar,
-.callout:focus-within > .yy-callout-bar {
+.callout:focus-within > .yy-callout-bar,
+.yy-callout-bar:has([data-state='open']) {
   opacity: 1;
 }
-
-.yy-bubble {
-  display: flex;
-  gap: 2px;
-  padding: 4px;
-  border: 1px solid var(--yy-border);
-  border-radius: var(--yy-radius-lg);
-  background: var(--yy-bg-elevated);
-  box-shadow: var(--yy-shadow-popover);
+.yy-callout-trigger {
+  color: rgb(var(--callout-color));
 }
-.yy-bubble button {
-  height: 28px;
+.yy-callout-menu {
+  width: 272px;
+}
+.yy-callout-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 0 2px 4px;
+}
+.yy-callout-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
   padding: 0 8px;
-  border: 0;
-  border-radius: var(--yy-radius-sm);
-  background: transparent;
+  border-radius: var(--yy-radius);
   color: var(--yy-text);
   font-size: 13px;
   cursor: pointer;
+  outline: none;
 }
-.yy-bubble button:hover {
+.yy-callout-type[data-highlighted] {
   background: var(--yy-bg-hover);
 }
-.yy-bubble button.active {
-  background: var(--yy-primary-soft);
-  color: var(--yy-primary);
+.yy-callout-type.active {
+  background: rgba(var(--callout-color), 0.12);
+  color: rgb(var(--callout-color));
 }
-
-.yy-slash {
-  position: fixed;
-  z-index: 50;
-  width: 240px;
-  max-height: 320px;
-  overflow: auto;
-  padding: 4px;
-  border: 1px solid var(--yy-border);
-  border-radius: var(--yy-radius-lg);
-  background: var(--yy-bg-elevated);
-  box-shadow: var(--yy-shadow-popover);
-  font: 14px var(--yy-font);
-}
-.yy-slash button {
-  display: flex;
+.yy-callout-swatch {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  height: 32px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--yy-radius);
-  background: transparent;
-  color: var(--yy-text);
-  cursor: pointer;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(var(--callout-color), 0.15);
+  color: rgb(var(--callout-color));
 }
-.yy-slash button.active {
-  background: var(--yy-bg-hover);
-}
-.yy-slash kbd {
-  color: var(--yy-text-3);
-}
-.yy-slash-empty {
-  padding: 8px;
-  color: var(--yy-text-3);
-}
-
-.yy-drag {
-  padding: 2px 4px;
-  border-radius: var(--yy-radius-sm);
-  color: var(--yy-text-3);
-  cursor: grab;
-  font-size: 14px;
-  line-height: 1;
-}
-.yy-drag:hover {
-  background: var(--yy-bg-hover);
+/* An empty title shows the reading page's default title. The editor keeps a trailing break in
+   empty titles, so :empty from content.css never matches here. */
+.ProseMirror .callout-title:has(> .ProseMirror-trailingBreak:only-child)::before {
+  float: left;
+  height: 0;
+  content: var(--yy-callout-default, 'Callout');
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* lowlight (highlight.js) token colours in the editor, close to the GitHub theme used on pages. */

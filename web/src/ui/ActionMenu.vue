@@ -1,10 +1,19 @@
 <script setup lang="ts">
-import { DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuSeparator, DropdownMenuTrigger } from 'reka-ui'
+import { DropdownMenuContent, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
 import type { MenuEntry } from './menu'
+import MenuItems from './MenuItems.vue'
 
-// A dropdown menu opened from the element in the default slot.
-withDefaults(defineProps<{ items: MenuEntry[]; align?: 'start' | 'center' | 'end' }>(), { align: 'end' })
+// A dropdown menu opened from the element in the default slot. Menus used inside the editor set
+// restoreFocus to false, so closing them leaves focus with the editor instead of the trigger.
+const props = withDefaults(defineProps<{ items: MenuEntry[]; align?: 'start' | 'center' | 'end'; restoreFocus?: boolean }>(), {
+  align: 'end',
+  restoreFocus: true,
+})
 const open = defineModel<boolean>('open', { default: false })
+
+function onCloseAutoFocus(e: Event) {
+  if (!props.restoreFocus) e.preventDefault()
+}
 </script>
 
 <template>
@@ -13,15 +22,8 @@ const open = defineModel<boolean>('open', { default: false })
       <slot />
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
-      <DropdownMenuContent class="yy-menu" :align="align" :side-offset="4" @click.stop>
-        <template v-for="(item, i) in items" :key="i">
-          <DropdownMenuSeparator v-if="!item" class="yy-menu-sep" />
-          <DropdownMenuItem v-else class="yy-menu-item" :class="{ danger: item.danger }" :disabled="item.disabled" @select="item.run()">
-            <component :is="item.icon" v-if="item.icon" :size="16" />
-            <span>{{ item.label }}</span>
-            <kbd v-if="item.hint">{{ item.hint }}</kbd>
-          </DropdownMenuItem>
-        </template>
+      <DropdownMenuContent class="yy-menu" :align="align" :side-offset="4" @click.stop @close-auto-focus="onCloseAutoFocus">
+        <MenuItems :items="items" />
       </DropdownMenuContent>
     </DropdownMenuPortal>
   </DropdownMenuRoot>

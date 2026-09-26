@@ -88,6 +88,54 @@
   font: inherit;
   white-space: pre;
 }
+/* Reading pages split code into lines (enhance.ts); line numbers and wrapping are display
+   settings on <html>. */
+.yy-content pre code .yy-line {
+  display: block;
+  min-height: 1.65em;
+}
+.yy-code-numbers .yy-content pre code {
+  counter-reset: yy-line;
+}
+.yy-code-numbers .yy-content pre code .yy-line {
+  position: relative;
+  padding-left: 3em;
+}
+.yy-code-numbers .yy-content pre code .yy-line::before {
+  position: absolute;
+  left: 0;
+  width: 2.2em;
+  color: var(--yy-text-4);
+  text-align: right;
+  content: counter(yy-line);
+  counter-increment: yy-line;
+  user-select: none;
+}
+.yy-code-wrap .yy-content pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.yy-content pre.is-folded {
+  max-height: calc(var(--yy-fold-lines, 30) * 1.65em + 14px);
+  overflow-y: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 72px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 72px), transparent);
+}
+.yy-code-fold {
+  display: block;
+  margin: -0.4em auto 0.75em;
+  padding: 3px 14px;
+  border: 1px solid var(--yy-border);
+  border-radius: 999px;
+  background: var(--yy-bg);
+  color: var(--yy-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.yy-code-fold:hover {
+  border-color: var(--yy-primary);
+  color: var(--yy-primary);
+}
 .yy-copy {
   position: absolute;
   top: 6px;
@@ -112,6 +160,10 @@ pre:hover > .yy-copy,
   max-width: 100%;
   vertical-align: middle;
   border-radius: 4px;
+  cursor: zoom-in;
+}
+.yy-content a img {
+  cursor: pointer;
 }
 .yy-content img:not([height]) {
   height: auto;
