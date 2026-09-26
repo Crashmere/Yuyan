@@ -93,4 +93,6 @@ systemctl show yuyan -p MemoryCurrent -p MemoryPeak -p NRestarts
 du -sh /opt/yuyan/data /opt/yuyan/backups
 ```
 
+`MemoryCurrent` 包含页缓存：正式导入后程序本身约 30 MiB，另有约 320 MiB 可回收的文件缓存。判断内存问题时看 `/sys/fs/cgroup/system.slice/yuyan.service/memory.stat` 的 anon 与 `memory.events` 的 oom_kill，不能只看接近上限。
+
 缺库或损坏时查备份和权限，不能通过 init 创建空库掩盖错误。文档提交推送后运行 `~/agent-config/skills/server-operations/scripts/sync-docs.sh Yuyan`。
