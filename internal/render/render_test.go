@@ -121,12 +121,19 @@ func canonical(t *testing.T, s string) string {
 func TestChromaCSSFollowsTheTheme(t *testing.T) {
 	css := ChromaCSS()
 	for _, want := range []string{
-		"\n.chroma .k {",
+		`:root[data-theme="light"] .chroma .k {`,
+		`:root:not([data-theme="dark"]) .chroma .k {`,
 		`:root[data-theme="dark"] .chroma .k {`,
 		`:root:not([data-theme="light"]) .chroma .k {`,
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("stylesheet lacks %q", want)
+		}
+	}
+	// A light rule without a theme scope would stay active in dark mode.
+	for _, line := range strings.Split(css, "\n") {
+		if strings.HasPrefix(line, ".chroma") {
+			t.Errorf("unscoped rule %q", line)
 		}
 	}
 	for _, unwanted := range []string{"/* Background */", "/* PreWrapper */", ".bg {"} {

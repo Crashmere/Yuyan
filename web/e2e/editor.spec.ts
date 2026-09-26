@@ -462,6 +462,17 @@ test('reading pages: image viewer, folded long code and line numbers', async ({ 
   expect(number).toBe('counter(yy-line)')
 })
 
+test('highlighted code stays legible in dark mode', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.goto('./')
+  await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
+  await page.locator('.yy-sidebar .yy-tree-row', { hasText: '基础' }).click()
+  await page.locator('.yy-sidebar .yy-tree-row', { hasText: '排序' }).click()
+  const punctuation = page.locator('.yy-content pre .p', { hasText: '(' }).first()
+  const [r, g, b] = (await punctuation.evaluate((el) => getComputedStyle(el).color)).match(/\d+/g)!.map(Number)
+  expect((r + g + b) / 3).toBeGreaterThan(128)
+})
+
 test('the longest documents stay responsive while editing', async ({ page, request }) => {
   test.setTimeout(120_000)
   // About as many blocks as the largest real document (3,800), in a similar mix.

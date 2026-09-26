@@ -49,14 +49,17 @@ func highlight(lang, code string) (string, bool) {
 	return buf.String(), true
 }
 
-// ChromaCSS returns the highlight stylesheet: GitHub light, and GitHub dark when the page is in
-// dark mode, either chosen in the app (data-theme="dark") or following the system unless the
-// app is set to light. Chroma's own backgrounds are dropped so code blocks keep the page colours.
+// ChromaCSS returns the highlight stylesheet: GitHub light or GitHub dark, chosen in the app
+// (data-theme) or following the system. Each set applies only in its own mode, because the two
+// styles colour different token classes: light rules left active in dark mode painted
+// punctuation almost in the background colour. Chroma's own backgrounds are dropped so code
+// blocks keep the page colours.
 func ChromaCSS() string {
 	var light, dark bytes.Buffer
 	_ = formatter.WriteCSS(&light, styles.Get("github"))
 	_ = formatter.WriteCSS(&dark, styles.Get("github-dark"))
-	return scopeCSS(light.String(), "") +
+	return scopeCSS(light.String(), `:root[data-theme="light"] `) +
+		"@media (prefers-color-scheme: light) {\n" + scopeCSS(light.String(), `:root:not([data-theme="dark"]) `) + "}\n" +
 		scopeCSS(dark.String(), `:root[data-theme="dark"] `) +
 		"@media (prefers-color-scheme: dark) {\n" + scopeCSS(dark.String(), `:root:not([data-theme="light"]) `) + "}\n"
 }
