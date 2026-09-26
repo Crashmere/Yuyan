@@ -7,6 +7,8 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -167,5 +169,85 @@ func TestSearchMatchesChineseSubstrings(t *testing.T) {
 	}
 	if hits, _ := s.Search(ctx, "innodb", 10); len(hits) != 1 {
 		t.Fatal("search must ignore ASCII case")
+	}
+}
+
+func TestBackupVerifyRestoreAndPrune(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	b, _ := s.CreateBook(ctx, "算法课", "")
+	d, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "最短路"})
+	if _, _, err := s.SaveDoc(ctx, d.ID, "最短路", paragraph("备份内容"), d.Revision); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	a, err := s.PutAsset(ctx, buf.Bytes(), "a.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	backups := t.TempDir()
+	out := filepath.Join(backups, "daily-20260926T000000Z")
+	if err := s.Backup(ctx, out); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Backup(ctx, out); err == nil {
+		t.Fatal("Backup must refuse an existing directory")
+	}
+	m, err := VerifyBackup(out)
+	if err != nil || len(m.Files) != 2 {
+		t.Fatalf("verify: %d files, %v", len(m.Files), err)
+	}
+
+	restored := filepath.Join(t.TempDir(), "restored")
+	if err := Restore(ctx, out, restored); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Open(restored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.GetDoc(ctx, d.ID)
+	r.Close()
+	if err != nil || doc.PlainText(got.Content) != "备份内容" {
+		t.Fatalf("restored doc: %v", err)
+	}
+	if err := Restore(ctx, out, restored); err == nil {
+		t.Fatal("Restore must refuse an existing directory")
+	}
+
+	// A changed image makes the backup unusable instead of restoring silently. The backup file is
+	// a hard link, so it is replaced by rename rather than written, leaving the live image intact.
+	changed := filepath.Join(out, "assets", a.ID+".png")
+	if err := os.WriteFile(changed+".tmp", []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(changed+".tmp", changed); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Check(ctx); err != nil {
+		t.Fatalf("live store must be unaffected: %v", err)
+	}
+	if _, err := VerifyBackup(out); err == nil {
+		t.Fatal("VerifyBackup must detect a changed image")
+	}
+
+	for _, name := range []string{"daily-20260920T000000Z", "daily-20260921T000000Z", "daily-20260922T000000Z"} {
+		if err := os.MkdirAll(filepath.Join(backups, name), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(backups, name, manifestFile), []byte("{}"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := PruneBackups(backups, 2); err != nil {
+		t.Fatal(err)
+	}
+	left, _ := os.ReadDir(backups)
+	if len(left) != 2 || left[0].Name() != "daily-20260922T000000Z" || left[1].Name() != "daily-20260926T000000Z" {
+		t.Fatalf("prune kept %v", left)
 	}
 }

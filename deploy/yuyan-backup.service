@@ -1,0 +1,19 @@
+[Unit]
+Description=Yuyan database and image backup
+
+[Service]
+Type=oneshot
+User=yuyan
+Group=yuyan
+ExecStart=/opt/yuyan/bin/yuyan daily --data /opt/yuyan/data --out /opt/yuyan/backups
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+# data 与 backups 必须在同一个挂载点，图片硬链接才能跨目录；其余内容归 root，应用用户仍不可写。
+ReadWritePaths=/opt/yuyan
+MemoryMax=256M
+CPUQuota=50%
+Nice=10
+TimeoutStartSec=15min

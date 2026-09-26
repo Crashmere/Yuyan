@@ -1,0 +1,26 @@
+[Unit]
+Description=Yuyan personal knowledge base
+After=network.target
+
+[Service]
+Type=simple
+User=yuyan
+Group=yuyan
+WorkingDirectory=/opt/yuyan
+ExecStart=/opt/yuyan/bin/yuyan serve --data /opt/yuyan/data --listen 127.0.0.1:18084
+Environment=GOMEMLIMIT=320MiB
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/yuyan/data
+MemoryMax=384M
+CPUQuota=100%
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

@@ -38,4 +38,14 @@ jobs:
           npm --prefix web run parity
           git diff --exit-code -- internal/render/testdata
           make test
+          for script in deploy/*.sh; do bash -n "$script"; done
+          bash deploy/test-release.sh
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o bin/yuyan-linux-amd64 ./cmd/yuyan
+      - name: Save deployable binary
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: yuyan-linux
+          path: bin/yuyan-linux-amd64
+          if-no-files-found: error
+          retention-days: 7

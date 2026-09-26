@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -27,7 +28,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("usage: yuyan init|check|serve [flags]")
+		return errors.New("usage: yuyan init|check|serve|backup|daily|restore [flags]")
 	}
 	cmd := os.Args[1]
 	flags := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -35,10 +36,41 @@ func run() error {
 	listen := flags.String("listen", "127.0.0.1:18084", "HTTP address")
 	base := flags.String("base", "/yuyan/", "public path prefix used in generated links")
 	withPrefix := flags.Bool("with-prefix", false, "also accept the public prefix directly (local testing without Nginx)")
+	out := flags.String("out", "", "backup: new backup directory; daily: directory holding daily backups")
+	from := flags.String("from", "", "restore: backup directory to restore from")
 	if err := flags.Parse(os.Args[2:]); err != nil {
 		return err
 	}
+	ctx := context.Background()
 	switch cmd {
+	case "backup", "daily":
+		if *out == "" {
+			return errors.New("--out required")
+		}
+		s, err := store.Open(*dir)
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		if cmd == "backup" {
+			return s.Backup(ctx, *out)
+		}
+		if err := os.MkdirAll(*out, 0o700); err != nil {
+			return err
+		}
+		if err := s.Backup(ctx, filepath.Join(*out, "daily-"+time.Now().UTC().Format("20060102T150405Z"))); err != nil {
+			return err
+		}
+		return store.PruneBackups(*out, 14)
+	case "restore":
+		if *from == "" {
+			return errors.New("--from required")
+		}
+		if err := store.Restore(ctx, *from, *dir); err != nil {
+			return err
+		}
+		fmt.Println("restored into", *dir)
+		return nil
 	case "init":
 		if err := store.Init(*dir); err != nil {
 			return err
@@ -51,7 +83,7 @@ func run() error {
 			return err
 		}
 		defer s.Close()
-		if err := s.Check(context.Background()); err != nil {
+		if err := s.Check(ctx); err != nil {
 			return err
 		}
 		fmt.Println("ok")
