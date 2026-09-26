@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# 同一分支顺序完成检查，避免旧运行覆盖后来的提交。发布作业随首次安装到 ali 一起加入。
+# 同一分支顺序完成检查和发布，避免旧发布覆盖后来的提交。
 concurrency:
   group: yuyan-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -49,3 +49,44 @@ jobs:
           path: bin/yuyan-linux-amd64
           if-no-files-found: error
           retention-days: 7
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: yuyan-linux
+          path: artifact
+      - name: Deploy through restricted SSH
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          DEPLOY_COMMIT: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$latest" != "$DEPLOY_COMMIT" ]]; then
+            echo 'A newer main commit exists; skip this stale deployment.'
+            exit 0
+          fi
+          credentials=$(mktemp -d "$RUNNER_TEMP/yuyan-ssh.XXXXXX")
+          trap 'rm -f "$credentials/key" "$credentials/known_hosts"; rmdir "$credentials"' EXIT
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$credentials/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$credentials/known_hosts"
+          chmod 600 "$credentials/key" "$credentials/known_hosts"
+          digest=$(sha256sum artifact/yuyan-linux-amd64 | cut -d ' ' -f 1)
+          # deploy-release.sh reads a gzip stream and checks the SHA-256 of the uncompressed program.
+          gzip -9 -c artifact/yuyan-linux-amd64 | ssh -T -i "$credentials/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$credentials/known_hosts" \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            "$SSH_USER@$SSH_HOST" "deploy $DEPLOY_COMMIT $digest"
+          curl --fail --silent --show-error --max-time 15 "http://$SSH_HOST/yuyan/healthz"
