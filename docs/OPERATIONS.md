@@ -43,6 +43,7 @@ make test
 make build
 bin/yuyan init --data .local/data
 bin/yuyan serve --data .local/data --with-prefix
+npm --prefix web run seed -- --server http://127.0.0.1:18084/yuyan/   # 可选：写入合成示例数据
 ```
 
 本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。测试只写 .local；仓库只放合成样例。
