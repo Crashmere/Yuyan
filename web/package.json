@@ -9,6 +9,8 @@
     "test": "vitest run",
     "parity": "tsx tools/parity/render.ts",
     "import": "tsx tools/import/import.ts",
+    "export": "tsx tools/export/export.ts",
+    "seed": "tsx tools/demo/seed.ts",
     "roundtrip": "tsx tools/roundtrip/check.ts"
   },
   "dependencies": {
