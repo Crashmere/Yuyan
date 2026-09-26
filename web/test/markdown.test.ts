@@ -68,6 +68,33 @@ describe('markdownToDoc', () => {
     valid(markdownToDoc('a <u>b</u> c', { issue: (m) => issues.push(m) }))
     expect(issues.length).toBeGreaterThan(0)
   })
+
+  it('gives each text node every mark type at most once', () => {
+    const doc = valid(markdownToDoc('**外层 **内层** 外层**'))
+    expect(doc.content![0].content).toEqual([{ type: 'text', text: '外层 内层 外层', marks: [{ type: 'bold' }] }])
+  })
+
+  it('allows inline code to keep bold and link marks', () => {
+    const doc = valid(markdownToDoc('**`main()`** 与 [`go build`](https://go.dev)'))
+    const [bold, , linked] = doc.content![0].content!
+    expect(bold).toEqual({ type: 'text', text: 'main()', marks: [{ type: 'bold' }, { type: 'code' }] })
+    expect(linked.marks?.map((m) => m.type)).toEqual(['link', 'code'])
+    expect(docToMarkdown(doc).trim()).toBe('**`main()`** 与 [`go build`](https://go.dev)')
+  })
+
+  it('keeps angle-bracket text that is not HTML', () => {
+    const doc = valid(markdownToDoc('ArrayList<String> list 和 <cmd>'))
+    expect(doc.content![0].content).toEqual([{ type: 'text', text: 'ArrayList<String> list 和 <cmd>' }])
+  })
+
+  it('repairs formulas the way Obsidian reads them', () => {
+    const adjacent = valid(markdownToDoc('端点：$R(0)=R_0$$R(1)=R_n$'))
+    expect(adjacent.content![0].content!.filter((n) => n.type === 'inlineMath').map((n) => n.attrs?.latex)).toEqual(['R(0)=R_0', 'R(1)=R_n'])
+    const align = valid(markdownToDoc('> [!note]\n> $\n> \\begin{align}\n> a &= 1\n> \\end{align}\n> $'))
+    expect(align.content![0].content![1].content![0]).toMatchObject({ type: 'blockMath' })
+    const star = valid(markdownToDoc('$T^\\*$'))
+    expect(star.content![0].content![0].attrs?.latex).toBe('T^*')
+  })
 })
 
 describe('docToMarkdown', () => {

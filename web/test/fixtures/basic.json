@@ -22,6 +22,14 @@
       ]
     },
     { "type": "paragraph" },
+    {
+      "type": "paragraph",
+      "content": [
+        { "type": "text", "text": "main()", "marks": [{ "type": "bold" }, { "type": "code" }] },
+        { "type": "text", "text": " 与 " },
+        { "type": "text", "text": "go build", "marks": [{ "type": "link", "attrs": { "href": "https://go.dev" } }, { "type": "code" }] }
+      ]
+    },
     { "type": "horizontalRule" },
     { "type": "blockquote", "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "引用" }] }] }
   ]

@@ -1,0 +1,244 @@
+/* Document content, shared by reading pages (.yy-content) and the editor (.yy-content .ProseMirror).
+   The markup mirrors Obsidian's for callouts so existing callout CSS can be adapted. */
+
+.yy-content {
+  font-size: 15px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.yy-content > :first-child,
+.yy-content .ProseMirror > :first-child {
+  margin-top: 0;
+}
+.yy-content :where(p, ul, ol, blockquote, pre, table, .callout, hr) {
+  margin: 0.7em 0;
+}
+.yy-content :where(h1, h2, h3, h4, h5, h6) {
+  margin: 1.4em 0 0.6em;
+  line-height: 1.4;
+  scroll-margin-top: calc(var(--header) + 12px);
+}
+.yy-content h1 {
+  font-size: 1.75em;
+}
+.yy-content h2 {
+  font-size: 1.45em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--border);
+}
+.yy-content h3 {
+  font-size: 1.2em;
+}
+.yy-content h4 {
+  font-size: 1.05em;
+}
+.yy-content a {
+  color: var(--accent);
+}
+.yy-content a:hover {
+  text-decoration: underline;
+}
+.yy-content :where(ul, ol) {
+  padding-left: 1.6em;
+}
+.yy-content li > p {
+  margin: 0.2em 0;
+}
+.yy-content blockquote {
+  padding: 0.2em 1em;
+  border-left: 4px solid var(--border);
+  color: var(--muted);
+}
+.yy-content hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.6em 0;
+}
+.yy-content mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: #fff3a3;
+  color: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  .yy-content mark {
+    background: #6b5a00;
+  }
+}
+
+.yy-content :not(pre) > code {
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font: 0.88em var(--mono);
+}
+.yy-content pre {
+  position: relative;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  overflow-x: auto;
+  font: 13px/1.6 var(--mono);
+  tab-size: 4;
+}
+.yy-content pre code {
+  font: inherit;
+  white-space: pre;
+}
+.yy-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  opacity: 0;
+}
+pre:hover > .yy-copy {
+  opacity: 1;
+}
+
+.yy-content img {
+  max-width: 100%;
+  vertical-align: middle;
+  border-radius: 4px;
+}
+.yy-content img:not([height]) {
+  height: auto;
+}
+.yy-content img[height] {
+  width: auto;
+}
+
+.yy-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.yy-content :where(th, td) {
+  min-width: 80px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  vertical-align: top;
+}
+.yy-content th {
+  background: var(--sidebar);
+  font-weight: 600;
+}
+.yy-content :where(th, td) > p {
+  margin: 0;
+}
+
+.yy-content ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+/* The editor's task item node view has no data-type on <li>, so match through the list. */
+.yy-content ul[data-type='taskList'] > li {
+  display: flex;
+  gap: 0.5em;
+}
+.yy-content ul[data-type='taskList'] > li > label {
+  flex: none;
+  padding-top: 0.2em;
+}
+.yy-content ul[data-type='taskList'] > li > div {
+  flex: 1;
+  min-width: 0;
+}
+.yy-content ul[data-type='taskList'] > li[data-checked='true'] > div {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.yy-content [data-type='block-math'] {
+  display: block;
+  margin: 1em 0;
+  overflow-x: auto;
+  text-align: center;
+}
+.yy-mermaid {
+  margin: 1em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+.yy-mermaid-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+.yy-unknown {
+  padding: 8px 12px;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+}
+
+/* Callouts: Obsidian's default colours per type. */
+.callout {
+  --callout-color: 68, 138, 255;
+  padding: 10px 14px;
+  border-left: 4px solid rgb(var(--callout-color));
+  border-radius: 6px;
+  background: rgba(var(--callout-color), 0.08);
+}
+.callout-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgb(var(--callout-color));
+  font-weight: 600;
+}
+.callout-content > :first-child {
+  margin-top: 0.4em;
+}
+.callout-content > :last-child {
+  margin-bottom: 0;
+}
+.callout[data-callout-fold] > .callout-title {
+  cursor: pointer;
+  user-select: none;
+}
+.callout[data-callout-fold] > .callout-title::after {
+  content: '▾';
+  margin-left: auto;
+  transition: transform 0.15s;
+}
+.callout.is-collapsed > .callout-title::after {
+  transform: rotate(-90deg);
+}
+.callout.is-collapsed > .callout-content {
+  display: none;
+}
+.callout[data-callout='abstract'], .callout[data-callout='summary'], .callout[data-callout='tldr'] { --callout-color: 0, 176, 255; }
+.callout[data-callout='info'] { --callout-color: 0, 184, 212; }
+.callout[data-callout='tip'], .callout[data-callout='hint'], .callout[data-callout='important'] { --callout-color: 0, 191, 165; }
+.callout[data-callout='success'], .callout[data-callout='check'], .callout[data-callout='done'] { --callout-color: 0, 200, 83; }
+.callout[data-callout='question'], .callout[data-callout='help'], .callout[data-callout='faq'] { --callout-color: 100, 221, 23; }
+.callout[data-callout='warning'], .callout[data-callout='caution'], .callout[data-callout='attention'] { --callout-color: 255, 145, 0; }
+.callout[data-callout='failure'], .callout[data-callout='fail'], .callout[data-callout='missing'] { --callout-color: 255, 82, 82; }
+.callout[data-callout='danger'], .callout[data-callout='error'] { --callout-color: 255, 23, 68; }
+.callout[data-callout='bug'] { --callout-color: 245, 0, 87; }
+.callout[data-callout='example'] { --callout-color: 124, 77, 255; }
+.callout[data-callout='quote'], .callout[data-callout='cite'] { --callout-color: 158, 158, 158; }
+.callout[data-callout='code'] { --callout-color: 96, 125, 139; }
+.callout[data-callout='code'] .callout-content pre {
+  margin: 0.4em 0;
+  background: var(--bg);
+}
+
+/* Obsidian shows the capitalised type when a callout has no title. */
+.callout > .callout-title:empty::before { content: 'Callout'; }
+.callout[data-callout='note'] > .callout-title:empty::before { content: 'Note'; }
+.callout[data-callout='abstract'] > .callout-title:empty::before { content: 'Abstract'; }
+.callout[data-callout='info'] > .callout-title:empty::before { content: 'Info'; }
+.callout[data-callout='todo'] > .callout-title:empty::before { content: 'Todo'; }
+.callout[data-callout='tip'] > .callout-title:empty::before { content: 'Tip'; }
+.callout[data-callout='success'] > .callout-title:empty::before { content: 'Success'; }
+.callout[data-callout='question'] > .callout-title:empty::before { content: 'Question'; }
+.callout[data-callout='warning'] > .callout-title:empty::before { content: 'Warning'; }
+.callout[data-callout='failure'] > .callout-title:empty::before { content: 'Failure'; }
+.callout[data-callout='danger'] > .callout-title:empty::before { content: 'Danger'; }
+.callout[data-callout='bug'] > .callout-title:empty::before { content: 'Bug'; }
+.callout[data-callout='example'] > .callout-title:empty::before { content: 'Example'; }
+.callout[data-callout='quote'] > .callout-title:empty::before { content: 'Quote'; }
+.callout[data-callout='code'] > .callout-title:empty::before { content: 'Code'; }

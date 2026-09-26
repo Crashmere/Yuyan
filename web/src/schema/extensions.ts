@@ -1,5 +1,6 @@
 import { mergeAttributes, type AnyExtension, type Extensions } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
+import Code from '@tiptap/extension-code'
 import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import Highlight from '@tiptap/extension-highlight'
@@ -70,6 +71,7 @@ export interface SchemaOverrides {
 export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
   return [
     StarterKit.configure({
+      code: false,
       codeBlock: false,
       undoRedo: false,
       dropcursor: false,
@@ -81,6 +83,8 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
         HTMLAttributes: { target: null, rel: null, class: null },
       },
     }),
+    // Obsidian notes use bold or linked inline code, which Tiptap's default code mark forbids.
+    Code.extend({ excludes: '' }),
     o.codeBlock ?? CodeBlock,
     o.image ?? YuyanImage,
     Highlight,

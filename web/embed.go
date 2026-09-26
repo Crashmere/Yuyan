@@ -3,5 +3,7 @@ package web
 
 import "embed"
 
-//go:embed dist
+// all: keeps chunks whose names start with "_" (Vite emits some, e.g. from lodash-es).
+//
+//go:embed all:dist
 var Files embed.FS

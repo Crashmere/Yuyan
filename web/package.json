@@ -8,11 +8,13 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "parity": "tsx tools/parity/render.ts",
-    "import": "tsx tools/import/import.ts"
+    "import": "tsx tools/import/import.ts",
+    "roundtrip": "tsx tools/roundtrip/check.ts"
   },
   "dependencies": {
     "@floating-ui/dom": "1.8.0",
     "@tiptap/core": "3.31.3",
+    "@tiptap/extension-code": "3.31.3",
     "@tiptap/extension-code-block": "3.31.3",
     "@tiptap/extension-code-block-lowlight": "3.31.3",
     "@tiptap/extension-drag-handle-vue-3": "3.31.3",

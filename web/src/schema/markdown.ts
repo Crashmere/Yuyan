@@ -21,6 +21,13 @@ export interface ImportContext {
 
 type Mark = NonNullable<JSONContent['marks']>[number]
 
+// A text node may carry each mark type once: nested emphasis keeps the outer mark, and an inner
+// link replaces an outer one.
+function withMark(marks: Mark[], mark: Mark): Mark[] {
+  if (!marks.some((m) => m.type === mark.type)) return [...marks, mark]
+  return mark.type === 'link' ? [...marks.filter((m) => m.type !== 'link'), mark] : marks
+}
+
 const calloutMarker = /^\[!([\w-]+)\]([+-]?)[ \t]*/
 
 export function markdownToDoc(markdown: string, ctx: ImportContext = {}): JSONContent {
@@ -67,7 +74,7 @@ class Converter {
       case 'code':
         return [this.code(n)]
       case 'math':
-        return [{ type: 'blockMath', attrs: { latex: n.value } }]
+        return [{ type: 'blockMath', attrs: { latex: cleanLatex(n.value) } }]
       case 'table':
         return [this.table(n)]
       case 'html':
@@ -84,9 +91,15 @@ class Converter {
   }
 
   // A paragraph that only contains images stays a paragraph; images are inline, as in Markdown.
+  // A paragraph holding nothing but one multi-line $...$ formula (Obsidian accepts align
+  // environments there) becomes a formula block.
   private paragraph(children: PhrasingContent[]): JSONContent[] {
     const inline = this.inline(children, [])
     if (!inline.length) return []
+    const solid = inline.filter((n) => n.type !== 'hardBreak' && !(n.type === 'text' && !n.text?.trim()))
+    if (solid.length === 1 && solid[0].type === 'inlineMath' && /\n|\\begin\{/.test(String(solid[0].attrs?.latex))) {
+      return [{ type: 'blockMath', attrs: { latex: String(solid[0].attrs?.latex).trim() } }]
+    }
     return [{ type: 'paragraph', content: inline }]
   }
 
@@ -181,8 +194,9 @@ class Converter {
   private htmlBlock(n: Html): JSONContent[] {
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
-    this.issue(`HTML 块按纯文本导入：${n.value.slice(0, 60)}`)
-    return [{ type: 'paragraph', content: [{ type: 'text', text: n.value }] }]
+    if (n.value.trim().startsWith('<!--')) return []
+    if (isHtmlTag(n.value.trim())) this.issue(`HTML 块按纯文本导入：${n.value.slice(0, 60)}`)
+    return this.paragraph([{ type: 'text', value: n.value }])
   }
 
   // inlineHtml converts the HTML we know how to keep (<img>, <br>); null means "not understood".
@@ -191,7 +205,7 @@ class Converter {
     if (/^<br\s*\/?>$/i.test(trimmed)) return [{ type: 'hardBreak' }]
     const imgs = [...trimmed.matchAll(/<img\s[^>]*>/gi)]
     if (imgs.length && trimmed.replace(/<img\s[^>]*>/gi, '').trim() === '') {
-      return imgs.flatMap((m) => {
+      return imgs.flatMap((m): JSONContent[] => {
         const attr = (name: string) => new RegExp(`${name}\\s*=\\s*["']?([^"'\\s>]+)`, 'i').exec(m[0])?.[1] ?? null
         const src = attr('src')
         if (!src) return []
@@ -214,25 +228,26 @@ class Converter {
       case 'text':
         return this.text(n.value, marks)
       case 'strong':
-        return this.inline(n.children, [...marks, { type: 'bold' }])
+        return this.inline(n.children, withMark(marks, { type: 'bold' }))
       case 'emphasis':
-        return this.inline(n.children, [...marks, { type: 'italic' }])
+        return this.inline(n.children, withMark(marks, { type: 'italic' }))
       case 'delete':
-        return this.inline(n.children, [...marks, { type: 'strike' }])
+        return this.inline(n.children, withMark(marks, { type: 'strike' }))
       case 'inlineCode':
-        return n.value ? [textNode(n.value, [...marks, { type: 'code' }])] : []
+        return n.value ? [textNode(n.value, withMark(marks, { type: 'code' }))] : []
       case 'break':
         return [{ type: 'hardBreak' }]
       case 'inlineMath':
-        return [{ type: 'inlineMath', attrs: { latex: n.value } }]
+        // "$a$$b$" is two formulas in Obsidian, but one formula containing "$$" to remark-math.
+        return n.value.split('$$').filter((s) => s.trim()).map((latex) => ({ type: 'inlineMath', attrs: { latex: cleanLatex(latex) } }))
       case 'link': {
         const href = this.linkHref(n.url)
-        return this.inline(n.children, href ? [...marks, { type: 'link', attrs: { href } }] : marks)
+        return this.inline(n.children, href ? withMark(marks, { type: 'link', attrs: { href } }) : marks)
       }
       case 'linkReference': {
         const def = this.defs.get(n.identifier.toLowerCase())
         if (!def) return this.text(`[${n.label ?? n.identifier}]`, marks)
-        return this.inline(n.children, [...marks, { type: 'link', attrs: { href: this.linkHref(def.url) } }])
+        return this.inline(n.children, withMark(marks, { type: 'link', attrs: { href: this.linkHref(def.url) } }))
       }
       case 'image':
         return [this.image(n.url, n.alt ?? '', n.title ?? null, 'markdown')]
@@ -243,7 +258,9 @@ class Converter {
       case 'html': {
         const inline = this.inlineHtml(n.value)
         if (inline) return inline
-        this.issue(`行内 HTML 标签已去掉：${n.value.slice(0, 40)}`)
+        // Text such as List<String> or <cmd> is not HTML; keep it as written.
+        if (!isHtmlTag(n.value)) return this.text(n.value, marks)
+        if (!n.value.startsWith('<!--')) this.issue(`行内 HTML 标签已去掉，文字保留：${n.value.slice(0, 40)}`)
         return []
       }
       case 'footnoteReference':
@@ -300,16 +317,35 @@ class Converter {
         } else {
           const href = this.ctx.resolveLink ? this.ctx.resolveLink(target.trim(), 'wiki') : null
           const label = (alias ?? target).trim()
-          out.push(textNode(label, href ? [...marks, { type: 'link', attrs: { href } }] : marks))
+          out.push(textNode(label, href ? withMark(marks, { type: 'link', attrs: { href } }) : marks))
         }
       } else {
-        out.push(textNode(m[3], [...marks, { type: 'highlight' }]))
+        out.push(textNode(m[3], withMark(marks, { type: 'highlight' })))
       }
       last = m.index! + m[0].length
     }
     if (last < line.length) out.push(textNode(line.slice(last), marks))
     return out.filter((n) => n.type !== 'text' || n.text)
   }
+}
+
+const htmlTagNames = new Set(
+  ('a abbr address article aside audio b bdi bdo big blockquote br button caption center cite code col colgroup dd del ' +
+    'details dfn div dl dt em figcaption figure font footer form h1 h2 h3 h4 h5 h6 header hr i iframe img input ins kbd ' +
+    'label li main mark nav ol option p pre q rp rt ruby s samp script section select small source span strike strong ' +
+    'style sub summary sup svg table tbody td textarea tfoot th thead time tr tt u ul var video wbr').split(' '),
+)
+
+// isHtmlTag tells real HTML (<u>, </font>, <!-- -->) from text in angle brackets (<String>, <cmd>).
+function isHtmlTag(value: string): boolean {
+  if (value.startsWith('<!--')) return true
+  const m = /^<\/?([a-zA-Z][\w-]*)/.exec(value)
+  return !!m && htmlTagNames.has(m[1].toLowerCase())
+}
+
+// "\*" is a Markdown escape left inside some formulas; LaTeX has no such command and "*" was meant.
+function cleanLatex(latex: string): string {
+  return latex.replace(/(^|[^\\])\\\*/g, '$1*')
 }
 
 function content(nodes: JSONContent[]): { content?: JSONContent[] } {

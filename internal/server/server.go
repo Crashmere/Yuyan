@@ -72,16 +72,37 @@ func readManifest(static fs.FS) (map[string]entry, error) {
 	var raw map[string]struct {
 		File    string   `json:"file"`
 		CSS     []string `json:"css"`
+		Imports []string `json:"imports"`
 		IsEntry bool     `json:"isEntry"`
 		Name    string   `json:"name"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
+	// An entry needs its own CSS plus the CSS of every chunk it imports statically.
+	var collect func(key string, seen map[string]bool, css *[]string)
+	collect = func(key string, seen map[string]bool, css *[]string) {
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		chunk := raw[key]
+		for _, imp := range chunk.Imports {
+			collect(imp, seen, css)
+		}
+		for _, c := range chunk.CSS {
+			if !seen["css:"+c] {
+				seen["css:"+c] = true
+				*css = append(*css, c)
+			}
+		}
+	}
 	out := map[string]entry{}
-	for _, v := range raw {
+	for key, v := range raw {
 		if v.IsEntry {
-			out[v.Name] = entry{JS: v.File, CSS: v.CSS}
+			var css []string
+			collect(key, map[string]bool{}, &css)
+			out[v.Name] = entry{JS: v.File, CSS: css}
 		}
 	}
 	for _, name := range []string{"reader", "editor"} {
