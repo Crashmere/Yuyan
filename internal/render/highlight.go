@@ -49,10 +49,32 @@ func highlight(lang, code string) (string, bool) {
 	return buf.String(), true
 }
 
-// ChromaCSS returns the highlight stylesheet: GitHub light, and GitHub dark for dark mode.
+// ChromaCSS returns the highlight stylesheet: GitHub light, and GitHub dark when the page is in
+// dark mode, either chosen in the app (data-theme="dark") or following the system unless the
+// app is set to light. Chroma's own backgrounds are dropped so code blocks keep the page colours.
 func ChromaCSS() string {
 	var light, dark bytes.Buffer
 	_ = formatter.WriteCSS(&light, styles.Get("github"))
 	_ = formatter.WriteCSS(&dark, styles.Get("github-dark"))
-	return light.String() + "\n@media (prefers-color-scheme: dark) {\n" + dark.String() + "\n}\n"
+	return scopeCSS(light.String(), "") +
+		scopeCSS(dark.String(), `:root[data-theme="dark"] `) +
+		"@media (prefers-color-scheme: dark) {\n" + scopeCSS(dark.String(), `:root:not([data-theme="light"]) `) + "}\n"
+}
+
+// scopeCSS prefixes every rule of Chroma's one-rule-per-line output and removes the background rules.
+func scopeCSS(css, prefix string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(css, "\n") {
+		if strings.Contains(line, "/* Background */") || strings.Contains(line, "/* PreWrapper */") {
+			continue
+		}
+		if i := strings.Index(line, "*/ "); i >= 0 && strings.Contains(line, "{") {
+			line = line[i+3:]
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		b.WriteString(prefix + line + "\n")
+	}
+	return b.String()
 }

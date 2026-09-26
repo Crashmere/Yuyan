@@ -1,0 +1,56 @@
+/* Design tokens. Colours use light-dark(), so the theme follows the system unless the app sets
+   data-theme="light" or "dark" on <html> (see the inline script in the page shell). */
+
+:root {
+  color-scheme: light dark;
+
+  --yy-primary: #00b96b;
+  --yy-primary-hover: light-dark(#009f5c, #1fd184);
+  --yy-primary-soft: light-dark(#e8f7ef, #173826);
+  --yy-on-primary: #fff;
+
+  --yy-text: light-dark(#262626, #e3e3e3);
+  --yy-text-2: light-dark(#585a5a, #b4b6b8);
+  --yy-text-3: light-dark(#8a8f8d, #85888c);
+  --yy-text-4: light-dark(#bec0bf, #5a5d61);
+
+  --yy-bg: light-dark(#ffffff, #1b1c1f);
+  --yy-bg-sidebar: light-dark(#fafafa, #202124);
+  --yy-bg-elevated: light-dark(#ffffff, #26272b);
+  --yy-bg-hover: light-dark(#eff0f0, #2c2d31);
+  --yy-bg-active: light-dark(#e7e9e8, #34363a);
+  --yy-bg-muted: light-dark(#f5f6f6, #25262a);
+  --yy-code-bg: light-dark(#f6f7f8, #25262a);
+  --yy-mark: light-dark(#fff3a3, #5e5200);
+
+  --yy-border: light-dark(#e7e9e8, #313236);
+  --yy-border-strong: light-dark(#d8dad9, #43454a);
+
+  --yy-danger: light-dark(#df2a3f, #ff6b7a);
+  --yy-danger-soft: light-dark(#fdecee, #3d1c21);
+  --yy-warning: light-dark(#c27a00, #f0b33c);
+  --yy-warning-soft: light-dark(#fff7e6, #3a2d12);
+
+  --yy-shadow-popover: 0 1px 2px light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.3)), 0 8px 24px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45));
+  --yy-shadow-dialog: 0 16px 48px light-dark(rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.55));
+  --yy-overlay: light-dark(rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.55));
+
+  --yy-radius-sm: 4px;
+  --yy-radius: 6px;
+  --yy-radius-lg: 8px;
+  --yy-radius-xl: 12px;
+
+  --yy-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  --yy-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --yy-topbar: 52px;
+  --yy-content-width: 800px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

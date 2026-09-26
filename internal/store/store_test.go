@@ -251,3 +251,169 @@ func TestBackupVerifyRestoreAndPrune(t *testing.T) {
 		t.Fatalf("prune kept %v", left)
 	}
 }
+
+func titles(nodes []*TreeNode) []string {
+	var out []string
+	for _, n := range nodes {
+		out = append(out, n.Title)
+	}
+	return out
+}
+
+func TestMoveDoc(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	b, _ := s.CreateBook(ctx, "设计模式", "")
+	other, _ := s.CreateBook(ctx, "杂项", "")
+	group, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Kind: "group", Title: "创建型模式"})
+	single, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, ParentID: &group.ID, Title: "单例"})
+	overview, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "创建型模式"})
+	last, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "附录"})
+	trashed, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, ParentID: &overview.ID, Title: "已删除"})
+	if err := s.DeleteDoc(ctx, trashed.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reorder among siblings: the index counts siblings without the moved document.
+	if err := s.MoveDoc(ctx, last.ID, b.ID, nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	tree, _ := s.Tree(ctx, b.ID)
+	if got := titles(tree); len(got) != 3 || got[0] != "附录" || got[1] != "创建型模式" {
+		t.Fatalf("order after reorder: %v", got)
+	}
+
+	// Merge a folder note: the child moves under the document of the same name.
+	if err := s.MoveDoc(ctx, single.ID, b.ID, &overview.ID, 99); err != nil {
+		t.Fatal(err)
+	}
+	tree, _ = s.Tree(ctx, b.ID)
+	if len(tree[2].Children) != 1 || tree[2].Children[0].ID != single.ID || tree[1].Children != nil {
+		t.Fatalf("child not moved under the overview: %+v", tree)
+	}
+
+	// Not into itself or its own subtree, and not under a parent in another book.
+	for _, bad := range []*int64{&overview.ID, &single.ID} {
+		if err := s.MoveDoc(ctx, overview.ID, b.ID, bad, 0); !errors.Is(err, ErrInvalid) {
+			t.Fatalf("move into own subtree: %v", err)
+		}
+	}
+	if err := s.MoveDoc(ctx, single.ID, other.ID, &group.ID, 0); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("parent from another book: %v", err)
+	}
+
+	// Across books the subtree follows, including children in the trash.
+	if err := s.MoveDoc(ctx, overview.ID, other.ID, nil, 0); err != nil {
+		t.Fatal(err)
+	}
+	moved, _ := s.Tree(ctx, other.ID)
+	if len(moved) != 1 || len(moved[0].Children) != 1 {
+		t.Fatalf("subtree not moved: %+v", moved)
+	}
+	if err := s.RestoreDoc(ctx, trashed.ID); err != nil {
+		t.Fatal(err)
+	}
+	restored, _ := s.GetDoc(ctx, trashed.ID)
+	if restored.BookID != other.ID {
+		t.Fatalf("trashed child stayed in book %d", restored.BookID)
+	}
+}
+
+func TestRenameAdvancesRevision(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	b, _ := s.CreateBook(ctx, "JUC", "")
+	d, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "线程池"})
+	rev, err := s.RenameDoc(ctx, d.ID, "  线程池原理 ")
+	if err != nil || rev != d.Revision+1 {
+		t.Fatalf("rename: rev=%d err=%v", rev, err)
+	}
+	if _, _, err := s.SaveDoc(ctx, d.ID, "线程池", paragraph("旧标签页"), d.Revision); !errors.Is(err, ErrConflict) {
+		t.Fatalf("editor with the old revision must conflict: %v", err)
+	}
+	if got, _ := s.GetDoc(ctx, d.ID); got.Title != "线程池原理" {
+		t.Fatalf("title = %q", got.Title)
+	}
+	if _, err := s.RenameDoc(ctx, d.ID, " "); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("empty title: %v", err)
+	}
+}
+
+func TestPurge(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	clock := time.Date(2026, 9, 26, 8, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return clock }
+	b, _ := s.CreateBook(ctx, "CentOS", "")
+	parent, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "服务管理"})
+	child, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, ParentID: &parent.ID, Title: "systemd"})
+	earlier, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, ParentID: &parent.ID, Title: "SysV"})
+	if err := s.DeleteDoc(ctx, earlier.ID); err != nil {
+		t.Fatal(err)
+	}
+	clock = clock.Add(time.Minute)
+	if err := s.DeleteDoc(ctx, parent.ID); err != nil {
+		t.Fatal(err)
+	}
+	live, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "防火墙"})
+	if err := s.PurgeDoc(ctx, live.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("a live document must not be purged: %v", err)
+	}
+	if err := s.PurgeDoc(ctx, parent.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []int64{parent.ID, child.ID} {
+		if _, err := s.GetDoc(ctx, id); !errors.Is(err, ErrNotFound) {
+			t.Fatalf("doc %d survived: %v", id, err)
+		}
+	}
+	// Trashed separately earlier: still in the trash, now without a parent.
+	if err := s.RestoreDoc(ctx, earlier.ID); err != nil {
+		t.Fatal(err)
+	}
+	if tree, _ := s.Tree(ctx, b.ID); len(tree) != 2 || (tree[0].ID != earlier.ID && tree[1].ID != earlier.ID) {
+		t.Fatalf("separately trashed child should be back at the top level: %v", titles(tree))
+	}
+
+	gone, _ := s.CreateBook(ctx, "旧知识库", "")
+	d, _ := s.CreateDoc(ctx, CreateDocInput{BookID: gone.ID, Title: "笔记"})
+	if err := s.DeleteBook(ctx, gone.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DeleteDoc(ctx, earlier.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.EmptyTrash(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if trash, _ := s.Trash(ctx); len(trash) != 0 {
+		t.Fatalf("trash not empty: %+v", trash)
+	}
+	if _, err := s.GetDoc(ctx, d.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("doc of purged book survived: %v", err)
+	}
+	if err := s.Check(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBooksReorderAndPartialUpdate(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	a, _ := s.CreateBook(ctx, "A", "第一个")
+	b, _ := s.CreateBook(ctx, "B", "")
+	if err := s.ReorderBooks(ctx, []int64{b.ID, a.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := s.ListBooks(ctx); list[0].ID != b.ID {
+		t.Fatalf("order: %+v", list)
+	}
+	if err := s.ReorderBooks(ctx, []int64{b.ID}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("incomplete order must be rejected: %v", err)
+	}
+	name := "A2"
+	got, err := s.UpdateBook(ctx, a.ID, BookPatch{Name: &name})
+	if err != nil || got.Name != "A2" || got.Description != "第一个" {
+		t.Fatalf("rename kept description? %+v %v", got, err)
+	}
+}

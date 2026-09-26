@@ -1,0 +1,96 @@
+<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { Check, CircleAlert, ClipboardCopy, CloudCheck, Ellipsis, History, LoaderCircle } from 'lucide-vue-next'
+import { api, ApiError, errorMessage, type Doc } from '../../shared/api'
+import EditorPane, { type SaveStatus } from '../../editor/EditorPane.vue'
+import ActionMenu from '../../ui/ActionMenu.vue'
+import { confirm } from '../../ui/dialog'
+import IconButton from '../../ui/IconButton.vue'
+import type { MenuEntry } from '../../ui/menu'
+import { copyDocLink } from '../actions'
+import { setTitle } from '../router'
+import { editing, loading, loadTree, setNodeTitle, setPage } from '../store'
+import NotFoundState from './NotFoundState.vue'
+
+const route = useRoute()
+const router = useRouter()
+const id = Number(route.params.id)
+const doc = shallowRef<Doc | null>(null)
+const pane = ref<InstanceType<typeof EditorPane> | null>(null)
+const missing = ref(false)
+const failure = ref('')
+const status = ref<SaveStatus>('loading')
+const statusText = ref('')
+const words = ref(0)
+
+const menu: MenuEntry[] = [
+  { label: '历史版本', icon: History, run: () => void router.push(`/docs/${id}/history`) },
+  { label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(id) },
+]
+
+onMounted(async () => {
+  try {
+    const d = await loading(api<Doc>(`docs/${id}`))
+    if (d.kind === 'group') {
+      await router.replace(`/docs/${id}`)
+      return
+    }
+    doc.value = d
+    setPage(d.bookId, d.id)
+    setTitle(`编辑：${d.title}`)
+    void loadTree(d.bookId)
+    editing.value = { docId: d.id, setTitle: (t) => pane.value?.setTitle(t) }
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) missing.value = true
+    else failure.value = errorMessage(e)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (editing.value?.docId === id) editing.value = null
+})
+
+function onStatus(s: SaveStatus, text: string) {
+  status.value = s
+  statusText.value = text
+}
+
+function onSaved(title: string) {
+  if (!doc.value) return
+  setNodeTitle(doc.value.bookId, id, title)
+  setTitle(`编辑：${title}`)
+}
+
+// Leaving saves first; only content that could not reach the server needs a decision.
+onBeforeRouteLeave(async () => {
+  if (!pane.value || (await pane.value.flush())) return true
+  return confirm({
+    title: '还有修改没有保存到服务器',
+    message: '内容已暂存在这个浏览器里，下次打开这篇文档时可以恢复。仍要离开吗？',
+    confirmText: '离开',
+    danger: true,
+  })
+})
+</script>
+
+<template>
+  <Teleport defer to="#yy-topbar-actions">
+    <template v-if="doc">
+      <span class="yy-save-status" :class="status" :title="statusText">
+        <LoaderCircle v-if="status === 'saving' || status === 'loading'" :size="14" class="yy-spin" />
+        <CircleAlert v-else-if="status === 'offline' || status === 'error' || status === 'conflict'" :size="14" />
+        <CloudCheck v-else :size="14" />
+        <span class="yy-save-text">{{ statusText }}</span>
+        <span class="yy-save-words">{{ words.toLocaleString() }} 字</span>
+      </span>
+      <ActionMenu :items="menu"><IconButton label="更多操作"><Ellipsis :size="18" /></IconButton></ActionMenu>
+      <button type="button" class="yy-btn primary" @click="router.push(`/docs/${id}`)"><Check :size="15" />完成</button>
+    </template>
+  </Teleport>
+  <main v-if="missing" class="yy-page"><NotFoundState /></main>
+  <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
+  <main v-else-if="doc" class="yy-edit-page">
+    <EditorPane ref="pane" :doc="doc" @status="onStatus" @words="(n) => (words = n)" @saved="onSaved" />
+  </main>
+</template>

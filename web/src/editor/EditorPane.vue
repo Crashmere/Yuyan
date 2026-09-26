@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { DragHandle } from '@tiptap/extension-drag-handle-vue-3'
 import type { Editor as CoreEditor, JSONContent } from '@tiptap/core'
-import { api, ApiError, base, pageURL, type Doc } from '../shared/api'
+import { api, ApiError, base, type Doc } from '../shared/api'
+import { prompt } from '../ui/dialog'
 import { editorExtensions, insertImages, setCurrentEditor } from './extensions'
-import { toast } from './toast'
+import 'katex/dist/katex.min.css'
+import '../styles/editor.css'
 
-const props = defineProps<{ docId: number; bookName: string }>()
+export type SaveStatus = 'loading' | 'saved' | 'dirty' | 'saving' | 'offline' | 'error' | 'conflict'
 
-type Status = 'loading' | 'saved' | 'dirty' | 'saving' | 'offline' | 'error' | 'conflict'
+const props = defineProps<{ doc: Doc }>()
+const emit = defineEmits<{ status: [SaveStatus, string]; words: [number]; saved: [string] }>()
+
 interface Draft {
   title: string
   content: JSONContent
@@ -19,35 +23,37 @@ interface Draft {
 }
 
 const editor = shallowRef<Editor | null>(null)
-const title = ref('')
-const revision = ref(0)
+const title = ref(props.doc.title)
+const revision = ref(props.doc.revision)
 const serverRevision = ref(0)
-const status = ref<Status>('loading')
+const status = ref<SaveStatus>('loading')
 const failure = ref('')
 const draftOffer = ref<Draft | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const titleInput = ref<HTMLTextAreaElement | null>(null)
-const words = ref(0)
 
-const draftKey = `yuyan:draft:${props.docId}`
-const readURL = pageURL(`docs/${props.docId}`)
-const historyURL = pageURL(`docs/${props.docId}/history`)
+const draftKey = `yuyan:draft:${props.doc.id}`
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 let retryDelay = 2000
 let inFlight = false
 let again = false
 let loaded = false
+let savedThisSession = false
 
-const statusText = computed(() => ({
-  loading: '加载中…',
-  saved: '已保存',
-  dirty: '有未保存的修改',
-  saving: '保存中…',
-  offline: '网络断开，恢复后自动保存',
-  error: `保存失败：${failure.value}，稍后重试`,
-  conflict: '文档已在别处修改',
-})[status.value])
+function statusText(): string {
+  return {
+    loading: '加载中…',
+    saved: '已保存',
+    dirty: '有未保存的修改',
+    saving: '保存中…',
+    offline: '网络断开，恢复后自动保存',
+    error: `保存失败：${failure.value}，稍后重试`,
+    conflict: '文档已在别处修改',
+  }[status.value]
+}
+
+watch([status, failure], () => emit('status', status.value, statusText()), { immediate: true })
 
 function writeDraft() {
   if (!editor.value) return
@@ -84,13 +90,16 @@ async function save() {
   inFlight = true
   status.value = 'saving'
   writeDraft()
+  const savedTitle = title.value
   try {
-    const res = await api<{ revision: number }>(`docs/${props.docId}`, {
+    const res = await api<{ revision: number }>(`docs/${props.doc.id}`, {
       method: 'PUT',
-      json: { title: title.value, content: editor.value.getJSON(), baseRevision: revision.value },
+      json: { title: savedTitle, content: editor.value.getJSON(), baseRevision: revision.value },
     })
     revision.value = res.revision
     retryDelay = 2000
+    savedThisSession = true
+    emit('saved', savedTitle.trim() || '无标题文档')
     if (!again) {
       localStorage.removeItem(draftKey)
       status.value = 'saved'
@@ -109,16 +118,34 @@ async function save() {
     inFlight = false
     if (again && status.value !== 'conflict') {
       again = false
-      save()
+      void save()
     }
   }
 }
+
+// flush saves pending changes now and reports whether everything reached the server.
+async function flush(): Promise<boolean> {
+  clearTimeout(saveTimer)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    while (inFlight) await new Promise((r) => setTimeout(r, 50))
+    if (status.value === 'saved' || status.value === 'loading') return true
+    if (status.value === 'conflict') return false
+    await save()
+  }
+  return status.value === 'saved'
+}
+
+function setTitle(value: string) {
+  title.value = value
+}
+
+defineExpose({ flush, setTitle })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {
   revision.value = serverRevision.value
   status.value = 'dirty'
-  save()
+  void save()
 }
 
 function reloadLatest() {
@@ -145,12 +172,6 @@ function discardDraft() {
   draftOffer.value = null
 }
 
-async function finish() {
-  clearTimeout(saveTimer)
-  if (status.value === 'dirty') await save()
-  if (status.value === 'saved') window.location.href = readURL
-}
-
 function pickImage() {
   fileInput.value?.click()
 }
@@ -159,17 +180,17 @@ function onFilePicked(e: Event) {
   const input = e.target as HTMLInputElement
   const files = [...(input.files ?? [])]
   input.value = ''
-  if (editor.value && files.length) insertImages(editor.value, files)
+  if (editor.value && files.length) void insertImages(editor.value, files)
 }
 
-function setLink() {
+async function setLink() {
   const e = editor.value
   if (!e) return
   const previous = e.getAttributes('link').href ?? ''
-  const href = window.prompt('链接地址（留空则移除链接）', previous)
+  const href = await prompt({ title: previous ? '编辑链接' : '添加链接', label: '链接地址（留空则移除链接）', value: previous, placeholder: 'https://', allowEmpty: true })
   if (href === null) return
-  if (!href.trim()) e.chain().focus().extendMarkRange('link').unsetLink().run()
-  else e.chain().focus().extendMarkRange('link').setLink({ href: href.trim() }).run()
+  if (!href) e.chain().focus().extendMarkRange('link').unsetLink().run()
+  else e.chain().focus().extendMarkRange('link').setLink({ href }).run()
 }
 
 function shouldShowBubble({ editor: e, from, to }: { editor: CoreEditor; from: number; to: number }) {
@@ -192,30 +213,30 @@ function beforeUnload(e: BeforeUnloadEvent) {
   }
 }
 
-function pageHide() {
-  navigator.sendBeacon(`${base}api/docs/${props.docId}/snapshot`)
+// Leaving the editor after saving something, by navigation or by closing the tab, ends an editing
+// session and records a version.
+function snapshot() {
+  if (savedThisSession) navigator.sendBeacon(`${base}api/docs/${props.doc.id}/snapshot`)
 }
 
 watch(title, () => {
   changed()
-  nextTick(autosizeTitle)
+  void nextTick(autosizeTitle)
 })
 
 onMounted(async () => {
-  const d = await api<Doc>(`docs/${props.docId}`)
-  title.value = d.title
-  revision.value = d.revision
+  const d = props.doc
   const e = new Editor({
     extensions: editorExtensions(pickImage),
     content: d.content,
     onUpdate: ({ editor: ed }) => {
-      words.value = ed.storage.characterCount.characters()
+      emit('words', ed.storage.characterCount.characters())
       changed()
     },
   })
   editor.value = e
   setCurrentEditor(e)
-  words.value = e.storage.characterCount.characters()
+  emit('words', e.storage.characterCount.characters())
   const draft = readDraft()
   if (draft && (draft.title !== d.title || JSON.stringify(draft.content) !== JSON.stringify(d.content))) draftOffer.value = draft
   else if (draft) localStorage.removeItem(draftKey)
@@ -226,42 +247,36 @@ onMounted(async () => {
   if (!d.content.content?.some((n) => n.content?.length)) titleInput.value?.focus()
   else e.commands.focus('start')
   window.addEventListener('beforeunload', beforeUnload)
-  window.addEventListener('pagehide', pageHide)
+  window.addEventListener('pagehide', snapshot)
   window.addEventListener('online', save)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforeUnload)
-  window.removeEventListener('pagehide', pageHide)
+  window.removeEventListener('pagehide', snapshot)
   window.removeEventListener('online', save)
+  clearTimeout(saveTimer)
+  clearTimeout(retryTimer)
+  snapshot()
   setCurrentEditor(null)
   editor.value?.destroy()
 })
 </script>
 
 <template>
-  <div class="yy-editor-page">
-    <header class="yy-editor-bar">
-      <a class="yy-back" :href="readURL">← {{ bookName }}</a>
-      <span class="yy-status" :class="status">{{ statusText }}</span>
-      <span class="yy-spacer"></span>
-      <span class="yy-count">{{ words }} 字</span>
-      <a class="button" :href="historyURL">历史</a>
-      <button class="primary" type="button" @click="finish">完成</button>
-    </header>
-
+  <div class="yy-editor-pane">
     <div v-if="draftOffer" class="yy-banner">
       发现 {{ new Date(draftOffer.savedAt).toLocaleString() }} 未保存到服务器的内容。
-      <button type="button" @click="restoreDraft">恢复</button>
-      <button type="button" @click="discardDraft">丢弃</button>
+      <button type="button" class="yy-btn small" @click="restoreDraft">恢复</button>
+      <button type="button" class="yy-btn small" @click="discardDraft">丢弃</button>
     </div>
     <div v-if="status === 'conflict'" class="yy-banner danger">
       这篇文档已在别的标签页或设备上修改，自动保存已暂停，你的内容仍在当前页面。
-      <button type="button" @click="reloadLatest">载入最新版本（放弃这里的修改）</button>
-      <button type="button" @click="overwrite">用这里的内容覆盖</button>
+      <button type="button" class="yy-btn small" @click="reloadLatest">载入最新版本（放弃这里的修改）</button>
+      <button type="button" class="yy-btn small" @click="overwrite">用这里的内容覆盖</button>
     </div>
 
-    <main class="yy-editor-main">
+    <div class="yy-editor-main">
       <textarea
         ref="titleInput"
         v-model="title"
@@ -271,7 +286,7 @@ onBeforeUnmount(() => {
         @keydown.enter.prevent="editor?.commands.focus('start')"
       ></textarea>
       <editor-content v-if="editor" :editor="editor" class="yy-content" />
-    </main>
+    </div>
 
     <bubble-menu v-if="editor" :editor="editor" :should-show="shouldShowBubble" class="yy-bubble">
       <button type="button" :class="{ active: editor.isActive('bold') }" title="粗体" @click="editor.chain().focus().toggleBold().run()"><b>B</b></button>
@@ -286,7 +301,6 @@ onBeforeUnmount(() => {
       <div class="yy-drag" title="拖动调整位置">⠿</div>
     </drag-handle>
 
-    <div v-if="toast" class="yy-toast">{{ toast }}</div>
     <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden @change="onFilePicked" />
   </div>
 </template>

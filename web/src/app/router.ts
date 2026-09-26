@@ -1,0 +1,56 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { base } from '../shared/api'
+import { state } from './store'
+import HomeView from './views/HomeView.vue'
+import BookView from './views/BookView.vue'
+import DocView from './views/DocView.vue'
+import HistoryView from './views/HistoryView.vue'
+import VersionView from './views/VersionView.vue'
+import SearchView from './views/SearchView.vue'
+import TrashView from './views/TrashView.vue'
+import NotFoundView from './views/NotFoundView.vue'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    // Which sidebar the page shows: the workspace (home, knowledge bases) or the current book.
+    sidebar: 'workspace' | 'book'
+  }
+}
+
+export const router = createRouter({
+  history: createWebHistory(base),
+  routes: [
+    { path: '/', name: 'home', component: HomeView, meta: { sidebar: 'workspace' } },
+    { path: '/books/:id', name: 'book', component: BookView, meta: { sidebar: 'book' } },
+    { path: '/docs/:id', name: 'doc', component: DocView, meta: { sidebar: 'book' } },
+    // The editor is loaded only when it is opened.
+    { path: '/docs/:id/edit', name: 'edit', component: () => import('./views/EditView.vue'), meta: { sidebar: 'book' } },
+    { path: '/docs/:id/history', name: 'history', component: HistoryView, meta: { sidebar: 'book' } },
+    { path: '/versions/:id', name: 'version', component: VersionView, meta: { sidebar: 'book' } },
+    { path: '/search', name: 'search', component: SearchView, meta: { sidebar: 'workspace' } },
+    { path: '/trash', name: 'trash', component: TrashView, meta: { sidebar: 'workspace' } },
+    { path: '/:pathMatch(.*)*', name: 'notfound', component: NotFoundView, meta: { sidebar: 'workspace' } },
+  ],
+  // Views scroll to a #heading themselves once their content has loaded.
+  scrollBehavior: (to, _from, saved) => saved ?? (to.hash ? false : { top: 0 }),
+})
+
+// The progress bar also covers loading a page's code, such as the editor on first use.
+router.beforeEach(() => {
+  state.navigating = true
+})
+router.afterEach(() => {
+  state.navigating = false
+})
+
+// After a new release the old tab's chunks are gone from the server; load the page afresh.
+router.onError((error: Error, to) => {
+  state.navigating = false
+  if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(error.message)) {
+    location.assign(router.resolve(to).href)
+  }
+})
+
+export function setTitle(title?: string) {
+  document.title = title ? `${title} - 语燕` : '语燕'
+}

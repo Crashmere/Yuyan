@@ -40,8 +40,11 @@ FROM books b WHERE b.deleted_at IS NULL ORDER BY b.position, b.id`)
 func (s *Store) GetBook(ctx context.Context, id int64) (Book, error) {
 	var b Book
 	var deleted sql.NullString
-	err := s.DB.QueryRowContext(ctx, `SELECT id, name, description, position, updated_at, deleted_at FROM books WHERE id = ?`, id).
-		Scan(&b.ID, &b.Name, &b.Description, &b.Position, &b.UpdatedAt, &deleted)
+	err := s.DB.QueryRowContext(ctx, `
+SELECT id, name, description, position, updated_at, deleted_at,
+       (SELECT count(*) FROM docs d WHERE d.book_id = books.id AND d.deleted_at IS NULL AND d.kind = 'doc')
+FROM books WHERE id = ?`, id).
+		Scan(&b.ID, &b.Name, &b.Description, &b.Position, &b.UpdatedAt, &deleted, &b.DocCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return b, ErrNotFound
 	}
@@ -65,20 +68,66 @@ VALUES (?, ?, (SELECT coalesce(max(position), 0) + 1 FROM books), ?, ?)`, name, 
 	return s.GetBook(ctx, id)
 }
 
-func (s *Store) UpdateBook(ctx context.Context, id int64, name, description string) (Book, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return Book{}, ErrInvalid
-	}
-	res, err := s.DB.ExecContext(ctx, `UPDATE books SET name = ?, description = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL`,
-		name, description, s.stamp(), id)
+// BookPatch changes only the fields that are set.
+type BookPatch struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+}
+
+func (s *Store) UpdateBook(ctx context.Context, id int64, p BookPatch) (Book, error) {
+	b, err := s.GetBook(ctx, id)
 	if err != nil {
 		return Book{}, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if b.DeletedAt != "" {
 		return Book{}, ErrNotFound
 	}
+	if p.Name != nil {
+		b.Name = strings.TrimSpace(*p.Name)
+	}
+	if p.Description != nil {
+		b.Description = strings.TrimSpace(*p.Description)
+	}
+	if b.Name == "" {
+		return Book{}, ErrInvalid
+	}
+	if _, err := s.DB.ExecContext(ctx, `UPDATE books SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
+		b.Name, b.Description, s.stamp(), id); err != nil {
+		return Book{}, err
+	}
 	return s.GetBook(ctx, id)
+}
+
+// ReorderBooks sets the display order. ids must list every live knowledge base exactly once, so
+// a list built from a stale page is rejected instead of silently dropping new entries.
+func (s *Store) ReorderBooks(ctx context.Context, ids []int64) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var live int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM books WHERE deleted_at IS NULL`).Scan(&live); err != nil {
+		return err
+	}
+	seen := map[int64]bool{}
+	for i, id := range ids {
+		if seen[id] {
+			return ErrInvalid
+		}
+		seen[id] = true
+		res, err := tx.ExecContext(ctx, `UPDATE books SET position = ? WHERE id = ? AND deleted_at IS NULL`, i+1, id)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrInvalid
+		}
+	}
+	if len(ids) != live {
+		return ErrInvalid
+	}
+	return tx.Commit()
 }
 
 // DeleteBook moves a knowledge base to the trash; its documents stay intact and return with it.

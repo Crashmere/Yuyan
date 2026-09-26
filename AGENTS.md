@@ -2,9 +2,10 @@
 
 先读 [docs/README.md](docs/README.md)，再按任务读取设计与验证文档。
 
-- Yuyan（语燕）是用户一人使用的网页知识库，功能参照语雀网页版中适合单人使用的部分：知识库与文档树、所见即所得编辑、服务端渲染的阅读页。
+- Yuyan（语燕）是用户一人使用的网页知识库，功能参照语雀网页版中适合单人使用的部分：知识库与文档树、所见即所得编辑、阅读页。
 - Go 内嵌 Vue + Tiptap 前端 + SQLite。正文以 Tiptap 文档 JSON 保存并记录格式版本号；Markdown 只用于导入和导出。启动缺库必须报错，只有 `init` 会建库。
-- 界面改版（阶段 D）按 docs/DESIGN.md 第 12 节进行：改为单页应用，只在 Markdown 能表达的范围内优化，不扩展文档格式；开发前先读该节。
+- 前端是单页应用：Go 对所有页面地址返回 `internal/server/templates/shell.html`，由 `internal/server/app.go` 预加载首屏数据，预加载的键必须与前端请求的 API 路径完全一致；正文 HTML 仍由 Go 渲染。前端代码在 `web/src/app`（路由、布局、目录、页面）、`web/src/ui`（通用组件）、`web/src/editor`（编辑器，按需加载）。
+- 界面改版（阶段 D）按 docs/DESIGN.md 第 12 节进行，只在 Markdown 能表达的范围内优化，不扩展文档格式；开发前先读该节。
 - 编辑器扩展（`web/src/schema`）与 Go 渲染器（`internal/render`）必须一一对应；新增或修改节点时同时更新两端，并运行 `make parity` 刷新一致性快照。
 - 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。
 - 本期按用户确认使用 HTTP、无登录。所有写接口集中在 `/api/` 下同一个中间件入口，以后在那里接入登录。

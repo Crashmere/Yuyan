@@ -2,16 +2,98 @@ import type { JSONContent } from '@tiptap/core'
 
 export const base = document.querySelector<HTMLMetaElement>('meta[name="yuyan-base"]')?.content ?? '/'
 
-export interface Doc {
+export interface Book {
+  id: number
+  name: string
+  description: string
+  position: number
+  docCount: number
+  updatedAt: string
+}
+
+export interface TreeNode {
+  id: number
+  parentId: number | null
+  kind: 'doc' | 'group'
+  title: string
+  updatedAt: string
+  children?: TreeNode[]
+}
+
+export interface DocMeta {
   id: number
   bookId: number
   parentId: number | null
   kind: 'doc' | 'group'
   title: string
-  content: JSONContent
   revision: number
+  createdAt: string
   updatedAt: string
   bookName: string
+}
+
+export interface Doc extends DocMeta {
+  content: JSONContent
+}
+
+export interface Heading {
+  level: number
+  text: string
+  id: string
+}
+
+export interface DocView {
+  doc: DocMeta
+  html: string
+  toc: Heading[]
+  hasMath: boolean
+  hasMermaid: boolean
+  chars: number
+  prev: { id: number; title: string } | null
+  next: { id: number; title: string } | null
+  children: TreeNode[]
+}
+
+export interface VersionInfo {
+  id: number
+  docId: number
+  revision: number
+  title: string
+  reason: 'create' | 'autosave' | 'session' | 'restore'
+  createdAt: string
+}
+
+export interface VersionView {
+  version: VersionInfo
+  doc: DocMeta
+  html: string
+  hasMath: boolean
+  hasMermaid: boolean
+}
+
+export interface DocSummary {
+  id: number
+  bookId: number
+  bookName: string
+  title: string
+  kind: 'doc' | 'group'
+  updatedAt: string
+}
+
+export interface SearchHit {
+  id: number
+  bookId: number
+  bookName: string
+  title: string
+  snippet: string
+}
+
+export interface TrashItem {
+  kind: 'book' | 'doc'
+  id: number
+  title: string
+  bookName: string
+  deletedAt: string
 }
 
 export interface Asset {
@@ -33,7 +115,23 @@ export class ApiError extends Error {
   }
 }
 
+// Responses the server rendered into the page for the first screen, keyed by API path. Each is
+// used once, so later navigation always asks the server again.
+const preloaded: Record<string, { status: number; body: { error?: string; message?: string; revision?: number } }> = (() => {
+  try {
+    return JSON.parse(document.getElementById('yy-initial')?.textContent || '{}')
+  } catch {
+    return {}
+  }
+})()
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+  if ((init.method ?? 'GET') === 'GET' && path in preloaded) {
+    const { status, body } = preloaded[path]
+    delete preloaded[path]
+    if (status >= 400) throw new ApiError(status, body.error ?? 'error', body.message ?? '', body.revision)
+    return body as T
+  }
   const headers = new Headers(init.headers)
   let body = init.body
   if (init.json !== undefined) {
@@ -50,6 +148,11 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new ApiError(res.status, data.error ?? 'error', data.message ?? res.statusText, data.revision)
   return data as T
+}
+
+export function errorMessage(e: unknown): string {
+  if (e instanceof ApiError && e.status === 409) return '文档已在别处修改，请刷新后再试'
+  return e instanceof Error ? e.message : String(e)
 }
 
 export function pageURL(path: string): string {
