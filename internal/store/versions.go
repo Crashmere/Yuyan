@@ -52,6 +52,19 @@ SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_version
 	return v, err
 }
 
+// PreviousVersion is the version of the same document recorded just before v, without its
+// content, or ErrNotFound when v is the oldest.
+func (s *Store) PreviousVersion(ctx context.Context, v Version) (Version, error) {
+	var p Version
+	err := s.DB.QueryRowContext(ctx, `
+SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE doc_id = ? AND id < ? ORDER BY id DESC LIMIT 1`, v.DocID, v.ID).
+		Scan(&p.ID, &p.DocID, &p.Revision, &p.Title, &p.Reason, &p.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return p, ErrNotFound
+	}
+	return p, err
+}
+
 // Snapshot records the current state at the end of an editing session unless it is already
 // the newest version.
 func (s *Store) Snapshot(ctx context.Context, docID int64) error {

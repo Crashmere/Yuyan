@@ -68,8 +68,14 @@ export interface VersionInfo {
   createdAt: string
 }
 
+export interface Version extends VersionInfo {
+  content: JSONContent
+}
+
 export interface VersionView {
   version: VersionInfo
+  // The version recorded just before this one; null for the oldest.
+  previous: VersionInfo | null
   doc: DocMeta
   html: string
   hasMath: boolean

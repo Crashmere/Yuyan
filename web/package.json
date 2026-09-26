@@ -33,6 +33,7 @@
     "@tiptap/static-renderer": "3.31.3",
     "@tiptap/suggestion": "3.31.3",
     "@tiptap/vue-3": "3.31.3",
+    "diff": "9.0.0",
     "fflate": "0.8.3",
     "katex": "0.18.9",
     "lowlight": "3.3.0",

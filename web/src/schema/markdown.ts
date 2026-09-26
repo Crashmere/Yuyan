@@ -416,12 +416,15 @@ export function normalizeLanguage(lang: string): string {
 export interface ExportContext {
   imageSrc?: (src: string) => string
   linkHref?: (href: string) => string
+  // Table columns are padded to line up unless this is false; comparing versions turns it off so
+  // that one longer cell does not change every row.
+  alignTables?: boolean
 }
 
 export function docToMarkdown(doc: JSONContent, ctx: ExportContext = {}): string {
   const root: Root = { type: 'root', children: new Exporter(ctx).blocks(doc.content ?? []) as RootContent[] }
   return unified()
-    .use(remarkGfm)
+    .use(remarkGfm, { tablePipeAlign: ctx.alignTables ?? true })
     .use(remarkMath)
     .use(remarkStringify, { bullet: '-', fences: true, emphasis: '*', strong: '*', rule: '-', listItemIndent: 'one' })
     .stringify(root)

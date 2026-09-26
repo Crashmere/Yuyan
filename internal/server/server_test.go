@@ -137,6 +137,36 @@ func TestViewsCarryImageSizes(t *testing.T) {
 	}
 }
 
+func TestVersionViewNamesThePreviousVersion(t *testing.T) {
+	ctx := context.Background()
+	st, h := newServer(t)
+	b, _ := st.CreateBook(ctx, "笔记", "")
+	d, _ := st.CreateDoc(ctx, store.CreateDocInput{BookID: b.ID, Title: "初稿"})
+	if _, _, err := st.SaveDoc(ctx, d.ID, "二稿", d.Content, d.Revision); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Snapshot(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	versions, _ := st.Versions(ctx, d.ID)
+	if len(versions) != 2 {
+		t.Fatalf("versions: %+v", versions)
+	}
+	var view struct {
+		Previous *versionInfo `json:"previous"`
+	}
+	for i, want := range []*versionInfo{{ID: versions[1].ID, Title: "初稿", Reason: "create"}, nil} {
+		status, body := do(t, h, "GET", fmt.Sprintf("/yuyan/api/versions/%d/view", versions[i].ID), "")
+		view.Previous = nil
+		if err := json.Unmarshal([]byte(body), &view); status != http.StatusOK || err != nil {
+			t.Fatalf("view: %d %v %s", status, err, body)
+		}
+		if (view.Previous == nil) != (want == nil) || want != nil && (view.Previous.ID != want.ID || view.Previous.Title != want.Title || view.Previous.Reason != want.Reason) {
+			t.Errorf("version %d: previous %+v, want %+v", versions[i].ID, view.Previous, want)
+		}
+	}
+}
+
 func TestTitlesListDocumentsWithTheirPlace(t *testing.T) {
 	ctx := context.Background()
 	st, h := newServer(t)

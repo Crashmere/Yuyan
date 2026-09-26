@@ -51,12 +51,13 @@ async function restore(v: VersionInfo) {
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
   <main v-else-if="doc" class="yy-page yy-narrow">
     <h1 class="yy-page-title">历史版本</h1>
-    <p class="yy-page-sub">编辑时每 10 分钟和每次编辑结束时自动保存一个版本，可以预览并恢复任一版本。</p>
+    <p class="yy-page-sub">编辑时每 10 分钟和每次编辑结束时自动保存一个版本，可以预览、对比并恢复任一版本。</p>
     <ul class="yy-version-list">
-      <li v-for="v in versions" :key="v.id">
+      <li v-for="(v, i) in versions" :key="v.id">
         <RouterLink :to="`/versions/${v.id}`" class="yy-version-time">{{ formatTime(v.createdAt) }}</RouterLink>
         <span class="yy-tag">{{ reasons[v.reason] ?? v.reason }}</span>
         <span class="yy-version-title">{{ v.title }}</span>
+        <RouterLink v-if="i < versions.length - 1" :to="`/versions/${v.id}?compare=previous`" class="yy-btn small" title="与上一版本对比">对比</RouterLink>
         <span v-if="v.revision === doc.revision" class="yy-version-current">当前版本</span>
         <button v-else type="button" class="yy-btn small" @click="restore(v)">恢复</button>
       </li>

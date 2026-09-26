@@ -1246,7 +1246,7 @@ a.yy-crumb:hover {
   margin-bottom: 8px;
   border-bottom: 1px solid var(--yy-border);
 }
-.yy-tabs button {
+.yy-tabs :is(button, a) {
   position: relative;
   padding: 8px 0;
   border: 0;
@@ -1255,11 +1255,11 @@ a.yy-crumb:hover {
   font-size: 15px;
   cursor: pointer;
 }
-.yy-tabs button.active {
+.yy-tabs :is(button, a).active {
   color: var(--yy-text);
   font-weight: 600;
 }
-.yy-tabs button.active::after {
+.yy-tabs :is(button, a).active::after {
   content: '';
   position: absolute;
   left: 0;
@@ -1575,6 +1575,106 @@ a.yy-catalog-title:hover {
 .yy-version-current {
   color: var(--yy-text-3);
   font-size: 13px;
+}
+
+.yy-diff-summary,
+.yy-diff-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0 0 12px;
+}
+.yy-diff-summary {
+  color: var(--yy-text-2);
+}
+.yy-diff-count {
+  font-size: 13px;
+}
+.yy-diff-count.added {
+  margin-left: 8px;
+  color: var(--yy-primary);
+}
+.yy-diff-count.removed {
+  color: var(--yy-danger);
+}
+.yy-diff-label {
+  color: var(--yy-text-3);
+  font-size: 13px;
+}
+.yy-diff-same {
+  color: var(--yy-text-3);
+}
+.yy-diff-view :is(ins, del) {
+  border-radius: 2px;
+  color: inherit;
+  text-decoration: none;
+}
+.yy-diff-view ins {
+  background: var(--yy-diff-added-strong);
+}
+.yy-diff-view del {
+  background: var(--yy-diff-removed-strong);
+}
+.yy-diff {
+  overflow: hidden;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  font: 13px/1.7 var(--yy-mono);
+  tab-size: 4;
+}
+.yy-diff-line {
+  display: flex;
+}
+.yy-diff-line.added {
+  background: var(--yy-diff-added);
+}
+.yy-diff-line.removed {
+  background: var(--yy-diff-removed);
+}
+.yy-diff-sign {
+  flex: none;
+  width: 28px;
+  color: var(--yy-text-3);
+  text-align: center;
+  user-select: none;
+}
+.yy-diff-line.added .yy-diff-sign {
+  color: var(--yy-primary);
+}
+.yy-diff-line.removed .yy-diff-sign {
+  color: var(--yy-danger);
+}
+.yy-diff-text {
+  flex: 1;
+  min-width: 0;
+  min-height: 1.7em;
+  padding-right: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.yy-diff-gap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-block: 1px solid var(--yy-border);
+  background: var(--yy-bg-muted);
+  color: var(--yy-text-3);
+  font: 13px/1.6 var(--yy-font);
+  cursor: pointer;
+}
+.yy-diff-gap:first-child {
+  border-top: 0;
+}
+.yy-diff-gap:last-child {
+  border-bottom: 0;
+}
+.yy-diff-gap:hover {
+  background: var(--yy-bg-hover);
+  color: var(--yy-text);
 }
 
 .yy-search-box {

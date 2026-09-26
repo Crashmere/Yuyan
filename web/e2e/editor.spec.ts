@@ -522,6 +522,51 @@ test('images keep their space before they load', async ({ page }) => {
   expect(Math.min(...(await heights(page.locator('.ProseMirror .yy-image img'))))).toBeGreaterThan(20)
 })
 
+test('versions compare with the previous and the current version, line by line', async ({ page, request }) => {
+  const filler = Array.from({ length: 8 }, (_, i) => `第 ${i + 1} 段没有变化的内容。`).join('\n\n')
+  const first = `${filler}\n\n我们需要在周一之前完成这个任务。\n\n1. 下载\n2. 安装\n3. 运行\n\n结尾。\n`
+  const second = first.replace('周一', '周五').replace('2. 安装\n3. 运行', '2. 运行').replace('结尾。', '新增的一段。\n\n结尾。')
+  const id = await createDoc(request, '对比测试', first)
+  const save = async (title: string, md: string) => {
+    const { revision } = (await (await request.get(`api/docs/${id}`)).json()) as { revision: number }
+    const content = markdownToDoc(md, { resolveLink: () => null, resolveImage: () => null })
+    expect((await request.put(`api/docs/${id}`, { data: { title, content, baseRevision: revision } })).ok()).toBeTruthy()
+  }
+  await request.post(`api/docs/${id}/snapshot`)
+  await save('对比测试（二）', second)
+  await request.post(`api/docs/${id}/snapshot`)
+  await save('对比测试（二）', second.replace('新增的一段', '新增并修改的一段'))
+
+  await page.goto(`docs/${id}/history`)
+  await expect(page.locator('.yy-version-list li')).toHaveCount(3)
+  await expect(page.locator('.yy-version-list li').last().getByRole('link', { name: '对比', exact: true })).toHaveCount(0)
+  await page.getByRole('link', { name: '对比', exact: true }).first().click()
+  await expect(page).toHaveURL(/compare=previous/)
+  const diff = page.locator('.yy-diff')
+  const lines = (kind: string) => diff.locator(`.yy-diff-line.${kind} .yy-diff-text`).filter({ hasText: /\S/ })
+  await expect(page.locator('.yy-diff-title ins')).toHaveText('（二）')
+  await expect(page.locator('.yy-diff-summary')).toContainText('新增 3 行')
+  await expect(page.locator('.yy-diff-summary')).toContainText('删除 3 行')
+  await expect(lines('removed')).toHaveText(['我们需要在周一之前完成这个任务。', '2. 安装', '3. 运行'])
+  await expect(lines('added')).toHaveText(['我们需要在周五之前完成这个任务。', '2. 运行', '新增的一段。'])
+  await expect(diff.locator('del')).toHaveText(['一', '3'])
+  await expect(diff.locator('ins')).toHaveText(['五', '2'])
+  await expect(diff).not.toContainText('第 1 段没有变化的内容。')
+  await diff.locator('.yy-diff-gap').first().click()
+  await expect(diff).toContainText('第 1 段没有变化的内容。')
+
+  await page.getByRole('link', { name: '与当前版本对比' }).click()
+  await expect(page).toHaveURL(/compare=current/)
+  await expect(lines('removed')).toHaveText(['新增的一段。'])
+  await expect(lines('added')).toHaveText(['新增并修改的一段。'])
+  await expect(diff.locator('ins')).toHaveText(['并修改'])
+  await expect(page.locator('.yy-diff-title')).toHaveCount(0)
+
+  await page.getByRole('link', { name: '预览', exact: true }).click()
+  await expect(page.locator('.yy-content')).toContainText('新增的一段。')
+  await expect(diff).toHaveCount(0)
+})
+
 test('highlighted code stays legible in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.goto('./')

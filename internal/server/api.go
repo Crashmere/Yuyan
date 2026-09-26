@@ -244,12 +244,19 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 	if d.DeletedAt != "" {
 		return nil, store.ErrNotFound
 	}
+	var previous *versionInfo
+	if p, err := s.store.PreviousVersion(r.Context(), v); err == nil {
+		info := infoOf(p)
+		previous = &info
+	} else if !errors.Is(err, store.ErrNotFound) {
+		return nil, err
+	}
 	res := render.Render(v.Content, render.Options{BasePath: s.base})
 	images, err := s.imageSizes(r, v.Content)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"version": infoOf(v), "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid, "images": images}, nil
+	return map[string]any{"version": infoOf(v), "previous": previous, "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid, "images": images}, nil
 }
 
 func (s *Server) trash(r *http.Request) (any, error) {
