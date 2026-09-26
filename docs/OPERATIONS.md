@@ -48,9 +48,7 @@ npm --prefix web run seed -- --server http://127.0.0.1:18084/yuyan/   # 可选�
 
 本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。测试只写 .local；仓库只放合成样例。
 
-`make e2e` 在临时目录启动新实例、写入合成示例数据，再用 Playwright + Chromium 跑浏览器端到端测试（`web/e2e`：冒烟测试和编辑器交互测试，含中文输入法模拟和长文档检查）；首次运行前执行一次 `npx --prefix web playwright install chromium`。CI 中这些测试不通过就不发布。
-
-`make e2e` 构建程序后，在临时目录启动实例、写入合成数据，运行 `web/e2e` 中的浏览器测试（首页、目录、回收站，以及编辑器交互、中文输入法、长文档和编辑后的导出）；首次运行前执行 `npx --prefix web playwright install chromium`。CI 中这一步不通过就不发布。
+`make e2e` 构建程序后，在临时目录启动新实例、写入合成示例数据，再用 Playwright + Chromium 运行 `web/e2e` 中的浏览器测试：首页、目录、回收站，编辑器交互、中文输入法模拟、长文档和编辑后的导出，以及搜索面板、图片占位和版本对比。首次运行前执行一次 `npx --prefix web playwright install chromium`。CI 中这一步不通过就不发布。
 
 ## 正式导入
 
