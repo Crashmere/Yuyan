@@ -1,4 +1,4 @@
-.PHONY: test web build linux dev parity
+.PHONY: test web build linux dev parity e2e
 
 test:
 	npm --prefix web test
@@ -21,3 +21,7 @@ dev: build
 
 parity:
 	npm --prefix web run parity
+
+# Browser smoke tests; needs `npx --prefix web playwright install chromium` once.
+e2e: build
+	npm --prefix web run e2e
