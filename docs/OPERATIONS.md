@@ -58,7 +58,7 @@ npm --prefix web run import -- --source <笔记仓库副本> --server http://<�
 npm --prefix web run roundtrip -- --server http://<服务器>/yuyan/
 ```
 
-`.local/import-overrides.json` 记录需要人工选择的项（同名不同图），不入库。
+overrides 文件记录需要人工选择的项（同名不同图），不入库。2026-09-26 的正式导入只有一项：`{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`；本地文件已删除，重新导入空实例时按此重建。
 
 ## 备份与恢复
 
