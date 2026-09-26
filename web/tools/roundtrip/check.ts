@@ -1,7 +1,9 @@
-// Checks that every stored document passes through the editor schema without losing or changing content:
+// Checks that every stored document passes through the editor schema without losing or changing
+// content, and that editing a table would not reshape it (see src/editor/tables.ts):
 //   npm --prefix web run roundtrip -- --server http://127.0.0.1:18084/yuyan/
 import { getSchema, type JSONContent } from '@tiptap/core'
 import { Node } from '@tiptap/pm/model'
+import { tablesToReshape } from '../../src/editor/tables'
 import { schemaExtensions } from '../../src/schema/extensions'
 
 interface TreeNode {
@@ -102,6 +104,15 @@ function firstDifference(a: unknown, b: unknown, path = ''): string | null {
   return `${path || '(root)'}: ${JSON.stringify(a)?.slice(0, 120)} → ${JSON.stringify(b)?.slice(0, 120)}`
 }
 
+function countTables(node: Node): number {
+  let n = 0
+  node.descendants((child) => {
+    if (child.type.name === 'table') n++
+    return child.type.name !== 'table'
+  })
+  return n
+}
+
 function docIds(nodes: TreeNode[], out: { id: number; title: string }[] = []) {
   for (const n of nodes) {
     if (n.kind === 'doc') out.push({ id: n.id, title: n.title })
@@ -115,6 +126,7 @@ async function main() {
   const books = await get<{ id: number; name: string }[]>(base, 'books')
   let checked = 0
   let trailing = 0
+  let tables = 0
   const failures: string[] = []
   for (const book of books) {
     for (const d of docIds(await get<TreeNode[]>(base, `books/${book.id}/tree`))) {
@@ -125,13 +137,16 @@ async function main() {
         node.check()
         const diff = firstDifference(normalize(content), normalize(node.toJSON() as JSONContent))
         if (diff) failures.push(`${book.name} / ${d.title}（#${d.id}）：${diff}`)
+        const reshaped = tablesToReshape(node)
+        if (reshaped) failures.push(`${book.name} / ${d.title}（#${d.id}）：${reshaped} 个表格在编辑时会被调整表头或列对齐`)
+        tables += countTables(node)
         if (node.lastChild?.type.name !== 'paragraph') trailing++
       } catch (e) {
         failures.push(`${book.name} / ${d.title}（#${d.id}）：${(e as Error).message}`)
       }
     }
   }
-  console.log(`检查 ${checked} 篇文档：${checked - failures.length} 篇通过，${failures.length} 篇有差异`)
+  console.log(`检查 ${checked} 篇文档（含 ${tables} 个表格）：${checked - failures.length} 篇通过，${failures.length} 篇有差异`)
   console.log(`${trailing} 篇不以段落结尾，编辑器首次保存时会在末尾补一个空段落`)
   for (const f of failures) console.log(`- ${f}`)
   if (failures.length) process.exitCode = 1

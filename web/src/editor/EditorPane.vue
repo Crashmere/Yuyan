@@ -1,12 +1,25 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
-import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { DragHandle } from '@tiptap/extension-drag-handle-vue-3'
-import type { Editor as CoreEditor, JSONContent } from '@tiptap/core'
+import { getMarkRange, type JSONContent } from '@tiptap/core'
 import { api, ApiError, base, type Doc } from '../shared/api'
-import { prompt } from '../ui/dialog'
-import { editorExtensions, insertImages, setCurrentEditor } from './extensions'
+import { prefs } from '../app/prefs'
+import BlockHandle from './BlockHandle.vue'
+import BubbleToolbar from './BubbleToolbar.vue'
+import { editorKey, type EditorUi } from './context'
+import EditorOutline from './EditorOutline.vue'
+import EditorToolbar from './EditorToolbar.vue'
+import { editorExtensions, imageTypes } from './extensions'
+import type { Anchor } from './floating'
+import FindReplace from './FindReplace.vue'
+import LinkCard from './LinkCard.vue'
+import LinkPopover from './LinkPopover.vue'
+import MathPopover from './MathPopover.vue'
+import ShortcutsDialog from './ShortcutsDialog.vue'
+import TableGrid from './TableGrid.vue'
+import TableToolbar from './TableToolbar.vue'
+import ImageToolbar from './ImageToolbar.vue'
+import { insertImages, pendingUploads } from './uploads'
 import 'katex/dist/katex.min.css'
 import '../styles/editor.css'
 
@@ -23,6 +36,7 @@ interface Draft {
 }
 
 const editor = shallowRef<Editor | null>(null)
+const tick = ref(0)
 const title = ref(props.doc.title)
 const revision = ref(props.doc.revision)
 const serverRevision = ref(0)
@@ -31,6 +45,53 @@ const failure = ref('')
 const draftOffer = ref<Draft | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const titleInput = ref<HTMLTextAreaElement | null>(null)
+
+// Panels over the editor.
+const linkEdit = ref<{ from: number; to: number; href: string; withText: boolean } | null>(null)
+const mathTarget = ref<{ pos: number; fresh: boolean } | null>(null)
+const findOpen = ref(false)
+const find = ref<InstanceType<typeof FindReplace> | null>(null)
+const shortcutsOpen = ref(false)
+const tableGrid = shallowRef<Anchor | null>(null)
+
+const ui: EditorUi = {
+  pickImage: () => fileInput.value?.click(),
+  openLink() {
+    const e = editor.value
+    if (!e || e.isActive('codeBlock')) return
+    const { from, to, empty } = e.state.selection
+    const href = String(e.getAttributes('link').href ?? '')
+    if (empty && e.isActive('link')) {
+      const range = getMarkRange(e.state.doc.resolve(from), e.schema.marks.link)
+      linkEdit.value = { from: range?.from ?? from, to: range?.to ?? to, href, withText: false }
+    } else {
+      linkEdit.value = { from, to, href: e.isActive('link') ? href : '', withText: empty }
+    }
+  },
+  openMath: (pos, fresh = false) => {
+    mathTarget.value = { pos, fresh }
+  },
+  async openFind() {
+    findOpen.value = true
+    await nextTick()
+    find.value?.focusFind()
+  },
+  openShortcuts: () => {
+    shortcutsOpen.value = true
+  },
+  openTableGrid(anchor) {
+    const e = editor.value
+    if (!e) return
+    tableGrid.value = anchor instanceof HTMLElement ? anchor : { rect: () => anchor, context: e.view.dom }
+  },
+}
+
+provide(editorKey, { editor, tick, ui })
+
+function insertTable(rows: number, cols: number) {
+  tableGrid.value = null
+  editor.value?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+}
 
 const draftKey = `yuyan:draft:${props.doc.id}`
 let saveTimer: ReturnType<typeof setTimeout> | undefined
@@ -123,8 +184,10 @@ async function save() {
   }
 }
 
-// flush saves pending changes now and reports whether everything reached the server.
+// flush saves pending changes now and reports whether everything reached the server. Images still
+// uploading are waited for first, so they are part of what gets saved.
 async function flush(): Promise<boolean> {
+  while (editor.value && pendingUploads(editor.value) > 0) await new Promise((r) => setTimeout(r, 100))
   clearTimeout(saveTimer)
   for (let attempt = 0; attempt < 3; attempt++) {
     while (inFlight) await new Promise((r) => setTimeout(r, 50))
@@ -172,31 +235,11 @@ function discardDraft() {
   draftOffer.value = null
 }
 
-function pickImage() {
-  fileInput.value?.click()
-}
-
 function onFilePicked(e: Event) {
   const input = e.target as HTMLInputElement
   const files = [...(input.files ?? [])]
   input.value = ''
-  if (editor.value && files.length) void insertImages(editor.value, files)
-}
-
-async function setLink() {
-  const e = editor.value
-  if (!e) return
-  const previous = e.getAttributes('link').href ?? ''
-  const href = await prompt({ title: previous ? '编辑链接' : '添加链接', label: '链接地址（留空则移除链接）', value: previous, placeholder: 'https://', allowEmpty: true })
-  if (href === null) return
-  if (!href) e.chain().focus().extendMarkRange('link').unsetLink().run()
-  else e.chain().focus().extendMarkRange('link').setLink({ href }).run()
-}
-
-function shouldShowBubble({ editor: e, from, to }: { editor: CoreEditor; from: number; to: number }) {
-  if (from === to || !e.isEditable) return false
-  if (e.isActive('codeBlock') || e.isActive('image') || e.isActive('inlineMath') || e.isActive('blockMath')) return false
-  return true
+  if (editor.value && files.length) insertImages(editor.value, files)
 }
 
 function autosizeTitle() {
@@ -207,7 +250,8 @@ function autosizeTitle() {
 }
 
 function beforeUnload(e: BeforeUnloadEvent) {
-  if (['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
+  const uploading = !!editor.value && pendingUploads(editor.value) > 0
+  if (uploading || ['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
     writeDraft()
     e.preventDefault()
   }
@@ -219,6 +263,18 @@ function snapshot() {
   if (savedThisSession) navigator.sendBeacon(`${base}api/docs/${props.doc.id}/snapshot`)
 }
 
+// Find and the shortcut list also open from the title field, where the editor's keymap is not active.
+function pageKeys(e: KeyboardEvent) {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return
+  if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault()
+    void ui.openFind()
+  } else if (e.key === '/') {
+    e.preventDefault()
+    ui.openShortcuts()
+  }
+}
+
 watch(title, () => {
   changed()
   void nextTick(autosizeTitle)
@@ -227,15 +283,17 @@ watch(title, () => {
 onMounted(async () => {
   const d = props.doc
   const e = new Editor({
-    extensions: editorExtensions(pickImage),
+    extensions: editorExtensions(ui),
     content: d.content,
     onUpdate: ({ editor: ed }) => {
       emit('words', ed.storage.characterCount.characters())
       changed()
     },
+    onTransaction: () => {
+      tick.value++
+    },
   })
   editor.value = e
-  setCurrentEditor(e)
   emit('words', e.storage.characterCount.characters())
   const draft = readDraft()
   if (draft && (draft.title !== d.title || JSON.stringify(draft.content) !== JSON.stringify(d.content))) draftOffer.value = draft
@@ -249,58 +307,63 @@ onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
   window.addEventListener('pagehide', snapshot)
   window.addEventListener('online', save)
+  window.addEventListener('keydown', pageKeys)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforeUnload)
   window.removeEventListener('pagehide', snapshot)
   window.removeEventListener('online', save)
+  window.removeEventListener('keydown', pageKeys)
   clearTimeout(saveTimer)
   clearTimeout(retryTimer)
   snapshot()
-  setCurrentEditor(null)
   editor.value?.destroy()
 })
 </script>
 
 <template>
   <div class="yy-editor-pane">
-    <div v-if="draftOffer" class="yy-banner">
+    <EditorToolbar />
+    <div v-if="draftOffer" class="yy-banner yy-editor-banner">
       发现 {{ new Date(draftOffer.savedAt).toLocaleString() }} 未保存到服务器的内容。
       <button type="button" class="yy-btn small" @click="restoreDraft">恢复</button>
       <button type="button" class="yy-btn small" @click="discardDraft">丢弃</button>
     </div>
-    <div v-if="status === 'conflict'" class="yy-banner danger">
+    <div v-if="status === 'conflict'" class="yy-banner danger yy-editor-banner">
       这篇文档已在别的标签页或设备上修改，自动保存已暂停，你的内容仍在当前页面。
       <button type="button" class="yy-btn small" @click="reloadLatest">载入最新版本（放弃这里的修改）</button>
       <button type="button" class="yy-btn small" @click="overwrite">用这里的内容覆盖</button>
     </div>
 
-    <div class="yy-editor-main">
-      <textarea
-        ref="titleInput"
-        v-model="title"
-        class="yy-title-input"
-        rows="1"
-        placeholder="请输入标题"
-        @keydown.enter.prevent="editor?.commands.focus('start')"
-      ></textarea>
-      <editor-content v-if="editor" :editor="editor" class="yy-content" />
+    <div class="yy-editor-body" :class="{ 'has-outline': prefs.editorOutline }">
+      <div class="yy-editor-main">
+        <textarea
+          ref="titleInput"
+          v-model="title"
+          class="yy-title-input"
+          rows="1"
+          placeholder="请输入标题"
+          @keydown.enter.prevent="!$event.isComposing && editor?.commands.focus('start')"
+        ></textarea>
+        <editor-content v-if="editor" :editor="editor" class="yy-content" />
+      </div>
+      <aside v-if="prefs.editorOutline && editor" class="yy-doc-aside yy-editor-outline">
+        <EditorOutline />
+      </aside>
     </div>
 
-    <bubble-menu v-if="editor" :editor="editor" :should-show="shouldShowBubble" class="yy-bubble">
-      <button type="button" :class="{ active: editor.isActive('bold') }" title="粗体" @click="editor.chain().focus().toggleBold().run()"><b>B</b></button>
-      <button type="button" :class="{ active: editor.isActive('italic') }" title="斜体" @click="editor.chain().focus().toggleItalic().run()"><i>I</i></button>
-      <button type="button" :class="{ active: editor.isActive('strike') }" title="删除线" @click="editor.chain().focus().toggleStrike().run()"><s>S</s></button>
-      <button type="button" :class="{ active: editor.isActive('code') }" title="行内代码" @click="editor.chain().focus().toggleCode().run()">&lt;/&gt;</button>
-      <button type="button" :class="{ active: editor.isActive('highlight') }" title="高亮" @click="editor.chain().focus().toggleHighlight().run()">高亮</button>
-      <button type="button" :class="{ active: editor.isActive('link') }" title="链接" @click="setLink">链接</button>
-    </bubble-menu>
+    <FindReplace v-if="findOpen" ref="find" @close="findOpen = false" />
+    <BubbleToolbar :hidden="!!linkEdit || !!mathTarget" />
+    <LinkCard :hidden="!!linkEdit || !!mathTarget" />
+    <LinkPopover v-if="linkEdit" v-bind="linkEdit" @close="linkEdit = null" />
+    <MathPopover v-if="mathTarget" :key="mathTarget.pos" :pos="mathTarget.pos" :fresh="mathTarget.fresh" @close="mathTarget = null" />
+    <TableGrid v-if="tableGrid" :anchor="tableGrid" @pick="insertTable" @close="tableGrid = null" />
+    <TableToolbar />
+    <ImageToolbar />
+    <BlockHandle />
+    <ShortcutsDialog v-model:open="shortcutsOpen" />
 
-    <drag-handle v-if="editor" :editor="editor">
-      <div class="yy-drag" title="拖动调整位置">⠿</div>
-    </drag-handle>
-
-    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden @change="onFilePicked" />
+    <input ref="fileInput" type="file" :accept="imageTypes.join(',')" multiple hidden @change="onFilePicked" />
   </div>
 </template>

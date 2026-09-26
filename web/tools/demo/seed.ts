@@ -72,6 +72,23 @@ ${'为了让页面可以滚动，这里重复一些句子。'.repeat(8)}
   )
   .join('\n')
 
+// Long enough to start folded on reading pages, with one line long enough to wrap.
+const longCode = [
+  'def dijkstra(graph, source):',
+  '    """Shortest distances from source in a graph with non-negative edge weights; the adjacency map is {node: [(neighbour, weight), ...]}."""',
+  '    import heapq',
+  '    dist = {source: 0}',
+  '    heap = [(0, source)]',
+  ...Array.from({ length: 50 }, (_, i) => `    # step ${i + 1}: relax the edges of the nearest unvisited node`),
+  '    while heap:',
+  '        d, u = heapq.heappop(heap)',
+  '        for v, w in graph.get(u, []):',
+  '            if d + w < dist.get(v, float("inf")):',
+  '                dist[v] = d + w',
+  '                heapq.heappush(heap, (dist[v], v))',
+  '    return dist',
+].join('\n')
+
 const books: SeedBook[] = [
   {
     name: '产品手册（示例）',
@@ -260,6 +277,7 @@ int search(int[] a, int x) {
         children: [
           { title: '最短路', md: '> [!code]- Dijkstra\n> ```cpp\n> int dijkstra();\n> ```\n\n边权非负时使用 Dijkstra，存在负权边时使用 Bellman-Ford 或 SPFA。' },
           { title: '最小生成树', md: 'Prim 适合稠密图，Kruskal 适合稀疏图。' },
+          { title: '长代码', md: `完整的 Dijkstra 实现：\n\n\`\`\`python\n${longCode}\n\`\`\`` },
         ],
       },
       { title: '复杂度速查', md: '| 算法 | 时间 | 空间 |\n| --- | --- | --- |\n| 快速排序 | $O(n\\log n)$ | $O(\\log n)$ |\n| 二分 | $O(\\log n)$ | $O(1)$ |' },

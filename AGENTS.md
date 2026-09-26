@@ -7,6 +7,7 @@
 - 前端是单页应用：Go 对所有页面地址返回 `internal/server/templates/shell.html`，由 `internal/server/app.go` 预加载首屏数据，预加载的键必须与前端请求的 API 路径完全一致；正文 HTML 仍由 Go 渲染。前端代码在 `web/src/app`（路由、布局、目录、页面）、`web/src/ui`（通用组件）、`web/src/editor`（编辑器，按需加载）。
 - 界面改版（阶段 D）按 docs/DESIGN.md 第 12 节进行，只在 Markdown 能表达的范围内优化，不扩展文档格式；开发前先读该节。
 - 编辑器扩展（`web/src/schema`）与 Go 渲染器（`internal/render`）必须一一对应；新增或修改节点时同时更新两端，并运行 `make parity` 刷新一致性快照。
+- 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格结构变化后恢复 Markdown 表格的形状，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。编辑器交互以 `web/e2e/editor.spec.ts` 的结果为准：IDE 浏览器工具会给页面元素加标记属性，ProseMirror 会因此重新读取选区（节点选区变成文本选区、正文里的菜单被关闭），这类现象不是产品问题；页面里可以用 `document.querySelector('.ProseMirror').editor` 取得编辑器实例。
 - 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。
 - 本期按用户确认使用 HTTP、无登录。所有写接口集中在 `/api/` 下同一个中间件入口，以后在那里接入登录。
 - 修改后运行 `make test`；前端改动还要 `npm --prefix web run build`。测试使用 `.local` 隔离数据，仓库只放合成样例，不提交真实笔记。本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。

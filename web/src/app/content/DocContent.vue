@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { base } from '../../shared/api'
 import { prefs } from '../prefs'
 import { enhance } from './enhance'
+import Lightbox, { type LightboxImage } from './Lightbox.vue'
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app.
 const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean }>()
@@ -28,11 +29,21 @@ watch(
   },
 )
 
+const images = ref<LightboxImage[]>([])
+const shown = ref<number | null>(null)
+
 function onClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   const title = target.closest('.callout[data-callout-fold] > .callout-title')
   if (title) {
     title.parentElement?.classList.toggle('is-collapsed')
+    return
+  }
+  // Linked images keep following their link.
+  if (target instanceof HTMLImageElement && !target.closest('a') && root.value) {
+    const all = [...root.value.querySelectorAll<HTMLImageElement>('img')].filter((img) => !img.closest('a'))
+    images.value = all.map((img) => ({ src: img.currentSrc || img.src, alt: img.alt }))
+    shown.value = all.indexOf(target)
     return
   }
   const a = target.closest<HTMLAnchorElement>('a[href]')
@@ -50,4 +61,5 @@ function onClick(e: MouseEvent) {
 
 <template>
   <div :key="generation" ref="root" class="yy-content" @click="onClick" v-html="html"></div>
+  <Lightbox v-model:index="shown" :images="images" />
 </template>

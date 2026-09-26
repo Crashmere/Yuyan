@@ -25,7 +25,11 @@ function resize(e: PointerEvent) {
 </script>
 
 <template>
-  <div class="yy-app" :class="{ 'sidebar-collapsed': prefs.sidebarCollapsed, 'drawer-open': drawer }" :style="{ '--yy-sidebar-width': `${prefs.sidebarWidth}px` }">
+  <div
+    class="yy-app"
+    :class="{ 'sidebar-collapsed': prefs.sidebarCollapsed, 'drawer-open': drawer, 'focus-mode': prefs.focusMode && route.name === 'edit' }"
+    :style="{ '--yy-sidebar-width': `${prefs.sidebarWidth}px` }"
+  >
     <aside class="yy-sidebar" aria-label="导航">
       <Sidebar />
       <div class="yy-sidebar-resizer" role="separator" aria-orientation="vertical" @pointerdown.prevent="resize" @dblclick="prefs.sidebarWidth = 264"></div>

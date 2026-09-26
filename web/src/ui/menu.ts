@@ -5,8 +5,11 @@ export interface MenuAction {
   icon?: Component
   danger?: boolean
   disabled?: boolean
+  checked?: boolean
   hint?: string
-  run: () => void | Promise<void>
+  // Entries under this one open as a submenu; run is ignored then.
+  children?: MenuEntry[]
+  run?: () => void | Promise<void>
 }
 
 // A null entry draws a separator.
