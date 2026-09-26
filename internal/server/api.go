@@ -6,8 +6,10 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"unicode"
 
 	"github.com/Crashmere/Yuyan/internal/doc"
+	"github.com/Crashmere/Yuyan/internal/render"
 	"github.com/Crashmere/Yuyan/internal/store"
 )
 
@@ -19,21 +21,188 @@ func pathID(r *http.Request) (int64, error) {
 	return id, nil
 }
 
+// ---------------------------------------------------------------------------------------------
+// Reads shared by the JSON API and page preloading. Each takes the request for its path values.
+
+func (s *Server) books(r *http.Request) (any, error) {
+	books, err := s.store.ListBooks(r.Context())
+	return nonNil(books), err
+}
+
+func (s *Server) liveBook(r *http.Request) (store.Book, error) {
+	id, err := pathID(r)
+	if err != nil {
+		return store.Book{}, err
+	}
+	b, err := s.store.GetBook(r.Context(), id)
+	if err == nil && b.DeletedAt != "" {
+		err = store.ErrNotFound
+	}
+	return b, err
+}
+
+func (s *Server) book(r *http.Request) (any, error) {
+	return s.liveBook(r)
+}
+
+func (s *Server) tree(r *http.Request) (any, error) {
+	b, err := s.liveBook(r)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := s.store.Tree(r.Context(), b.ID)
+	return nonNil(tree), err
+}
+
+func (s *Server) recent(r *http.Request) (any, error) {
+	recent, err := s.store.Recent(r.Context(), 20)
+	return nonNil(recent), err
+}
+
+func (s *Server) liveDoc(r *http.Request) (store.Doc, error) {
+	id, err := pathID(r)
+	if err != nil {
+		return store.Doc{}, err
+	}
+	d, err := s.store.GetDoc(r.Context(), id)
+	if err == nil && d.DeletedAt != "" {
+		err = store.ErrNotFound
+	}
+	return d, err
+}
+
+func (s *Server) fullDoc(r *http.Request) (any, error) {
+	return s.liveDoc(r)
+}
+
+type docLink struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+}
+
+type docView struct {
+	Doc        store.DocMeta     `json:"doc"`
+	HTML       string            `json:"html"`
+	TOC        []render.Heading  `json:"toc"`
+	HasMath    bool              `json:"hasMath"`
+	HasMermaid bool              `json:"hasMermaid"`
+	Chars      int               `json:"chars"`
+	Prev       *docLink          `json:"prev"`
+	Next       *docLink          `json:"next"`
+	Children   []*store.TreeNode `json:"children"`
+}
+
+// docView is what the reading view shows: rendered content, its outline, the neighbours in
+// reading order, and for groups the documents under them.
+func (s *Server) docView(r *http.Request) (any, error) {
+	d, err := s.liveDoc(r)
+	if err != nil {
+		return nil, err
+	}
+	tree, err := s.store.Tree(r.Context(), d.BookID)
+	if err != nil {
+		return nil, err
+	}
+	v := docView{Doc: d.Meta(), TOC: []render.Heading{}, Children: []*store.TreeNode{}}
+	flat := store.Flatten(tree)
+	for i, n := range flat {
+		if n.ID != d.ID {
+			continue
+		}
+		v.Children = nonNil(n.Children)
+		for j := i - 1; j >= 0 && v.Prev == nil; j-- {
+			if flat[j].Kind == "doc" {
+				v.Prev = &docLink{ID: flat[j].ID, Title: flat[j].Title}
+			}
+		}
+		for j := i + 1; j < len(flat) && v.Next == nil; j++ {
+			if flat[j].Kind == "doc" {
+				v.Next = &docLink{ID: flat[j].ID, Title: flat[j].Title}
+			}
+		}
+	}
+	if d.Kind == "doc" {
+		res := s.rendered(d)
+		v.HTML, v.TOC, v.HasMath, v.HasMermaid = res.HTML, nonNil(res.TOC), res.HasMath, res.HasMermaid
+		v.Chars = countChars(doc.PlainText(d.Content))
+	}
+	return v, nil
+}
+
+// countChars counts characters other than whitespace, the way Chinese word counts are given.
+func countChars(text string) int {
+	n := 0
+	for _, c := range text {
+		if !unicode.IsSpace(c) {
+			n++
+		}
+	}
+	return n
+}
+
+type versionInfo struct {
+	ID        int64  `json:"id"`
+	DocID     int64  `json:"docId"`
+	Revision  int64  `json:"revision"`
+	Title     string `json:"title"`
+	Reason    string `json:"reason"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func infoOf(v store.Version) versionInfo {
+	return versionInfo{ID: v.ID, DocID: v.DocID, Revision: v.Revision, Title: v.Title, Reason: v.Reason, CreatedAt: v.CreatedAt}
+}
+
+func (s *Server) versions(r *http.Request) (any, error) {
+	d, err := s.liveDoc(r)
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.store.Versions(r.Context(), d.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]versionInfo, len(list))
+	for i, v := range list {
+		out[i] = infoOf(v)
+	}
+	return map[string]any{"doc": d.Meta(), "versions": out}, nil
+}
+
+func (s *Server) versionView(r *http.Request) (any, error) {
+	id, err := pathID(r)
+	if err != nil {
+		return nil, err
+	}
+	v, err := s.store.GetVersion(r.Context(), id)
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.store.GetDoc(r.Context(), v.DocID)
+	if err != nil {
+		return nil, err
+	}
+	if d.DeletedAt != "" {
+		return nil, store.ErrNotFound
+	}
+	res := render.Render(v.Content, render.Options{BasePath: s.base})
+	return map[string]any{"version": infoOf(v), "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid}, nil
+}
+
+func (s *Server) trash(r *http.Request) (any, error) {
+	items, err := s.store.Trash(r.Context())
+	return nonNil(items), err
+}
+
+// ---------------------------------------------------------------------------------------------
+// Writes
+
 func (s *Server) apiMeta(w http.ResponseWriter, r *http.Request) error {
 	stats, err := s.store.Stats(r.Context())
 	if err != nil {
 		return err
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"schemaVersion": doc.SchemaVersion, "stats": stats})
-	return nil
-}
-
-func (s *Server) apiListBooks(w http.ResponseWriter, r *http.Request) error {
-	books, err := s.store.ListBooks(r.Context())
-	if err != nil {
-		return err
-	}
-	writeJSON(w, http.StatusOK, nonNil(books))
 	return nil
 }
 
@@ -60,15 +229,31 @@ func (s *Server) apiUpdateBook(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	var in bookInput
+	var in store.BookPatch
 	if err := readJSON(w, r, &in); err != nil {
 		return err
 	}
-	b, err := s.store.UpdateBook(r.Context(), id, in.Name, in.Description)
+	b, err := s.store.UpdateBook(r.Context(), id, in)
 	if err != nil {
 		return err
 	}
 	writeJSON(w, http.StatusOK, b)
+	return nil
+}
+
+func (s *Server) apiReorderBooks(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		IDs []int64 `json:"ids"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		return err
+	}
+	if err := s.store.ReorderBooks(r.Context(), in.IDs); errors.Is(err, store.ErrInvalid) {
+		return badRequest("知识库列表已变化，请刷新后再排序")
+	} else if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
 
@@ -93,22 +278,6 @@ func (s *Server) apiRestoreBook(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
-	return nil
-}
-
-func (s *Server) apiTree(w http.ResponseWriter, r *http.Request) error {
-	id, err := pathID(r)
-	if err != nil {
-		return err
-	}
-	if _, err := s.store.GetBook(r.Context(), id); err != nil {
-		return err
-	}
-	tree, err := s.store.Tree(r.Context(), id)
-	if err != nil {
-		return err
-	}
-	writeJSON(w, http.StatusOK, nonNil(tree))
 	return nil
 }
 
@@ -142,22 +311,6 @@ func (s *Server) apiCreateDoc(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *Server) apiGetDoc(w http.ResponseWriter, r *http.Request) error {
-	id, err := pathID(r)
-	if err != nil {
-		return err
-	}
-	d, err := s.store.GetDoc(r.Context(), id)
-	if err != nil {
-		return err
-	}
-	if d.DeletedAt != "" {
-		return store.ErrNotFound
-	}
-	writeJSON(w, http.StatusOK, d)
-	return nil
-}
-
 type saveDocInput struct {
 	Title        string          `json:"title"`
 	Content      json.RawMessage `json:"content"`
@@ -186,6 +339,51 @@ func (s *Server) apiSaveDoc(w http.ResponseWriter, r *http.Request) error {
 	}
 	s.forget(id)
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "updatedAt": updated})
+	return nil
+}
+
+func (s *Server) apiRenameDoc(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Title string `json:"title"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		return err
+	}
+	revision, err := s.store.RenameDoc(r.Context(), id, in.Title)
+	if errors.Is(err, store.ErrInvalid) {
+		return badRequest("标题不能为空")
+	}
+	if err != nil {
+		return err
+	}
+	s.forget(id)
+	writeJSON(w, http.StatusOK, map[string]any{"revision": revision})
+	return nil
+}
+
+func (s *Server) apiMoveDoc(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		BookID   int64  `json:"bookId"`
+		ParentID *int64 `json:"parentId"`
+		Index    int    `json:"index"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		return err
+	}
+	if err := s.store.MoveDoc(r.Context(), id, in.BookID, in.ParentID, in.Index); errors.Is(err, store.ErrInvalid) {
+		return badRequest("不能移动到这里：目标不存在，或者在它自己的子文档下")
+	} else if err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
 
@@ -222,19 +420,6 @@ func (s *Server) apiSnapshot(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	w.WriteHeader(http.StatusNoContent)
-	return nil
-}
-
-func (s *Server) apiVersions(w http.ResponseWriter, r *http.Request) error {
-	id, err := pathID(r)
-	if err != nil {
-		return err
-	}
-	versions, err := s.store.Versions(r.Context(), id)
-	if err != nil {
-		return err
-	}
-	writeJSON(w, http.StatusOK, nonNil(versions))
 	return nil
 }
 
@@ -307,6 +492,38 @@ func (s *Server) apiSearch(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	writeJSON(w, http.StatusOK, nonNil(hits))
+	return nil
+}
+
+func (s *Server) apiEmptyTrash(w http.ResponseWriter, r *http.Request) error {
+	if err := s.store.EmptyTrash(r.Context()); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (s *Server) apiPurgeDoc(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r)
+	if err != nil {
+		return err
+	}
+	if err := s.store.PurgeDoc(r.Context(), id); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return nil
+}
+
+func (s *Server) apiPurgeBook(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r)
+	if err != nil {
+		return err
+	}
+	if err := s.store.PurgeBook(r.Context(), id); err != nil {
+		return err
+	}
+	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
 

@@ -1,10 +1,7 @@
-import { ref } from 'vue'
+import { toast } from '../ui/toast'
 
-export const toast = ref('')
-let timer: ReturnType<typeof setTimeout> | undefined
-
+// Editor messages share one toast, so an upload's progress is replaced by its result.
 export function notify(message: string, ms = 4000) {
-  toast.value = message
-  clearTimeout(timer)
-  if (ms > 0) timer = setTimeout(() => (toast.value = ''), ms)
+  const type = ms === 0 ? 'loading' : /失败/.test(message) ? 'error' : 'info'
+  toast(message, type, { key: 'editor', ms })
 }

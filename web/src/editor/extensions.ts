@@ -9,6 +9,7 @@ import { common, createLowlight } from 'lowlight'
 import { Callout } from '../schema/callout'
 import { schemaExtensions, YuyanImage } from '../schema/extensions'
 import { assetURL, unassetURL, uploadImage } from '../shared/api'
+import { prompt } from '../ui/dialog'
 import { CalloutKeys } from './calloutKeys'
 import { MarkdownShortcuts } from './inputRules'
 import { MarkdownPaste } from './markdownPaste'
@@ -22,14 +23,14 @@ const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image
 
 let current: Editor | null = null
 
-// editMath edits the formula node at pos with a simple prompt; an empty answer removes it.
-export function editMath(editor: Editor, pos: number) {
+// editMath edits the formula node at pos in a dialog; an empty answer removes it.
+export async function editMath(editor: Editor, pos: number) {
   const node = editor.state.doc.nodeAt(pos)
   if (!node || (node.type.name !== 'inlineMath' && node.type.name !== 'blockMath')) return
-  const latex = window.prompt('编辑公式（LaTeX）', node.attrs.latex ?? '')
-  if (latex === null) return
+  const latex = await prompt({ title: '编辑公式', label: 'LaTeX（留空则删除公式）', value: node.attrs.latex ?? '', multiline: node.type.name === 'blockMath', allowEmpty: true })
+  if (latex === null || editor.isDestroyed) return
   const chain = editor.chain().focus()
-  if (!latex.trim()) {
+  if (!latex) {
     chain.deleteRange({ from: pos, to: pos + node.nodeSize }).run()
   } else if (node.type.name === 'inlineMath') {
     chain.updateInlineMath({ latex, pos }).run()
@@ -63,9 +64,9 @@ function insertCallout(type: string) {
 }
 
 function insertMath(kind: 'inlineMath' | 'blockMath') {
-  return (editor: Editor) => {
-    const latex = window.prompt('输入公式（LaTeX）')
-    if (!latex?.trim()) return
+  return async (editor: Editor) => {
+    const latex = await prompt({ title: kind === 'inlineMath' ? '插入行内公式' : '插入公式块', label: 'LaTeX', placeholder: 'E = mc^2', multiline: kind === 'blockMath' })
+    if (!latex || editor.isDestroyed) return
     if (kind === 'inlineMath') editor.chain().focus().insertInlineMath({ latex }).run()
     else editor.chain().focus().insertBlockMath({ latex }).run()
   }
@@ -120,7 +121,8 @@ export function editorExtensions(pickImage: () => void): Extensions {
     Dropcursor.configure({ width: 2, color: '#2f7de1' }),
     Gapcursor,
     TrailingNode,
-    CharacterCount,
+    // Count characters other than whitespace, as the reading view does.
+    CharacterCount.configure({ textCounter: (text) => Array.from(text.replace(/\s/g, '')).length }),
     Placeholder.configure({
       placeholder: ({ node }) => (node.type.name === 'heading' ? '标题' : '输入 / 插入内容，也可以直接用 Markdown 语法'),
     }),

@@ -1,23 +1,24 @@
 type Mermaid = typeof import('mermaid').default
 
 let loading: Promise<Mermaid> | null = null
+let theme = ''
 let seq = 0
 
-// Mermaid is large, so it is only loaded on pages that contain a diagram.
-export function loadMermaid(): Promise<Mermaid> {
-  loading ??= import('mermaid').then(({ default: mermaid }) => {
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
-    })
-    return mermaid
-  })
-  return loading
+// The page theme set in the app, or the system theme when the app follows it.
+function pageTheme(): 'dark' | 'default' {
+  const set = document.documentElement.dataset.theme
+  const dark = set ? set === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches
+  return dark ? 'dark' : 'default'
 }
 
+// Mermaid is large, so it is only loaded on pages that contain a diagram.
 export async function renderMermaid(source: string): Promise<string> {
-  const mermaid = await loadMermaid()
+  loading ??= import('mermaid').then(({ default: mermaid }) => mermaid)
+  const mermaid = await loading
+  if (theme !== pageTheme()) {
+    theme = pageTheme()
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: theme as 'dark' | 'default' })
+  }
   const id = `yy-mermaid-${++seq}`
   try {
     const { svg } = await mermaid.render(id, source)

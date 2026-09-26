@@ -1,7 +1,8 @@
-/* Document content, shared by reading pages (.yy-content) and the editor (.yy-content .ProseMirror).
+/* Document content, shared by reading views (.yy-content) and the editor (.yy-content .ProseMirror).
    The markup mirrors Obsidian's for callouts so existing callout CSS can be adapted. */
 
 .yy-content {
+  color: var(--yy-text);
   font-size: 15px;
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -11,29 +12,31 @@
   margin-top: 0;
 }
 .yy-content :where(p, ul, ol, blockquote, pre, table, .callout, hr) {
-  margin: 0.7em 0;
+  margin: 0.75em 0;
 }
 .yy-content :where(h1, h2, h3, h4, h5, h6) {
-  margin: 1.4em 0 0.6em;
-  line-height: 1.4;
-  scroll-margin-top: calc(var(--header) + 12px);
+  margin: 1.5em 0 0.6em;
+  font-weight: 600;
+  line-height: 1.45;
+  scroll-margin-top: calc(var(--yy-topbar) + 16px);
 }
 .yy-content h1 {
   font-size: 1.75em;
 }
 .yy-content h2 {
   font-size: 1.45em;
-  padding-bottom: 0.2em;
-  border-bottom: 1px solid var(--border);
 }
 .yy-content h3 {
-  font-size: 1.2em;
+  font-size: 1.22em;
 }
 .yy-content h4 {
-  font-size: 1.05em;
+  font-size: 1.07em;
+}
+.yy-content :where(h5, h6) {
+  font-size: 1em;
 }
 .yy-content a {
-  color: var(--accent);
+  color: var(--yy-primary);
 }
 .yy-content a:hover {
   text-decoration: underline;
@@ -44,41 +47,41 @@
 .yy-content li > p {
   margin: 0.2em 0;
 }
+.yy-content li::marker {
+  color: var(--yy-text-3);
+}
 .yy-content blockquote {
-  padding: 0.2em 1em;
-  border-left: 4px solid var(--border);
-  color: var(--muted);
+  padding: 0.1em 1em;
+  border-left: 3px solid var(--yy-border-strong);
+  color: var(--yy-text-2);
 }
 .yy-content hr {
+  margin: 1.8em 0;
   border: 0;
-  border-top: 1px solid var(--border);
-  margin: 1.6em 0;
+  border-top: 1px solid var(--yy-border);
 }
 .yy-content mark {
   padding: 0 2px;
   border-radius: 3px;
-  background: #fff3a3;
+  background: var(--yy-mark);
   color: inherit;
-}
-@media (prefers-color-scheme: dark) {
-  .yy-content mark {
-    background: #6b5a00;
-  }
 }
 
 .yy-content :not(pre) > code {
   padding: 0.15em 0.4em;
+  border: 1px solid var(--yy-border);
   border-radius: 4px;
-  background: var(--code-bg);
-  font: 0.88em var(--mono);
+  background: var(--yy-code-bg);
+  font: 0.87em var(--yy-mono);
 }
 .yy-content pre {
   position: relative;
   padding: 14px 16px;
-  border-radius: 8px;
-  background: var(--code-bg);
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-code-bg);
   overflow-x: auto;
-  font: 13px/1.6 var(--mono);
+  font: 13px/1.65 var(--yy-mono);
   tab-size: 4;
 }
 .yy-content pre code {
@@ -91,10 +94,17 @@
   right: 6px;
   height: 24px;
   padding: 0 8px;
-  font-size: 12px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius-sm);
+  background: var(--yy-bg);
+  color: var(--yy-text-2);
+  font: 12px var(--yy-font);
+  cursor: pointer;
   opacity: 0;
+  transition: opacity 0.15s;
 }
-pre:hover > .yy-copy {
+pre:hover > .yy-copy,
+.yy-copy:focus-visible {
   opacity: 1;
 }
 
@@ -118,13 +128,14 @@ pre:hover > .yy-copy {
 }
 .yy-content :where(th, td) {
   min-width: 80px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
+  padding: 7px 12px;
+  border: 1px solid var(--yy-border-strong);
   vertical-align: top;
 }
 .yy-content th {
-  background: var(--sidebar);
+  background: var(--yy-bg-muted);
   font-weight: 600;
+  text-align: left;
 }
 .yy-content :where(th, td) > p {
   margin: 0;
@@ -137,18 +148,30 @@ pre:hover > .yy-copy {
 /* The editor's task item node view has no data-type on <li>, so match through the list. */
 .yy-content ul[data-type='taskList'] > li {
   display: flex;
+  align-items: flex-start;
   gap: 0.5em;
 }
 .yy-content ul[data-type='taskList'] > li > label {
+  display: flex;
   flex: none;
-  padding-top: 0.2em;
+  align-items: center;
+  height: 1.75em;
+}
+.yy-content ul[data-type='taskList'] input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--yy-primary);
 }
 .yy-content ul[data-type='taskList'] > li > div {
   flex: 1;
   min-width: 0;
 }
+.yy-content ul[data-type='taskList'] > li > div > p:first-child {
+  margin-top: 0;
+}
 .yy-content ul[data-type='taskList'] > li[data-checked='true'] > div {
-  color: var(--muted);
+  color: var(--yy-text-3);
   text-decoration: line-through;
 }
 
@@ -164,21 +187,21 @@ pre:hover > .yy-copy {
   overflow-x: auto;
 }
 .yy-mermaid-error {
-  color: var(--danger);
+  color: var(--yy-danger);
   font-size: 13px;
 }
 .yy-unknown {
   padding: 8px 12px;
-  border: 1px dashed var(--border);
-  color: var(--muted);
+  border: 1px dashed var(--yy-border);
+  color: var(--yy-text-3);
 }
 
 /* Callouts: Obsidian's default colours per type. */
 .callout {
   --callout-color: 68, 138, 255;
   padding: 10px 14px;
-  border-left: 4px solid rgb(var(--callout-color));
-  border-radius: 6px;
+  border-left: 3px solid rgb(var(--callout-color));
+  border-radius: var(--yy-radius-lg);
   background: rgba(var(--callout-color), 0.08);
 }
 .callout-title {
@@ -199,12 +222,17 @@ pre:hover > .yy-copy {
   user-select: none;
 }
 .callout[data-callout-fold] > .callout-title::after {
-  content: '▾';
-  margin-left: auto;
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin: 0 4px 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
   transition: transform 0.15s;
 }
 .callout.is-collapsed > .callout-title::after {
-  transform: rotate(-90deg);
+  transform: rotate(-45deg);
 }
 .callout.is-collapsed > .callout-content {
   display: none;
@@ -213,7 +241,7 @@ pre:hover > .yy-copy {
 .callout[data-callout='info'] { --callout-color: 0, 184, 212; }
 .callout[data-callout='tip'], .callout[data-callout='hint'], .callout[data-callout='important'] { --callout-color: 0, 191, 165; }
 .callout[data-callout='success'], .callout[data-callout='check'], .callout[data-callout='done'] { --callout-color: 0, 200, 83; }
-.callout[data-callout='question'], .callout[data-callout='help'], .callout[data-callout='faq'] { --callout-color: 100, 221, 23; }
+.callout[data-callout='question'], .callout[data-callout='help'], .callout[data-callout='faq'] { --callout-color: 100, 190, 23; }
 .callout[data-callout='warning'], .callout[data-callout='caution'], .callout[data-callout='attention'] { --callout-color: 255, 145, 0; }
 .callout[data-callout='failure'], .callout[data-callout='fail'], .callout[data-callout='missing'] { --callout-color: 255, 82, 82; }
 .callout[data-callout='danger'], .callout[data-callout='error'] { --callout-color: 255, 23, 68; }
@@ -223,7 +251,7 @@ pre:hover > .yy-copy {
 .callout[data-callout='code'] { --callout-color: 96, 125, 139; }
 .callout[data-callout='code'] .callout-content pre {
   margin: 0.4em 0;
-  background: var(--bg);
+  background: var(--yy-bg);
 }
 
 /* Obsidian shows the capitalised type when a callout has no title. */

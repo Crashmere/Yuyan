@@ -117,3 +117,21 @@ func canonical(t *testing.T, s string) string {
 	}
 	return b.String()
 }
+
+func TestChromaCSSFollowsTheTheme(t *testing.T) {
+	css := ChromaCSS()
+	for _, want := range []string{
+		"\n.chroma .k {",
+		`:root[data-theme="dark"] .chroma .k {`,
+		`:root:not([data-theme="light"]) .chroma .k {`,
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("stylesheet lacks %q", want)
+		}
+	}
+	for _, unwanted := range []string{"/* Background */", "/* PreWrapper */", ".bg {"} {
+		if strings.Contains(css, unwanted) {
+			t.Errorf("stylesheet still contains %q", unwanted)
+		}
+	}
+}

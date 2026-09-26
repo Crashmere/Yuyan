@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/Crashmere/Yuyan/internal/render"
 	"github.com/Crashmere/Yuyan/internal/store"
@@ -26,9 +26,8 @@ type Server struct {
 	base      string
 	static    fs.FS
 	entries   map[string]entry
-	pages     map[string]*template.Template
+	shell     *template.Template
 	chromaCSS string
-	loc       *time.Location
 
 	mu    sync.Mutex
 	cache map[int64]cachedRender
@@ -50,15 +49,12 @@ func New(st *store.Store, static fs.FS, base string) (*Server, error) {
 	if !strings.HasPrefix(base, "/") || !strings.HasSuffix(base, "/") {
 		return nil, fmt.Errorf("base path %q must start and end with /", base)
 	}
-	loc, err := time.LoadLocation("Asia/Shanghai")
-	if err != nil {
-		loc = time.FixedZone("CST", 8*3600)
-	}
-	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), loc: loc, cache: map[int64]cachedRender{}}
+	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedRender{}}
+	var err error
 	if s.entries, err = readManifest(static); err != nil {
 		return nil, err
 	}
-	if s.pages, err = s.parseTemplates(); err != nil {
+	if s.shell, err = s.parseShell(); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -105,10 +101,8 @@ func readManifest(static fs.FS) (map[string]entry, error) {
 			out[v.Name] = entry{JS: v.File, CSS: css}
 		}
 	}
-	for _, name := range []string{"reader", "editor"} {
-		if _, ok := out[name]; !ok {
-			return nil, fmt.Errorf("frontend entry %q missing from manifest", name)
-		}
+	if _, ok := out["app"]; !ok {
+		return nil, errors.New(`frontend entry "app" missing from manifest`)
 	}
 	return out, nil
 }
@@ -119,14 +113,16 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 
-	mux.HandleFunc("GET /{$}", s.homePage)
-	mux.HandleFunc("GET /books/{id}", s.bookPage)
-	mux.HandleFunc("GET /docs/{id}", s.docPage)
-	mux.HandleFunc("GET /docs/{id}/edit", s.editPage)
-	mux.HandleFunc("GET /docs/{id}/history", s.historyPage)
-	mux.HandleFunc("GET /versions/{id}", s.versionPage)
-	mux.HandleFunc("GET /search", s.searchPage)
-	mux.HandleFunc("GET /trash", s.trashPage)
+	// Every page is the same app shell; each route preloads the data its first screen needs.
+	mux.HandleFunc("GET /{$}", s.appPage(routeHome))
+	mux.HandleFunc("GET /books/{id}", s.appPage(routeBook))
+	mux.HandleFunc("GET /docs/{id}", s.appPage(routeDoc))
+	mux.HandleFunc("GET /docs/{id}/edit", s.appPage(routeEdit))
+	mux.HandleFunc("GET /docs/{id}/history", s.appPage(routeHistory))
+	mux.HandleFunc("GET /versions/{id}", s.appPage(routeVersion))
+	mux.HandleFunc("GET /search", s.appPage(routeSearch))
+	mux.HandleFunc("GET /trash", s.appPage(routeTrash))
+	mux.HandleFunc("GET /", s.appPage(routeNotFound))
 
 	mux.HandleFunc("GET /assets/{file}", s.assetFile)
 	mux.HandleFunc("GET /static/chroma.css", func(w http.ResponseWriter, r *http.Request) {
@@ -137,23 +133,35 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", immutable(http.FileServerFS(s.static))))
 
 	mux.Handle("GET /api/meta", s.read(s.apiMeta))
-	mux.Handle("GET /api/books", s.read(s.apiListBooks))
+	mux.Handle("GET /api/books", s.get(s.books))
 	mux.Handle("POST /api/books", s.write(s.apiCreateBook))
+	mux.Handle("PUT /api/books/order", s.write(s.apiReorderBooks))
+	mux.Handle("GET /api/books/{id}", s.get(s.book))
 	mux.Handle("PATCH /api/books/{id}", s.write(s.apiUpdateBook))
 	mux.Handle("DELETE /api/books/{id}", s.write(s.apiDeleteBook))
 	mux.Handle("POST /api/books/{id}/restore", s.write(s.apiRestoreBook))
-	mux.Handle("GET /api/books/{id}/tree", s.read(s.apiTree))
+	mux.Handle("GET /api/books/{id}/tree", s.get(s.tree))
+	mux.Handle("GET /api/recent", s.get(s.recent))
 	mux.Handle("POST /api/docs", s.write(s.apiCreateDoc))
-	mux.Handle("GET /api/docs/{id}", s.read(s.apiGetDoc))
+	mux.Handle("GET /api/docs/{id}", s.get(s.fullDoc))
 	mux.Handle("PUT /api/docs/{id}", s.write(s.apiSaveDoc))
+	mux.Handle("PATCH /api/docs/{id}", s.write(s.apiRenameDoc))
 	mux.Handle("DELETE /api/docs/{id}", s.write(s.apiDeleteDoc))
+	mux.Handle("GET /api/docs/{id}/view", s.get(s.docView))
+	mux.Handle("POST /api/docs/{id}/move", s.write(s.apiMoveDoc))
 	mux.Handle("POST /api/docs/{id}/restore", s.write(s.apiRestoreDoc))
 	mux.Handle("POST /api/docs/{id}/snapshot", s.write(s.apiSnapshot))
-	mux.Handle("GET /api/docs/{id}/versions", s.read(s.apiVersions))
+	mux.Handle("GET /api/docs/{id}/versions", s.get(s.versions))
 	mux.Handle("GET /api/versions/{id}", s.read(s.apiGetVersion))
+	mux.Handle("GET /api/versions/{id}/view", s.get(s.versionView))
 	mux.Handle("POST /api/versions/{id}/restore", s.write(s.apiRestoreVersion))
 	mux.Handle("POST /api/assets", s.write(s.apiUploadAsset))
 	mux.Handle("GET /api/search", s.read(s.apiSearch))
+	mux.Handle("GET /api/trash", s.get(s.trash))
+	mux.Handle("DELETE /api/trash", s.write(s.apiEmptyTrash))
+	mux.Handle("DELETE /api/trash/docs/{id}", s.write(s.apiPurgeDoc))
+	mux.Handle("DELETE /api/trash/books/{id}", s.write(s.apiPurgeBook))
+	mux.Handle("GET /api/", s.read(func(http.ResponseWriter, *http.Request) error { return store.ErrNotFound }))
 
 	var h http.Handler = headers(mux)
 	if withPrefix {
@@ -208,6 +216,18 @@ func (s *Server) read(h func(http.ResponseWriter, *http.Request) error) http.Han
 	})
 }
 
+// get serves a read that pages also preload (see app.go), so both return the same JSON.
+func (s *Server) get(load func(*http.Request) (any, error)) http.Handler {
+	return s.read(func(w http.ResponseWriter, r *http.Request) error {
+		v, err := load(r)
+		if err != nil {
+			return err
+		}
+		writeJSON(w, http.StatusOK, v)
+		return nil
+	})
+}
+
 // write wraps every state-changing API call. It is the single place where login will be enforced
 // once HTTPS and authentication are added; until then access is open by the user's decision.
 func (s *Server) write(h func(http.ResponseWriter, *http.Request) error) http.Handler {
@@ -244,23 +264,27 @@ type conflictError struct{ revision int64 }
 func (c conflictError) Error() string { return "revision conflict" }
 
 func writeError(w http.ResponseWriter, err error) {
-	status, code, msg := http.StatusInternalServerError, "internal", "服务器出错，请稍后重试"
-	var revision int64
+	status, body := errorResponse(err)
+	writeJSON(w, status, body)
+}
+
+func errorResponse(err error) (int, apiError) {
 	var conflict conflictError
 	var maxBytes *http.MaxBytesError
 	switch {
 	case errors.As(err, &conflict):
-		status, code, msg, revision = http.StatusConflict, "conflict", "文档已在别处修改", conflict.revision
+		return http.StatusConflict, apiError{Error: "conflict", Message: "文档已在别处修改", Revision: conflict.revision}
 	case errors.Is(err, store.ErrNotFound):
-		status, code, msg = http.StatusNotFound, "not_found", "内容不存在或已删除"
+		return http.StatusNotFound, apiError{Error: "not_found", Message: "内容不存在或已删除"}
 	case errors.Is(err, store.ErrUnsupported):
-		status, code, msg = http.StatusUnsupportedMediaType, "unsupported", "只支持 PNG、JPEG、GIF、WebP 和 BMP 图片"
+		return http.StatusUnsupportedMediaType, apiError{Error: "unsupported", Message: "只支持 PNG、JPEG、GIF、WebP 和 BMP 图片"}
 	case errors.As(err, &maxBytes):
-		status, code, msg = http.StatusRequestEntityTooLarge, "too_large", "内容过大"
+		return http.StatusRequestEntityTooLarge, apiError{Error: "too_large", Message: "内容过大"}
 	case errors.Is(err, store.ErrInvalid), errors.Is(err, errBadRequest):
-		status, code, msg = http.StatusBadRequest, "invalid", err.Error()
+		return http.StatusBadRequest, apiError{Error: "invalid", Message: err.Error()}
 	}
-	writeJSON(w, status, apiError{Error: code, Message: msg, Revision: revision})
+	slog.Error("request", "error", err)
+	return http.StatusInternalServerError, apiError{Error: "internal", Message: "服务器出错，请稍后重试"}
 }
 
 var errBadRequest = errors.New("bad request")

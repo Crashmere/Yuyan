@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="yuyan-base" content="{{.Base}}">
+<title>{{.Title}}</title>
+<link rel="icon" href="{{static "favicon.svg"}}" type="image/svg+xml">
+<script>try{var t=localStorage.getItem('yuyan:theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="{{static "chroma.css"}}">
+{{range .Entry.CSS}}<link rel="stylesheet" href="{{static .}}">
+{{end}}<script type="module" src="{{static .Entry.JS}}"></script>
+</head>
+<body>
+<div id="app"></div>
+<script id="yy-initial" type="application/json">{{.Initial}}</script>
+</body>
+</html>

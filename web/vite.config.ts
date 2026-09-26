@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// Pages are rendered by Go, so the build has two script entries instead of an index.html.
+// Go serves one page shell for every route, so the build has a single script entry instead of an
+// index.html. The editor, KaTeX and Mermaid are split into chunks loaded on demand.
 export default defineConfig({
   base: './',
   plugins: [vue()],
@@ -11,10 +12,7 @@ export default defineConfig({
     manifest: 'manifest.json',
     chunkSizeWarningLimit: 4096,
     rollupOptions: {
-      input: {
-        reader: 'src/reader/main.ts',
-        editor: 'src/editor/main.ts',
-      },
+      input: { app: 'src/app/main.ts' },
     },
   },
 })
