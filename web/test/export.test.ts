@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { JSONContent } from '@tiptap/core'
-import { encodeLinkPath, exportDoc, fileName, planExport, relativePath, type ExportBook } from '../src/shared/export'
+import { encodeLinkPath, exportDoc, fileName, planExport, planNodes, relativePath, type ExportBook } from '../src/shared/export'
 
 const asset = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png'
 
@@ -94,6 +94,27 @@ describe('exportDoc', () => {
     expect(out.markdown.trim()).toBe(`[代理](../结构型模式/代理.md) [旧文](/docs/999) ![图|300](../../attachments/${asset})`)
     expect(out.assets).toEqual([asset])
     expect(out.missingLinks).toEqual(['/docs/999'])
+  })
+
+  it('exports part of a knowledge base at the root and can turn outside links into web addresses', () => {
+    const plan = planNodes('设计模式', [books[0].tree[2]])
+    expect(plan.entries.get(13)).toMatchObject({ file: '结构型模式.md', dir: '结构型模式' })
+    expect(plan.entries.get(14)?.file).toBe('结构型模式/代理.md')
+    const content: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: '单例', marks: [{ type: 'link', attrs: { href: '/docs/11' } }] },
+            { type: 'image', attrs: { src: `/assets/${asset}` } },
+          ],
+        },
+      ],
+    }
+    const out = exportDoc(content, plan.entries.get(14)!.file!, plan, (href) => `https://example.com/yuyan${href}`)
+    expect(out.markdown.trim()).toBe(`[单例](https://example.com/yuyan/docs/11)![](../attachments/${asset})`)
+    expect(out.missingLinks).toEqual(['/docs/11'])
   })
 
   it('encodes spaces and brackets the way Obsidian writes Markdown links', () => {

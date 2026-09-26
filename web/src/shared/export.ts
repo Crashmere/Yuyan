@@ -73,6 +73,26 @@ class Names {
   }
 }
 
+const join = (parent: string, name: string) => (parent ? `${parent}/${name}` : name)
+
+function placeNodes(plan: ExportPlan, nodes: ExportTreeNode[], parent: string, book: string, names = new Names()) {
+  for (const n of nodes) {
+    const kind = n.kind === 'group' ? 'group' : 'doc'
+    const hasChildren = !!n.children?.length
+    const name = names.claim(fileName(n.title), { file: kind === 'doc', dir: kind === 'group' || hasChildren })
+    if (name !== n.title) plan.renamed.push({ book, title: n.title, name })
+    const entry: ExportEntry = { id: n.id, kind, title: n.title, book }
+    if (kind === 'doc') entry.file = `${join(parent, name)}.md`
+    if (kind === 'group' || hasChildren) {
+      entry.dir = join(parent, name)
+      plan.dirs.push(entry.dir)
+    }
+    plan.entries.set(n.id, entry)
+    if (hasChildren) placeNodes(plan, n.children!, entry.dir!, book)
+  }
+}
+
+// planExport puts each knowledge base in a folder of its own at the export root.
 export function planExport(books: ExportBook[]): ExportPlan {
   const plan: ExportPlan = { entries: new Map(), dirs: [], renamed: [] }
   const roots = new Names([attachmentsDir, metaDir])
@@ -80,25 +100,15 @@ export function planExport(books: ExportBook[]): ExportPlan {
     const bookDir = roots.claim(fileName(book.name), { file: false, dir: true })
     if (bookDir !== book.name) plan.renamed.push({ book: book.name, title: book.name, name: bookDir })
     plan.dirs.push(bookDir)
-    const walk = (nodes: ExportTreeNode[], parent: string) => {
-      const names = new Names()
-      for (const n of nodes) {
-        const kind = n.kind === 'group' ? 'group' : 'doc'
-        const hasChildren = !!n.children?.length
-        const name = names.claim(fileName(n.title), { file: kind === 'doc', dir: kind === 'group' || hasChildren })
-        if (name !== n.title) plan.renamed.push({ book: book.name, title: n.title, name })
-        const entry: ExportEntry = { id: n.id, kind, title: n.title, book: book.name }
-        if (kind === 'doc') entry.file = `${parent}/${name}.md`
-        if (kind === 'group' || hasChildren) {
-          entry.dir = `${parent}/${name}`
-          plan.dirs.push(entry.dir)
-        }
-        plan.entries.set(n.id, entry)
-        if (hasChildren) walk(n.children!, entry.dir!)
-      }
-    }
-    walk(book.tree, bookDir)
+    placeNodes(plan, book.tree, bookDir, book.name)
   }
+  return plan
+}
+
+// planNodes lays out part of one knowledge base, such as a document and its children, at the root.
+export function planNodes(book: string, nodes: ExportTreeNode[]): ExportPlan {
+  const plan: ExportPlan = { entries: new Map(), dirs: [], renamed: [] }
+  placeNodes(plan, nodes, '', book, new Names([attachmentsDir, metaDir]))
   return plan
 }
 
@@ -128,7 +138,9 @@ export interface ExportedDoc {
   missingLinks: string[]
 }
 
-export function exportDoc(content: JSONContent, file: string, plan: ExportPlan): ExportedDoc {
+// unresolvedLink decides what a link to a document outside the plan becomes; by default it stays
+// as written and is reported in missingLinks.
+export function exportDoc(content: JSONContent, file: string, plan: ExportPlan, unresolvedLink?: (href: string) => string): ExportedDoc {
   const assets = new Set<string>()
   const missingLinks: string[] = []
   const markdown = docToMarkdown(content, {
@@ -145,7 +157,7 @@ export function exportDoc(content: JSONContent, file: string, plan: ExportPlan):
       const path = target?.file ?? target?.dir
       if (!path) {
         missingLinks.push(href)
-        return href
+        return unresolvedLink ? unresolvedLink(href) : href
       }
       return encodeLinkPath(relativePath(file, path)) + (m[2] ?? '')
     },

@@ -1,5 +1,5 @@
 import { shallowRef } from 'vue'
-import { ClipboardCopy, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2 } from 'lucide-vue-next'
+import { ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2 } from 'lucide-vue-next'
 import { base, errorMessage, type Book, type TreeNode } from '../shared/api'
 import { copyText } from '../shared/clipboard'
 import { confirm, prompt } from '../ui/dialog'
@@ -84,6 +84,39 @@ export function moveDocTo(bookId: number, node: TreeNode) {
   }, '移动失败')
 }
 
+// runExport downloads the given nodes of a knowledge base, reporting progress in one toast.
+async function runExport(bookName: string, nodes: TreeNode[], zipName: string) {
+  const progress = (message: string) => toast(message, 'loading', { key: 'export' })
+  progress('正在准备导出…')
+  try {
+    const { exportNodes } = await import('./webExport')
+    const r = await exportNodes(bookName, nodes, zipName, progress)
+    const images = r.images ? `、${r.images} 张图片` : ''
+    const failed = r.failedImages ? `；${r.failedImages} 张图片下载失败` : ''
+    toast(`已导出 ${r.docs} 篇文档${images}${failed}`, r.failedImages ? 'error' : 'success', { key: 'export' })
+  } catch (e) {
+    toast(`导出失败：${errorMessage(e)}`, 'error', { key: 'export' })
+  }
+}
+
+export function exportDoc(bookId: number, node: TreeNode) {
+  const book = store.bookOf(bookId)
+  return runExport(book?.name ?? '', [node], node.title)
+}
+
+export async function exportBook(book: Book) {
+  try {
+    const tree = await store.loadTree(book.id)
+    if (!tree.length) {
+      toast('这个知识库还没有文档', 'info')
+      return
+    }
+    await runExport(book.name, tree, book.name)
+  } catch (e) {
+    toast(`导出失败：${errorMessage(e)}`, 'error')
+  }
+}
+
 export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () => void; history?: boolean } = {}): MenuEntry[] {
   return [
     { label: '新建子文档', icon: FilePlus, run: () => newDoc(bookId, node.id) },
@@ -94,6 +127,7 @@ export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () 
     { label: '移动到…', icon: FolderInput, run: () => moveDocTo(bookId, node) },
     ...(node.kind === 'doc' ? [{ label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(node.id) }] : []),
     ...(options.history && node.kind === 'doc' ? [{ label: '历史版本', icon: History, run: () => void router.push(`/docs/${node.id}/history`) }] : []),
+    { label: '导出', icon: Download, hint: node.children?.length ? '含子文档' : undefined, run: () => exportDoc(bookId, node) },
     null,
     { label: '删除', icon: Trash2, danger: true, run: () => deleteDoc(bookId, node) },
   ]
@@ -139,6 +173,7 @@ export function bookMenu(book: Book): MenuEntry[] {
     null,
     { label: '重命名', icon: PencilLine, run: () => renameBook(book) },
     { label: '编辑简介', icon: SquarePen, run: () => editBookDescription(book) },
+    { label: '导出知识库', icon: Download, run: () => exportBook(book) },
     null,
     { label: '删除知识库', icon: Trash2, danger: true, run: () => deleteBook(book) },
   ]
