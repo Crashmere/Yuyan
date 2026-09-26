@@ -1,0 +1,51 @@
+{
+  "name": "yuyan-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "parity": "tsx tools/parity/render.ts",
+    "import": "tsx tools/import/import.ts"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "1.8.0",
+    "@tiptap/core": "3.31.3",
+    "@tiptap/extension-code-block": "3.31.3",
+    "@tiptap/extension-code-block-lowlight": "3.31.3",
+    "@tiptap/extension-drag-handle-vue-3": "3.31.3",
+    "@tiptap/extension-file-handler": "3.31.3",
+    "@tiptap/extension-highlight": "3.31.3",
+    "@tiptap/extension-image": "3.31.3",
+    "@tiptap/extension-list": "3.31.3",
+    "@tiptap/extension-mathematics": "3.31.3",
+    "@tiptap/extension-table": "3.31.3",
+    "@tiptap/extensions": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@tiptap/starter-kit": "3.31.3",
+    "@tiptap/static-renderer": "3.31.3",
+    "@tiptap/suggestion": "3.31.3",
+    "@tiptap/vue-3": "3.31.3",
+    "katex": "0.18.9",
+    "lowlight": "3.3.0",
+    "mermaid": "12.0.0",
+    "remark-gfm": "4.0.1",
+    "remark-math": "6.0.0",
+    "remark-parse": "11.0.0",
+    "remark-stringify": "11.0.0",
+    "unified": "11.0.5",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@types/mdast": "4.0.4",
+    "@types/node": "24.3.0",
+    "@vitejs/plugin-vue": "6.0.9",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2",
+    "vue-tsc": "3.3.11"
+  }
+}

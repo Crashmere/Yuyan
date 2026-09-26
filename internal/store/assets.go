@@ -1,0 +1,132 @@
+package store
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/webp"
+)
+
+const MaxAssetBytes = 25 << 20
+
+var ErrUnsupported = errors.New("unsupported image type")
+
+var imageExt = map[string]string{
+	"image/png":  "png",
+	"image/jpeg": "jpg",
+	"image/gif":  "gif",
+	"image/webp": "webp",
+	"image/bmp":  "bmp",
+}
+
+type Asset struct {
+	ID           string `json:"id"`
+	Ext          string `json:"ext"`
+	Mime         string `json:"mime"`
+	Size         int64  `json:"size"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	OriginalName string `json:"originalName"`
+	URL          string `json:"url"`
+}
+
+func (s *Store) AssetPath(id, ext string) string {
+	return filepath.Join(s.dir, "assets", id+"."+ext)
+}
+
+// PutAsset stores an image under the first 128 bits of its SHA-256. Identical bytes map to the
+// same object; existing files are never overwritten.
+func (s *Store) PutAsset(ctx context.Context, data []byte, originalName string) (Asset, error) {
+	if len(data) == 0 || len(data) > MaxAssetBytes {
+		return Asset{}, ErrInvalid
+	}
+	mime := http.DetectContentType(data)
+	ext, ok := imageExt[mime]
+	if !ok {
+		return Asset{}, ErrUnsupported
+	}
+	sum := sha256.Sum256(data)
+	full := hex.EncodeToString(sum[:])
+	id := full[:32]
+	if a, err := s.GetAsset(ctx, id); err == nil {
+		return a, nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return Asset{}, err
+	}
+	var width, height int
+	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+		width, height = cfg.Width, cfg.Height
+	}
+	path := s.AssetPath(id, ext)
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		if err := writeFileAtomic(path, data); err != nil {
+			return Asset{}, err
+		}
+	}
+	_, err := s.DB.ExecContext(ctx, `
+INSERT OR IGNORE INTO assets(id, sha256, ext, mime, size, width, height, original_name, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, full, ext, mime, len(data), nullInt(width), nullInt(height), originalName, s.stamp())
+	if err != nil {
+		return Asset{}, err
+	}
+	return s.GetAsset(ctx, id)
+}
+
+func nullInt(v int) any {
+	if v == 0 {
+		return nil
+	}
+	return v
+}
+
+func writeFileAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".upload-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp.Name(), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
+}
+
+func (s *Store) GetAsset(ctx context.Context, id string) (Asset, error) {
+	var a Asset
+	var w, h sql.NullInt64
+	err := s.DB.QueryRowContext(ctx, `SELECT id, ext, mime, size, width, height, original_name FROM assets WHERE id = ?`, id).
+		Scan(&a.ID, &a.Ext, &a.Mime, &a.Size, &w, &h, &a.OriginalName)
+	if errors.Is(err, sql.ErrNoRows) {
+		return a, ErrNotFound
+	}
+	if err != nil {
+		return a, err
+	}
+	a.Width, a.Height = int(w.Int64), int(h.Int64)
+	a.URL = fmt.Sprintf("/assets/%s.%s", a.ID, a.Ext)
+	return a, nil
+}
