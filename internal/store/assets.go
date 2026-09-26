@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
@@ -113,6 +114,43 @@ func writeFileAtomic(path string, data []byte) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// AssetSizes returns the stored pixel size of the given images, keyed by asset id. Images whose
+// size could not be read when they were uploaded are left out.
+func (s *Store) AssetSizes(ctx context.Context, ids []string) (map[string][2]int, error) {
+	sizes := map[string][2]int{}
+	seen := map[string]bool{}
+	var unique []any
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			unique = append(unique, id)
+		}
+	}
+	// SQLite limits the number of bound parameters in one statement.
+	for start := 0; start < len(unique); start += 500 {
+		batch := unique[start:min(start+500, len(unique))]
+		rows, err := s.DB.QueryContext(ctx, `SELECT id, width, height FROM assets WHERE width IS NOT NULL AND height IS NOT NULL AND id IN (?`+strings.Repeat(",?", len(batch)-1)+`)`, batch...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var id string
+			var w, h int
+			if err := rows.Scan(&id, &w, &h); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			sizes[id] = [2]int{w, h}
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return sizes, nil
 }
 
 func (s *Store) GetAsset(ctx context.Context, id string) (Asset, error) {

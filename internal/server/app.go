@@ -99,7 +99,7 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 			}
 		case routeEdit:
 			if v, ok := main("docs/"+id, s.fullDoc); ok {
-				d := v.(store.Doc)
+				d := v.(docWithImages)
 				title = "编辑：" + d.Title
 				tree(d.BookID)
 			}

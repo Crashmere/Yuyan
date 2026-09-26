@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { base } from '../../shared/api'
+import { base, type ImageSizes } from '../../shared/api'
 import { prefs } from '../prefs'
 import { enhance } from './enhance'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app.
-const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean }>()
+const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes }>()
 const router = useRouter()
 const root = ref<HTMLElement | null>(null)
 // Diagrams are drawn in the theme's colours; a theme change re-creates the content to redraw them.
@@ -15,7 +15,7 @@ const generation = ref(0)
 
 async function run() {
   await nextTick()
-  if (root.value) enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid })
+  if (root.value) enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images })
 }
 
 onMounted(run)

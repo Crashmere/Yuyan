@@ -1,13 +1,27 @@
+import type { ImageSizes } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
+import { assetId, reservedSize } from '../../shared/images'
 import { needsDisplay } from '../../shared/latex'
 import { renderMermaid } from '../../shared/mermaid'
 
-// What the server-rendered HTML leaves to the browser: code lines, folding and copy buttons,
-// formulas and diagrams. KaTeX and Mermaid load only for pages that contain them.
-export function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean }) {
+// What the server-rendered HTML leaves to the browser: space for images, code lines, folding and
+// copy buttons, formulas and diagrams. KaTeX and Mermaid load only for pages that contain them.
+export function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
+  if (options.images) reserveImageSpace(root, options.images)
   enhanceCode(root)
   if (options.math) void renderMath(root)
   if (options.mermaid) void renderDiagrams(root)
+}
+
+// Lazily loaded images take no space until they arrive, which pushes the text below them down
+// and makes jumps to headings land in the wrong place; the stored sizes reserve the space.
+function reserveImageSpace(root: HTMLElement, sizes: ImageSizes) {
+  for (const img of root.querySelectorAll<HTMLImageElement>('img')) {
+    const id = assetId(img.getAttribute('src') ?? '')
+    const r = reservedSize(id ? sizes[id] : undefined, Number(img.getAttribute('width')) || null, Number(img.getAttribute('height')) || null)
+    if (r.width) img.setAttribute('width', String(r.width))
+    if (r.aspectRatio) img.style.aspectRatio = r.aspectRatio
+  }
 }
 
 // Longer code blocks start folded to about this many lines.

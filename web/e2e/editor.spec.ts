@@ -462,6 +462,21 @@ test('reading pages: image viewer, folded long code and line numbers', async ({ 
   expect(number).toBe('counter(yy-line)')
 })
 
+test('images keep their space before they load', async ({ page }) => {
+  // Hold every image back; the application's own scripts under /static/assets/ still load.
+  await page.route(/\/yuyan\/assets\/[0-9a-f]{32}\./, () => {})
+  await page.goto('./')
+  await page.locator('.yy-book-card', { hasText: '产品手册（示例）' }).click()
+  await page.locator('.yy-catalog-title', { hasText: '长文档示例' }).click()
+  const heights = (locator: ReturnType<Page['locator']>) => locator.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))
+  await expect(page.locator('.yy-content img')).toHaveCount(2)
+  expect(Math.min(...(await heights(page.locator('.yy-content img'))))).toBeGreaterThan(20)
+
+  await page.getByRole('link', { name: '编辑' }).click()
+  await expect(page.locator('.ProseMirror .yy-image img')).toHaveCount(2)
+  expect(Math.min(...(await heights(page.locator('.ProseMirror .yy-image img'))))).toBeGreaterThan(20)
+})
+
 test('highlighted code stays legible in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.goto('./')

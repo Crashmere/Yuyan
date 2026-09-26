@@ -2,6 +2,7 @@ import { Extension, type Editor } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { base, type Asset } from '../shared/api'
+import { imageSizes } from './images'
 
 // An image being uploaded shows a placeholder with its progress where it will appear. A failed
 // upload keeps the placeholder with retry and remove buttons. Placeholders are decorations, so they
@@ -131,6 +132,7 @@ function finish(editor: Editor, up: Upload, asset: Asset) {
   forget(editor, up)
   // The placeholder is gone when the text around it was deleted meanwhile.
   if (pos === null) return
+  if (asset.width && asset.height) imageSizes(editor)[asset.id] = [asset.width, asset.height]
   const node = { type: 'image', attrs: { src: asset.url, alt: null, title: null, width: null, height: null } }
   editor
     .chain()

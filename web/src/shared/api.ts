@@ -32,8 +32,12 @@ export interface DocMeta {
   bookName: string
 }
 
+// Pixel sizes of a document's uploaded images, keyed by asset id.
+export type ImageSizes = Record<string, [number, number]>
+
 export interface Doc extends DocMeta {
   content: JSONContent
+  images?: ImageSizes
 }
 
 export interface Heading {
@@ -52,6 +56,7 @@ export interface DocView {
   prev: { id: number; title: string } | null
   next: { id: number; title: string } | null
   children: TreeNode[]
+  images: ImageSizes
 }
 
 export interface VersionInfo {
@@ -69,6 +74,7 @@ export interface VersionView {
   html: string
   hasMath: boolean
   hasMermaid: boolean
+  images: ImageSizes
 }
 
 export interface DocSummary {

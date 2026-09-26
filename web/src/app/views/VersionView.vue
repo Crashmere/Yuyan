@@ -59,7 +59,7 @@ async function restore() {
     <article class="yy-article">
       <p class="yy-banner">这是 {{ formatTime(view.version.createdAt) }} 的版本（{{ reasons[view.version.reason] ?? view.version.reason }}），只能查看。</p>
       <h1 class="yy-doc-title">{{ view.version.title }}</h1>
-      <DocContent :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" />
+      <DocContent :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" />
     </article>
   </main>
 </template>

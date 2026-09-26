@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { assetURL } from '../../shared/api'
-import { blockWidth } from '../images'
+import { assetId, reservedSize } from '../../shared/images'
+import { blockWidth, imageSizes } from '../images'
 
 const props = defineProps(nodeViewProps)
 
@@ -10,7 +11,12 @@ const img = ref<HTMLImageElement | null>(null)
 // The width while a corner is being dragged; written to the document on release.
 const live = ref<number | null>(null)
 const src = computed(() => assetURL(String(props.node.attrs.src ?? '')))
-const width = computed(() => live.value ?? (props.node.attrs.width as number | null) ?? undefined)
+// Display only: the stored size keeps the image's space before it loads; the document is unchanged.
+const reserved = computed(() => {
+  const id = assetId(src.value)
+  return reservedSize(id ? imageSizes(props.editor)[id] : undefined, props.node.attrs.width as number | null, props.node.attrs.height as number | null)
+})
+const width = computed(() => live.value ?? (props.node.attrs.width as number | null) ?? reserved.value.width)
 const height = computed(() => (live.value === null ? ((props.node.attrs.height as number | null) ?? undefined) : undefined))
 
 // Dragging a corner sets the width in pixels and drops any height, keeping the proportions; the
@@ -55,6 +61,7 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
       :title="node.attrs.title ?? undefined"
       :width="width"
       :height="height"
+      :style="reserved.aspectRatio ? { aspectRatio: reserved.aspectRatio } : undefined"
       draggable="true"
       data-drag-handle
     />

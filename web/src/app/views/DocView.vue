@@ -90,7 +90,7 @@ onMounted(async () => {
       <div v-else-if="empty" class="yy-empty-inline">
         这篇文档还是空的。<RouterLink :to="`/docs/${id}/edit`" class="yy-link-btn">开始写作</RouterLink>
       </div>
-      <DocContent v-else :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" />
+      <DocContent v-else :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" />
       <nav v-if="view.prev || view.next" class="yy-pager">
         <RouterLink v-if="view.prev" :to="`/docs/${view.prev.id}`" class="prev">
           <span class="yy-pager-label"><ArrowLeft :size="14" />上一篇</span><span class="yy-pager-title">{{ titleOf(view.prev) }}</span>

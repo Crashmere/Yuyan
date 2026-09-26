@@ -71,8 +71,27 @@ func (s *Server) liveDoc(r *http.Request) (store.Doc, error) {
 	return d, err
 }
 
+// imageSizes gives the pixel size of a document's uploaded images, keyed by asset id, so pages can
+// reserve their space before the images load.
+func (s *Server) imageSizes(r *http.Request, n doc.Node) (map[string][2]int, error) {
+	return s.store.AssetSizes(r.Context(), doc.AssetIDs(n))
+}
+
+type docWithImages struct {
+	store.Doc
+	Images map[string][2]int `json:"images"`
+}
+
 func (s *Server) fullDoc(r *http.Request) (any, error) {
-	return s.liveDoc(r)
+	d, err := s.liveDoc(r)
+	if err != nil {
+		return nil, err
+	}
+	images, err := s.imageSizes(r, d.Content)
+	if err != nil {
+		return nil, err
+	}
+	return docWithImages{Doc: d, Images: images}, nil
 }
 
 type docLink struct {
@@ -90,6 +109,7 @@ type docView struct {
 	Prev       *docLink          `json:"prev"`
 	Next       *docLink          `json:"next"`
 	Children   []*store.TreeNode `json:"children"`
+	Images     map[string][2]int `json:"images"`
 }
 
 // docView is what the reading view shows: rendered content, its outline, the neighbours in
@@ -103,7 +123,7 @@ func (s *Server) docView(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := docView{Doc: d.Meta(), TOC: []render.Heading{}, Children: []*store.TreeNode{}}
+	v := docView{Doc: d.Meta(), TOC: []render.Heading{}, Children: []*store.TreeNode{}, Images: map[string][2]int{}}
 	flat := store.Flatten(tree)
 	for i, n := range flat {
 		if n.ID != d.ID {
@@ -125,6 +145,9 @@ func (s *Server) docView(r *http.Request) (any, error) {
 		res := s.rendered(d)
 		v.HTML, v.TOC, v.HasMath, v.HasMermaid = res.HTML, nonNil(res.TOC), res.HasMath, res.HasMermaid
 		v.Chars = countChars(doc.PlainText(d.Content))
+		if v.Images, err = s.imageSizes(r, d.Content); err != nil {
+			return nil, err
+		}
 	}
 	return v, nil
 }
@@ -186,7 +209,11 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 		return nil, store.ErrNotFound
 	}
 	res := render.Render(v.Content, render.Options{BasePath: s.base})
-	return map[string]any{"version": infoOf(v), "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid}, nil
+	images, err := s.imageSizes(r, v.Content)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"version": infoOf(v), "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid, "images": images}, nil
 }
 
 func (s *Server) trash(r *http.Request) (any, error) {

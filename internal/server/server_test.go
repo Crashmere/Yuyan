@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	pngenc "image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -95,6 +98,41 @@ func TestShellPreloadsTheFirstScreen(t *testing.T) {
 	for _, key := range []string{"books", fmt.Sprintf("books/%d/tree", b.ID)} {
 		if data[key].Status != http.StatusOK {
 			t.Errorf("%s not preloaded: %+v", key, data[key])
+		}
+	}
+
+	status, page = do(t, h, "GET", fmt.Sprintf("/yuyan/docs/%d/edit", d.ID), "")
+	edit := preloadedOf(t, page)[fmt.Sprintf("docs/%d", d.ID)]
+	if body, _ := json.Marshal(edit.Body); status != http.StatusOK || edit.Status != http.StatusOK || !strings.Contains(string(body), `"images":{}`) {
+		t.Fatalf("edit page preload: %d %d %s", status, edit.Status, body)
+	}
+}
+
+func TestViewsCarryImageSizes(t *testing.T) {
+	ctx := context.Background()
+	st, h := newServer(t)
+	var png bytes.Buffer
+	if err := pngenc.Encode(&png, image.NewRGBA(image.Rect(0, 0, 30, 20))); err != nil {
+		t.Fatal(err)
+	}
+	asset, err := st.PutAsset(ctx, png.Bytes(), "a.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := st.CreateBook(ctx, "图集", "")
+	content := doc.Node{Type: "doc", Content: []doc.Node{{Type: "paragraph", Content: []doc.Node{
+		{Type: "image", Attrs: map[string]any{"src": asset.URL}},
+		{Type: "image", Attrs: map[string]any{"src": "https://example.com/b.png"}},
+	}}}}
+	d, _ := st.CreateDoc(ctx, store.CreateDocInput{BookID: b.ID, Title: "图片", Content: &content})
+	if err := st.Snapshot(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	versions, _ := st.Versions(ctx, d.ID)
+	want := fmt.Sprintf(`"images":{"%s":[30,20]}`, asset.ID)
+	for _, path := range []string{fmt.Sprintf("/yuyan/api/docs/%d/view", d.ID), fmt.Sprintf("/yuyan/api/docs/%d", d.ID), fmt.Sprintf("/yuyan/api/versions/%d/view", versions[0].ID)} {
+		if status, body := do(t, h, "GET", path, ""); status != http.StatusOK || !strings.Contains(body, want) {
+			t.Errorf("%s: %d, want %s in\n%s", path, status, want, body)
 		}
 	}
 }

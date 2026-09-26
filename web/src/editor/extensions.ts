@@ -10,6 +10,7 @@ import { schemaExtensions, YuyanImage } from '../schema/extensions'
 import { assetURL, unassetURL } from '../shared/api'
 import { CalloutKeys } from './calloutKeys'
 import type { EditorUi } from './context'
+import { ImageSizeStore } from './images'
 import { MarkdownShortcuts } from './inputRules'
 import { lowlight } from './lowlight'
 import { MarkdownPaste } from './markdownPaste'
@@ -61,6 +62,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
       onDrop: (editor, files, pos) => insertImages(editor, files, pos),
     }),
     UploadPlaceholders,
+    ImageSizeStore,
     SlashCommand.configure({ ui }),
     MarkdownShortcuts.configure({ editMath: (_editor, pos) => ui.openMath(pos, true) }),
     MarkdownPaste,

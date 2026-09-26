@@ -10,6 +10,7 @@ import { editorKey, type EditorUi } from './context'
 import EditorOutline from './EditorOutline.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import { editorExtensions, imageTypes } from './extensions'
+import { imageSizes } from './images'
 import type { Anchor } from './floating'
 import FindReplace from './FindReplace.vue'
 import LinkCard from './LinkCard.vue'
@@ -291,6 +292,10 @@ onMounted(async () => {
     },
     onTransaction: () => {
       tick.value++
+    },
+    // Before the node views are created, so images have their space from the start.
+    onBeforeCreate: ({ editor: ed }) => {
+      Object.assign(imageSizes(ed), d.images)
     },
   })
   editor.value = e
