@@ -25,9 +25,21 @@ func pathID(r *http.Request) (int64, error) {
 // ---------------------------------------------------------------------------------------------
 // Reads shared by the JSON API and page preloading. Each takes the request for its path values.
 
+type bookEntry struct {
+	store.Book
+	Pinyin string `json:"pinyin"`
+}
+
 func (s *Server) books(r *http.Request) (any, error) {
 	books, err := s.store.ListBooks(r.Context())
-	return nonNil(books), err
+	if err != nil {
+		return nil, err
+	}
+	out := make([]bookEntry, len(books))
+	for i, b := range books {
+		out[i] = bookEntry{Book: b, Pinyin: pinyinOf(b.Name)}
+	}
+	return out, nil
 }
 
 func (s *Server) liveBook(r *http.Request) (store.Book, error) {
@@ -63,6 +75,7 @@ func (s *Server) recent(r *http.Request) (any, error) {
 type titleEntry struct {
 	ID       int64    `json:"id"`
 	Title    string   `json:"title"`
+	Pinyin   string   `json:"pinyin"`
 	BookID   int64    `json:"bookId"`
 	BookName string   `json:"bookName"`
 	Path     []string `json:"path"`
@@ -85,7 +98,7 @@ func (s *Server) titles(r *http.Request) (any, error) {
 		walk = func(nodes []*store.TreeNode, path []string) {
 			for _, n := range nodes {
 				if n.Kind == "doc" {
-					out = append(out, titleEntry{ID: n.ID, Title: n.Title, BookID: b.ID, BookName: b.Name, Path: slices.Clone(path)})
+					out = append(out, titleEntry{ID: n.ID, Title: n.Title, Pinyin: pinyinOf(n.Title), BookID: b.ID, BookName: b.Name, Path: slices.Clone(path)})
 				}
 				walk(n.Children, append(slices.Clone(path), n.Title))
 			}

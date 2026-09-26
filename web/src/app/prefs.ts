@@ -14,6 +14,8 @@ interface Prefs {
   pageWidth: 'standard' | 'wide'
   // The outline beside the editor.
   editorOutline: boolean
+  // Whether the outline beside a document being read lists its headings (its eye button).
+  readingOutline: boolean
   // Editing without the sidebar.
   focusMode: boolean
   codeLineNumbers: boolean
@@ -41,6 +43,7 @@ export const prefs = reactive<Prefs>({
   sidebarCollapsed: false,
   pageWidth: 'standard',
   editorOutline: true,
+  readingOutline: true,
   focusMode: false,
   codeLineNumbers: false,
   codeWrap: false,

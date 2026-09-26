@@ -78,16 +78,18 @@ async function finishAndExport(page: Page, title: string): Promise<string> {
 type EditorElement = HTMLElement & { editor: { view: { domAtPos: (p: number) => { node: Node } }; state: { selection: { from: number; to: number } } } }
 
 // Selections made through the DOM reach the editor with the next selectionchange event, so both
-// helpers wait until the editor has taken them before the test types.
+// helpers wait until the editor has taken them before the test types. They set the selection
+// again while waiting: a focus command from the previous step (Tiptap focuses a frame later)
+// writes the editor's own selection back into the DOM.
 async function selectText(page: Page, locator: ReturnType<Page['locator']>, text: string) {
   await locator.evaluate(async (el, t) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       const i = n.textContent!.indexOf(t)
       if (i < 0) continue
-      getSelection()!.setBaseAndExtent(n, i, n, i + t.length)
       const { editor } = document.querySelector<EditorElement>('.ProseMirror')!
       for (let k = 0; k < 40; k++) {
+        getSelection()!.setBaseAndExtent(n, i, n, i + t.length)
         await new Promise((r) => setTimeout(r, 25))
         if (editor.state.selection.to - editor.state.selection.from === t.length) return
       }
@@ -104,10 +106,10 @@ async function caretAtEnd(locator: ReturnType<Page['locator']>) {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
     let last: Node | null = null
     for (let n = walker.nextNode(); n; n = walker.nextNode()) last = n
-    if (last) getSelection()!.setBaseAndExtent(last, last.textContent!.length, last, last.textContent!.length)
-    else getSelection()!.collapse(el, 0)
     const { editor } = document.querySelector<EditorElement>('.ProseMirror')!
     for (let k = 0; k < 40; k++) {
+      if (last) getSelection()!.setBaseAndExtent(last, last.textContent!.length, last, last.textContent!.length)
+      else getSelection()!.collapse(el, 0)
       await new Promise((r) => setTimeout(r, 25))
       const { from, to } = editor.state.selection
       if (from === to && el.contains(editor.view.domAtPos(from).node)) return
@@ -227,7 +229,17 @@ test('links: from the selection toolbar and the slash menu, with a card under th
   await expect(page.locator('.ProseMirror a[href="https://example.org/help"]')).toHaveText('帮助文档')
 })
 
-test('Cmd/Ctrl+K opens the search panel: recent documents, titles, pinyin initials, full text', async ({ page, request }) => {
+// The texts highlighted in the page for what was searched for, with where they are on screen.
+function searchHighlights(page: Page) {
+  return page.evaluate(() =>
+    [...(CSS.highlights.get('yy-search') ?? [])].map((r) => {
+      const box = (r as Range).getBoundingClientRect()
+      return { text: r.toString(), top: box.top, bottom: box.bottom }
+    }),
+  )
+}
+
+test('Cmd/Ctrl+K opens the search panel: recent documents, knowledge bases, titles by pinyin, full text', async ({ page, request }) => {
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
   await page.locator('.yy-catalog-title', { hasText: '排序' }).click()
@@ -245,11 +257,28 @@ test('Cmd/Ctrl+K opens the search panel: recent documents, titles, pinyin initia
   await expect(panel.locator('.yy-search-item').first()).toContainText('快速开始')
   await input.fill('zdl')
   await expect(panel.locator('.yy-search-item').first()).toContainText('最短路')
+  await input.fill('zuiduanlu')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('最短路')
+  await input.fill('kuaisuks')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('快速开始')
+  await input.fill('suanfabiji')
+  await expect(panel.locator('.yy-search-section').first()).toHaveText('知识库')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('算法笔记（示例）')
+  // Full-text results open with the query highlighted.
   await input.fill('Bellman')
   await expect(panel.locator('.yy-search-item', { hasText: '最短路' }).locator('.yy-search-snippet mark')).toHaveText('Bellman')
   await page.keyboard.press('Enter')
   await expect(page.locator('.yy-doc-title')).toHaveText('最短路')
   await expect(panel).toHaveCount(0)
+  await expect(page).toHaveURL(/[?&]hl=Bellman/)
+  await expect.poll(async () => (await searchHighlights(page)).map((h) => h.text)).toEqual(['Bellman'])
+
+  await page.keyboard.press('ControlOrMeta+k')
+  await input.fill('读书')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('读书摘录（示例）')
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/books\/\d+$/)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('读书摘录（示例）')
 
   // In the editor the shortcut opens search too; links come from the toolbars and the slash menu.
   const id = await createDoc(request, '快捷键测试', '正文')
@@ -567,6 +596,53 @@ test('versions compare with the previous and the current version, line by line',
   await page.getByRole('link', { name: '预览', exact: true }).click()
   await expect(page.locator('.yy-content')).toContainText('新增的一段。')
   await expect(diff).toHaveCount(0)
+})
+
+test('search results open at the first match, unfolding long code and collapsed callouts', async ({ page }) => {
+  await page.goto('search?q=heappush')
+  await page.locator('.yy-result-title', { hasText: '长代码' }).click()
+  await expect(page).toHaveURL(/[?&]hl=heappush/)
+  await expect.poll(async () => (await searchHighlights(page)).map((h) => h.text)).toEqual(['heappush'])
+  await expect(page.locator('.yy-content pre')).not.toHaveClass(/is-folded/)
+  const [hit] = await searchHighlights(page)
+  expect(hit.top).toBeGreaterThan(52)
+  expect(hit.bottom).toBeLessThan(860)
+
+  await page.goto('search?q=int dijkstra')
+  await page.locator('.yy-result-title', { hasText: '最短路' }).click()
+  await expect.poll(async () => (await searchHighlights(page)).map((h) => h.text)).toEqual(['int dijkstra'])
+  await expect(page.locator('.yy-content .callout')).not.toHaveClass(/is-collapsed/)
+})
+
+test('the outline beside a document hides and shows with its eye button', async ({ page }) => {
+  await page.goto('./')
+  await page.locator('.yy-book-card', { hasText: '产品手册（示例）' }).click()
+  await page.locator('.yy-catalog-title', { hasText: '长文档示例' }).click()
+  const toc = page.locator('.yy-doc-aside .yy-toc')
+  await expect(toc.getByRole('link').first()).toBeVisible()
+  await toc.getByRole('button', { name: '隐藏大纲' }).click()
+  await expect(toc.locator('ul')).toBeHidden()
+  await page.reload()
+  await expect(toc.getByRole('button', { name: '显示大纲' })).toBeVisible()
+  await expect(toc.locator('ul')).toBeHidden()
+  await toc.getByRole('button', { name: '显示大纲' }).click()
+  await expect(toc.getByRole('link').first()).toBeVisible()
+})
+
+test('a menu that has to scroll shows half of its last item', async ({ page }) => {
+  await page.setViewportSize({ width: 1360, height: 210 })
+  await page.goto('./')
+  await page.locator('.yy-book-card', { hasText: '产品手册（示例）' }).click()
+  await page.getByRole('button', { name: '切换知识库' }).click()
+  const menu = page.locator('.yy-menu')
+  await expect(menu.getByRole('menuitem').first()).toBeVisible()
+  const shown = () =>
+    menu.evaluate((m) => {
+      const items = [...m.children].filter((c): c is HTMLElement => c.getAttribute('role') === 'menuitem')
+      const cut = items.find((i) => i.offsetTop + i.offsetHeight > m.clientHeight)
+      return cut ? (m.clientHeight - cut.offsetTop) / cut.offsetHeight : 1
+    })
+  await expect.poll(shown).toBeCloseTo(0.5, 1)
 })
 
 test('highlighted code stays legible in dark mode', async ({ page }) => {

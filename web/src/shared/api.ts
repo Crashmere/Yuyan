@@ -9,6 +9,8 @@ export interface Book {
   position: number
   docCount: number
   updatedAt: string
+  // The name's pinyin for the search panel (see search/match.ts); only in the list of books.
+  pinyin?: string
 }
 
 export interface TreeNode {
@@ -87,6 +89,7 @@ export interface VersionView {
 export interface TitleEntry {
   id: number
   title: string
+  pinyin: string
   bookId: number
   bookName: string
   path: string[]

@@ -61,7 +61,7 @@ onMounted(() => {
       <p class="yy-page-sub">“{{ searched }}”共 {{ hits.length }} 条结果{{ hits.length === 50 ? '（只显示前 50 条）' : '' }}</p>
       <ul class="yy-results">
         <li v-for="h in hits" :key="h.id">
-          <RouterLink :to="`/docs/${h.id}`" class="yy-result-title">
+          <RouterLink :to="{ path: `/docs/${h.id}`, query: { hl: searched } }" class="yy-result-title">
             <template v-for="(p, i) in parts(h.title, searched)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template>
           </RouterLink>
           <span class="yy-result-book">{{ h.bookName }}</span>

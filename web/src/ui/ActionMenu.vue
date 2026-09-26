@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { DropdownMenuContent, DropdownMenuPortal, DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
+import { vHalfRow } from './halfRow'
 import type { MenuEntry } from './menu'
 import MenuItems from './MenuItems.vue'
 
@@ -22,7 +23,7 @@ function onCloseAutoFocus(e: Event) {
       <slot />
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
-      <DropdownMenuContent class="yy-menu" :align="align" :side-offset="4" @click.stop @close-auto-focus="onCloseAutoFocus">
+      <DropdownMenuContent v-half-row class="yy-menu" :align="align" :side-offset="4" @click.stop @close-auto-focus="onCloseAutoFocus">
         <MenuItems :items="items" />
       </DropdownMenuContent>
     </DropdownMenuPortal>

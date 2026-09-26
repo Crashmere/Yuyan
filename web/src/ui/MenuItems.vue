@@ -3,6 +3,7 @@ import {
   DropdownMenuItem, DropdownMenuPortal, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger,
 } from 'reka-ui'
 import { Check, ChevronRight } from 'lucide-vue-next'
+import { vHalfRow } from './halfRow'
 import type { MenuEntry } from './menu'
 
 // The entries of a dropdown menu, with submenus; used by ActionMenu.
@@ -20,7 +21,7 @@ defineProps<{ items: MenuEntry[] }>()
         <ChevronRight :size="14" class="yy-menu-arrow" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent class="yy-menu" :side-offset="4">
+        <DropdownMenuSubContent v-half-row class="yy-menu" :side-offset="4">
           <MenuItems :items="item.children" />
         </DropdownMenuSubContent>
       </DropdownMenuPortal>

@@ -6,11 +6,11 @@ import { renderMermaid } from '../../shared/mermaid'
 
 // What the server-rendered HTML leaves to the browser: space for images, code lines, folding and
 // copy buttons, formulas and diagrams. KaTeX and Mermaid load only for pages that contain them.
-export function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
+// The returned promise settles once formulas and diagrams are drawn.
+export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
   if (options.images) reserveImageSpace(root, options.images)
   enhanceCode(root)
-  if (options.math) void renderMath(root)
-  if (options.mermaid) void renderDiagrams(root)
+  await Promise.all([options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
 }
 
 // Lazily loaded images take no space until they arrive, which pushes the text below them down

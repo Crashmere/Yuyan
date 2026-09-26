@@ -24,6 +24,8 @@ const tocOpen = ref(false)
 // The editor is a large download; start fetching it when the pointer reaches the edit button.
 const prefetchEditor = () => void import('./EditView.vue')
 
+// Search results open documents with ?hl=<query>, which is highlighted in the content.
+const highlight = computed(() => (typeof route.query.hl === 'string' ? route.query.hl : ''))
 const node = computed(() => locate(state.bookId, id)?.node)
 const menu = computed(() => (view.value && node.value ? nodeMenu(view.value.doc.bookId, node.value, { history: true }) : []))
 const title = computed(() => node.value?.title ?? view.value?.doc.title ?? '')
@@ -90,7 +92,7 @@ onMounted(async () => {
       <div v-else-if="empty" class="yy-empty-inline">
         这篇文档还是空的。<RouterLink :to="`/docs/${id}/edit`" class="yy-link-btn">开始写作</RouterLink>
       </div>
-      <DocContent v-else :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" />
+      <DocContent v-else :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" :highlight="highlight" />
       <nav v-if="view.prev || view.next" class="yy-pager">
         <RouterLink v-if="view.prev" :to="`/docs/${view.prev.id}`" class="prev">
           <span class="yy-pager-label"><ArrowLeft :size="14" />上一篇</span><span class="yy-pager-title">{{ titleOf(view.prev) }}</span>

@@ -84,7 +84,7 @@ onBeforeUnmount(() => {
 
 <template>
   <nav class="yy-toc" aria-label="大纲">
-    <div class="yy-toc-title">大纲</div>
+    <div class="yy-toc-head"><span class="yy-toc-title">大纲</span></div>
     <ul v-if="entries.length">
       <li v-for="(h, i) in entries" :key="`${h.pos}-${i}`" :style="{ '--level': h.level - minLevel }">
         <a href="#" :class="{ active: active === i }" :title="h.text" @click.prevent="go(h)">{{ h.text }}</a>

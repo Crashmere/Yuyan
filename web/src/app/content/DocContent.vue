@@ -1,25 +1,40 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { base, type ImageSizes } from '../../shared/api'
 import { prefs } from '../prefs'
 import { enhance } from './enhance'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
+import { clearMatches, showMatches } from './matches'
 
-// Shows HTML rendered by the Go renderer. Links inside the site open within the app.
-const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes }>()
+// Shows HTML rendered by the Go renderer. Links inside the site open within the app. highlight is
+// the text searched for when the page was opened from search results.
+const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes; highlight?: string }>()
 const router = useRouter()
 const root = ref<HTMLElement | null>(null)
 // Diagrams are drawn in the theme's colours; a theme change re-creates the content to redraw them.
 const generation = ref(0)
+let drawn: Promise<unknown> = Promise.resolve()
 
 async function run() {
   await nextTick()
-  if (root.value) enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images })
+  if (!root.value) return
+  drawn = enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images }).catch((e: unknown) => console.warn('enhance', e))
+  await mark()
+}
+
+// Matches are found once formulas and diagrams are drawn, so the page does not move afterwards.
+async function mark() {
+  clearMatches()
+  if (!props.highlight) return
+  await drawn
+  if (root.value) showMatches(root.value, props.highlight)
 }
 
 onMounted(run)
 watch(() => props.html, run)
+watch(() => props.highlight, mark)
+onBeforeUnmount(clearMatches)
 watch(
   () => prefs.theme,
   () => {

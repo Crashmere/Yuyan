@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import type { Heading } from '../../shared/api'
+import IconButton from '../../ui/IconButton.vue'
+import { prefs } from '../prefs'
 
 // The outline beside a document; the entry for the heading at the top of the page is highlighted.
+// The eye button beside its title hides the list, as in Yuque; the choice is kept in this browser.
 const props = defineProps<{ items: Heading[] }>()
 const emit = defineEmits<{ navigate: [] }>()
 const router = useRouter()
@@ -40,8 +44,14 @@ function go(h: Heading) {
 </script>
 
 <template>
-  <nav class="yy-toc" aria-label="大纲">
-    <div class="yy-toc-title">大纲</div>
+  <nav class="yy-toc" :class="{ 'is-hidden': !prefs.readingOutline }" aria-label="大纲">
+    <div class="yy-toc-head">
+      <span class="yy-toc-title">大纲</span>
+      <IconButton small class="yy-toc-eye" :label="prefs.readingOutline ? '隐藏大纲' : '显示大纲'" @click="prefs.readingOutline = !prefs.readingOutline">
+        <Eye v-if="prefs.readingOutline" :size="14" />
+        <EyeOff v-else :size="14" />
+      </IconButton>
+    </div>
     <ul>
       <li v-for="h in items" :key="h.id" :style="{ '--level': h.level - minLevel }">
         <a :href="`#${h.id}`" :class="{ active: active === h.id }" :title="h.text" @click.prevent="go(h)">{{ h.text }}</a>

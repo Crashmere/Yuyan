@@ -585,6 +585,7 @@ a.yy-crumb:hover {
 /* Menus, tooltips, dialogs, toasts ---------------------------------------------------------- */
 
 .yy-menu {
+  position: relative;
   z-index: 70;
   min-width: 180px;
   max-height: min(420px, var(--reka-dropdown-menu-content-available-height, 420px));
@@ -767,6 +768,10 @@ a.yy-crumb:hover {
   border-radius: 2px;
   background: var(--yy-mark);
   color: inherit;
+}
+/* What was searched for, in a document opened from search results (content/matches.ts). */
+::highlight(yy-search) {
+  background-color: var(--yy-mark);
 }
 .yy-search-note {
   margin: 12px 10px;
@@ -1503,10 +1508,24 @@ a.yy-catalog-title:hover {
   max-height: calc(100vh - var(--yy-topbar) - 48px);
   overflow: auto;
 }
-.yy-toc-title {
+.yy-toc-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-bottom: 8px;
+  background: var(--yy-bg);
+}
+.yy-toc-title {
   color: var(--yy-text-3);
   font-size: 12px;
+}
+.yy-toc-eye {
+  color: var(--yy-text-3);
+}
+.yy-toc.is-hidden ul {
+  display: none;
 }
 .yy-toc ul {
   list-style: none;
@@ -1807,6 +1826,13 @@ a.yy-catalog-title:hover {
     box-shadow: var(--yy-shadow-popover);
   }
   .toc-open .yy-doc-aside {
+    display: block;
+  }
+  /* Opened from the top bar as a drawer, the outline is always shown in full. */
+  .yy-toc-eye {
+    display: none;
+  }
+  .yy-toc.is-hidden ul {
     display: block;
   }
   .toc-open .yy-aside-mask {

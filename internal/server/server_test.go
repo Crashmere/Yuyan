@@ -180,11 +180,31 @@ func TestTitlesListDocumentsWithTheirPlace(t *testing.T) {
 		t.Fatalf("titles: %d %v %s", status, err, body)
 	}
 	want := []titleEntry{
-		{ID: parent.ID, Title: "装饰", BookID: b.ID, BookName: "设计模式", Path: []string{"结构型模式"}},
-		{ID: parent.ID + 1, Title: "IO 流", BookID: b.ID, BookName: "设计模式", Path: []string{"结构型模式", "装饰"}},
+		{ID: parent.ID, Title: "装饰", Pinyin: "zhuang shi", BookID: b.ID, BookName: "设计模式", Path: []string{"结构型模式"}},
+		{ID: parent.ID + 1, Title: "IO 流", Pinyin: "io liu", BookID: b.ID, BookName: "设计模式", Path: []string{"结构型模式", "装饰"}},
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("titles:\n got %+v\nwant %+v", got, want)
+	}
+	status, body = do(t, h, "GET", "/yuyan/api/books", "")
+	if status != http.StatusOK || !strings.Contains(body, `"name":"设计模式","description":"","position":1,"docCount":2,`) || !strings.Contains(body, `"pinyin":"she ji mo/mu shi/te"`) {
+		t.Fatalf("books: %d %s", status, body)
+	}
+}
+
+func TestPinyinOf(t *testing.T) {
+	for text, want := range map[string]string{
+		"01 最短路":       "01 zui/cuo duan lu/luo",
+		"装饰_Decorator": "zhuang shi decorator",
+		"长文档":          "zhang/chang wen dang",
+		"绿色，过滤器":       "lv/lu se/shai guo lv/lu qi",
+		// Characters whose initials the collation-based guess once got wrong.
+		"楼 龙 如 入 他 喔": "lou long ru ru ta/tuo o/wo/wu",
+		"Vue3 + Go":   "vue3 go",
+	} {
+		if got := pinyinOf(text); got != want {
+			t.Errorf("pinyinOf(%q) = %q, want %q", text, got, want)
+		}
 	}
 }
 

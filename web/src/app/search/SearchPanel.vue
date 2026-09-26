@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, nextTick, ref, watch, type Component } from 'vue'
+import { useRouter, type RouteLocationRaw } from 'vue-router'
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
-import { FileText, Search } from 'lucide-vue-next'
-import { api, errorMessage, type DocSummary, type SearchHit, type TitleEntry } from '../../shared/api'
+import { BookOpen, FileText, Search } from 'lucide-vue-next'
+import { api, errorMessage, type Book, type DocSummary, type SearchHit, type TitleEntry } from '../../shared/api'
 import { recentlyViewed } from '../prefs'
+import { loadBooks } from '../store'
 import { parts } from './highlight'
+import { score, units, type Units } from './match'
 import { searchOpen } from './panel'
-import { initials } from './pinyin'
 
 // Opened with Cmd/Ctrl+K or the sidebar's search button. Before typing it lists recent documents;
-// then documents whose title matches, also by pinyin initials, at once, and full-text results a
-// moment later.
+// then knowledge bases and documents whose name matches, also by pinyin, at once, and full-text
+// results a moment later. Full-text results open with the query highlighted in the document.
 interface Item {
-  id: number
+  key: string
+  to: RouteLocationRaw
+  icon: Component
   title: string
   where: string
   snippet?: string
@@ -23,7 +26,8 @@ const router = useRouter()
 const query = ref('')
 const input = ref<HTMLInputElement | null>(null)
 const list = ref<HTMLElement | null>(null)
-const index = ref<(TitleEntry & { lower: string; letters: string })[]>([])
+const index = ref<(TitleEntry & { spelled: Units })[]>([])
+const books = ref<(Book & { spelled: Units })[]>([])
 const edited = ref<DocSummary[]>([])
 const hits = ref<SearchHit[]>([])
 const searched = ref('')
@@ -36,8 +40,9 @@ const where = (bookName: string, path: string[] = []) => [bookName, ...path].joi
 async function load() {
   failure.value = ''
   try {
-    const [titles, recent] = await Promise.all([api<TitleEntry[]>('titles'), api<DocSummary[]>('recent')])
-    index.value = titles.map((t) => ({ ...t, lower: t.title.toLowerCase(), letters: initials(t.title) }))
+    const [titles, recent, all] = await Promise.all([api<TitleEntry[]>('titles'), api<DocSummary[]>('recent'), loadBooks()])
+    index.value = titles.map((t) => ({ ...t, spelled: units(t.pinyin) }))
+    books.value = all.map((b) => ({ ...b, spelled: units(b.pinyin ?? '') }))
     edited.value = recent
   } catch (e) {
     failure.value = errorMessage(e)
@@ -79,12 +84,29 @@ watch(query, (q) => {
   }, 200)
 })
 
+// The best matches first; among equals, the shorter name.
+function ranked<T>(list: T[], name: (x: T) => string, spelled: (x: T) => Units, q: string, limit: number): T[] {
+  return list
+    .map((x) => ({ x, s: score(name(x), spelled(x), q) }))
+    .filter((m) => m.s > 0)
+    .sort((a, b) => b.s - a.s || name(a.x).length - name(b.x).length)
+    .slice(0, limit)
+    .map((m) => m.x)
+}
+
 const sections = computed<{ name: string; items: Item[] }[]>(() => {
-  const q = query.value.trim().toLowerCase()
+  const q = query.value.trim()
   const byId = new Map(index.value.map((t) => [t.id, t]))
-  const item = (id: number, title: string, bookName: string, snippet?: string): Item => {
+  const doc = (id: number, title: string, bookName: string, snippet?: string, highlight?: string): Item => {
     const t = byId.get(id)
-    return { id, title: t?.title ?? title, where: t ? where(t.bookName, t.path) : bookName, snippet }
+    return {
+      key: `d${id}`,
+      to: highlight ? { path: `/docs/${id}`, query: { hl: highlight } } : `/docs/${id}`,
+      icon: FileText,
+      title: t?.title ?? title,
+      where: t ? where(t.bookName, t.path) : bookName,
+      snippet,
+    }
   }
   if (!q) {
     const viewed = recentlyViewed()
@@ -93,27 +115,21 @@ const sections = computed<{ name: string; items: Item[] }[]>(() => {
     const seen = new Set(viewed.map((v) => v.id))
     const recent = edited.value.filter((d) => d.kind === 'doc' && !seen.has(d.id)).slice(0, 6)
     return [
-      { name: '最近浏览', items: viewed.map((v) => item(v.id, v.title, v.bookName)) },
-      { name: '最近编辑', items: recent.map((d) => item(d.id, d.title, d.bookName)) },
+      { name: '最近浏览', items: viewed.map((v) => doc(v.id, v.title, v.bookName)) },
+      { name: '最近编辑', items: recent.map((d) => doc(d.id, d.title, d.bookName)) },
     ].filter((s) => s.items.length)
   }
-  // A title containing the query beats one whose pinyin initials contain it; starting with it
-  // beats containing it somewhere else.
-  const letters = /^[a-z]+$/.test(q)
-  const titled = index.value
-    .map((t) => {
-      const i = t.lower.indexOf(q)
-      const j = letters ? t.letters.indexOf(q) : -1
-      return { t, score: i === 0 ? 4 : i > 0 ? 3 : j === 0 ? 2 : j > 0 ? 1 : 0 }
-    })
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score || a.t.title.length - b.t.title.length)
-    .slice(0, 8)
-  const shown = new Set(titled.map((x) => x.t.id))
-  const text = searched.value === query.value.trim() ? hits.value.filter((h) => !shown.has(h.id)).slice(0, 8) : []
+  const matchedBooks = ranked(books.value, (b) => b.name, (b) => b.spelled, q, 5)
+  const titled = ranked(index.value, (t) => t.title, (t) => t.spelled, q, 8)
+  const shown = new Set(titled.map((t) => t.id))
+  const text = searched.value === q ? hits.value.filter((h) => !shown.has(h.id)).slice(0, 8) : []
   return [
-    { name: '标题', items: titled.map(({ t }) => item(t.id, t.title, t.bookName)) },
-    { name: '正文', items: text.map((h) => item(h.id, h.title, h.bookName, h.snippet)) },
+    {
+      name: '知识库',
+      items: matchedBooks.map((b) => ({ key: `b${b.id}`, to: `/books/${b.id}`, icon: BookOpen, title: b.name, where: `${b.docCount} 篇文档` })),
+    },
+    { name: '标题', items: titled.map((t) => doc(t.id, t.title, t.bookName)) },
+    { name: '正文', items: text.map((h) => doc(h.id, h.title, h.bookName, h.snippet, q)) },
   ].filter((s) => s.items.length)
 })
 
@@ -132,9 +148,9 @@ watch(active, async (i) => {
   list.value?.querySelector(`[data-index="${i}"]`)?.scrollIntoView({ block: 'nearest' })
 })
 
-function go(id: number) {
+function go(it: Item) {
   searchOpen.value = false
-  void router.push(`/docs/${id}`)
+  void router.push(it.to)
 }
 
 function showAll() {
@@ -155,7 +171,7 @@ function onKey(e: KeyboardEvent) {
   } else if (e.key === 'Enter') {
     e.preventDefault()
     const hit = items.value[active.value]
-    if (hit) go(hit.id)
+    if (hit) go(hit)
     else if (query.value.trim()) showAll()
   }
 }
@@ -169,7 +185,7 @@ function onKey(e: KeyboardEvent) {
         <DialogTitle class="yy-visually-hidden">搜索文档</DialogTitle>
         <div class="yy-search-field">
           <Search :size="18" />
-          <input ref="input" v-model="query" placeholder="搜索标题和正文，标题也可以用拼音首字母" aria-label="搜索文档" @keydown="onKey" />
+          <input ref="input" v-model="query" placeholder="搜索知识库、标题和正文，名称也可以用拼音" aria-label="搜索文档" @keydown="onKey" />
           <kbd>Esc</kbd>
         </div>
         <div ref="list" class="yy-search-results" role="listbox" aria-label="搜索结果">
@@ -178,7 +194,7 @@ function onKey(e: KeyboardEvent) {
             <div class="yy-search-section">{{ s.name }}</div>
             <button
               v-for="(it, k) in s.items"
-              :key="it.id"
+              :key="it.key"
               type="button"
               role="option"
               class="yy-search-item"
@@ -186,9 +202,9 @@ function onKey(e: KeyboardEvent) {
               :aria-selected="offsets[si] + k === active"
               :data-index="offsets[si] + k"
               @mouseenter="active = offsets[si] + k"
-              @click="go(it.id)"
+              @click="go(it)"
             >
-              <FileText :size="16" />
+              <component :is="it.icon" :size="16" />
               <span class="yy-search-text">
                 <span class="yy-search-title"><template v-for="(p, i) in parts(it.title, query)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template></span>
                 <span class="yy-search-where">{{ it.where }}</span>
