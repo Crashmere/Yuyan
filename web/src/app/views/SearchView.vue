@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Search } from 'lucide-vue-next'
 import { api, errorMessage, type SearchHit } from '../../shared/api'
 import { setTitle } from '../router'
+import { parts } from '../search/highlight'
 import { loading, setPage } from '../store'
 
 setPage(null)
@@ -47,22 +48,6 @@ onMounted(() => {
   input.value?.focus()
   if (q.value) void run(q.value)
 })
-
-// parts splits text around case-insensitive matches of the query, for highlighting.
-function parts(text: string): { text: string; hit: boolean }[] {
-  const query = searched.value.toLowerCase()
-  if (!query) return [{ text, hit: false }]
-  const out: { text: string; hit: boolean }[] = []
-  const lower = text.toLowerCase()
-  let at = 0
-  for (let i = lower.indexOf(query); i >= 0; i = lower.indexOf(query, i + query.length)) {
-    if (i > at) out.push({ text: text.slice(at, i), hit: false })
-    out.push({ text: text.slice(i, i + query.length), hit: true })
-    at = i + query.length
-  }
-  if (at < text.length) out.push({ text: text.slice(at), hit: false })
-  return out
-}
 </script>
 
 <template>
@@ -77,11 +62,11 @@ function parts(text: string): { text: string; hit: boolean }[] {
       <ul class="yy-results">
         <li v-for="h in hits" :key="h.id">
           <RouterLink :to="`/docs/${h.id}`" class="yy-result-title">
-            <template v-for="(p, i) in parts(h.title)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template>
+            <template v-for="(p, i) in parts(h.title, searched)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template>
           </RouterLink>
           <span class="yy-result-book">{{ h.bookName }}</span>
           <p class="yy-result-snippet">
-            <template v-for="(p, i) in parts(h.snippet)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template>
+            <template v-for="(p, i) in parts(h.snippet, searched)" :key="i"><mark v-if="p.hit">{{ p.text }}</mark><template v-else>{{ p.text }}</template></template>
           </p>
         </li>
       </ul>

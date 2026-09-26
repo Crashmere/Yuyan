@@ -1,12 +1,25 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { prefs } from '../prefs'
+import { openSearch, searchLoaded } from '../search/panel'
 import { state } from '../store'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 
+const SearchPanel = defineAsyncComponent(() => import('../search/SearchPanel.vue'))
+
 const route = useRoute()
+
+// Cmd/Ctrl+K opens the search panel everywhere, including in the editor.
+function onKey(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k' && !e.isComposing) {
+    e.preventDefault()
+    openSearch()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 // On narrow screens the sidebar is a drawer over the page.
 const drawer = ref(false)
 watch(() => route.fullPath, () => (drawer.value = false))
@@ -42,5 +55,6 @@ function resize(e: PointerEvent) {
         <component :is="Component" :key="r.path" />
       </RouterView>
     </div>
+    <SearchPanel v-if="searchLoaded" />
   </div>
 </template>

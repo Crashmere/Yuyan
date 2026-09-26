@@ -196,13 +196,13 @@ test('the slash menu finds items by pinyin and inserts a table sized on the grid
   expect(md).toMatch(/\| -+ \| :-+: \| -+ \|/)
 })
 
-test('Cmd/Ctrl+K links the selection and a link under the cursor shows its card', async ({ page, request }) => {
+test('links: from the selection toolbar and the slash menu, with a card under the cursor', async ({ page, request }) => {
   const id = await createDoc(request, '链接测试', '访问示例网站了解更多。')
   await openEditor(page, id)
   const para = page.locator('.ProseMirror p').first()
   await para.click()
   await selectText(page, para, '示例网站')
-  await page.keyboard.press('ControlOrMeta+k')
+  await textBubble(page).locator('[title="链接"]').click()
   const panel = page.locator('.yy-link-panel')
   await expect(panel).toBeVisible()
   await expect(panel.locator('input')).toBeFocused()
@@ -213,6 +213,51 @@ test('Cmd/Ctrl+K links the selection and a link under the cursor shows its card'
   await expect(link).toHaveText('示例网站')
   await link.click()
   await expect(page.locator('.yy-link-card')).toContainText('https://example.com')
+
+  // Without a selection the slash menu's 链接 asks for the text too.
+  await caretAtEnd(para)
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('/lj')
+  await expect(page.locator('.yy-slash .yy-slash-title')).toHaveText(['链接'])
+  await page.keyboard.press('Enter')
+  await expect(panel).toBeVisible()
+  await panel.locator('input').nth(0).fill('帮助文档')
+  await panel.locator('input').nth(1).fill('example.org/help')
+  await panel.locator('input').nth(1).press('Enter')
+  await expect(page.locator('.ProseMirror a[href="https://example.org/help"]')).toHaveText('帮助文档')
+})
+
+test('Cmd/Ctrl+K opens the search panel: recent documents, titles, pinyin initials, full text', async ({ page, request }) => {
+  await page.goto('./')
+  await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
+  await page.locator('.yy-catalog-title', { hasText: '排序' }).click()
+  await expect(page.locator('.yy-doc-title')).toHaveText('排序')
+  await page.keyboard.press('ControlOrMeta+k')
+  const panel = page.locator('.yy-search-panel')
+  const input = panel.locator('input')
+  await expect(input).toBeFocused()
+  await expect(panel.locator('.yy-search-section').first()).toHaveText('最近浏览')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('排序')
+
+  await page.keyboard.type('长文档')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('长文档示例')
+  await input.fill('ksks')
+  await expect(panel.locator('.yy-search-item').first()).toContainText('快速开始')
+  await input.fill('Bellman')
+  await expect(panel.locator('.yy-search-item', { hasText: '最短路' }).locator('.yy-search-snippet mark')).toHaveText('Bellman')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.yy-doc-title')).toHaveText('最短路')
+  await expect(panel).toHaveCount(0)
+
+  // In the editor the shortcut opens search too; links come from the toolbars and the slash menu.
+  const id = await createDoc(request, '快捷键测试', '正文')
+  await openEditor(page, id)
+  await page.keyboard.press('ControlOrMeta+k')
+  await expect(panel).toBeVisible()
+  await expect(page.locator('.yy-link-panel')).toHaveCount(0)
+  await page.keyboard.press('ArrowDown')
+  await page.keyboard.press('Escape')
+  await expect(panel).toHaveCount(0)
 })
 
 test('formulas are written in a popover with a live preview', async ({ page, request }) => {

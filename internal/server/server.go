@@ -142,6 +142,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("POST /api/books/{id}/restore", s.write(s.apiRestoreBook))
 	mux.Handle("GET /api/books/{id}/tree", s.get(s.tree))
 	mux.Handle("GET /api/recent", s.get(s.recent))
+	mux.Handle("GET /api/titles", s.get(s.titles))
 	mux.Handle("POST /api/docs", s.write(s.apiCreateDoc))
 	mux.Handle("GET /api/docs/{id}", s.get(s.fullDoc))
 	mux.Handle("PUT /api/docs/{id}", s.write(s.apiSaveDoc))

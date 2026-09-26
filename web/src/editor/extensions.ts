@@ -69,6 +69,6 @@ export function editorExtensions(ui: EditorUi): Extensions {
     CalloutKeys,
     Search,
     TableShape,
-    UiShortcuts.configure({ openLink: ui.openLink, openFind: ui.openFind, openShortcuts: ui.openShortcuts }),
+    UiShortcuts.configure({ openFind: ui.openFind, openShortcuts: ui.openShortcuts }),
   ]
 }

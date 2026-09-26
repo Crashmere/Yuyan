@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Bird, PanelLeftClose, Search, Trash2 } from 'lucide-vue-next'
+import { withKey } from '../../editor/keys'
 import IconButton from '../../ui/IconButton.vue'
 import { prefs } from '../prefs'
+import { openSearch } from '../search/panel'
 import { state } from '../store'
 import BookPanel from './BookPanel.vue'
 import ThemeMenu from './ThemeMenu.vue'
 import WorkspacePanel from './WorkspacePanel.vue'
 
 const route = useRoute()
-const router = useRouter()
 const bookId = computed(() => (route.meta.sidebar === 'book' ? state.bookId : null))
 </script>
 
@@ -18,7 +19,7 @@ const bookId = computed(() => (route.meta.sidebar === 'book' ? state.bookId : nu
   <div class="yy-sidebar-inner">
     <div class="yy-sidebar-head">
       <RouterLink to="/" class="yy-brand"><span class="yy-brand-mark"><Bird :size="16" /></span>语燕</RouterLink>
-      <IconButton label="搜索" @click="router.push('/search')"><Search :size="17" /></IconButton>
+      <IconButton :label="withKey('搜索', 'Mod-K')" @click="openSearch()"><Search :size="17" /></IconButton>
       <IconButton class="yy-collapse-btn" label="收起侧栏" @click="prefs.sidebarCollapsed = true"><PanelLeftClose :size="17" /></IconButton>
     </div>
     <BookPanel v-if="bookId != null" :key="bookId" :book-id="bookId" />

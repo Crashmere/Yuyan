@@ -91,7 +91,7 @@ const moreMenu = computed<MenuEntry[]>(() => [{ label: '快捷键说明', icon: 
       >
         <component :is="m.icon" :size="17" />
       </IconButton>
-      <IconButton :label="withKey('链接', 'Mod-K')" :active="state.link" :disabled="state.inCode" @mousedown.prevent @click="ui.openLink()"><Link :size="17" /></IconButton>
+      <IconButton label="链接" :active="state.link" :disabled="state.inCode" @mousedown.prevent @click="ui.openLink()"><Link :size="17" /></IconButton>
       <span class="yy-toolbar-sep"></span>
       <IconButton
         v-for="m in listButtons"

@@ -3,7 +3,7 @@ import type { Editor } from '@tiptap/core'
 import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import {
-  Bold, Code, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, List, ListOrdered,
+  Bold, Code, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
   ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow,
 } from 'lucide-vue-next'
 import type { EditorUi } from './context'
@@ -115,6 +115,7 @@ export const insertItems: InsertItem[] = [
   },
   { id: 'table', label: '表格', description: '选择行数和列数', icon: Table, group: '插入', keywords: 'bg table', run: (e, ui, anchor) => ui.openTableGrid(anchor ?? coordsRect(e)) },
   { id: 'image', label: '图片', description: '上传图片，也可以直接粘贴或拖入', icon: Image, group: '插入', keywords: 'tp image picture', run: (_e, ui) => ui.pickImage() },
+  { id: 'link', label: '链接', description: '网址或本站文档的链接', icon: Link, group: '插入', keywords: 'lj link url', run: (_e, ui) => ui.openLink() },
   { id: 'hr', label: '分割线', description: '分隔上下内容', icon: Minus, group: '插入', markdown: '---', keywords: 'fgx hr divider', run: (e) => e.chain().focus().setHorizontalRule().run() },
   { id: 'blockMath', label: '公式块', description: '独占一行的 LaTeX 公式', icon: Sigma, group: '插入', markdown: '$$', keywords: 'gsk math formula latex', run: (e, ui) => insertMath(e, ui, 'blockMath') },
   { id: 'inlineMath', label: '行内公式', description: '嵌在文字中的公式', icon: Radical, group: '插入', markdown: '$…$', keywords: 'hngs inline math', run: (e, ui) => insertMath(e, ui, 'inlineMath') },

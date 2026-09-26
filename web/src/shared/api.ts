@@ -77,6 +77,15 @@ export interface VersionView {
   images: ImageSizes
 }
 
+// A document in the title index of the search panel.
+export interface TitleEntry {
+  id: number
+  title: string
+  bookId: number
+  bookName: string
+  path: string[]
+}
+
 export interface DocSummary {
   id: number
   bookId: number

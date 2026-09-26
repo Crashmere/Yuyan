@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"unicode"
 
@@ -57,6 +58,41 @@ func (s *Server) tree(r *http.Request) (any, error) {
 func (s *Server) recent(r *http.Request) (any, error) {
 	recent, err := s.store.Recent(r.Context(), 20)
 	return nonNil(recent), err
+}
+
+type titleEntry struct {
+	ID       int64    `json:"id"`
+	Title    string   `json:"title"`
+	BookID   int64    `json:"bookId"`
+	BookName string   `json:"bookName"`
+	Path     []string `json:"path"`
+}
+
+// titles lists every document with its knowledge base and the titles above it, so the search
+// panel can match titles as the user types without a request per keystroke.
+func (s *Server) titles(r *http.Request) (any, error) {
+	books, err := s.store.ListBooks(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	out := []titleEntry{}
+	for _, b := range books {
+		tree, err := s.store.Tree(r.Context(), b.ID)
+		if err != nil {
+			return nil, err
+		}
+		var walk func(nodes []*store.TreeNode, path []string)
+		walk = func(nodes []*store.TreeNode, path []string) {
+			for _, n := range nodes {
+				if n.Kind == "doc" {
+					out = append(out, titleEntry{ID: n.ID, Title: n.Title, BookID: b.ID, BookName: b.Name, Path: slices.Clone(path)})
+				}
+				walk(n.Children, append(slices.Clone(path), n.Title))
+			}
+		}
+		walk(tree, []string{})
+	}
+	return out, nil
 }
 
 func (s *Server) liveDoc(r *http.Request) (store.Doc, error) {

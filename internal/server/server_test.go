@@ -137,6 +137,27 @@ func TestViewsCarryImageSizes(t *testing.T) {
 	}
 }
 
+func TestTitlesListDocumentsWithTheirPlace(t *testing.T) {
+	ctx := context.Background()
+	st, h := newServer(t)
+	b, _ := st.CreateBook(ctx, "设计模式", "")
+	group, _ := st.CreateDoc(ctx, store.CreateDocInput{BookID: b.ID, Kind: "group", Title: "结构型模式"})
+	parent, _ := st.CreateDoc(ctx, store.CreateDocInput{BookID: b.ID, ParentID: &group.ID, Title: "装饰"})
+	st.CreateDoc(ctx, store.CreateDocInput{BookID: b.ID, ParentID: &parent.ID, Title: "IO 流"})
+	status, body := do(t, h, "GET", "/yuyan/api/titles", "")
+	var got []titleEntry
+	if err := json.Unmarshal([]byte(body), &got); status != http.StatusOK || err != nil {
+		t.Fatalf("titles: %d %v %s", status, err, body)
+	}
+	want := []titleEntry{
+		{ID: parent.ID, Title: "装饰", BookID: b.ID, BookName: "设计模式", Path: []string{"结构型模式"}},
+		{ID: parent.ID + 1, Title: "IO 流", BookID: b.ID, BookName: "设计模式", Path: []string{"结构型模式", "装饰"}},
+	}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("titles:\n got %+v\nwant %+v", got, want)
+	}
+}
+
 func TestMissingPagesAndAPIs(t *testing.T) {
 	_, h := newServer(t)
 	status, page := do(t, h, "GET", "/yuyan/docs/999", "")

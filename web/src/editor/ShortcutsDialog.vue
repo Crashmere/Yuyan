@@ -12,7 +12,7 @@ const groups: { title: string; items: [string, string][] }[] = [
       ['撤销', 'Mod-Z'],
       ['重做', 'Mod-Shift-Z'],
       ['查找替换', 'Mod-F'],
-      ['添加链接', 'Mod-K'],
+      ['搜索文档', 'Mod-K'],
       ['快捷键说明', 'Mod-/'],
       ['换行（不分段）', 'Shift-Enter'],
     ],
