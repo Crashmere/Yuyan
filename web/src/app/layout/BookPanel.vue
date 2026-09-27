@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { BookOpen, ChevronsUpDown, Ellipsis, FoldVertical, Plus, UnfoldVertical } from 'lucide-vue-next'
+import { BookOpen, ChevronsUpDown, Ellipsis, Plus } from 'lucide-vue-next'
 import ActionMenu from '../../ui/ActionMenu.vue'
+import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
 import { bookMenu, newDoc } from '../actions'
@@ -42,8 +43,7 @@ onMounted(() => {
     <div class="yy-tree-scroll">
       <div v-if="tree?.length" class="yy-tree-head">
         <span>目录</span>
-        <IconButton small label="全部折叠" @click="treeView?.foldAll()"><FoldVertical :size="14" /></IconButton>
-        <IconButton small label="全部展开" @click="treeView?.unfoldAll()"><UnfoldVertical :size="14" /></IconButton>
+        <FoldAllButton v-if="treeView?.hasBranches" :expanded="treeView.hasExpanded" @click="treeView.toggleAll()" />
       </div>
       <BookTree v-if="tree" ref="treeView" :book-id="bookId" :nodes="tree" :current-id="state.docId" />
     </div>

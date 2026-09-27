@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
-import { Eye, EyeOff, FoldVertical, UnfoldVertical } from 'lucide-vue-next'
+import { Eye, EyeOff } from 'lucide-vue-next'
+import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
 
 // The outline of a reading page or the editor. As in Yuque, the eye beside its title only pins it:
@@ -32,13 +33,16 @@ const shownBy = computed(() => {
   })
 })
 const highlighted = computed(() => (props.active < 0 ? -1 : shownBy.value[props.active]))
+// Hidden descendants do not count as expanded: once every visible branch is closed, offer to open all.
+const hasExpanded = computed(() => props.items.some((h, i) => parents.value[i] && shownBy.value[i] === i && !folded.has(h.key)))
 
 function toggle(key: string) {
   if (folded.has(key)) folded.delete(key)
   else folded.add(key)
 }
-function foldAll() {
-  props.items.forEach((h, i) => parents.value[i] && folded.add(h.key))
+function toggleAll() {
+  if (hasExpanded.value) props.items.forEach((h, i) => parents.value[i] && folded.add(h.key))
+  else folded.clear()
 }
 </script>
 
@@ -54,8 +58,7 @@ function foldAll() {
           <Eye v-if="pinned" :size="14" /><EyeOff v-else :size="14" />
         </IconButton>
         <span v-if="parents.some(Boolean)" class="yy-toc-tools">
-          <IconButton small label="全部折叠" @click="foldAll"><FoldVertical :size="14" /></IconButton>
-          <IconButton small label="全部展开" @click="folded.clear()"><UnfoldVertical :size="14" /></IconButton>
+          <FoldAllButton :expanded="hasExpanded" @click="toggleAll" />
         </span>
       </div>
       <ul v-if="items.length">

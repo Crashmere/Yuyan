@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, provide, reactive, ref, watch } from 'vue'
+import { computed, nextTick, provide, reactive, ref, watch } from 'vue'
 import { errorMessage, type TreeNode } from '../../shared/api'
 import { toast } from '../../ui/toast'
 import { nodeMenu } from '../actions'
@@ -21,7 +21,10 @@ function toggle(id: number, open = !expanded.has(id)) {
   saveExpanded(props.bookId, expanded)
 }
 
-// The buttons above the tree fold or open every node.
+// If every root branch is closed, nested expansion state is invisible and we offer to open all.
+const hasBranches = computed(() => props.nodes.some((n) => n.children?.length))
+const hasExpanded = computed(() => props.nodes.some((n) => n.children?.length && expanded.has(n.id)))
+
 function foldAll() {
   expanded.clear()
   saveExpanded(props.bookId, expanded)
@@ -37,7 +40,11 @@ function unfoldAll() {
   walk(props.nodes)
   saveExpanded(props.bookId, expanded)
 }
-defineExpose({ foldAll, unfoldAll })
+function toggleAll() {
+  if (hasExpanded.value) foldAll()
+  else unfoldAll()
+}
+defineExpose({ hasBranches, hasExpanded, toggleAll })
 
 // Opening a document expands the path to it and scrolls its row into view.
 watch(

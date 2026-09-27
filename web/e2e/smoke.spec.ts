@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { openSidebar } from './sidebar'
 
 // Titles come from the synthetic data written by tools/demo/seed.ts.
 
@@ -64,17 +65,20 @@ test('a document dragged onto a group moves into it', async ({ page }) => {
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '产品手册（示例）' }).click()
   await page.locator('.yy-catalog-title', { hasText: '常见问题' }).click()
+  await openSidebar(page)
   const moved = page.waitForResponse((r) => r.url().endsWith('/move') && r.ok())
   await treeRow(page, '常见问题').dragTo(treeRow(page, '入门'))
   await moved
   await expect(treeChildren(page, '入门')).toContainText('常见问题')
   await page.reload()
+  await openSidebar(page)
   await expect(treeChildren(page, '入门')).toContainText('常见问题')
 })
 
 test('a deleted document comes back from the trash', async ({ page }) => {
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
+  await openSidebar(page)
   await treeRow(page, '复杂度速查').click({ button: 'right' })
   await page.getByRole('menuitem', { name: '删除' }).click()
   await page.locator('.yy-dialog').getByRole('button', { name: '删除' }).click()
@@ -83,6 +87,8 @@ test('a deleted document comes back from the trash', async ({ page }) => {
   const item = page.locator('.yy-trash-list li', { hasText: '复杂度速查' })
   await item.getByRole('button', { name: '恢复' }).click()
   await expect(item).toHaveCount(0)
+  await openSidebar(page)
   await page.locator('.yy-sidebar').getByRole('link', { name: '算法笔记（示例）' }).click()
+  await openSidebar(page)
   await expect(treeRow(page, '复杂度速查')).toBeVisible()
 })

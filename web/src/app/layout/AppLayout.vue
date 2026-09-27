@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import { isNavigationFailure, NavigationFailureType, RouterView, useRoute, useRouter } from 'vue-router'
 import { prefs } from '../prefs'
 import { openSearch, searchLoaded } from '../search/panel'
 import { state } from '../store'
@@ -10,6 +10,7 @@ import TopBar from './TopBar.vue'
 const SearchPanel = defineAsyncComponent(() => import('../search/SearchPanel.vue'))
 
 const route = useRoute()
+const router = useRouter()
 
 // Cmd/Ctrl+K opens the search panel everywhere, including in the editor.
 function onKey(e: KeyboardEvent) {
@@ -22,7 +23,11 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 // On narrow screens the sidebar is a drawer over the page.
 const drawer = ref(false)
-watch(() => route.fullPath, () => (drawer.value = false))
+// Selecting the current document also closes the drawer; toggling a tree group does not navigate.
+const stopAfterEach = router.afterEach((_to, _from, failure) => {
+  if (!failure || isNavigationFailure(failure, NavigationFailureType.duplicated)) drawer.value = false
+})
+onBeforeUnmount(stopAfterEach)
 
 function resize(e: PointerEvent) {
   const handle = e.currentTarget as HTMLElement

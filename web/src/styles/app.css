@@ -190,15 +190,23 @@ kbd {
 /* Layout ---------------------------------------------------------------------------------- */
 
 .yy-app {
-  display: flex;
+  /* The document uses the full window, just as it does with the sidebar closed. Only the chrome
+     reserves sidebar space. On large screens the sidebar fits inside the left content margin. */
+  --yy-sidebar-size: min(var(--yy-sidebar-width, 264px), calc((100vw - var(--yy-content-width)) / 2 - 32px));
+  --yy-sidebar-inset: var(--yy-sidebar-size);
   min-height: 100vh;
+}
+.yy-app.sidebar-collapsed,
+.yy-app.focus-mode {
+  --yy-sidebar-inset: 0px;
 }
 
 .yy-sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  flex: none;
-  width: var(--yy-sidebar-width, 264px);
+  left: 0;
+  z-index: 25;
+  width: var(--yy-sidebar-size);
   height: 100vh;
   border-right: 1px solid var(--yy-border);
   background: var(--yy-bg-sidebar);
@@ -513,7 +521,6 @@ button.yy-tree-caret:hover {
 
 .yy-main {
   position: relative;
-  flex: 1;
   min-width: 0;
 }
 
@@ -525,6 +532,7 @@ button.yy-tree-caret:hover {
   align-items: center;
   gap: 8px;
   height: var(--yy-topbar);
+  margin-left: var(--yy-sidebar-inset);
   padding: 0 16px 0 20px;
   border-bottom: 1px solid var(--yy-border);
   background: color-mix(in srgb, var(--yy-bg) 92%, transparent);
@@ -1989,7 +1997,12 @@ a.yy-catalog-title:hover {
   }
 }
 
-@media (max-width: 900px) {
+/* Below this width there is not enough left margin for navigation beside a 1100 px document.
+   The drawer overlays the page, and closes on an outside click or after navigation. */
+@media (max-width: 1700px) {
+  .yy-app {
+    --yy-sidebar-inset: 0px;
+  }
   .yy-sidebar,
   .yy-app.sidebar-collapsed .yy-sidebar {
     position: fixed;
@@ -2002,6 +2015,7 @@ a.yy-catalog-title:hover {
     transition: transform 0.2s ease-out;
   }
   .yy-app.drawer-open .yy-sidebar {
+    display: block;
     transform: none;
   }
   .yy-drawer-mask {
@@ -2026,6 +2040,9 @@ a.yy-catalog-title:hover {
     display: inline-flex;
     margin-left: -8px;
   }
+}
+
+@media (max-width: 900px) {
   .yy-topbar {
     padding: 0 12px;
   }

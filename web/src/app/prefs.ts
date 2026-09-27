@@ -1,5 +1,5 @@
 import { reactive, watch } from 'vue'
-import { ListOrdered, MoveHorizontal, TextWrap } from 'lucide-vue-next'
+import { ListOrdered, TextWrap } from 'lucide-vue-next'
 import type { MenuEntry } from '../ui/menu'
 
 // Display preferences live in this browser only; none of them is written into documents.
@@ -10,8 +10,6 @@ interface Prefs {
   theme: Theme
   sidebarWidth: number
   sidebarCollapsed: boolean
-  // Content column: standard (800 px) or wide (1100 px), for reading and editing.
-  pageWidth: 'standard' | 'wide'
   // Whether the outlines beside the editor and beside a document being read are pinned (their eye
   // buttons); unpinned, they show as lines that open on hover.
   editorOutline: boolean
@@ -28,7 +26,8 @@ const themeKey = 'yuyan:theme'
 
 function load(): Partial<Prefs> {
   try {
-    const saved = JSON.parse(localStorage.getItem(prefsKey) ?? '{}') as Partial<Prefs>
+    const saved = JSON.parse(localStorage.getItem(prefsKey) ?? '{}') as Partial<Prefs> & { pageWidth?: unknown }
+    delete saved.pageWidth // All pages now use the former wide layout.
     const theme = localStorage.getItem(themeKey)
     if (theme === 'light' || theme === 'dark') saved.theme = theme
     return saved
@@ -41,7 +40,6 @@ export const prefs = reactive<Prefs>({
   theme: 'system',
   sidebarWidth: 264,
   sidebarCollapsed: false,
-  pageWidth: 'standard',
   editorOutline: true,
   readingOutline: true,
   focusMode: false,
@@ -55,17 +53,14 @@ export function applyPrefs() {
   const root = document.documentElement
   if (prefs.theme === 'system') delete root.dataset.theme
   else root.dataset.theme = prefs.theme
-  root.dataset.width = prefs.pageWidth
+  delete root.dataset.width
   root.classList.toggle('yy-code-numbers', prefs.codeLineNumbers)
   root.classList.toggle('yy-code-wrap', prefs.codeWrap)
 }
 
-// Menu entries for the page width and code display, offered in the appearance menu and the editor.
+// Code display options, offered in the appearance menu and the editor.
 export function displayItems(): MenuEntry[] {
   return [
-    { label: '标准宽度', icon: MoveHorizontal, checked: prefs.pageWidth === 'standard', run: () => void (prefs.pageWidth = 'standard') },
-    { label: '宽屏', icon: MoveHorizontal, checked: prefs.pageWidth === 'wide', run: () => void (prefs.pageWidth = 'wide') },
-    null,
     { label: '代码行号', icon: ListOrdered, checked: prefs.codeLineNumbers, run: () => void (prefs.codeLineNumbers = !prefs.codeLineNumbers) },
     { label: '代码自动换行', icon: TextWrap, checked: prefs.codeWrap, run: () => void (prefs.codeWrap = !prefs.codeWrap) },
   ]

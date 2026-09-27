@@ -6,7 +6,7 @@
 <meta name="yuyan-base" content="{{.Base}}">
 <title>{{.Title}}</title>
 <link rel="icon" href="{{static "favicon.svg"}}" type="image/svg+xml">
-<script>try{var d=document.documentElement,t=localStorage.getItem('yuyan:theme');if(t==='light'||t==='dark')d.dataset.theme=t;if(JSON.parse(localStorage.getItem('yuyan:prefs')||'{}').pageWidth==='wide')d.dataset.width='wide'}catch(e){}</script>
+<script>try{var d=document.documentElement,t=localStorage.getItem('yuyan:theme');if(t==='light'||t==='dark')d.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="{{static "chroma.css"}}">
 {{range .Entry.CSS}}<link rel="stylesheet" href="{{static .}}">
 {{end}}<script type="module" src="{{static .Entry.JS}}"></script>

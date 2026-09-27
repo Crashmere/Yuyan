@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
 import { markdownToDoc } from '../src/schema/markdown'
+import { openSidebar } from './sidebar'
 
 // Editor interactions (docs/DESIGN.md 12.6 and 12.7). Each test writes its own document into the
 // synthetic 读书摘录 knowledge base, which the smoke tests leave alone.
@@ -61,6 +62,7 @@ async function openEditor(page: Page, id: number) {
 async function finishAndExport(page: Page, title: string): Promise<string> {
   await page.getByRole('button', { name: '完成' }).click()
   await expect(page.locator('.yy-doc-title')).toHaveText(title)
+  await openSidebar(page)
   const download = page.waitForEvent('download')
   await page.locator('.yy-sidebar .yy-tree-row', { hasText: title }).click({ button: 'right' })
   await page.getByRole('menuitem', { name: '导出' }).click()
@@ -583,6 +585,7 @@ test('reading pages: image viewer, folded long code and line numbers', async ({ 
   await expect(pre).not.toHaveClass(/is-folded/)
   await expect(fold).toHaveText('收起代码')
 
+  await openSidebar(page)
   await page.getByRole('button', { name: /^外观/ }).click()
   await page.getByRole('menuitem', { name: '代码行号' }).click()
   await expect(page.locator('html')).toHaveClass(/yy-code-numbers/)
@@ -915,6 +918,7 @@ test('a menu that has to scroll shows half of its last item', async ({ page }) =
   await page.setViewportSize({ width: 1360, height: 210 })
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '产品手册（示例）' }).click()
+  await openSidebar(page)
   await page.getByRole('button', { name: '切换知识库' }).click()
   const menu = page.locator('.yy-menu')
   await expect(menu.getByRole('menuitem').first()).toBeVisible()
@@ -931,7 +935,9 @@ test('highlighted code stays legible in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' })
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
+  await openSidebar(page)
   await page.locator('.yy-sidebar .yy-tree-row', { hasText: '基础' }).click()
+  await openSidebar(page)
   await page.locator('.yy-sidebar .yy-tree-row', { hasText: '排序' }).click()
   const punctuation = page.locator('.yy-content pre .p', { hasText: '(' }).first()
   const [r, g, b] = (await punctuation.evaluate((el) => getComputedStyle(el).color)).match(/\d+/g)!.map(Number)
@@ -979,9 +985,10 @@ test('the longest documents stay responsive while editing', async ({ page, reque
 
 test('buttons share one tooltip, shown soon after the pointer rests', async ({ page }) => {
   await openLongDocument(page)
+  await openSidebar(page)
   const tip = page.locator('.yy-tooltip')
-  await page.locator('#yy-topbar-actions').getByRole('button', { name: '更多操作' }).hover()
-  await expect(tip).toHaveText('更多操作', { timeout: 800 })
+  await page.locator('.yy-book-head').getByRole('button', { name: '知识库操作' }).hover()
+  await expect(tip).toHaveText('知识库操作', { timeout: 800 })
   await page.locator('.yy-book-head').getByRole('button', { name: '新建文档' }).hover()
   await expect(tip).toHaveText('新建文档', { timeout: 300 })
   await page.mouse.move(700, 600)
@@ -990,27 +997,48 @@ test('buttons share one tooltip, shown soon after the pointer rests', async ({ p
 
 test('outline entries fold one by one or all at once, and so does the tree', async ({ page }) => {
   await openLongDocument(page)
-  const aside = page.locator('.yy-doc-aside')
-  const links = aside.getByRole('link')
-  const all = await links.count()
-  await aside.locator('li', { hasText: '1. 背景' }).getByRole('button', { name: '折叠' }).click()
-  await expect(aside.getByRole('link', { name: '1.1 细节', exact: true })).toHaveCount(0)
-  await expect(links).toHaveCount(all - 2)
-  await aside.getByRole('button', { name: '全部折叠' }).click()
-  await expect(links).toHaveCount(1)
-  await aside.getByRole('button', { name: '全部展开' }).click()
-  await expect(links).toHaveCount(all)
+  for (const editing of [false, true]) {
+    if (editing) {
+      await page.getByRole('link', { name: '编辑', exact: true }).click()
+      await expect(page.locator('.ProseMirror')).toBeVisible()
+    }
+    const aside = page.locator(editing ? '.yy-editor-outline' : '.yy-doc-aside')
+    const links = aside.getByRole('link')
+    const all = await links.count()
+    await expect(aside.getByRole('button', { name: /^全部/ })).toHaveCount(1)
+    await aside.locator('.yy-toc-head').screenshot({ path: `test-results/fold-button-${editing ? 'edit' : 'read'}-collapse.png` })
+    await aside.locator('li', { hasText: '1. 背景' }).getByRole('button', { name: '折叠' }).click()
+    await expect(aside.getByRole('link', { name: '1.1 细节', exact: true })).toHaveCount(0)
+    await expect(links).toHaveCount(all - 2)
+    await aside.getByRole('button', { name: '全部折叠' }).click()
+    await expect(links).toHaveCount(1)
+    await aside.locator('.yy-toc-head').screenshot({ path: `test-results/fold-button-${editing ? 'edit' : 'read'}-expand.png` })
+    await aside.getByRole('button', { name: '全部展开' }).click()
+    await expect(links).toHaveCount(all)
+    // Closing the root manually hides expanded descendants: offer to open them again.
+    await aside.getByRole('button', { name: '折叠', exact: true }).first().click()
+    await expect(links).toHaveCount(1)
+    await aside.getByRole('button', { name: '全部展开' }).click()
+    await expect(links).toHaveCount(all)
+  }
+  await page.getByRole('button', { name: '完成', exact: true }).click()
 
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
   const head = page.locator('.yy-tree-head')
   const rows = page.locator('.yy-sidebar .yy-tree-row')
-  await head.getByRole('button', { name: '全部折叠' }).click()
+  await openSidebar(page)
+  await expect(head.getByRole('button', { name: /^全部/ })).toHaveCount(1)
   const folded = await rows.count()
   await head.getByRole('button', { name: '全部展开' }).click()
   await expect.poll(() => rows.count()).toBeGreaterThan(folded)
   await head.getByRole('button', { name: '全部折叠' }).click()
   await expect(rows).toHaveCount(folded)
+  // Manual toggles update the same button, including when the last visible branch is closed.
+  await rows.getByRole('button', { name: '展开', exact: true }).first().click()
+  await expect(head.getByRole('button', { name: '全部折叠' })).toBeVisible()
+  await rows.getByRole('button', { name: '收起', exact: true }).first().click()
+  await expect(head.getByRole('button', { name: '全部展开' })).toBeVisible()
 })
 
 test('the editor: the outline as on reading pages, Mod-A within a block, heading levels at the handle', async ({ page, request }) => {
