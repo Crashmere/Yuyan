@@ -1,0 +1,59 @@
+/* Both shortcut references share sizing, rows and keycaps. Only their content area scrolls. */
+.yy-shortcuts-shell, .yy-dialog.yy-shortcuts {
+  width: min(780px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(680px, calc(100dvh - 64px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--yy-border);
+  border-radius: 12px;
+  background: var(--yy-bg-elevated);
+  color: var(--yy-text);
+  font: 13px/1.5 var(--yy-font);
+  box-shadow: var(--yy-shadow-dialog);
+}
+.yy-dialog.yy-shortcuts { top: 8vh; display: flex; flex-direction: column; outline: none; }
+.yy-code-shortcuts[open] { display: flex; flex-direction: column; }
+.yy-code-shortcuts::backdrop { background: var(--yy-overlay); }
+.yy-shortcuts-header { display: flex; align-items: center; flex: none; gap: 10px; padding: 20px 22px 16px; }
+.yy-shortcuts-header h2 { margin: 0; font: 600 18px/1.4 var(--yy-font); }
+.yy-shortcuts-platform { padding: 2px 7px; border-radius: 4px; background: var(--yy-bg-muted); color: var(--yy-text-2); font-size: 11px; white-space: nowrap; }
+.yy-shortcuts-close { display: inline-flex; align-items: center; justify-content: center; flex: none; margin-left: auto; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
+.yy-shortcuts-close:hover { background: var(--yy-bg-hover); color: var(--yy-text); }
+.yy-shortcuts-tabs { display: flex; flex-direction: column; min-height: 0; }
+.yy-shortcuts-nav { display: flex; flex: none; gap: 4px; padding: 0 22px; border-bottom: 1px solid var(--yy-border); }
+.yy-shortcuts-nav button { position: relative; flex: 1; padding: 10px 8px; border: 0; border-radius: 4px 4px 0 0; background: transparent; color: var(--yy-text-2); font: 500 13px/1.4 var(--yy-font); white-space: nowrap; cursor: pointer; }
+.yy-shortcuts-nav button:hover { background: var(--yy-bg-hover); }
+.yy-shortcuts-nav button[data-state=active] { color: var(--yy-primary); }
+.yy-shortcuts-nav button[data-state=active]::after { position: absolute; inset: auto 10px -1px; height: 2px; background: currentColor; content: ''; }
+.yy-shortcuts-body { min-height: 0; padding: 16px 22px 20px; overflow: auto; overscroll-behavior: contain; }
+.yy-shortcuts-description { margin: 0 0 12px; color: var(--yy-text-2); font-size: 12px; line-height: 1.6; }
+.yy-shortcut-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; margin: 0; }
+.yy-shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 7px 0; border-bottom: 1px solid var(--yy-border); }
+.yy-shortcut-row dt { min-width: 0; font-size: 13px; line-height: 1.5; }
+.yy-shortcut-row dd { flex: none; max-width: 58%; margin: 0; }
+.yy-shortcut-keys { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 5px; vertical-align: middle; }
+.yy-shortcut-chord { display: inline-flex; align-items: center; gap: 4px; }
+.yy-keycap { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 26px; height: 25px; padding: 0 6px; border: 1px solid var(--yy-border-strong); border-radius: 5px; background: var(--yy-bg-muted); color: var(--yy-text); box-shadow: 0 1px 0 var(--yy-border); font: 500 12px/1 var(--yy-font); white-space: nowrap; }
+.yy-keycap svg { flex: none; }
+.yy-shortcut-or { color: var(--yy-text-3); font-size: 11px; }
+.yy-shortcut-input { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.yy-shortcut-input code { padding: 3px 6px; border-radius: 4px; background: var(--yy-bg-muted); font: 12px/1.4 var(--yy-mono); white-space: nowrap; }
+.yy-shortcuts-footer { display: flex; align-items: center; justify-content: space-between; flex: none; flex-wrap: wrap; gap: 10px 20px; padding: 12px 22px; border-top: 1px solid var(--yy-border); background: var(--yy-bg-sidebar); color: var(--yy-text-2); font-size: 11px; }
+.yy-shortcut-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.yy-shortcut-legend > span, .yy-shortcuts-escape { display: inline-flex; align-items: center; gap: 5px; }
+.yy-shortcut-legend svg { flex: none; }
+.yy-shortcuts-escape { margin-left: auto; white-space: nowrap; }
+.yy-shortcuts-escape .yy-keycap { height: 22px; font-size: 11px; }
+.yy-shortcuts-note { margin: 0; font-size: 12px; line-height: 1.6; }
+@media (max-width: 620px) {
+  .yy-shortcuts-shell, .yy-dialog.yy-shortcuts { width: calc(100vw - 24px); max-height: calc(100dvh - 32px); }
+  .yy-dialog.yy-shortcuts { top: 16px; }
+  .yy-shortcuts-header { padding: 16px 16px 12px; }
+  .yy-shortcuts-nav { gap: 0; padding: 0 10px; }
+  .yy-shortcuts-nav button { padding: 10px 5px; font-size: 12px; }
+  .yy-shortcuts-body { padding: 12px 16px 16px; }
+  .yy-shortcut-list { grid-template-columns: minmax(0, 1fr); }
+  .yy-shortcuts-footer { padding: 12px 16px; }
+  .yy-shortcut-legend { gap: 6px 12px; }
+}

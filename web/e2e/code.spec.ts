@@ -372,7 +372,7 @@ for (const platform of ['MacIntel', 'Win32']) {
     await page.getByRole('menuitem', { name: '代码块快捷键' }).click()
     const help = page.getByRole('dialog', { name: '代码块快捷键', exact: true })
     await expect(help).toContainText('JetBrains 默认方案')
-    await expect(help).toContainText(platform === 'MacIntel' ? '⌘⌫' : 'Ctrl+Y')
+    await expect(help.locator('.yy-shortcut-row').filter({ hasText: '删除当前行' }).locator('.yy-shortcut-chord')).toHaveAttribute('aria-label', platform === 'MacIntel' ? 'Command + Backspace' : 'Ctrl + Y')
     await expect(help).not.toContainText('跳转到行')
     await page.keyboard.press('Escape')
     await expect(help).toHaveCount(0)
@@ -415,5 +415,65 @@ for (const width of [1360, 375]) {
         const view = el.codeEditor.view; return view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)
       })).toBe('}')
     }
+  })
+}
+
+for (const width of [1360, 375]) {
+  test(`shortcut reference stays readable and navigable at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 667 })
+    const id = await createCode(request, 'const example = 1')
+    await page.goto(`docs/${id}/edit`)
+    await page.locator('.ProseMirror > p').first().click()
+    await page.keyboard.press('ControlOrMeta+/')
+    const help = page.getByRole('dialog', { name: '快捷键', exact: true })
+    await expect(help.getByRole('tab', { name: '常用', exact: true })).toBeFocused()
+    await page.keyboard.press('End')
+    await expect(help.getByRole('tab', { name: 'Markdown', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(help.getByRole('tabpanel')).toContainText('公式块')
+    await page.keyboard.press('ArrowLeft')
+    await expect(help.getByRole('tabpanel')).toContainText('JetBrains 默认方案')
+    await expect(help.locator('.yy-shortcut-row').filter({ hasText: '格式化代码' }).locator('kbd')).toHaveCount(3)
+    await help.evaluate(el => Promise.all(el.getAnimations().map(animation => animation.finished)))
+    const box = (await help.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(width)
+    expect(box.y + box.height).toBeLessThanOrEqual(667)
+    expect(await help.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThan(2)
+    const nav = (await help.getByRole('tablist').boundingBox())!
+    const body = help.getByRole('tabpanel'), rect = (await body.boundingBox())!
+    const pageTop = await page.evaluate(() => scrollY)
+    await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2)
+    await page.mouse.wheel(0, 800)
+    await expect.poll(() => body.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+    expect((await help.getByRole('tablist').boundingBox())!.y).toBe(nav.y)
+    expect(await page.evaluate(() => scrollY)).toBe(pageTop)
+    await body.evaluate(el => { el.scrollTop = 0 })
+    await help.screenshot({ path: `test-results/shortcuts-${width}.png` })
+    await page.locator('html').evaluate(el => { el.dataset.theme = 'dark' })
+    await help.screenshot({ path: `test-results/shortcuts-${width}-dark.png` })
+    await help.getByRole('button', { name: '关闭快捷键', exact: true }).click()
+    await expect(help).toHaveCount(0)
+
+    // The reading page loads the standalone reference without the editor's stylesheet.
+    await page.goto(`docs/${id}`)
+    await page.getByRole('button', { name: '代码块更多操作' }).click()
+    await page.getByRole('menuitem', { name: '代码块快捷键' }).click()
+    const codeHelp = page.getByRole('dialog', { name: '代码块快捷键', exact: true })
+    const codeBox = (await codeHelp.boundingBox())!
+    expect(codeBox.x).toBeGreaterThanOrEqual(0)
+    expect(codeBox.x + codeBox.width).toBeLessThanOrEqual(width)
+    expect(codeBox.y + codeBox.height).toBeLessThanOrEqual(667)
+    const codeBody = codeHelp.locator('.yy-shortcuts-body')
+    expect(await codeBody.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThan(2)
+    await codeHelp.screenshot({ path: `test-results/code-shortcuts-${width}.png` })
+    if (width < 500) {
+      const headerTop = (await codeHelp.locator('h2').boundingBox())!.y
+      await codeBody.hover()
+      await page.mouse.wheel(0, 800)
+      await expect.poll(() => codeBody.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+      expect((await codeHelp.locator('h2').boundingBox())!.y).toBe(headerTop)
+    }
+    await codeHelp.getByRole('button', { name: '关闭代码块快捷键' }).click()
+    await expect(codeHelp).toHaveCount(0)
   })
 }

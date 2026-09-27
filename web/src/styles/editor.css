@@ -724,64 +724,6 @@ body.yy-row-dragging * {
   color: var(--yy-text-3);
 }
 
-/* Shortcuts dialog ---------------------------------------------------------------------------- */
-
-.yy-shortcuts {
-  top: 8vh;
-  width: min(820px, calc(100vw - 32px));
-  max-height: 84vh;
-  overflow: auto;
-}
-.yy-shortcuts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px 28px;
-}
-.yy-shortcuts h3 {
-  margin: 8px 0 6px;
-  color: var(--yy-text-2);
-  font-size: 13px;
-  font-weight: 600;
-}
-.yy-shortcuts dl {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 6px 12px;
-  margin: 0;
-  font-size: 13px;
-}
-.yy-shortcuts dt {
-  color: var(--yy-text);
-}
-.yy-shortcuts dd {
-  margin: 0;
-  color: var(--yy-text-2);
-  text-align: right;
-}
-.yy-shortcuts-md {
-  grid-column: 1 / -1;
-  margin-top: 8px;
-}
-.yy-shortcuts-md dl {
-  grid-template-columns: repeat(3, max-content minmax(0, 1fr));
-  column-gap: 16px;
-}
-.yy-shortcuts-md dd {
-  text-align: left;
-}
-@media (max-width: 720px) {
-  .yy-shortcuts-md dl {
-    grid-template-columns: max-content minmax(0, 1fr);
-  }
-}
-.yy-shortcuts kbd {
-  padding: 1px 6px;
-  border: 1px solid var(--yy-border);
-  border-radius: var(--yy-radius-sm);
-  background: var(--yy-bg-muted);
-  white-space: nowrap;
-}
-
 /* Node views ---------------------------------------------------------------------------------- */
 
 .yy-codeblock {

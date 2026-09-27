@@ -1,29 +1,33 @@
 <script setup lang="ts">
-import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
-import { keyLabel } from './keys'
+import { ref } from 'vue'
+import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle, TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
+import { X } from 'lucide-vue-next'
+import ShortcutKeys from '../ui/ShortcutKeys.vue'
+import { keyboardPlatform, modifierLegend } from '../ui/shortcutKeys'
 import { codeShortcutRows } from '../code/keymap'
 
 // The keyboard shortcuts and Markdown shortcuts the editor understands, opened with Cmd/Ctrl+/.
 const open = defineModel<boolean>('open', { required: true })
+const active = ref('common')
 
-const groups: { title: string; items: [string, string][] }[] = [
+const groups: { id: string; title: string; description: string; items: [string, string][] }[] = [
   {
+    id: 'common',
     title: '常用',
+    description: '在正文中使用，组合中的按键需同时按下。',
     items: [
       ['撤销', 'Mod-Z'],
       ['重做', 'Mod-Shift-Z'],
       ['查找替换', 'Mod-F'],
       ['搜索文档', 'Mod-K'],
-      ['快捷键说明（代码外）', 'Mod-/'],
+      ['快捷键说明', 'Mod-/'],
       ['换行（不分段）', 'Shift-Enter'],
     ],
   },
   {
-    title: '代码块内 · JetBrains',
-    items: codeShortcutRows(),
-  },
-  {
+    id: 'text',
     title: '文字',
+    description: '选中文字后应用格式，再次使用可取消对应格式。',
     items: [
       ['粗体', 'Mod-B'],
       ['斜体', 'Mod-I'],
@@ -35,7 +39,9 @@ const groups: { title: string; items: [string, string][] }[] = [
     ],
   },
   {
+    id: 'paragraph',
     title: '段落',
+    description: '更改当前段落的类型，或调整列表缩进。',
     items: [
       ['正文', 'Mod-Alt-0'],
       ['标题 1–6', 'Mod-Alt-1…6'],
@@ -48,32 +54,36 @@ const groups: { title: string; items: [string, string][] }[] = [
       ['取消缩进', 'Shift-Tab / Mod-['],
     ],
   },
+  {
+    id: 'code',
+    title: '代码块',
+    description: 'JetBrains 默认方案 · 在编辑模式的代码区内生效。',
+    items: codeShortcutRows(),
+  },
+  { id: 'markdown', title: 'Markdown', description: '在行首或文字两侧输入符号；标有空格或回车的项目需再按对应按键。', items: [] },
 ]
 
-const markdown: [string, string][] = [
-  ['# 空格', '标题（# 到 ######）'],
-  ['- 空格', '无序列表'],
-  ['1. 空格', '有序列表'],
-  ['[ ] 空格', '任务列表'],
-  ['> 空格', '引用'],
-  ['> [!note] 空格', 'Callout'],
-  ['``` 回车', '代码块，可以紧跟语言名'],
-  ['---', '分割线'],
-  ['$$ 空格', '公式块'],
-  ['$公式$', '行内公式'],
-  ['**文字**', '粗体'],
-  ['*文字*', '斜体'],
-  ['~~文字~~', '删除线'],
-  ['==文字==', '高亮'],
-  ['`代码`', '行内代码'],
-  ['/ 或 、', '插入菜单'],
+const markdown: [string, string, string?][] = [
+  ['标题 1–6', '# … ######', 'Space'],
+  ['无序列表', '-', 'Space'],
+  ['有序列表', '1.', 'Space'],
+  ['任务列表', '[ ]', 'Space'],
+  ['引用', '>', 'Space'],
+  ['Callout', '> [!note]', 'Space'],
+  ['代码块', '```', 'Enter'],
+  ['分割线', '---'],
+  ['公式块', '$$', 'Space'],
+  ['行内公式', '$公式$'],
+  ['粗体', '**文字**'],
+  ['斜体', '*文字*'],
+  ['删除线', '~~文字~~'],
+  ['高亮', '==文字=='],
+  ['行内代码', '`代码`'],
+  ['插入菜单', '/ 或 、'],
 ]
 
-function label(combo: string): string {
-  return combo
-    .split(' / ')
-    .map((part) => (part.includes('…') ? keyLabel(part.replace('1…6', '1')).replace(/1$/, '1…6') : keyLabel(part)))
-    .join(' / ')
+function focusTab() {
+  document.querySelector<HTMLElement>('.yy-shortcuts [role=tab][data-state=active]')?.focus({ preventScroll: true })
 }
 </script>
 
@@ -81,29 +91,39 @@ function label(combo: string): string {
   <DialogRoot v-model:open="open">
     <DialogPortal>
       <DialogOverlay class="yy-overlay" />
-      <DialogContent class="yy-dialog yy-shortcuts" :aria-describedby="undefined">
-        <DialogTitle class="yy-dialog-title">快捷键</DialogTitle>
-        <div class="yy-shortcuts-grid">
-          <section v-for="g in groups" :key="g.title">
-            <h3>{{ g.title }}</h3>
-            <dl>
-              <template v-for="[name, combo] in g.items" :key="name">
-                <dt>{{ name }}</dt>
-                <dd><kbd>{{ label(combo) }}</kbd></dd>
-              </template>
+      <DialogContent class="yy-dialog yy-shortcuts yy-shortcuts-shell" :aria-describedby="undefined" @open-auto-focus.prevent="focusTab">
+        <header class="yy-shortcuts-header">
+          <DialogTitle>快捷键</DialogTitle>
+          <span class="yy-shortcuts-platform">{{ keyboardPlatform }}</span>
+          <DialogClose class="yy-shortcuts-close" aria-label="关闭快捷键" data-tip="关闭"><X :size="18" /></DialogClose>
+        </header>
+        <TabsRoot v-model="active" class="yy-shortcuts-tabs">
+          <TabsList class="yy-shortcuts-nav" aria-label="快捷键分类">
+            <TabsTrigger v-for="g in groups" :key="g.id" :value="g.id">{{ g.title }}</TabsTrigger>
+          </TabsList>
+          <TabsContent v-for="g in groups" :key="g.id" :value="g.id" class="yy-shortcuts-body">
+            <p class="yy-shortcuts-description">{{ g.description }}</p>
+            <dl v-if="g.id !== 'markdown'" class="yy-shortcut-list">
+              <div v-for="[name, combo] in g.items" :key="name" class="yy-shortcut-row">
+                <dt>{{ name }}</dt><dd><ShortcutKeys :combo="combo" /></dd>
+              </div>
             </dl>
-          </section>
-          <section class="yy-shortcuts-md">
-            <h3>Markdown 快捷输入</h3>
-            <dl>
-              <template v-for="[typed, result] in markdown" :key="typed">
-                <dt><kbd>{{ typed }}</kbd></dt>
-                <dd>{{ result }}</dd>
-              </template>
+            <dl v-else class="yy-shortcut-list">
+              <div v-for="[name, typed, key] in markdown" :key="name" class="yy-shortcut-row">
+                <dt>{{ name }}</dt><dd class="yy-shortcut-input"><code>{{ typed }}</code><ShortcutKeys v-if="key" :combo="key" /></dd>
+              </div>
             </dl>
-          </section>
-        </div>
-        <p class="yy-dialog-message">中文输入法下输入的全角符号（如 ＃、》、···、￥）同样生效。</p>
+          </TabsContent>
+        </TabsRoot>
+        <footer class="yy-shortcuts-footer">
+          <p v-if="active === 'markdown'" class="yy-shortcuts-note">中文全角符号（＃、》、···、￥）同样生效；代码围栏后可紧跟语言名。</p>
+          <div v-else class="yy-shortcut-legend">
+            <span v-for="key in modifierLegend" :key="key.label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="key.path" /></svg>{{ key.label }}
+            </span>
+          </div>
+          <span class="yy-shortcuts-escape"><ShortcutKeys combo="Esc" />关闭</span>
+        </footer>
       </DialogContent>
     </DialogPortal>
   </DialogRoot>
