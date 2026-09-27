@@ -67,17 +67,17 @@ overrides 文件记录需要人工选择的项（同名不同图），不入库�
 
 ## 代码 Callout 迁移
 
-`migrate-code` 把 `[!code]` Callout 改回带标题栏的代码块（规则见 DESIGN.md 第 16 节）。它在开发电脑上运行，通过 SSH 隧道写入正式实例；需要先发布认识代码块标题的程序。它会改写真实文档，所以先做一次手动备份：
+`migrate-code` 把 `[!code]` Callout 改回带标题栏的代码块（规则见 DESIGN.md 第 16 节）。它在开发电脑上运行，通过 SSH 隧道写入正式实例；需要先发布认识代码块标题的程序。正式实例的程序本身不带 `/yuyan/` 前缀（由 Nginx 去掉），所以隧道地址写到端口为止。它会改写真实文档，所以先做一次手动备份：
 
 ```sh
-ssh ali 'runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-$(date +%Y%m%d-%H%M%S)'
-ssh -N -L 18199:127.0.0.1:18084 ali &                                          # 隧道，完成后结束
-npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/yuyan/ --dry   # 只报告
-npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/yuyan/
-npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/yuyan/
+ssh ali 'runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-$(date -u +%Y%m%dT%H%M%SZ)-before-code-migration'
+ssh -N -L 18199:127.0.0.1:18084 ali &                                    # 隧道，完成后结束
+npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/ --dry   # 只报告
+npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/
+npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
 ```
 
-每篇改动的文档先保存一个版本再写入，写入时核对 revision；重复运行不会再改动。单篇文档要撤回时，在它的历史里恢复迁移前的版本。
+每篇改动的文档先保存一个版本再写入，写入时核对 revision；重复运行不会再改动。单篇文档要撤回时，在它的历史里恢复迁移前的版本。2026-09-27 已对正式实例运行，62 篇文档中的 313 个全部转换（结果见 DESIGN.md 第 16 节），以后不需要再运行：Markdown 导入会直接把 `[!code]` 转为代码块。
 
 ## 导出
 
