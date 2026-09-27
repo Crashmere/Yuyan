@@ -3,6 +3,8 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, Plugin, type Transaction } from '@tiptap/pm/state'
 import { columnResizingPluginKey, isInTable, selectedRect, TableMap } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
+import { TableView } from '@tiptap/extension-table'
+import { frameTable } from '../shared/tableFrame'
 
 export type Align = 'left' | 'center' | 'right' | null
 
@@ -139,10 +141,11 @@ export function rowResizing(): Plugin {
   function show(view: EditorView, row: HTMLTableRowElement, bottom: number) {
     line ??= Object.assign(document.createElement('div'), { className: 'yy-row-resize-line' })
     document.body.appendChild(line)
-    const box = (row.closest('.tableWrapper') ?? row).getBoundingClientRect()
+    const box = (row.closest('.yy-table-scroll') ?? row).getBoundingClientRect()
     const table = row.closest('table')!.getBoundingClientRect()
-    line.style.transform = `translate(${box.left}px, ${bottom}px)`
-    line.style.width = `${Math.min(box.right, table.right) - box.left}px`
+    const left = Math.max(box.left, table.left)
+    line.style.transform = `translate(${left}px, ${bottom}px)`
+    line.style.width = `${Math.min(box.right, table.right) - left}px`
     view.dom.classList.add('yy-row-resize')
   }
   function hide(view: EditorView) {
@@ -210,6 +213,57 @@ export function rowResizing(): Plugin {
     },
   })
 }
+
+// Tiptap's table view inside the frame of wide tables, as on reading pages (shared/tableFrame.ts).
+export class FramedTableView extends TableView {
+  private release: () => void
+
+  constructor(node: PMNode, cellMinWidth: number, view: EditorView, attrs?: Record<string, unknown>) {
+    super(node, cellMinWidth, view, attrs)
+    const scroller = this.dom
+    scroller.classList.add('yy-table-scroll')
+    const frame = document.createElement('div')
+    frame.className = 'yy-table-frame'
+    frame.append(scroller)
+    this.dom = frame
+    this.release = frameTable(frame, scroller)
+  }
+
+  stopEvent(event: Event) {
+    return event.target instanceof Element && !!event.target.closest('.yy-table-bar')
+  }
+
+  destroy() {
+    this.release()
+  }
+}
+
+// While a column border is dragged past the right edge of the visible table, the border stays at
+// the edge and the table scrolls left under it, so what the border reaches stays in view.
+export const followColumnBorder = new Plugin({
+  view(view) {
+    let frame = 0
+    const move = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const state = columnResizingPluginKey.getState(view.state)
+        if (!state?.dragging || state.activeHandle < 0) return
+        const cell = view.nodeDOM(state.activeHandle)
+        const scroller = cell instanceof HTMLElement ? cell.closest<HTMLElement>('.yy-table-scroll') : null
+        if (!cell || !scroller) return
+        const over = (cell as HTMLElement).getBoundingClientRect().right - (scroller.getBoundingClientRect().right - 8)
+        if (over > 0) scroller.scrollLeft += over
+      })
+    }
+    addEventListener('mousemove', move)
+    return {
+      destroy() {
+        removeEventListener('mousemove', move)
+        cancelAnimationFrame(frame)
+      },
+    }
+  },
+})
 
 export type TableCommand = 'addRowBefore' | 'addRowAfter' | 'addColumnBefore' | 'addColumnAfter' | 'deleteRow' | 'deleteColumn' | 'deleteTable'
 

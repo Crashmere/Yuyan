@@ -81,7 +81,7 @@ npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
 
 ## 导出
 
-导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。
+导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹（Markdown 表达不了的内容写成 HTML，例如设置了列宽行高的表格，见 DESIGN.md 第 18 节）：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。
 
 ```sh
 npm --prefix web run export -- --server http://<服务器>/yuyan/ --dry          # 只转换和检查，不写文件

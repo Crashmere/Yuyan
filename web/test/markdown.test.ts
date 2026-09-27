@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+// (a DOMParser, for tables written as HTML)
 import { describe, expect, it } from 'vitest'
 import { getSchema, type JSONContent } from '@tiptap/core'
 import { Node as PMNode } from '@tiptap/pm/model'
@@ -161,6 +163,36 @@ describe('docToMarkdown', () => {
     expect(back).toContain('==重点==')
     expect(back).toContain('![图|200](a.png)')
     expect(valid(markdownToDoc(back))).toEqual(doc)
+  })
+
+  it('writes tables Markdown cannot hold as HTML and reads them back', () => {
+    const cell = (type: string, content: JSONContent[], width: number): JSONContent => ({
+      type,
+      attrs: { colspan: 1, rowspan: 1, colwidth: [width], align: null },
+      content: [{ type: 'paragraph', content }],
+    })
+    const link = { type: 'text', text: '另一篇', marks: [{ type: 'link', attrs: { href: '/docs/12' } }] }
+    const doc = valid({
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            { type: 'tableRow', content: [cell('tableHeader', [{ type: 'text', text: '名称' }], 180), cell('tableHeader', [{ type: 'text', text: '说明' }], 360)] },
+            { type: 'tableRow', attrs: { height: 64 }, content: [cell('tableCell', [{ type: 'text', text: '**不是粗体** <b>' }], 180), cell('tableCell', [link], 360)] },
+          ],
+        },
+        { type: 'paragraph', content: [{ type: 'text', text: '表格之后' }] },
+      ],
+    })
+    const md = docToMarkdown(doc, { linkHref: (h) => (h === '/docs/12' ? '另一篇.md' : h) })
+    expect(md).toContain('<table style="width: 540px">')
+    expect(md).toContain('<tr style="height: 64px">')
+    expect(md).toContain('<a href="另一篇.md"')
+    const back = valid(markdownToDoc(md, { resolveLink: (t) => (t === '另一篇.md' ? '/docs/12' : null) }))
+    // Read through the schema, the attributes left out before come back with their defaults.
+    const filled = (d: JSONContent) => PMNode.fromJSON(schema, d).toJSON()
+    expect(filled(back)).toEqual(filled(doc))
   })
 })
 

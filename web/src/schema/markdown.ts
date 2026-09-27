@@ -1,4 +1,6 @@
-import type { JSONContent } from '@tiptap/core'
+import { getSchema, type Extensions, type JSONContent } from '@tiptap/core'
+import { DOMParser as SchemaParser, type Schema } from '@tiptap/pm/model'
+import { renderToHTMLString } from '@tiptap/static-renderer/pm/html-string'
 import type {
   Blockquote, Code, Html, List, ListItem, Nodes, Paragraph, PhrasingContent, Root, RootContent, Table,
 } from 'mdast'
@@ -8,11 +10,13 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import remarkStringify from 'remark-stringify'
 import { codeFromCallout, codeMeta, parseCodeMeta } from './codeBlock'
+import { schemaExtensions } from './extensions'
 
 // Markdown <-> Tiptap JSON using remark, with Obsidian's extensions: callouts, ==highlight==,
 // [[wiki links]], ![[embeds]], image sizes (![alt|300](src)) and single-newline line breaks.
 // Code block titles and collapsed state travel in the fence (```cpp title="…" collapsed); the
-// [!code] callouts once used in Obsidian for them are read as titled code blocks.
+// [!code] callouts once used in Obsidian for them are read as titled code blocks. Tables Markdown
+// cannot hold (column widths, row heights, merged cells) are written as HTML and read back.
 
 export interface ImportContext {
   // Obsidian treats a single newline inside a paragraph as a line break unless "strict line breaks" is on.
@@ -197,11 +201,28 @@ class Converter {
   }
 
   private htmlBlock(n: Html): JSONContent[] {
+    const table = /^\s*<table[\s>]/i.test(n.value) ? this.htmlTable(n.value) : null
+    if (table) return [table]
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
     if (n.value.trim().startsWith('<!--')) return []
     if (isHtmlTag(n.value.trim())) this.issue(`HTML 块按纯文本导入：${n.value.slice(0, 60)}`)
     return this.paragraph([{ type: 'text', value: n.value }])
+  }
+
+  // A table written as HTML, as docToMarkdown writes the tables Markdown cannot hold, is read with
+  // the schema's own parse rules. Outside the browser the caller provides a DOMParser (the import
+  // tool does); without one the table stays text.
+  private htmlTable(html: string): JSONContent | null {
+    if (typeof DOMParser === 'undefined') return null
+    const body = new DOMParser().parseFromString(html, 'text/html').body
+    const table = (SchemaParser.fromSchema(documentSchema().schema).parse(body).toJSON() as JSONContent).content?.find((c) => c.type === 'table')
+    if (!table) return null
+    return mapTargets(
+      table,
+      (src) => (this.ctx.resolveImage ? this.ctx.resolveImage(src, 'html') : src),
+      (href) => this.linkHref(href),
+    )
   }
 
   // inlineHtml converts the HTML we know how to keep (<img>, <br>); null means "not understood".
@@ -476,7 +497,7 @@ class Exporter {
       case 'blockMath':
         return [{ type: 'math', value: String(n.attrs?.latex ?? '') }]
       case 'table':
-        return [this.table(n)]
+        return tableNeedsHtml(n) ? [{ type: 'html', value: this.tableHtml(n) }] : [this.table(n)]
       case 'callout': {
         const [title, body] = kids
         const fold = String(n.attrs?.fold ?? '')
@@ -492,6 +513,16 @@ class Exporter {
       default:
         return [{ type: 'paragraph', children: this.inline(kids) }]
     }
+  }
+
+  // Written with the schema's rendering, rows on lines of their own; a blank line, which would end
+  // the HTML block in Markdown, is written as &#10;.
+  private tableHtml(n: JSONContent): string {
+    const table = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href)
+    return renderToHTMLString({ extensions: documentSchema().extensions, content: { type: 'doc', content: [table] } })
+      .replace('<tbody>', '<tbody>\n')
+      .replace(/<\/tr>/g, '</tr>\n')
+      .replace(/\n(?=\n)/g, '&#10;')
   }
 
   private table(n: JSONContent): Table {
@@ -581,4 +612,40 @@ class Exporter {
 function textOf(n: JSONContent): string {
   if (n.type === 'text') return n.text ?? ''
   return (n.content ?? []).map(textOf).join('')
+}
+
+// Tables Markdown cannot hold, which docToMarkdown writes as HTML: column widths, row heights,
+// merged cells, or cells holding more than paragraphs. Anything else Markdown cannot express that
+// the editor gains later is exported as HTML too, so nothing is lost.
+function tableNeedsHtml(n: JSONContent): boolean {
+  return (n.content ?? []).some(
+    (row) =>
+      !!row.attrs?.height ||
+      (row.content ?? []).some((cell) => {
+        const a = cell.attrs ?? {}
+        return (a.colspan ?? 1) > 1 || (a.rowspan ?? 1) > 1 || !!(a.colwidth as number[] | null)?.some(Boolean) || (cell.content ?? []).some((b) => b.type !== 'paragraph')
+      }),
+  )
+}
+
+// The document schema, for tables written as HTML: they are rendered and read back through the
+// schema itself.
+let schemaParts: { extensions: Extensions; schema: Schema } | null = null
+function documentSchema() {
+  if (!schemaParts) {
+    const extensions = schemaExtensions()
+    schemaParts = { extensions, schema: getSchema(extensions) }
+  }
+  return schemaParts
+}
+
+// Rewrites the image sources and link targets inside a node, as the rest of the Markdown gets them.
+function mapTargets(n: JSONContent, image: (src: string) => string | null, link: (href: string) => string | null): JSONContent {
+  const out: JSONContent = { ...n }
+  if (n.type === 'image' && typeof n.attrs?.src === 'string') out.attrs = { ...n.attrs, src: image(n.attrs.src) ?? n.attrs.src }
+  if (n.marks) {
+    out.marks = n.marks.map((m) => (m.type === 'link' && typeof m.attrs?.href === 'string' ? { ...m, attrs: { ...m.attrs, href: link(m.attrs.href) ?? m.attrs.href } } : m))
+  }
+  if (n.content) out.content = n.content.map((c) => mapTargets(c, image, link))
+  return out
 }

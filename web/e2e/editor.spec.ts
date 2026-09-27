@@ -1046,7 +1046,10 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   await page.mouse.up()
   await expect.poll(async () => (await table()).content[1].attrs?.height ?? 0).toBeGreaterThan(row.height + 30)
 
-  await page.getByRole('button', { name: '完成' }).click()
+  // Markdown cannot hold the sizes, so the export writes the table as HTML.
+  const md = await finishAndExport(page, '表格尺寸')
+  expect(md).toMatch(/<table style="width: \d+px">/)
+  expect(md).toMatch(/<tr style="height: \d+px">/)
   const shown = page.locator('.yy-content table')
   await expect(shown).toHaveAttribute('style', /^width: \d+px/)
   await expect(shown.locator('tr').nth(1)).toHaveAttribute('style', /height: \d+px/)
@@ -1063,11 +1066,40 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   }
   expect((await request.put(`api/docs/${wide.id}`, { data: { title: '宽表格', content, baseRevision: 1 } })).ok()).toBeTruthy()
   await page.goto(`docs/${wide.id}`)
-  const box = page.locator('.yy-table-scroll')
+  const frame = page.locator('.yy-table-frame')
   const main = (await page.locator('main').boundingBox())!
-  await expect.poll(async () => Math.round((await box.boundingBox())!.x - main.x)).toBe(0)
-  const bleed = await box.evaluate((b) => parseFloat(b.style.getPropertyValue('--bleed')))
+  const text = (await page.locator('.yy-content').boundingBox())!
+  await expect.poll(async () => Math.round((await frame.boundingBox())!.x - main.x)).toBe(0)
+  // The table starts with the text and shows more of itself on the right; the scrollbar spans the
+  // text column; shadows mark what is hidden.
+  expect(Math.round((await frame.locator('table').boundingBox())!.x - text.x)).toBe(0)
+  const box = (await frame.boundingBox())!
+  expect(box.x + box.width).toBeGreaterThan(text.x + text.width + 50)
+  await frame.hover()
+  const bar = (await frame.locator('.yy-table-bar').boundingBox())!
+  expect(Math.round(bar.x - text.x)).toBe(0)
+  expect(Math.round(bar.width - text.width)).toBe(0)
+  await expect(frame).toHaveClass(/has-right/)
+  await expect(frame).not.toHaveClass(/has-left/)
+  const bleed = await frame.evaluate((f) => parseFloat(f.style.getPropertyValue('--bleed')))
   expect(bleed).toBeGreaterThan(0)
-  await box.evaluate((b, x) => b.scrollTo(x, 0), bleed + 100)
-  await expect(box).toHaveClass(/is-cut/)
+  await frame.locator('.yy-table-scroll').evaluate((s, x) => s.scrollTo(x, 0), bleed + 100)
+  await expect(frame).toHaveClass(/has-left/)
+
+  // The editor frames tables the same way; a column border dragged past the visible right edge
+  // stays at the edge while the table scrolls left under it.
+  await openEditor(page, wide.id)
+  const edFrame = page.locator('.ProseMirror .yy-table-frame')
+  const scroller = edFrame.locator('.yy-table-scroll')
+  const edMain = (await page.locator('main').boundingBox())!
+  await expect.poll(async () => Math.round((await edFrame.boundingBox())!.x - edMain.x)).toBe(0)
+  const th = page.locator('.ProseMirror th').first()
+  const start = (await th.boundingBox())!
+  const edge = await scroller.evaluate((s) => s.getBoundingClientRect().right)
+  await page.mouse.move(start.x + start.width - 2, start.y + start.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(edge + 40, start.y + start.height / 2, { steps: 12 })
+  await expect.poll(() => scroller.evaluate((s) => s.scrollLeft)).toBeGreaterThan(0)
+  await expect.poll(async () => Math.abs((await th.evaluate((c) => c.getBoundingClientRect().right)) - (edge - 8))).toBeLessThan(6)
+  await page.mouse.up()
 })

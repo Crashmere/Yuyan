@@ -4,6 +4,7 @@ import { copyText } from '../../shared/clipboard'
 import { assetId, reservedSize } from '../../shared/images'
 import { needsDisplay } from '../../shared/latex'
 import { renderMermaid } from '../../shared/mermaid'
+import { frameTable } from '../../shared/tableFrame'
 
 // What the server-rendered HTML leaves to the browser: space for images, code lines, folding and
 // copy buttons, formulas and diagrams. KaTeX and Mermaid load only for pages that contain them.
@@ -11,31 +12,19 @@ import { renderMermaid } from '../../shared/mermaid'
 export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
   if (options.images) reserveImageSpace(root, options.images)
   enhanceCode(root)
-  wrapTables(root)
+  frameTables(root)
   await Promise.all([options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
 }
 
-// Wide tables scroll sideways in a wrapper whose scroll area reaches left to the edge of the page
-// (content.css). --bleed is the distance from where the table starts to that edge, measured again
-// when the page changes size; is-cut marks a table scrolled past the edge.
-function wrapTables(root: HTMLElement) {
-  const tables = [...root.querySelectorAll('table')]
-  const page = root.closest('main')
-  if (!tables.length || !page) return
-  const bleed = (box: HTMLElement) => parseFloat(box.style.getPropertyValue('--bleed')) || 0
-  const boxes = tables.map((table) => {
-    const box = Object.assign(document.createElement('div'), { className: 'yy-table-scroll' })
-    table.replaceWith(box)
-    box.append(table)
-    box.addEventListener('scroll', () => box.classList.toggle('is-cut', box.scrollLeft > bleed(box)), { passive: true })
-    return box
-  })
-  const observer = new ResizeObserver(() => {
-    if (!root.isConnected) return observer.disconnect()
-    const edge = page.getBoundingClientRect().left
-    for (const box of boxes) box.style.setProperty('--bleed', `${Math.max(0, box.getBoundingClientRect().left + bleed(box) - edge)}px`)
-  })
-  observer.observe(page)
+// Wide tables scroll sideways in a frame (shared/tableFrame.ts).
+function frameTables(root: HTMLElement) {
+  for (const table of root.querySelectorAll('table')) {
+    const frame = Object.assign(document.createElement('div'), { className: 'yy-table-frame' })
+    const scroller = frame.appendChild(Object.assign(document.createElement('div'), { className: 'yy-table-scroll' }))
+    table.replaceWith(frame)
+    scroller.append(table)
+    frameTable(frame, scroller)
+  }
 }
 
 // Lazily loaded images take no space until they arrive, which pushes the text below them down

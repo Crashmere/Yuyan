@@ -45,6 +45,10 @@
   --yy-diff-removed: light-dark(#fdeef0, rgba(248, 81, 73, 0.12));
   --yy-diff-removed-strong: light-dark(#f9c6cc, rgba(248, 81, 73, 0.4));
 
+  --yy-table-shadow: light-dark(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5));
+  --yy-scroll-thumb: light-dark(rgba(0, 0, 0, 0.25), rgba(255, 255, 255, 0.28));
+  --yy-scroll-thumb-active: light-dark(rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.5));
+
   --yy-shadow-popover: 0 1px 2px light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.3)), 0 8px 24px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45));
   --yy-shadow-dialog: 0 16px 48px light-dark(rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.55));
   --yy-overlay: light-dark(rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.55));

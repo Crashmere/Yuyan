@@ -378,23 +378,84 @@ pre:hover > .yy-copy,
 .yy-content table[style^='width'] {
   table-layout: fixed;
 }
-/* Tables scroll sideways in a wrapper: Tiptap's in the editor, and on reading pages one that
-   reaches left to the edge of the page (enhance.ts). A table scrolled left stays visible over the
-   margin until it meets the edge; from then on a border stays there to mark the cut. */
-.yy-content .tableWrapper,
-.yy-table-scroll {
-  margin: 0.75em 0;
-  overflow-x: auto;
+/* Tables scroll sideways in a frame (shared/tableFrame.ts): --bleed reaches left to the edge of
+   the page, --extend right past the text column. Shadows mark what is hidden at either side, and
+   the scrollbar, drawn by the frame, spans the text column only. */
+.yy-table-frame {
+  position: relative;
+  margin: 0.75em calc(-1 * var(--extend, 0px)) 0.75em calc(-1 * var(--bleed, 0px));
 }
-.yy-content :is(.tableWrapper, .yy-table-scroll) > table {
+.yy-table-frame.is-scrollable {
+  padding-bottom: 12px;
+}
+.yy-table-scroll {
+  overflow-x: auto;
+  padding-left: var(--bleed, 0px);
+  scrollbar-width: none;
+}
+.yy-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+.yy-table-scroll > table {
   margin: 0;
 }
-.yy-table-scroll {
-  margin-left: calc(-1 * var(--bleed, 0px));
-  padding-left: var(--bleed, 0px);
+.yy-table-frame::before,
+.yy-table-frame::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 16px;
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 }
-.yy-table-scroll.is-cut {
-  box-shadow: inset 1px 0 0 var(--yy-border-strong);
+.yy-table-frame.is-scrollable::before,
+.yy-table-frame.is-scrollable::after {
+  bottom: 12px;
+}
+.yy-table-frame::before {
+  left: 0;
+  background: linear-gradient(to right, var(--yy-table-shadow), transparent);
+}
+.yy-table-frame::after {
+  right: 0;
+  background: linear-gradient(to left, var(--yy-table-shadow), transparent);
+}
+.yy-table-frame.has-left::before,
+.yy-table-frame.has-right::after {
+  opacity: 1;
+}
+.yy-table-bar {
+  position: absolute;
+  right: var(--extend, 0px);
+  bottom: 2px;
+  left: var(--bleed, 0px);
+  display: none;
+  height: 8px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+.yy-table-frame.is-scrollable > .yy-table-bar {
+  display: block;
+}
+.yy-table-frame:hover > .yy-table-bar,
+.yy-table-bar.is-active {
+  opacity: 1;
+}
+.yy-table-bar:hover {
+  background: var(--yy-bg-hover);
+}
+.yy-table-thumb {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--yy-scroll-thumb);
+}
+.yy-table-thumb:hover,
+.yy-table-thumb.is-dragging {
+  background: var(--yy-scroll-thumb-active);
 }
 /* Anywhere else a wide table scrolls by itself. */
 .yy-content :not(.tableWrapper, .yy-table-scroll) > table {

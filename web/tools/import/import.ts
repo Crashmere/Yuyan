@@ -5,9 +5,13 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, posix } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import katex from 'katex'
+import { Window } from 'happy-dom'
 import type { JSONContent } from '@tiptap/core'
 import { markdownToDoc } from '../../src/schema/markdown'
 import { needsDisplay } from '../../src/shared/latex'
+
+// markdownToDoc reads tables written as HTML with a DOMParser, which Node lacks.
+globalThis.DOMParser = new Window().DOMParser as unknown as typeof DOMParser
 import { FileIndex, imageExtensions, resolveFile } from './resolve'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
