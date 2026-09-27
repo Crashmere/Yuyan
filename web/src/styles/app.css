@@ -210,10 +210,18 @@ kbd {
   height: 100vh;
   border-right: 1px solid var(--yy-border);
   background: var(--yy-bg-sidebar);
+  transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  transition: transform 180ms ease-out, opacity 180ms ease-out, visibility 0s;
 }
 .yy-app.sidebar-collapsed .yy-sidebar,
 .yy-app.focus-mode .yy-sidebar {
-  display: none;
+  transform: translateX(-105%);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: transform 180ms ease-out, opacity 180ms ease-out, visibility 0s 180ms;
 }
 
 .yy-spacer {
@@ -533,6 +541,7 @@ button.yy-tree-caret:hover {
   gap: 8px;
   height: var(--yy-topbar);
   margin-left: var(--yy-sidebar-inset);
+  transition: margin-left 180ms ease-out;
   padding: 0 16px 0 20px;
   border-bottom: 1px solid var(--yy-border);
   background: color-mix(in srgb, var(--yy-bg) 92%, transparent);
@@ -646,7 +655,8 @@ a.yy-crumb:hover {
 .yy-menu-item.danger .lucide {
   color: var(--yy-danger);
 }
-.yy-menu-item kbd {
+.yy-menu-item kbd,
+.yy-menu-description {
   margin-left: auto;
   padding-left: 16px;
   color: var(--yy-text-3);
@@ -2004,7 +2014,8 @@ a.yy-catalog-title:hover {
     --yy-sidebar-inset: 0px;
   }
   .yy-sidebar,
-  .yy-app.sidebar-collapsed .yy-sidebar {
+  .yy-app.sidebar-collapsed .yy-sidebar,
+  .yy-app.focus-mode .yy-sidebar {
     position: fixed;
     left: 0;
     z-index: 50;
@@ -2012,11 +2023,18 @@ a.yy-catalog-title:hover {
     width: min(300px, 85vw);
     box-shadow: var(--yy-shadow-dialog);
     transform: translateX(-105%);
-    transition: transform 0.2s ease-out;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 180ms ease-out, opacity 180ms ease-out, visibility 0s 180ms;
   }
   .yy-app.drawer-open .yy-sidebar {
     display: block;
     transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
   }
   .yy-drawer-mask {
     position: fixed;
@@ -2039,6 +2057,14 @@ a.yy-catalog-title:hover {
   .yy-drawer-btn {
     display: inline-flex;
     margin-left: -8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yy-app .yy-sidebar,
+  .yy-app .yy-topbar,
+  .yy-app .yy-drawer-mask {
+    transition: none;
   }
 }
 

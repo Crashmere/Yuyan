@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChevronDown, Ellipsis, Keyboard, Link, Maximize2, Minimize2, Plus, Redo2, RemoveFormatting, Search, Undo2 } from 'lucide-vue-next'
-import { displayItems, prefs } from '../app/prefs'
+import { prefs } from '../app/prefs'
 import ActionMenu from '../ui/ActionMenu.vue'
 import IconButton from '../ui/IconButton.vue'
 import type { MenuEntry } from '../ui/menu'
@@ -65,7 +65,7 @@ const insertMenu = computed<MenuEntry[]>(() => {
   return out
 })
 
-const moreMenu = computed<MenuEntry[]>(() => [{ label: '快捷键说明', icon: Keyboard, hint: keyLabel('Mod-/'), run: () => ui.openShortcuts() }, null, ...displayItems()])
+const moreMenu: MenuEntry[] = [{ label: '快捷键说明', icon: Keyboard, hint: keyLabel('Mod-/'), run: () => ui.openShortcuts() }]
 </script>
 
 <template>

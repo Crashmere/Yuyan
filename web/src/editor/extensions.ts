@@ -19,7 +19,9 @@ import { MarkdownPaste } from './markdownPaste'
 import { Search } from './search'
 import { SlashCommand } from './slash'
 import { SelectWithin } from './selectWithin'
-import { fixColumnWidths, followColumnBorder, FramedTableView, rowResizing, TableShape } from './tables'
+import { fixColumnWidths, followColumnBorder, FramedTableView, TableShape } from './tables'
+import { rowResizing, withResizeDelay } from './tableResize'
+import { tableControls } from './tableControls'
 import { UiShortcuts } from './uiShortcuts'
 import { insertImages, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
@@ -46,7 +48,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
       // column resizing (tables.ts). Wide tables sit in the same frame as on reading pages.
       table: YuyanTable.extend({
         addProseMirrorPlugins() {
-          return [fixColumnWidths, followColumnBorder, rowResizing(), ...(this.parent?.() ?? [])]
+          return [fixColumnWidths, followColumnBorder, rowResizing(), tableControls(), ...(this.parent?.() ?? []).map(withResizeDelay)]
         },
       }).configure({ resizable: true, View: FramedTableView }),
       image: YuyanImage.extend({

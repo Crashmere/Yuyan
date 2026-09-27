@@ -1,6 +1,7 @@
 import { languages } from '../../editor/languages'
 import type { ImageSizes } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
+import { codeIcon } from '../../shared/codeIcons'
 import { assetId, reservedSize } from '../../shared/images'
 import { needsDisplay } from '../../shared/latex'
 import { renderMermaid } from '../../shared/mermaid'
@@ -68,11 +69,21 @@ function addTitleBar(pre: HTMLElement, language: string | undefined, text: strin
     block.append(Object.assign(document.createElement('div'), { className: 'code-title' }), pre)
   }
   const bar = block.querySelector(':scope > .code-title')!
-  if (language) {
-    const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
-    label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language))?.label ?? language
-    bar.appendChild(label)
-  }
+  const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
+  label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language ?? ''))?.label ?? language ?? '纯文本'
+  bar.appendChild(label)
+  const wrap = Object.assign(document.createElement('button'), { type: 'button', className: 'yy-code-wrap-btn' })
+  wrap.append(codeIcon('wrap'), Object.assign(document.createElement('span'), { textContent: '自动换行' }))
+  wrap.setAttribute('aria-label', '自动换行')
+  wrap.setAttribute('aria-pressed', 'false')
+  wrap.dataset.tip = '开启自动换行'
+  wrap.addEventListener('click', () => {
+    const on = block.classList.toggle('is-wrapped')
+    wrap.setAttribute('aria-pressed', String(on))
+    wrap.dataset.tip = on ? '关闭自动换行' : '开启自动换行'
+    if (on) pre.querySelector('code')!.scrollLeft = 0
+  })
+  bar.appendChild(wrap)
   addCopyButton(bar, text)
   const tab = Object.assign(document.createElement('button'), { type: 'button', className: 'code-tab' })
   const update = () => {
@@ -134,10 +145,22 @@ function addCopyButton(parent: Element, text: string) {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'yy-copy'
-  button.textContent = '复制'
+  const label = Object.assign(document.createElement('span'), { textContent: '复制' })
+  button.append(codeIcon('copy'), label)
+  button.setAttribute('aria-label', '复制')
+  button.dataset.tip = '复制代码'
   button.addEventListener('click', async () => {
-    button.textContent = (await copyText(text)) ? '已复制' : '复制失败'
-    setTimeout(() => (button.textContent = '复制'), 1500)
+    const copied = await copyText(text)
+    label.textContent = copied ? '已复制' : '复制失败'
+    button.setAttribute('aria-label', label.textContent)
+    button.dataset.tip = label.textContent
+    button.replaceChild(codeIcon(copied ? 'check' : 'copy'), button.firstElementChild!)
+    setTimeout(() => {
+      label.textContent = '复制'
+      button.setAttribute('aria-label', '复制')
+      button.dataset.tip = '复制代码'
+      button.replaceChild(codeIcon('copy'), button.firstElementChild!)
+    }, 1500)
   })
   parent.appendChild(button)
 }

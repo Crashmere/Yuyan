@@ -2,8 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { NodeViewContent, NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { ChevronDown } from 'lucide-vue-next'
-import { prefs } from '../../app/prefs'
 import { copyText } from '../../shared/clipboard'
+import { codeIcons } from '../../shared/codeIcons'
 import { renderMermaid } from '../../shared/mermaid'
 import { setCollapsed } from '../codeBlocks'
 import LanguagePicker from './LanguagePicker.vue'
@@ -62,9 +62,15 @@ function titleEntered() {
 
 // Line numbers sit on a transparent copy of the code with the same width and wrapping, so each
 // number lines up with its line even when long lines wrap.
-const lines = computed(() => (prefs.codeLineNumbers ? props.node.textContent.split('\n') : []))
+const lines = computed(() => props.node.textContent.split('\n'))
+const wrapped = ref(false)
 const pre = ref<HTMLElement | null>(null)
 const scrollLeft = ref(0)
+function toggleWrap() {
+  wrapped.value = !wrapped.value
+  if (pre.value) pre.value.scrollLeft = 0
+  scrollLeft.value = 0
+}
 
 // The diagram previews beside the source; a syntax error keeps the last diagram that worked.
 const preview = ref('')
@@ -101,18 +107,25 @@ async function copy() {
 </script>
 
 <template>
-  <node-view-wrapper class="yy-codeblock" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed }">
+  <node-view-wrapper class="yy-codeblock" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed, 'is-wrapped': wrapped }">
     <div v-if="titled" class="yy-codeblock-title" contenteditable="false">
       <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :data-tip="collapsed ? '展开代码' : '收起代码'" @click="toggle">
         <ChevronDown :size="15" />
       </button>
       <input ref="titleInput" v-model="titleText" class="yy-codeblock-name" placeholder="代码块标题" aria-label="代码块标题" @keydown.enter.prevent="titleEntered" />
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
-      <button type="button" class="yy-codeblock-btn" @click="copy">{{ copied ? '已复制' : '复制' }}</button>
+      <button type="button" class="yy-codeblock-btn yy-code-wrap-btn" aria-label="自动换行" :aria-pressed="wrapped" :data-tip="wrapped ? '关闭自动换行' : '开启自动换行'" @mousedown.prevent @click="toggleWrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="codeIcons.wrap" /></svg><span>自动换行</span>
+      </button>
+      <button type="button" class="yy-codeblock-btn" :aria-label="copied ? '已复制' : '复制'" :data-tip="copied ? '已复制' : '复制代码'" @mousedown.prevent @click="copy">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="copied ? codeIcons.check : codeIcons.copy" /></svg>{{ copied ? '已复制' : '复制' }}
+      </button>
     </div>
     <div v-else class="yy-codeblock-bar" contenteditable="false">
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
-      <button type="button" class="yy-codeblock-btn" @click="copy">{{ copied ? '已复制' : '复制' }}</button>
+      <button type="button" class="yy-codeblock-btn yy-code-copy-icon" :aria-label="copied ? '已复制' : '复制'" :data-tip="copied ? '已复制' : '复制代码'" @mousedown.prevent @click="copy">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="copied ? codeIcons.check : codeIcons.copy" /></svg>
+      </button>
     </div>
     <div v-show="!collapsed" class="yy-codeblock-body">
       <button
@@ -125,7 +138,7 @@ async function copy() {
         @click="titled ? hideTitle() : showTitle()"
       ></button>
       <!-- No whitespace inside <pre>: it would show up as blank lines. -->
-      <pre ref="pre" :class="{ 'has-numbers': prefs.codeLineNumbers }" @scroll="scrollLeft = pre?.scrollLeft ?? 0"><div v-if="prefs.codeLineNumbers" class="yy-code-lines" contenteditable="false" aria-hidden="true" :style="{ transform: `translateX(${scrollLeft}px)` }"><div v-for="(line, i) in lines" :key="i" :data-n="i + 1">{{ line }}</div></div><node-view-content as="code" :class="language ? `language-${language}` : undefined" /></pre>
+      <pre ref="pre" class="has-numbers" @scroll="scrollLeft = pre?.scrollLeft ?? 0"><div class="yy-code-lines" contenteditable="false" aria-hidden="true" :style="{ transform: `translateX(${scrollLeft}px)` }"><div v-for="(line, i) in lines" :key="i" :data-n="i + 1">{{ line }}</div></div><node-view-content as="code" :class="language ? `language-${language}` : undefined" :style="{ whiteSpace: wrapped ? 'pre-wrap' : 'pre' }" /></pre>
       <div v-if="isMermaid" class="yy-mermaid-preview" contenteditable="false">
         <div v-if="preview" class="yy-mermaid-svg" :class="{ stale: !!error }" v-html="preview"></div>
         <p v-else-if="!error" class="yy-mermaid-empty">输入 Mermaid 代码后在这里预览</p>

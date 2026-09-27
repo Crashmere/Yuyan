@@ -21,6 +21,7 @@ const emit = defineEmits<{ open: [boolean] }>()
             <component :is="item.icon" v-if="item.icon" :size="16" />
             <span>{{ item.label }}</span>
             <kbd v-if="item.hint">{{ item.hint }}</kbd>
+            <span v-if="item.description" class="yy-menu-description">{{ item.description }}</span>
           </ContextMenuItem>
         </template>
       </ContextMenuContent>

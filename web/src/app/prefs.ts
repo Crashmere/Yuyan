@@ -1,6 +1,4 @@
 import { reactive, watch } from 'vue'
-import { ListOrdered, TextWrap } from 'lucide-vue-next'
-import type { MenuEntry } from '../ui/menu'
 
 // Display preferences live in this browser only; none of them is written into documents.
 
@@ -16,8 +14,6 @@ interface Prefs {
   readingOutline: boolean
   // Editing without the sidebar.
   focusMode: boolean
-  codeLineNumbers: boolean
-  codeWrap: boolean
 }
 
 const prefsKey = 'yuyan:prefs'
@@ -26,8 +22,10 @@ const themeKey = 'yuyan:theme'
 
 function load(): Partial<Prefs> {
   try {
-    const saved = JSON.parse(localStorage.getItem(prefsKey) ?? '{}') as Partial<Prefs> & { pageWidth?: unknown }
+    const saved = JSON.parse(localStorage.getItem(prefsKey) ?? '{}') as Partial<Prefs> & { pageWidth?: unknown; codeLineNumbers?: unknown; codeWrap?: unknown }
     delete saved.pageWidth // All pages now use the former wide layout.
+    delete saved.codeLineNumbers
+    delete saved.codeWrap
     const theme = localStorage.getItem(themeKey)
     if (theme === 'light' || theme === 'dark') saved.theme = theme
     return saved
@@ -43,8 +41,6 @@ export const prefs = reactive<Prefs>({
   editorOutline: true,
   readingOutline: true,
   focusMode: false,
-  codeLineNumbers: false,
-  codeWrap: false,
   ...load(),
 })
 
@@ -54,16 +50,7 @@ export function applyPrefs() {
   if (prefs.theme === 'system') delete root.dataset.theme
   else root.dataset.theme = prefs.theme
   delete root.dataset.width
-  root.classList.toggle('yy-code-numbers', prefs.codeLineNumbers)
-  root.classList.toggle('yy-code-wrap', prefs.codeWrap)
-}
-
-// Code display options, offered in the appearance menu and the editor.
-export function displayItems(): MenuEntry[] {
-  return [
-    { label: '代码行号', icon: ListOrdered, checked: prefs.codeLineNumbers, run: () => void (prefs.codeLineNumbers = !prefs.codeLineNumbers) },
-    { label: '代码自动换行', icon: TextWrap, checked: prefs.codeWrap, run: () => void (prefs.codeWrap = !prefs.codeWrap) },
-  ]
+  root.classList.remove('yy-code-numbers', 'yy-code-wrap')
 }
 
 export function isDark(): boolean {

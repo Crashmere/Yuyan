@@ -30,6 +30,7 @@ defineProps<{ items: MenuEntry[] }>()
       <component :is="item.icon" v-if="item.icon" :size="16" />
       <span>{{ item.label }}</span>
       <kbd v-if="item.hint">{{ item.hint }}</kbd>
+      <span v-if="item.description" class="yy-menu-description">{{ item.description }}</span>
       <Check v-if="item.checked" :size="15" class="yy-menu-check" />
     </DropdownMenuItem>
   </template>

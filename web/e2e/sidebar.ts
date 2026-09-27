@@ -8,6 +8,7 @@ export async function openSidebar(page: Page) {
   } else {
     const expand = page.getByRole('button', { name: '展开侧栏', exact: true })
     if (await expand.isVisible()) await expand.click()
+    await expect.poll(() => page.locator('.yy-sidebar').evaluate((el) => el.getBoundingClientRect().x)).toBe(0)
   }
 }
 

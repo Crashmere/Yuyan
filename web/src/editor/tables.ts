@@ -101,7 +101,8 @@ export const TableShape = Extension.create({
 export const fixColumnWidths = new Plugin({
   props: {
     handleDOMEvents: {
-      mousedown(view) {
+      mousedown(view, event) {
+        if (event.button !== 0) return false
         const handle = columnResizingPluginKey.getState(view.state)?.activeHandle ?? -1
         if (handle < 0) return false
         const $cell = view.state.doc.resolve(handle)
@@ -128,91 +129,6 @@ export const fixColumnWidths = new Plugin({
     },
   },
 })
-
-// Dragging the bottom border of a row sets its height, as dragging a column border sets a width. A
-// line follows the pointer and the row takes the height when the button is released; a row never
-// gets shorter than its content.
-export function rowResizing(): Plugin {
-  const edge = 4
-  let hover: { pos: number; row: HTMLTableRowElement } | null = null
-  let dragging = false
-  let line: HTMLDivElement | null = null
-
-  function show(view: EditorView, row: HTMLTableRowElement, bottom: number) {
-    line ??= Object.assign(document.createElement('div'), { className: 'yy-row-resize-line' })
-    document.body.appendChild(line)
-    const box = (row.closest('.yy-table-scroll') ?? row).getBoundingClientRect()
-    const table = row.closest('table')!.getBoundingClientRect()
-    const left = Math.max(box.left, table.left)
-    line.style.transform = `translate(${left}px, ${bottom}px)`
-    line.style.width = `${Math.min(box.right, table.right) - left}px`
-    view.dom.classList.add('yy-row-resize')
-  }
-  function hide(view: EditorView) {
-    hover = null
-    line?.remove()
-    view.dom.classList.remove('yy-row-resize')
-  }
-
-  return new Plugin({
-    view: () => ({ destroy: () => line?.remove() }),
-    props: {
-      handleDOMEvents: {
-        mousemove(view, event) {
-          if (dragging || !view.editable) return false
-          const cell = event.target instanceof Element ? event.target.closest('td, th') : null
-          const row = cell?.parentElement
-          const box = cell?.getBoundingClientRect()
-          // Near a column border the column resizing takes the pointer.
-          const columnBorder = !!box && (event.clientX - box.left <= 5 || box.right - event.clientX <= 5)
-          if (!cell || !(row instanceof HTMLTableRowElement) || columnBorder || row.getBoundingClientRect().bottom - event.clientY > edge) {
-            if (hover) hide(view)
-            return false
-          }
-          const $pos = view.state.doc.resolve(view.posAtDOM(cell, 0))
-          for (let d = $pos.depth; d > 0; d--) {
-            if ($pos.node(d).type.name !== 'tableRow') continue
-            hover = { pos: $pos.before(d), row }
-            show(view, row, row.getBoundingClientRect().bottom)
-            break
-          }
-          return false
-        },
-        mouseleave(view) {
-          if (hover && !dragging) hide(view)
-          return false
-        },
-        mousedown(view, event) {
-          if (!hover || event.button !== 0) return false
-          event.preventDefault()
-          const { pos, row } = hover
-          const top = row.getBoundingClientRect().top
-          const startY = event.clientY
-          const start = row.getBoundingClientRect().height
-          let height = start
-          dragging = true
-          const move = (e: MouseEvent) => {
-            height = Math.max(24, start + e.clientY - startY)
-            show(view, row, top + height)
-          }
-          const up = () => {
-            removeEventListener('mousemove', move)
-            removeEventListener('mouseup', up)
-            dragging = false
-            hide(view)
-            const node = view.state.doc.nodeAt(pos)
-            if (node?.type.name === 'tableRow' && Math.round(height) !== Math.round(start)) {
-              view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, height: Math.round(height) }))
-            }
-          }
-          addEventListener('mousemove', move)
-          addEventListener('mouseup', up)
-          return true
-        },
-      },
-    },
-  })
-}
 
 // Tiptap's table view inside the frame of wide tables, as on reading pages (shared/tableFrame.ts).
 export class FramedTableView extends TableView {

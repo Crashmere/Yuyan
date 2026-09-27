@@ -43,7 +43,7 @@ function anchor() {
     contextElement: table,
     getBoundingClientRect() {
       const r = table.getBoundingClientRect()
-      const floor = (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 44
+      const floor = (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 76
       const top = Math.min(Math.max(r.top, floor), r.bottom)
       return new DOMRect(r.left, top, r.width, r.bottom - top)
     },
@@ -63,7 +63,7 @@ function align(value: Exclude<Align, null>) {
     plugin-key="tableMenu"
     :should-show="shouldShow"
     :get-referenced-virtual-element="anchor"
-    :options="{ placement: 'top-start', offset: 8, flip: false }"
+    :options="{ placement: 'top-start', offset: 40, flip: false }"
     class="yy-bubble yy-table-toolbar"
   >
     <button v-for="i in inserts" :key="i.command" type="button" class="yy-bubble-btn" :data-tip="i.label" :aria-label="i.label" @mousedown.prevent @click="runTable(editor, i.command)">

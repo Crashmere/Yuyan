@@ -127,7 +127,7 @@ export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () 
     { label: '移动到…', icon: FolderInput, run: () => moveDocTo(bookId, node) },
     ...(node.kind === 'doc' ? [{ label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(node.id) }] : []),
     ...(options.history && node.kind === 'doc' ? [{ label: '历史版本', icon: History, run: () => void router.push(`/docs/${node.id}/history`) }] : []),
-    { label: '导出', icon: Download, hint: node.children?.length ? '含子文档' : undefined, run: () => exportDoc(bookId, node) },
+    { label: '导出', icon: Download, description: node.children?.length ? '含子文档' : undefined, run: () => exportDoc(bookId, node) },
     null,
     { label: '删除', icon: Trash2, danger: true, run: () => deleteDoc(bookId, node) },
   ]

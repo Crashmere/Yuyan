@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { strFromU8, unzipSync } from 'fflate'
 import { markdownToDoc } from '../src/schema/markdown'
 import { openSidebar } from './sidebar'
@@ -520,8 +520,6 @@ test('code blocks: language search, Tab indentation, line numbers', async ({ pag
   await page.keyboard.press('Shift+Tab')
   await expect(code).toHaveText('const a = 1\nconsole.log(a)\nx')
 
-  await page.locator('.yy-toolbar').getByRole('button', { name: '更多' }).click()
-  await page.getByRole('menuitem', { name: '代码行号' }).click()
   await expect(page.locator('.yy-code-lines > div')).toHaveCount(3)
 
   const md = await finishAndExport(page, '代码测试')
@@ -587,8 +585,8 @@ test('reading pages: image viewer, folded long code and line numbers', async ({ 
 
   await openSidebar(page)
   await page.getByRole('button', { name: /^外观/ }).click()
-  await page.getByRole('menuitem', { name: '代码行号' }).click()
-  await expect(page.locator('html')).toHaveClass(/yy-code-numbers/)
+  await expect(page.getByRole('menuitem', { name: /代码行号|代码自动换行/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
   const number = await pre.locator('.yy-line').nth(9).evaluate((el) => getComputedStyle(el, '::before').content)
   expect(number).toBe('counter(yy-line)')
 })
@@ -1215,7 +1213,13 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   const table = () => page.evaluate(() => (document.querySelector('.ProseMirror') as unknown as { editor: { getJSON: () => { content: unknown[] } } }).editor.getJSON().content[0]) as Promise<{ content: { attrs?: { height?: number }; content: Cell[] }[] }>
   const header = (await page.locator('.ProseMirror th').first().boundingBox())!
   await page.mouse.move(header.x + header.width - 2, header.y + header.height / 2)
+  await expect(page.locator('.ProseMirror .column-resize-handle')).toHaveCount(0)
+  await page.mouse.move(header.x + 20, header.y + header.height / 2)
+  await page.waitForTimeout(300)
+  await expect(page.locator('.ProseMirror .column-resize-handle')).toHaveCount(0)
+  await page.mouse.move(header.x + header.width - 2, header.y + header.height / 2)
   await expect(page.locator('.ProseMirror .column-resize-handle').first()).toBeAttached()
+  expect(await page.locator('.ProseMirror').evaluate((el) => getComputedStyle(el).cursor)).toContain('data:image/svg+xml')
   await page.mouse.down()
   await page.mouse.move(header.x + header.width + 150, header.y + header.height / 2, { steps: 5 })
   await page.mouse.up()
@@ -1228,6 +1232,7 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
 
   const row = (await page.locator('.ProseMirror tr').nth(1).boundingBox())!
   await page.mouse.move(row.x + 20, row.y + row.height - 1)
+  await expect(page.locator('.yy-row-resize-line')).toHaveCount(0)
   await expect(page.locator('.yy-row-resize-line')).toBeVisible()
   await page.mouse.down()
   await page.mouse.move(row.x + 20, row.y + row.height + 40, { steps: 4 })
@@ -1285,9 +1290,120 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   const start = (await th.boundingBox())!
   const edge = await scroller.evaluate((s) => s.getBoundingClientRect().right)
   await page.mouse.move(start.x + start.width - 2, start.y + start.height / 2)
+  await expect(page.locator('.ProseMirror .column-resize-handle').first()).toBeAttached()
   await page.mouse.down()
   await page.mouse.move(edge + 40, start.y + start.height / 2, { steps: 12 })
   await expect.poll(() => scroller.evaluate((s) => s.scrollLeft)).toBeGreaterThan(0)
   await expect.poll(async () => Math.abs((await th.evaluate((c) => c.getBoundingClientRect().right)) - (edge - 8))).toBeLessThan(6)
   await page.mouse.up()
+  await th.hover({ position: { x: 120, y: 20 }, force: true })
+  const controls = page.locator('.yy-table-controls')
+  const boundary = controls.locator('.yy-table-insert[data-axis="column"][data-index="1"]')
+  await expect(controls).toHaveClass(/is-visible/)
+  const aligned = () => boundary.evaluate((b) => {
+    const cell = document.querySelector('.ProseMirror th')!.getBoundingClientRect()
+    const point = b.getBoundingClientRect()
+    return Math.abs(point.x + point.width / 2 - cell.right)
+  })
+  await expect.poll(aligned).toBeLessThan(2)
+  await scroller.evaluate((s) => s.scrollLeft += 100)
+  await expect.poll(aligned).toBeLessThan(2)
 })
+
+test('table rails select rows and columns, and insert at their boundaries', async ({ page, request }) => {
+  const id = await createDoc(request, '表格外围操作', '前置段落。\n\n| 名称 | 说明 |\n| --- | --- |\n| a | b |\n| c | d |\n\n后续段落。')
+  await openEditor(page, id)
+  const table = page.locator('.ProseMirror table')
+  const controls = page.locator('.yy-table-controls')
+  await table.locator('td').first().hover()
+  await expect(controls).toHaveClass(/is-visible/)
+  await controls.getByRole('button', { name: '选中第 2 列', exact: true }).click()
+  await expect(table.locator('.selectedCell')).toHaveCount(3)
+  await expect(controls.getByRole('button', { name: '选中第 2 列', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(textBubble(page)).not.toBeVisible()
+  const tools = page.locator('.yy-table-toolbar')
+  await expect(tools).toBeVisible()
+  const toolbar = (await tools.boundingBox())!
+  const insert = controls.getByRole('button', { name: '在第 2 列前插入列', exact: true })
+  expect(toolbar.y + toolbar.height).toBeLessThan((await insert.boundingBox())!.y)
+
+  await controls.getByRole('button', { name: '选中第 2 行', exact: true }).click()
+  await expect(table.locator('.selectedCell')).toHaveCount(2)
+  await insert.hover()
+  await expect(controls.locator('.yy-table-insert-line')).toBeVisible()
+  await expect.poll(() => insert.evaluate((el) => getComputedStyle(el, '::before').top)).toBe('0px')
+  await page.screenshot({ path: 'test-results/table-column-insert.png' })
+  await insert.click()
+  await expect(table.locator('tr').first().locator('th')).toHaveCount(3)
+  await expect(table.locator('tr').nth(1).locator('td')).toHaveText(['a', '', 'b'])
+  await expect(table.locator('.selectedCell')).toHaveCount(3)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(table.locator('tr').first().locator('th')).toHaveCount(2)
+
+  await table.locator('td').first().hover()
+  await controls.getByRole('button', { name: '在第 1 行前插入行', exact: true }).click()
+  await expect(table.locator('tr')).toHaveCount(4)
+  await expect(table.locator('tr').first().locator('th')).toHaveText(['', ''])
+  await expect(table.locator('tr').nth(1).locator('td')).toHaveText(['名称', '说明'])
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(table.locator('tr')).toHaveCount(3)
+
+  // Moving away fades the controls out; returning still works after crossing the small gap.
+  await page.locator('.ProseMirror > p').last().hover()
+  await expect(controls).not.toHaveClass(/is-visible/)
+  await table.locator('td').first().hover()
+  await expect(controls).toHaveClass(/is-visible/)
+  await controls.getByRole('button', { name: '在第 4 行前插入行', exact: true }).click()
+  await expect(table.locator('tr')).toHaveCount(4)
+  const md = await finishAndExport(page, '表格外围操作')
+  expect(md).toContain('| 名称 | 说明 |')
+  expect(md).not.toContain('yy-table')
+})
+
+for (const width of [1360, 375]) {
+  test(`code numbers always show and title bars wrap individual blocks at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 860 })
+    await page.addInitScript(() => localStorage.setItem('yuyan:prefs', JSON.stringify({ codeLineNumbers: false, codeWrap: true })))
+    const source = 'const long_line = "' + 'long value '.repeat(30) + '";\nend();'
+    const id = await createDoc(request, `代码显示-${width}`, `\`\`\`js title="第一个"\n${source}\n\`\`\`\n\n\`\`\`js title="第二个"\n${source}\n\`\`\`\n\n\`\`\`js\nconst plain = true;\n\`\`\``)
+    await page.goto(`docs/${id}`)
+    for (const editing of [false, true]) {
+      if (editing) {
+        await page.getByRole('link', { name: '编辑', exact: true }).click()
+        await expect(page.locator('.ProseMirror')).toBeVisible()
+      }
+      const blocks = page.locator(editing ? '.yy-codeblock' : '.yy-content .code-block')
+      const first = blocks.nth(0)
+      const second = blocks.nth(1)
+      const scroller = (b: Locator) => b.locator(editing ? 'pre' : 'pre > code')
+      const overflow = (b: Locator) => scroller(b).evaluate((el) => el.scrollWidth - el.clientWidth)
+      const wrap = first.getByRole('button', { name: '自动换行', exact: true })
+      await expect(wrap).toHaveAttribute('aria-pressed', 'false')
+      await expect.poll(() => overflow(first)).toBeGreaterThan(100)
+      await wrap.click()
+      await expect(first.locator('pre')).toBeVisible()
+      await expect(wrap).toHaveAttribute('aria-pressed', 'true')
+      await expect.poll(() => overflow(first)).toBeLessThanOrEqual(1)
+      await expect.poll(() => overflow(second)).toBeGreaterThan(100)
+      await expect(second.getByRole('button', { name: '自动换行', exact: true })).toHaveAttribute('aria-pressed', 'false')
+      if (editing) {
+        await expect(first.locator('.yy-code-lines > div')).toHaveCount(2)
+        const height = await first.locator('pre > code').evaluate((el) => el.getBoundingClientRect().height)
+        const numbered = await first.locator('.yy-code-lines > div').evaluateAll((els) => els.reduce((h, el) => h + el.getBoundingClientRect().height, 0))
+        expect(Math.abs(height - numbered)).toBeLessThan(2)
+      } else {
+        expect(await first.locator('.yy-line').first().evaluate((el) => getComputedStyle(el, '::before').content)).toBe('counter(yy-line)')
+      }
+      await page.screenshot({ path: `test-results/code-controls-${width}-${editing ? 'edit' : 'read'}.png` })
+      await first.getByRole('button', { name: '隐藏标题栏', exact: true }).click()
+      await expect(scroller(first)).toBeVisible()
+      await expect.poll(() => overflow(first)).toBeLessThanOrEqual(1)
+      const copy = first.getByRole('button', { name: '复制', exact: true })
+      await expect(copy).toHaveText('', { useInnerText: true })
+      await expect(copy.locator('svg')).toHaveCount(1)
+      await first.getByRole('button', { name: '显示标题栏', exact: true }).click()
+      await expect(first.getByRole('button', { name: '自动换行', exact: true })).toHaveAttribute('aria-pressed', 'true')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
+    }
+  })
+}

@@ -168,20 +168,19 @@
   display: block;
   overflow-x: auto;
 }
-/* Reading pages split code into lines (enhance.ts); line numbers and wrapping are display
-   settings on <html>. */
+/* Reading pages split code into lines (enhance.ts). Numbers always show; wrapping is per block. */
 .yy-content pre code .yy-line {
   display: block;
   min-height: 1.65em;
 }
-.yy-code-numbers .yy-content pre code {
+.yy-content pre code {
   counter-reset: yy-line;
 }
-.yy-code-numbers .yy-content pre code .yy-line {
+.yy-content pre code .yy-line {
   position: relative;
   padding-left: 3em;
 }
-.yy-code-numbers .yy-content pre code .yy-line::before {
+.yy-content pre code .yy-line::before {
   position: absolute;
   left: 0;
   width: 2.2em;
@@ -191,7 +190,7 @@
   counter-increment: yy-line;
   user-select: none;
 }
-.yy-code-wrap .yy-content pre code {
+.yy-content .is-wrapped pre code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -223,6 +222,10 @@
   color: var(--yy-primary);
 }
 .yy-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   position: absolute;
   top: 6px;
   right: 6px;
@@ -236,6 +239,40 @@
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
+}
+pre > .yy-copy {
+  width: 28px;
+  padding: 0;
+}
+pre > .yy-copy > span {
+  display: none;
+}
+.yy-copy svg,
+.yy-code-wrap-btn svg {
+  flex: none;
+}
+.yy-code-wrap-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--yy-radius-sm);
+  background: none;
+  color: var(--yy-codeblock-muted);
+  font: 12px var(--yy-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.yy-code-wrap-btn:hover,
+.yy-code-wrap-btn[aria-pressed='true'] {
+  background: var(--yy-codeblock-hover);
+  color: var(--yy-codeblock-title);
+}
+.yy-code-wrap-btn[aria-pressed='true'] {
+  box-shadow: inset 0 -2px var(--yy-primary);
 }
 .yy-copy:hover {
   color: var(--yy-codeblock-title);
@@ -338,6 +375,7 @@ pre:hover > .yy-copy,
   opacity: 1;
 }
 .code-lang {
+  flex: none;
   margin-left: auto;
   color: var(--yy-codeblock-muted);
   font-size: 12px;

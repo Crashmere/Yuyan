@@ -23,7 +23,8 @@ async function geometry(locator: Locator) {
 
 async function noPageWidthOptions(page: Page) {
   await expect(page.getByRole('menuitem', { name: /标准宽度|宽屏|标准页|宽页/ })).toHaveCount(0)
-  await expect(page.getByRole('menuitem', { name: '代码自动换行' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: /代码行号|代码自动换行/ })).toHaveCount(0)
+  await expect(page.getByRole('menuitem').first()).toBeVisible()
   await page.keyboard.press('Escape')
 }
 
