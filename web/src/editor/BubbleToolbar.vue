@@ -7,6 +7,7 @@ import { ChevronDown, Link, RemoveFormatting } from 'lucide-vue-next'
 import { clearFormatting, currentStyle, markButtons, textStyles } from './commands'
 import { useEditorContext } from './context'
 import { withKey } from './keys'
+import { hasTextTools } from './textSelection'
 
 // The toolbar over selected text. Its style list lives inside the bubble, since a menu in a
 // separate layer would take focus away from the editor and hide the bubble.
@@ -31,9 +32,9 @@ const state = computed(() => {
   return { style: currentStyle(e)?.label ?? '正文', marks: Object.fromEntries(markButtons.map((m) => [m.name, e.isActive(m.name)])), link: e.isActive('link') }
 })
 
-function shouldShow({ editor: e, element, view, from, to }: { editor: Editor; element: HTMLElement; view: EditorView; from: number; to: number }) {
+function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTMLElement; view: EditorView }) {
   const focused = view.hasFocus() || element.contains(document.activeElement)
-  const show = !props.hidden && focused && from !== to && e.isEditable && !e.isActive('codeBlock') && !e.isActive('image') && !e.isActive('inlineMath') && !e.isActive('blockMath')
+  const show = !props.hidden && focused && e.isEditable && hasTextTools(e)
   if (!show) stylesOpen.value = false
   return show
 }

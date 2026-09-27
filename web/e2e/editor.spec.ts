@@ -198,6 +198,58 @@ test('the slash menu finds items by pinyin and inserts a table sized on the grid
   expect(md).toMatch(/\| -+ \| :-+: \| -+ \|/)
 })
 
+test('table and text tools take turns for column, row and text selections', async ({ page, request }) => {
+  const id = await createDoc(request, '表格浮动工具', '| 第一列 | 第二列 | 第三列 |\n| --- | --- | --- |\n| 甲一文本 | 甲二文本 | 甲三文本 |\n| 乙一文本 | 乙二文本 | 乙三文本 |\n\n表格后的正文。')
+  await openEditor(page, id)
+  const table = page.locator('.ProseMirror table')
+  const rows = table.locator('tr')
+  const cell = (row: number, col: number) => rows.nth(row).locator('th, td').nth(col)
+  const tools = page.locator('.yy-table-toolbar')
+  const drag = async (from: ReturnType<typeof cell>, to: ReturnType<typeof cell>) => {
+    const a = (await from.boundingBox())!
+    const b = (await to.boundingBox())!
+    await page.mouse.move(a.x + 12, a.y + a.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(b.x + 12, b.y + b.height / 2, { steps: 8 })
+    await page.mouse.up()
+  }
+  const tableToolsOnly = async () => {
+    await expect(tools).toBeVisible()
+    await expect(textBubble(page)).toBeHidden()
+    await expect(page.locator('.yy-bubble:visible')).toHaveCount(1)
+  }
+
+  // Real pointer drags produce cell selections, not a text range spanning the whole table.
+  await drag(cell(0, 1), cell(2, 1))
+  await expect(table.locator('.selectedCell')).toHaveCount(3)
+  await tableToolsOnly()
+  await tools.getByRole('button', { name: '整列居中' }).click()
+  for (const row of await rows.all()) await expect(row.locator('th, td').nth(1)).toHaveCSS('text-align', 'center')
+  // Formatting the whole column remains available without another floating toolbar.
+  await page.locator('.yy-toolbar').getByRole('button', { name: /^粗体/ }).click()
+  await expect(table.locator('.selectedCell strong')).toHaveCount(3)
+  await tableToolsOnly()
+
+  await drag(cell(1, 0), cell(1, 2))
+  await expect(table.locator('.selectedCell')).toHaveCount(3)
+  await tableToolsOnly()
+  await tools.getByRole('button', { name: '在下方插入行' }).click()
+  await expect(rows).toHaveCount(4)
+
+  // Text inside a cell switches to formatting tools; collapsing it returns to table tools.
+  await cell(1, 0).click()
+  await selectText(page, cell(1, 0), '甲一')
+  await expect(textBubble(page)).toBeVisible()
+  await expect(tools).toBeHidden()
+  await expect(page.locator('.yy-bubble:visible')).toHaveCount(1)
+  await textBubble(page).getByRole('button', { name: '粗体', exact: true }).click()
+  await expect(cell(1, 0).locator('strong')).toHaveText('甲一')
+  await page.keyboard.press('ArrowRight')
+  await tableToolsOnly()
+  await page.locator('.ProseMirror > p').last().click()
+  await expect(tools).toBeHidden()
+})
+
 test('links: from the selection toolbar and the slash menu, with a card under the cursor', async ({ page, request }) => {
   const id = await createDoc(request, '链接测试', '访问示例网站了解更多。')
   await openEditor(page, id)

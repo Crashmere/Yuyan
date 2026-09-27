@@ -7,9 +7,10 @@ import { TextAlignCenter, TextAlignEnd, TextAlignStart, Trash2 } from 'lucide-vu
 import { useEditorContext } from './context'
 import { ColumnLeft, ColumnRight, RowAbove, RowBelow } from './tableIcons'
 import { columnAlign, runTable, setColumnAlign, tableElement, type Align, type TableCommand } from './tables'
+import { hasTextTools } from './textSelection'
 
-// Shown above the table while the cursor is in it. When the top of a long table has scrolled
-// under the toolbar, the bar stays in view just below it.
+// Shown above the table for a cursor or cell selection; selected text gets the text tools instead.
+// When the top of a long table has scrolled under the toolbar, this bar stays just below it.
 const { editor, tick } = useEditorContext()
 
 const inserts: { command: TableCommand; label: string; icon: unknown }[] = [
@@ -31,7 +32,7 @@ const current = computed(() => {
 
 function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTMLElement; view: EditorView }) {
   const focused = view.hasFocus() || element.contains(document.activeElement)
-  return focused && e.isEditable && e.isActive('table')
+  return focused && e.isEditable && e.isActive('table') && !hasTextTools(e)
 }
 
 function anchor() {
