@@ -21,3 +21,10 @@
 - ali 上位于 `/opt/yuyan`，`yuyan.service` 监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问；安装、发布、导入、备份与诊断见 [docs/OPERATIONS.md](docs/OPERATIONS.md)。推送 main 会自动测试并发布，纯文档提交加 `[skip ci]`。
 - 服务器上不安装 Node：前端在 CI 构建后嵌入程序。部署先读 server-operations，并显式读取 `ssh ali 'cat /opt/AGENTS.md'`；哪些事直接做、哪些先确认，只看 server-operations SKILL.md 的授权表。
 - 仓库 public，不提交数据库、图片、备份、凭据或服务器公网地址。
+
+## 门户资源同步
+
+- 本项目的 `deploy/portal.json` 是 ServerPortal 资源声明的维护源，记录目录用途、数据库、运行用户、端口、unit、访问路径、API 与备份类型。新增/迁移/删除数据根、接口或运行材料时，必须同步修改声明、对应 docs 与共享应用清单。
+- 声明部署在 `/opt/yuyan/config/portal.json`，root 管理；普通 CI 不自动安装配置。经授权安装后重启门户采集进程并核对目录、只读数据表、备份覆盖与未知资源提示。
+- 统一认证由共享 Nginx 与门户负责，不在本项目另存设备白名单；本机调用和发布健康检查按共享约定保留。当前生产是否已经启用，以 server-operations current-state 为准。
+- 门户只读展示不替代本项目原生一致性备份；备份格式或媒体生命周期变化必须同时验证门户全量/增量与离线恢复。真实业务数据、凭据和备份仍不得进入 Git。

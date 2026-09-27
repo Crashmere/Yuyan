@@ -1,0 +1,236 @@
+{
+  "id": "yuyan",
+  "name": "语燕 Yuyan",
+  "description": "个人知识库、文档与图片。",
+  "icon": "/portal/static/icons/yuyan.svg",
+  "url": "/yuyan/",
+  "repo": "https://github.com/Crashmere/Yuyan",
+  "root": "/opt/yuyan",
+  "port": 18084,
+  "user": "yuyan",
+  "units": [
+    "yuyan.service",
+    "yuyan-backup.service",
+    "yuyan-backup.timer"
+  ],
+  "database": "/opt/yuyan/data/yuyan.db",
+  "backupKind": "media",
+  "resources": [
+    {
+      "id": "data",
+      "name": "业务数据",
+      "path": "/opt/yuyan/data",
+      "purpose": "数据库、图片与历史迁移材料；临时文件不属于恢复数据。",
+      "kind": "data",
+      "browse": true,
+      "cleanup": false
+    },
+    {
+      "id": "backups",
+      "name": "数据备份",
+      "path": "/opt/yuyan/backups",
+      "purpose": "daily、manual 与 before-deploy 一致性快照。",
+      "kind": "backups",
+      "browse": true,
+      "cleanup": true
+    },
+    {
+      "id": "releases",
+      "name": "部署版本",
+      "path": "/opt/yuyan/releases",
+      "purpose": "程序、发布结果与 previous 回退材料。",
+      "kind": "releases",
+      "browse": true,
+      "cleanup": true
+    },
+    {
+      "id": "config",
+      "name": "运行配置",
+      "path": "/opt/yuyan/config",
+      "purpose": "环境配置、systemd、Nginx 与资源声明；不直接展示秘密。",
+      "kind": "config",
+      "browse": false,
+      "cleanup": false
+    },
+    {
+      "id": "bin",
+      "name": "服务程序",
+      "path": "/opt/yuyan/bin",
+      "purpose": "当前应用程序及固定维护/发布脚本。",
+      "kind": "binaries",
+      "browse": false,
+      "cleanup": false
+    },
+    {
+      "id": "docs",
+      "name": "维护文档",
+      "path": "/opt/yuyan/docs",
+      "purpose": "架构、API、运维与恢复说明。",
+      "kind": "documents",
+      "browse": true,
+      "cleanup": false
+    }
+  ],
+  "apis": [
+    {
+      "method": "GET",
+      "path": "/healthz",
+      "description": "健康状态"
+    },
+    {
+      "method": "GET",
+      "path": "/api/meta",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/books",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/books",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/books/order",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/books/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/books/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/books/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/books/{id}/restore",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/books/{id}/tree",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/recent",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/titles",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/docs",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/docs/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/docs/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/docs/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/docs/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/docs/{id}/view",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/docs/{id}/move",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/docs/{id}/restore",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/docs/{id}/snapshot",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/docs/{id}/discard",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/docs/{id}/versions",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/versions/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/versions/{id}/view",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/versions/{id}/restore",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "POST",
+      "path": "/api/assets",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/search",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/trash",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/trash",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/trash/docs/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/trash/books/{id}",
+      "description": "以项目 API 路由和 DESIGN.md 为准"
+    }
+  ]
+}
