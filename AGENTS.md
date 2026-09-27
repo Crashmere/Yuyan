@@ -15,7 +15,7 @@
 - 编辑器扩展（`web/src/schema`）与 Go 渲染器（`internal/render`）必须一一对应；新增或修改节点时同时更新两端，并运行 `make parity` 刷新一致性快照。
 - 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格结构变化后恢复 Markdown 表格的形状，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。编辑器交互以 `web/e2e/editor.spec.ts` 的结果为准：IDE 浏览器工具会给页面元素加标记属性，ProseMirror 会因此重新读取选区（节点选区变成文本选区、正文里的菜单被关闭），这类现象不是产品问题；页面里可以用 `document.querySelector('.ProseMirror').editor` 取得编辑器实例。
 - 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。
-- 当前公网使用 HTTPS、无登录。所有写接口集中在 `/api/` 下同一个中间件入口，以后在那里接入登录。
+- 当前公网使用 HTTPS 与 ServerPortal 统一设备认证，所有公网页面和 API 均由共享 Nginx 校验。应用写接口继续保留自身来源校验。
 - 修改后运行 `make test`；前端改动还要 `npm --prefix web run build`。测试使用 `.local` 隔离数据，仓库只放合成样例，不提交真实笔记。本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。
 - 导入：`npm --prefix web run import -- --source <笔记仓库> --server <实例地址>/yuyan/ --overrides .local/import-overrides.json --report <报告文件>`，先加 `--dry` 演练；目标必须是空实例，overrides 的内容见 docs/OPERATIONS.md。导入后运行 `npm --prefix web run roundtrip -- --server <实例地址>/yuyan/`，确认每篇文档都能被编辑器原样接受。导出用 `npm --prefix web run export -- --server <实例地址>/yuyan/ --out <文件夹>`（先加 `--dry`）；本地试用界面用 `npm --prefix web run seed` 向空实例写入合成数据。
 - ali 上位于 `/opt/yuyan`，`yuyan.service` 监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问；安装、发布、导入、备份与诊断见 [docs/OPERATIONS.md](docs/OPERATIONS.md)。推送 main 会自动测试并发布，纯文档提交加 `[skip ci]`。
@@ -25,6 +25,6 @@
 ## 门户资源同步
 
 - 本项目的 `deploy/portal.json` 是 ServerPortal 资源声明的维护源，记录目录用途、数据库、运行用户、端口、unit、访问路径、API 与备份类型。新增/迁移/删除数据根、接口或运行材料时，必须同步修改声明、对应 docs 与共享应用清单。
-- 声明部署在 `/opt/yuyan/config/portal.json`，root 管理；普通 CI 不自动安装配置。经授权安装后重启门户采集进程并核对目录、只读数据表、备份覆盖与未知资源提示。
-- 统一认证由共享 Nginx 与门户负责，不在本项目另存设备白名单；本机调用和发布健康检查按共享约定保留。当前生产是否已经启用，以 server-operations current-state 为准。
+- 声明部署在 `/opt/yuyan/config/portal.json`，root 管理；普通 CI 不自动安装配置。维护安装后重启门户采集进程并核对目录、只读数据表、备份覆盖与未知资源提示。
+- 统一认证由共享 Nginx 与门户负责，不在本项目另存设备白名单；本机调用和发布健康检查按共享约定保留。生产已启用设备认证；变更后同步 server-operations current-state。
 - 门户只读展示不替代本项目原生一致性备份；备份格式或媒体生命周期变化必须同时验证门户全量/增量与离线恢复。真实业务数据、凭据和备份仍不得进入 Git。
