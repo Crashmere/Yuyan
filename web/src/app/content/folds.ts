@@ -36,7 +36,7 @@ function setFolded(heading: Element, folded: boolean) {
   button?.setAttribute('data-tip', folded ? '展开这一节' : '折叠这一节')
 }
 
-// Adds the arrows to the top-level headings of root and folds what was folded before. key names
+// Adds level markers and folding arrows to root headings, restoring the saved folds. key names
 // the document; without it nothing is remembered.
 export function setupFolds(root: HTMLElement, key?: string) {
   if (key) root.dataset.folds = key
@@ -50,10 +50,25 @@ export function setupFolds(root: HTMLElement, key?: string) {
   blocks.forEach((el, i) => {
     const level = levelOf(el)
     const next = blocks[i + 1]
-    if (!level || !next || (levelOf(next) && levelOf(next) <= level) || el.querySelector(':scope > .yy-fold')) return
+    if (!level || el.querySelector(':scope > .yy-heading-tools')) return
+    // Generated labels stay out of heading text, copied content and scroll-position matching.
+    const marker = document.createElement('span')
+    marker.className = 'yy-heading-level'
+    marker.dataset.level = String(level)
+    marker.setAttribute('aria-hidden', 'true')
+    const foldable = next && (!levelOf(next) || levelOf(next) > level)
+    if (!foldable) {
+      const tools = document.createElement('span')
+      tools.className = 'yy-heading-tools'
+      tools.setAttribute('aria-hidden', 'true')
+      tools.append(marker)
+      el.prepend(tools)
+      return
+    }
     const button = document.createElement('button')
     button.type = 'button'
-    button.className = 'yy-fold'
+    button.className = 'yy-heading-tools yy-fold'
+    button.append(marker)
     button.addEventListener('click', () => {
       setFolded(el, !el.classList.contains('is-folded'))
       apply(root)

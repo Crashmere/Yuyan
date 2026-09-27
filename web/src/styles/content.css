@@ -35,29 +35,46 @@
 .yy-content :where(h5, h6) {
   font-size: 1em;
 }
-/* Reading pages fold the section under a heading with the arrow before it (content/folds.ts). */
-.yy-content > :is(h1, h2, h3, h4, h5, h6):has(> .yy-fold) {
+/* Heading levels share the reading-page folding controls (content/folds.ts). */
+.yy-content > :is(h1, h2, h3, h4, h5, h6):has(> .yy-heading-tools) {
   position: relative;
 }
-.yy-fold {
+.yy-heading-tools {
   position: absolute;
   top: 0;
-  left: -26px;
+  left: -36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  gap: 4px;
+  width: 34px;
   height: 1.45em;
   padding: 0;
   border: 0;
   border-radius: var(--yy-radius-sm);
   background: none;
   color: var(--yy-text-3);
-  cursor: pointer;
+  user-select: none;
   opacity: 0;
   transition: opacity 0.15s;
 }
-.yy-fold::before {
+.yy-heading-level {
+  flex: none;
+  color: var(--yy-primary);
+  font: 600 12px/1 var(--yy-font);
+}
+.yy-heading-level::before {
+  content: 'H';
+}
+.yy-heading-level::after {
+  content: attr(data-level);
+  font-size: 9px;
+  vertical-align: -2px;
+}
+.yy-fold {
+  cursor: pointer;
+}
+.yy-fold::after {
   content: '';
   width: 6px;
   height: 6px;
@@ -66,10 +83,10 @@
   transform: translateY(-2px) rotate(45deg);
   transition: transform 0.15s;
 }
-.is-folded > .yy-fold::before {
+.is-folded > .yy-fold::after {
   transform: rotate(-45deg);
 }
-.yy-content > :hover > .yy-fold,
+.yy-content > :hover > .yy-heading-tools,
 .yy-fold:focus-visible,
 .is-folded > .yy-fold {
   opacity: 1;
@@ -94,14 +111,16 @@
   display: none !important;
 }
 @media (hover: none) {
-  .yy-fold {
+  .yy-heading-tools {
     opacity: 0.6;
   }
 }
 @media (max-width: 720px) {
-  .yy-fold {
+  .yy-heading-tools {
     left: -16px;
     width: 16px;
+    flex-direction: column;
+    gap: 3px;
   }
 }
 .yy-content a {
