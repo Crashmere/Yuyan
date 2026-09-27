@@ -672,6 +672,55 @@ test('the outline sits at the right edge; unpinned, it is a line per heading tha
   expect((await article.boundingBox())!.x).toBe(left)
 })
 
+test('the outline highlights the entry clicked and then the section being read', async ({ page, request }) => {
+  await openLongDocument(page)
+  const aside = page.locator('.yy-doc-aside')
+  const active = aside.locator('a.active')
+  const still = () =>
+    expect
+      .poll(async () => {
+        const y = await page.evaluate(() => scrollY)
+        await page.waitForTimeout(200)
+        return y === (await page.evaluate(() => scrollY))
+      })
+      .toBe(true)
+  // Jumps keep the entry clicked, although the smooth scroll passes other headings.
+  for (const name of ['1.1 细节', '4.2 小结', '2. 目标']) {
+    await aside.getByRole('link', { name, exact: true }).click()
+    await still()
+    await expect(active).toHaveText(name)
+  }
+  // Scrolling by hand, the section is the one whose heading last passed the top of the page; at
+  // the end of the page, the last heading.
+  const last = (await aside.getByRole('link').allTextContents()).at(-1)!
+  const put = (text: string, top: number) =>
+    page.evaluate(
+      ([t, y]) => {
+        const h = [...document.querySelectorAll('.yy-content :is(h1, h2, h3)')].find((e) => e.textContent?.includes(t))!
+        window.scrollBy(0, h.getBoundingClientRect().top - y)
+      },
+      [text, top] as const,
+    )
+  await put('5. 验证', 60)
+  await expect(active).toHaveText('5. 验证')
+  await put('5. 验证', 200)
+  await expect(active).toHaveText('4.2 小结')
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await expect(active).toHaveText(last)
+
+  // Near the end the page stops before the heading clicked reaches the top; the entry stays until
+  // the reader scrolls again.
+  const body = Array.from({ length: 6 }, (_, i) => `## 第 ${i + 1} 节\n\n${'正文。'.repeat(200)}`)
+  const id = await createDoc(request, '大纲末尾测试', [...body, '## 倒数第二节\n\n短。', '## 最后一节\n\n短。'].join('\n\n'))
+  await page.goto(`docs/${id}`)
+  await aside.getByRole('link', { name: '倒数第二节', exact: true }).click()
+  await still()
+  await expect(active).toHaveText('倒数第二节')
+  await page.evaluate(() => window.scrollBy(0, -300))
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await expect(active).toHaveText('最后一节')
+})
+
 test('sections fold under their headings, stay folded, and open for the outline and search', async ({ page }) => {
   await openLongDocument(page)
   const background = page.locator('.yy-content > h2', { hasText: '1. 背景' })
