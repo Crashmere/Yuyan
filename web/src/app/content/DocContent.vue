@@ -8,24 +8,32 @@ import { enhance } from './enhance'
 import { reveal, setupFolds } from './folds'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
 import { clearMatches, showMatches } from './matches'
+import { restoreReadingPosition, type ReadingPosition } from './readingPosition'
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app. highlight is
 // the text searched for when the page was opened from search results; foldKey names the document
 // whose folded sections are remembered.
-const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes; highlight?: string; foldKey?: string }>()
+const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes; highlight?: string; foldKey?: string; readingPosition?: ReadingPosition }>()
 const router = useRouter()
 const root = ref<HTMLElement | null>(null)
 // Diagrams are drawn in the theme's colours; a theme change re-creates the content to redraw them.
 const generation = ref(0)
 let drawn: Promise<unknown> = Promise.resolve()
+let initialPosition = props.readingPosition
 
 async function run() {
+  const position = initialPosition
+  initialPosition = undefined // Only on entry, not a later theme change or content redraw.
   await nextTick()
   if (!root.value) return
   drawn = enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images }).catch((e: unknown) => console.warn('enhance', e))
   setupFolds(root.value, props.foldKey)
   if (location.hash) scrollTo(decodeURIComponent(location.hash.slice(1)))
   await mark()
+  if (position) {
+    await drawn
+    if (root.value?.isConnected) restoreReadingPosition(root.value, position)
+  }
 }
 
 function scrollTo(id: string, smooth = false) {

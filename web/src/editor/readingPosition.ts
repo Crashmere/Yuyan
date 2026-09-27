@@ -1,6 +1,27 @@
 import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
-import type { ReadingPosition } from '../app/content/readingPosition'
+import type { Node } from '@tiptap/pm/model'
+import type { Mapping } from '@tiptap/pm/transform'
+import { captureBlockPosition, type ReadingPosition } from '../app/content/readingPosition'
+
+export function captureEditingPosition(editor: Editor, original?: { doc: Node; mapping: Mapping }): ReadingPosition | undefined {
+  const blocks: (Element | null)[] = []
+  const offsets: number[] = []
+  editor.state.doc.forEach((_node, offset) => {
+    const dom = editor.view.nodeDOM(offset)
+    blocks.push(dom instanceof Element ? dom : null)
+    offsets.push(offset)
+  })
+  const top = (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 16
+  const position = captureBlockPosition(blocks, top)
+  if (position && original) {
+    // Cancelling restores the original document. Undo the positional effects of inserted/deleted
+    // blocks too; a removed new block lands at the nearest surviving position in that document.
+    const mapped = original.mapping.map(offsets[position.block])
+    position.block = Math.min(original.doc.resolve(mapped).index(0), original.doc.childCount - 1)
+  }
+  return position
+}
 
 export function restoreReadingPosition(editor: Editor, position: ReadingPosition): boolean {
   let pos: number | undefined

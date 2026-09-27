@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import { getMarkRange, type JSONContent } from '@tiptap/core'
+import { Mapping } from '@tiptap/pm/transform'
 import { api, ApiError, base, errorMessage, type Doc } from '../shared/api'
 import { stopLoading } from '../shared/images'
 import { toast } from '../ui/toast'
@@ -24,7 +25,7 @@ import TableGrid from './TableGrid.vue'
 import TableToolbar from './TableToolbar.vue'
 import ImageToolbar from './ImageToolbar.vue'
 import { insertImages, pendingUploads } from './uploads'
-import { restoreReadingPosition } from './readingPosition'
+import { captureEditingPosition, restoreReadingPosition } from './readingPosition'
 import 'katex/dist/katex.min.css'
 import '../styles/editor.css'
 
@@ -107,6 +108,7 @@ let again = false
 let loaded = false
 let savedThisSession = false
 let discarded = false
+const positionMapping = new Mapping()
 
 function statusText(): string {
   return {
@@ -239,7 +241,13 @@ async function discard(): Promise<boolean> {
   }
 }
 
-defineExpose({ flush, setTitle, touched, discard })
+function capturePosition() {
+  const e = editor.value
+  if (!e) return
+  return captureEditingPosition(e, discarded ? { doc: e.schema.nodeFromJSON(props.doc.content), mapping: positionMapping.invert() } : undefined)
+}
+
+defineExpose({ flush, setTitle, touched, discard, capturePosition })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {
@@ -326,8 +334,10 @@ onMounted(async () => {
       emit('words', ed.storage.characterCount.characters())
       changed()
     },
-    onTransaction: () => {
+    onTransaction: ({ transaction, appendedTransactions }) => {
       tick.value++
+      positionMapping.appendMapping(transaction.mapping)
+      for (const appended of appendedTransactions) positionMapping.appendMapping(appended.mapping)
     },
     // Before the node views are created, so images have their space from the start.
     onBeforeCreate: ({ editor: ed }) => {

@@ -75,14 +75,18 @@ async function cancel() {
 }
 
 // Leaving saves first; only content that could not reach the server needs a decision.
-onBeforeRouteLeave(async () => {
-  if (!pane.value || (await pane.value.flush())) return true
-  return confirm({
-    title: '还有修改没有保存到服务器',
-    message: '内容已暂存在这个浏览器里，下次打开这篇文档时可以恢复。仍要离开吗？',
-    confirmText: '离开',
-    danger: true,
-  })
+onBeforeRouteLeave(async (to) => {
+  if (pane.value && !(await pane.value.flush())) {
+    const leave = await confirm({
+      title: '还有修改没有保存到服务器',
+      message: '内容已暂存在这个浏览器里，下次打开这篇文档时可以恢复。仍要离开吗？',
+      confirmText: '离开',
+      danger: true,
+    })
+    if (!leave) return false
+  }
+  if (to.name === 'doc' && Number(to.params.id) === id) to.meta.readingPosition = pane.value?.capturePosition()
+  return true
 })
 </script>
 

@@ -1039,8 +1039,16 @@ for (const narrow of [false, true]) {
     await page.keyboard.type('x')
     await expect(editing).toContainText('x')
     expect(await page.evaluate(() => scrollY)).toBeCloseTo(scroll, 0)
+    // Exit from a different position, not the place at which editing began.
+    await page.evaluate(() => window.scrollBy(0, 120))
+    const editingOffset = await editing.evaluate((el) => document.querySelector('.yy-toolbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)
+    await page.route(`**/api/docs/${id}/view`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      await route.continue()
+    })
     await page.getByRole('button', { name: '完成', exact: true }).click()
-    await expect(page.locator('.yy-doc-title')).toBeVisible()
+    await expect(reading).toContainText('x')
+    await expect.poll(() => reading.evaluate((el) => document.querySelector('.yy-topbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)).toBeCloseTo(editingOffset, 0)
 
     // A fresh edit URL and entering from the top have no reading anchor to restore.
     await openEditor(page, id)
@@ -1052,6 +1060,52 @@ for (const narrow of [false, true]) {
     expect(await page.evaluate(() => scrollY)).toBe(0)
   })
 }
+
+test('cancelling keeps the visible paragraph, even when discarded edits shifted its index', async ({ page, request }) => {
+  const padding = Array.from({ length: 20 }, (_, i) => `第 ${i} 段内容。`.repeat(10))
+  const id = await createDoc(request, '取消时的位置', [...padding, '取消定位目标，继续显示当前段落。'.repeat(60), ...padding].join('\n\n'))
+  for (const modified of [false, true]) {
+    await openEditor(page, id)
+    if (modified) {
+      await page.locator('.ProseMirror').evaluate((el) => {
+        const { editor } = el as HTMLElement & { editor: { commands: { insertContentAt: (pos: number, content: string) => void } } }
+        editor.commands.insertContentAt(0, '<p>临时新增第一段</p><p>临时新增第二段</p>')
+      })
+      await expect.poll(async () => JSON.stringify((await (await request.get(`api/docs/${id}`)).json()).content)).toContain('临时新增第一段')
+    }
+    const editing = page.locator('.ProseMirror > p', { hasText: '取消定位目标' })
+    await editing.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top + 180))
+    const offset = await editing.evaluate((el) => document.querySelector('.yy-toolbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)
+    await page.getByRole('button', { name: '取消', exact: true }).click()
+    if (modified) await page.getByRole('button', { name: '放弃修改', exact: true }).click()
+    const reading = page.locator('.yy-content > p', { hasText: '取消定位目标' })
+    await expect(reading).toBeVisible()
+    await expect.poll(() => reading.evaluate((el) => document.querySelector('.yy-topbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)).toBeCloseTo(offset, 0)
+    await expect(page.locator('.yy-content')).not.toContainText('临时新增')
+  }
+})
+
+test('browser back reveals the edited position inside folded sections, callouts and long code', async ({ page, request }) => {
+  const code = ['> [!note]- 默认收起', '>', '> ```js', ...Array.from({ length: 90 }, (_, i) => `> console.log("line ${i}")`), '> ```'].join('\n')
+  const padding = Array.from({ length: 20 }, (_, i) => `末尾第 ${i} 段。`.repeat(10)).join('\n\n')
+  const id = await createDoc(request, '返回时展开目标', `首段搜索词。\n\n## 折叠目标\n\n${code}\n\n## 末尾\n\n${padding}`)
+  await page.goto(`docs/${id}?hl=首段搜索词`)
+  const heading = page.locator('.yy-content > h2', { hasText: '折叠目标' })
+  await heading.getByRole('button', { name: '折叠这一节' }).click({ force: true })
+  await page.getByRole('link', { name: '编辑', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))).toBe(true)
+  await page.locator('.ProseMirror pre code').evaluate((el) => {
+    window.scrollBy(0, el.getBoundingClientRect().top + 65 * parseFloat(getComputedStyle(el).lineHeight) - 150)
+  })
+  const offset = await page.locator('.ProseMirror > .callout').evaluate((el) => document.querySelector('.yy-toolbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)
+  await page.goBack()
+  const reading = page.locator('.yy-content > .callout')
+  await expect(reading).toBeVisible()
+  await expect(reading).not.toHaveClass(/is-collapsed|yy-folded-away/)
+  await expect(reading.locator('pre')).not.toHaveClass(/is-folded/)
+  await expect(reading.locator('.yy-line').nth(65)).toBeInViewport()
+  await expect.poll(() => reading.evaluate((el) => document.querySelector('.yy-topbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)).toBeCloseTo(offset, 0)
+})
 
 test('cancelling the editor drops the edits of this session and leaves no version', async ({ page, request }) => {
   const id = await createDoc(request, '取消测试', '原来的内容。')
