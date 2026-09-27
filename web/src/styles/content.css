@@ -134,6 +134,17 @@
 .yy-code-menu { position: fixed; z-index: 90; display: grid; min-width: 190px; padding: 5px; border: 1px solid var(--yy-border); border-radius: 7px; background: var(--yy-bg-elevated); box-shadow: var(--yy-shadow-popover); font: 13px/1.5 var(--yy-font); }
 .yy-code-menu button { padding: 7px 9px; border: 0; border-radius: 4px; text-align: left; color: var(--yy-text); background: none; cursor: pointer; }
 .yy-code-menu button:hover, .yy-code-menu button:focus-visible { background: var(--yy-bg-hover); }
+.yy-code-menu { overflow: auto; overscroll-behavior: contain; }
+.yy-code-menu button:disabled { color: var(--yy-text-3); cursor: default; background: none; }
+.yy-code-shortcuts { width: min(540px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); box-sizing: border-box; overflow: auto; overscroll-behavior: contain; padding: 18px 22px; border: 1px solid var(--yy-border); border-radius: 9px; color: var(--yy-text); background: var(--yy-bg-elevated); font: 13px/1.6 var(--yy-font); }
+.yy-code-shortcuts::backdrop { background: #0006; }
+.yy-code-shortcuts-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.yy-code-shortcuts h2 { font-size: 16px; margin: 0; }
+.yy-code-shortcuts-title button { border: 0; border-radius: 4px; padding: 0 7px; background: none; color: inherit; font-size: 22px; cursor: pointer; }
+.yy-code-shortcuts p { margin: 6px 0 14px; color: var(--yy-text-3); font-size: 12px; }
+.yy-code-shortcuts dl { display: grid; grid-template-columns: 1fr auto; gap: 7px 14px; margin: 0; }
+.yy-code-shortcuts dd { margin: 0; text-align: right; }
+.yy-code-shortcuts kbd { font: 12px var(--yy-mono); white-space: nowrap; }
 .yy-code-dialog { position: fixed; inset: 24px; width: calc(100% - 48px); height: calc(100% - 48px); max-width: none; max-height: none; padding: 0; border: 1px solid #ffffff25; border-radius: 9px; background: var(--yy-codeblock-bg); color: var(--yy-codeblock-text); overflow: hidden; }
 .yy-code-dialog[open] { display: flex; flex-direction: column; }
 .yy-code-dialog::backdrop { background: #0008; }

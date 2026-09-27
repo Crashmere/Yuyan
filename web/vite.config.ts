@@ -6,6 +6,7 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   base: './',
   plugins: [vue()],
+  worker: { format: 'es' },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

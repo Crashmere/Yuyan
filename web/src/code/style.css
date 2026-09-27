@@ -20,6 +20,5 @@
 .yy-code-search button { flex: none; padding: 3px 5px; border: 0; border-radius: 3px; color: #abb2bf; background: none; font: inherit; cursor: pointer; }
 .yy-code-search button:hover, .yy-code-search button[aria-pressed=true] { background: #ffffff18; color: #fff; }
 .yy-code-search-count { white-space: nowrap; font-size: 11px; color: #8c98ab; }
-.yy-code-editor-host .cm-panel.cm-goto-line { padding: 8px; font: 12px/1.5 var(--yy-font); }
-.yy-code-editor-host .cm-panel.cm-goto-line input { width: 90px; }
+.yy-code-format-status { position: absolute; top: 6px; right: 12px; z-index: 5; max-width: calc(100% - 24px); padding: 6px 10px; border: 1px solid #ffffff25; border-radius: 5px; background: #252830; color: #abb2bf; font: 12px/1.5 var(--yy-font); }
 .yy-code-editor-host .cm-tooltip-autocomplete { font-family: var(--yy-mono); }

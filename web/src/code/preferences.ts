@@ -1,6 +1,5 @@
 export interface CodePreferences {
   wrapped: boolean
-  indent: '2' | '4' | 'tab'
   hash?: string
   folds?: { from: number; to: number }[]
 }
@@ -18,8 +17,8 @@ export function codeHash(text: string) {
 export function readCodePreferences(key: string): CodePreferences {
   try {
     const stored = JSON.parse(localStorage.getItem(key) ?? '{}') as Partial<CodePreferences>
-    return { ...stored, wrapped: stored.wrapped === true, indent: ['2', '4', 'tab'].includes(stored.indent ?? '') ? stored.indent! : '4' }
-  } catch { return { wrapped: false, indent: '4' } }
+    return { wrapped: stored.wrapped === true, hash: stored.hash, folds: stored.folds }
+  } catch { return { wrapped: false } }
 }
 
 export function saveCodePreferences(key: string, value: CodePreferences) {

@@ -1,14 +1,16 @@
-import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField, type Extension } from '@codemirror/state'
+import { Compartment, EditorSelection, EditorState, Prec, StateEffect, StateField } from '@codemirror/state'
 import { Decoration, drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection, type DecorationSet, type KeyBinding, type ViewUpdate } from '@codemirror/view'
 import { bracketMatching, codeFolding, foldAll, foldCode, foldedRanges, foldEffect, foldGutter, indentOnInput, indentUnit, syntaxHighlighting, unfoldAll, unfoldCode, unfoldEffect } from '@codemirror/language'
 import { classHighlighter } from '@lezer/highlight'
-import { defaultKeymap, deleteLine, indentLess, indentMore, insertTab, moveLineDown, moveLineUp, copyLineDown, copyLineUp, toggleComment } from '@codemirror/commands'
+import { standardKeymap, simplifySelection, deleteLine, indentLess, indentMore, moveLineDown, moveLineUp, copyLineDown, toggleComment, toggleBlockComment } from '@codemirror/commands'
 import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
-import { closeSearchPanel, gotoLine, search, searchPanelOpen, selectNextOccurrence } from '@codemirror/search'
+import { closeSearchPanel, search, searchPanelOpen, selectNextOccurrence } from '@codemirror/search'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { codeLanguage } from './language'
 import { codeHash, readCodePreferences, saveCodePreferences, type CodePreferences } from './preferences'
 import { codeSearchPanel, openCodeSearch } from './search'
+import { formatLanguage } from './formatLanguage'
+import { codeKeys } from './keymap'
 import './style.css'
 
 const externalMatches = StateEffect.define<{ from: number; to: number; current: boolean }[]>()
@@ -37,12 +39,16 @@ export class CodeEditor {
   preferences: CodePreferences
   private language = new Compartment()
   private wrapping = new Compartment()
-  private indentation = new Compartment()
   private generation = 0
   private syncing = false
   private destroyed = false
   private stopDrag?: () => void
   private observer: MutationObserver
+  private languageName = ''
+  private version = 0
+  private formatting = false
+  private feedback?: HTMLElement
+  private feedbackTimer?: ReturnType<typeof setTimeout>
 
   constructor(readonly host: HTMLElement, readonly options: CodeEditorOptions) {
     this.preferences = readCodePreferences(options.key)
@@ -68,19 +74,31 @@ export class CodeEditor {
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', stop); window.addEventListener('blur', stop)
       return true
     }
+    const commands: Record<string, (view: EditorView) => boolean> = {
+      find: openCodeSearch,
+      replace: view => { openCodeSearch(view); view.dom.querySelector<HTMLInputElement>('[aria-label="代码替换为"]')?.focus(); return true },
+      format: () => { void this.format(); return true }, indent: indentMore, unindent: indentLess,
+      comment: toggleComment, blockComment: toggleBlockComment,
+      duplicate: view => {
+        if (view.state.selection.ranges.every(range => range.empty)) return copyLineDown(view)
+        if (view.state.readOnly) return false
+        view.dispatch(view.state.changeByRange(range => {
+          const text = view.state.sliceDoc(range.from, range.to)
+          return { changes: { from: range.to, insert: text }, range: EditorSelection.range(range.to, range.to + text.length) }
+        }), { userEvent: 'input' })
+        return true
+      },
+      delete: deleteLine, moveUp: moveLineUp, moveDown: moveLineDown, next: selectNextOccurrence,
+      fold: foldCode, unfold: unfoldCode, foldAll, unfoldAll,
+    }
     const keys: KeyBinding[] = [
       ...(options.keys ?? []),
-      { key: 'Mod-f', run: openCodeSearch }, { key: 'Mod-h', mac: 'Alt-Mod-f', run: openCodeSearch },
-      { key: 'Mod-g', run: gotoLine }, { key: 'Mod-/', run: toggleComment },
-      { key: 'Alt-ArrowUp', run: moveLineUp }, { key: 'Alt-ArrowDown', run: moveLineDown },
-      { key: 'Shift-Alt-ArrowUp', run: copyLineUp }, { key: 'Shift-Alt-ArrowDown', run: copyLineDown },
-      { key: 'Shift-Mod-k', run: deleteLine }, { key: 'Mod-d', run: selectNextOccurrence },
-      { key: 'Mod-[', run: indentLess }, { key: 'Mod-]', run: indentMore },
-      { key: 'Shift-Mod-[', run: foldCode }, { key: 'Shift-Mod-]', run: unfoldCode },
-      { key: 'Tab', run: view => this.preferences.indent === 'tab' && view.state.selection.main.empty ? insertTab(view) : indentMore(view) },
-      { key: 'Shift-Tab', run: indentLess },
+      ...codeKeys.flatMap(binding => commands[binding.action] ? [{ key: binding.key, mac: 'mac' in binding ? binding.mac : undefined, run: commands[binding.action], preventDefault: true }] : []),
       { key: 'Escape', run: view => { if (!searchPanelOpen(view.state)) return false; closeSearchPanel(view); return true } },
-      ...closeBracketsKeymap, ...completionKeymap, ...defaultKeymap,
+      ...closeBracketsKeymap, ...completionKeymap,
+      { key: 'Escape', run: simplifySelection },
+      // Keep normal text navigation without CodeMirror's VS Code-style editing shortcuts.
+      ...standardKeymap,
     ]
     this.view = new EditorView({ parent: host, doc: options.doc, extensions: [
       EditorState.readOnly.of(!!options.readOnly), EditorState.allowMultipleSelections.of(true),
@@ -90,12 +108,13 @@ export class CodeEditor {
       codeFolding({ preparePlaceholder: (state, range) => state.doc.lineAt(range.to).number - state.doc.lineAt(range.from).number,
         placeholderDOM: (_view, click, lines) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'yy-code-fold-placeholder'; b.textContent = `⋯ ${lines} 行`; b.dataset.tip = '展开代码区域'; b.setAttribute('aria-label', `展开 ${lines} 行代码`); b.onclick = click; return b } }),
       this.language.of([]), this.wrapping.of(this.preferences.wrapped ? EditorView.lineWrapping : []),
-      this.indentation.of(this.indentExtension()), indentOnInput(), bracketMatching(), closeBrackets(),
+      indentUnit.of('    '), EditorState.tabSize.of(4), indentOnInput(), bracketMatching(), closeBrackets(),
       autocompletion(), rectangularSelection(), drawSelection(), highlightActiveLine(), oneDark, syntaxHighlighting(classHighlighter),
       search({ top: true, createPanel: codeSearchPanel }), externalHighlights,
-      EditorState.phrases.of({ 'Go to line': '跳转到行', 'go': '跳转', 'Fold line': '折叠代码区域', 'Unfold line': '展开代码区域' }),
+      EditorState.phrases.of({ 'Fold line': '折叠代码区域', 'Unfold line': '展开代码区域' }),
       Prec.highest(keymap.of(keys)),
       EditorView.updateListener.of(update => {
+        if (update.docChanged) this.version++
         if (!this.syncing && (update.docChanged || update.selectionSet || update.focusChanged)) options.onUpdate?.(update)
         if (update.docChanged || update.transactions.some(tr => tr.effects.some(e => e.is(foldEffect) || e.is(unfoldEffect)))) this.save()
       }),
@@ -112,11 +131,8 @@ export class CodeEditor {
     }
   }
 
-  private indentExtension(): Extension {
-    const indent = this.preferences.indent === 'tab' ? '\t' : ' '.repeat(Number(this.preferences.indent))
-    return [indentUnit.of(indent), EditorState.tabSize.of(this.preferences.indent === '2' ? 2 : 4)]
-  }
   async setLanguage(name: string) {
+    this.languageName = name
     const generation = ++this.generation
     const language = await codeLanguage(name)
     if (!this.destroyed && generation === this.generation) this.view.dispatch({ effects: this.language.reconfigure(language) })
@@ -124,11 +140,6 @@ export class CodeEditor {
   setWrapped(value: boolean) {
     this.preferences.wrapped = value
     this.view.dispatch({ effects: this.wrapping.reconfigure(value ? EditorView.lineWrapping : []) })
-    this.save()
-  }
-  setIndent(value: CodePreferences['indent']) {
-    this.preferences.indent = value
-    this.view.dispatch({ effects: this.indentation.reconfigure(this.indentExtension()) })
     this.save()
   }
   private save() {
@@ -162,10 +173,33 @@ export class CodeEditor {
   find() { openCodeSearch(this.view) }
   highlight(matches: { from: number; to: number; current: boolean }[]) { this.view.dispatch({ effects: externalMatches.of(matches) }) }
   revealSelection() { this.view.dispatch({ effects: EditorView.scrollIntoView(this.view.state.selection.main.head, { y: 'center' }) }) }
-  goto() { gotoLine(this.view) }
   foldAll() { foldAll(this.view) }
   unfoldAll() { unfoldAll(this.view) }
-  destroy() { this.destroyed = true; this.stopDrag?.(); this.observer.disconnect(); this.view.destroy(); delete (this.host as CodeHost).codeEditor }
+  private status(message: string, persistent = false) {
+    clearTimeout(this.feedbackTimer)
+    this.feedback ??= Object.assign(document.createElement('div'), { className: 'yy-code-format-status' })
+    this.feedback.setAttribute('role', 'status'); this.feedback.textContent = message
+    this.view.dom.append(this.feedback)
+    if (!persistent) this.feedbackTimer = setTimeout(() => this.feedback?.remove(), 5000)
+  }
+  async format() {
+    if (this.formatting || this.options.readOnly) return
+    if (!formatLanguage(this.languageName)) { this.status('当前语言暂不支持格式化'); return }
+    const original = this.view.state.doc.toString(), version = this.version, generation = this.generation
+    this.formatting = true; this.status('正在格式化…', true)
+    try {
+      const { formatCode, formatChanges } = await import('./format')
+      const formatted = await formatCode(original, this.languageName)
+      if (this.destroyed) return
+      if (version !== this.version || generation !== this.generation) { this.status('代码已变化，请重新格式化'); return }
+      if (formatted === original) { this.status('代码格式已整齐'); return }
+      this.view.dispatch({ changes: formatChanges(original, formatted), userEvent: 'input.format' })
+      this.status('已格式化，可撤销')
+      this.view.focus()
+    } catch (error) { if (!this.destroyed) this.status(error instanceof Error ? error.message : '格式化失败，请重试') }
+    finally { this.formatting = false }
+  }
+  destroy() { this.destroyed = true; clearTimeout(this.feedbackTimer); this.stopDrag?.(); this.observer.disconnect(); this.view.destroy(); delete (this.host as CodeHost).codeEditor }
 }
 
 export type CodeHost = HTMLElement & { codeEditor?: CodeEditor }

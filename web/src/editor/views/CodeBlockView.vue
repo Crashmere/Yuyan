@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { AllSelection, Selection, TextSelection } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import { ChevronDown } from 'lucide-vue-next'
 import { copyText } from '../../shared/clipboard'
 import { codeIcons } from '../../shared/codeIcons'
@@ -12,6 +13,7 @@ import { CodeEditor } from '../../code/editor'
 import { codeActions, expandCode, type CodeAction } from '../../code/actions'
 import { codeKey } from '../../code/preferences'
 import { searchState } from '../search'
+import { formatLanguage } from '../../code/formatLanguage'
 
 const props = defineProps(nodeViewProps)
 
@@ -100,12 +102,11 @@ async function action(action: CodeAction) {
     }, codeHost.value?.closest('.yy-codeblock')?.querySelector<HTMLElement>('.yy-codeblock-title, .yy-codeblock-bar') ?? undefined)
   }
   else if (action === 'find') cm.find()
-  else if (action === 'goto') cm.goto()
+  else if (action === 'format') await cm.format()
   else if (action === 'fold') cm.foldAll()
   else if (action === 'unfold') cm.unfoldAll()
-  else cm.setIndent(action === 'indenttab' ? 'tab' : action === 'indent2' ? '2' : '4')
 }
-watch(actions, el => { removeActions?.(); removeActions = el ? codeActions(el, a => { void action(a) }, true) : undefined })
+watch(actions, el => { removeActions?.(); removeActions = el ? codeActions(el, a => { void action(a) }, true, () => !!formatLanguage(language.value)) : undefined })
 
 onMounted(() => {
   const pos = props.getPos()
@@ -129,12 +130,14 @@ onMounted(() => {
         offset += (toB - fromB) - (toA - fromA)
       })
       tr.setSelection(TextSelection.create(tr.doc, start + 1 + main.anchor, start + 1 + main.head))
+      const formatting = update.transactions.some(transaction => transaction.isUserEvent('input.format'))
+      if (formatting) closeHistory(tr)
       props.editor.view.dispatch(tr)
+      if (formatting) props.editor.view.dispatch(closeHistory(props.editor.state.tr))
     },
     keys: [
       { key: 'Mod-z', run: () => props.editor.commands.undo() },
       { key: 'Shift-Mod-z', run: () => props.editor.commands.redo() },
-      { key: 'Mod-y', run: () => props.editor.commands.redo() },
       { key: 'ArrowUp', run: () => leaveCode('line', -1) }, { key: 'ArrowDown', run: () => leaveCode('line', 1) },
       { key: 'ArrowLeft', run: () => leaveCode('char', -1) }, { key: 'ArrowRight', run: () => leaveCode('char', 1) },
       { key: 'Mod-Enter', run: () => { const done = props.editor.commands.exitCode(); if (done) props.editor.view.focus(); return done } },

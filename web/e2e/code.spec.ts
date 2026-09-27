@@ -182,24 +182,25 @@ for (const [language, text] of [
   })
 }
 
-test('VS Code keys indent, comment and move lines while language changes retain the caret', async ({ page, request }) => {
+test('JetBrains keys indent, comment and duplicate lines while language changes retain the caret', async ({ page, request }) => {
   const id = await createCode(request, 'if (true) {}')
   await page.goto(`docs/${id}/edit`)
   await expect.poll(() => page.locator('.yy-code-editor-host').evaluate((el: any) => el.codeEditor.view.state.languageDataAt('commentTokens', 0).length)).toBeGreaterThan(0)
   await page.getByRole('button', { name: '代码块更多操作' }).click()
-  await page.getByRole('menuitem', { name: '缩进：2 个空格' }).click()
+  await expect(page.getByRole('menuitem', { name: /缩进|跳转到行/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
   await selectCode(page, 11)
   await page.keyboard.press('Enter')
-  await expect.poll(() => source(page)).toBe('if (true) {\n  \n}')
+  await expect.poll(() => source(page)).toBe('if (true) {\n    \n}')
   await page.keyboard.type('hello()')
-  await expect.poll(() => source(page)).toBe('if (true) {\n  hello()\n}')
+  await expect.poll(() => source(page)).toBe('if (true) {\n    hello()\n}')
   await page.keyboard.press('ControlOrMeta+/')
-  await expect.poll(() => source(page)).toContain('  // hello()')
+  await expect.poll(() => source(page)).toContain('    // hello()')
   await expect(page.getByRole('dialog', { name: '快捷键' })).toHaveCount(0)
   await page.keyboard.press('ControlOrMeta+/')
-  await expect.poll(() => source(page)).toContain('  hello()')
-  await page.keyboard.press('Alt+Shift+ArrowDown')
-  await expect.poll(() => source(page)).toBe('if (true) {\n  hello()\n  hello()\n}')
+  await expect.poll(() => source(page)).toContain('    hello()')
+  await page.keyboard.press('ControlOrMeta+d')
+  await expect.poll(() => source(page)).toBe('if (true) {\n    hello()\n    hello()\n}')
   const caret = await page.locator('.yy-code-editor-host').evaluate((el: any) => el.codeEditor.view.state.selection.main.head)
   await page.getByRole('button', { name: '代码语言', exact: true }).click()
   await page.getByRole('textbox', { name: '搜索语言' }).fill('ts')
@@ -207,7 +208,7 @@ test('VS Code keys indent, comment and move lines while language changes retain 
   await expect.poll(() => page.locator('.yy-code-editor-host').evaluate((el: any) => el.codeEditor.view.state.selection.main.head)).toBe(caret)
 })
 
-test('reading code expands on a narrow screen with local search and line navigation', async ({ page, request }) => {
+test('reading code expands on a narrow screen with local search and no line-navigation action', async ({ page, request }) => {
   await page.setViewportSize({ width: 375, height: 667 })
   const text = Array.from({ length: 80 }, (_, i) => `const value${i + 1} = ${i + 1}`).join('\n')
   const id = await createCode(request, text)
@@ -215,10 +216,7 @@ test('reading code expands on a narrow screen with local search and line navigat
   await page.getByRole('button', { name: '放大代码块' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toBeVisible()
-  await dialog.getByRole('button', { name: '跳转到行', exact: true }).click()
-  await dialog.getByRole('textbox', { name: '跳转到行:' }).fill('60')
-  await dialog.getByRole('textbox', { name: '跳转到行:' }).press('Enter')
-  await expect(dialog.locator('.cm-activeLine')).toHaveText('const value60 = 60')
+  await expect(dialog.getByRole('button', { name: '跳转到行', exact: true })).toHaveCount(0)
   await dialog.getByRole('button', { name: '查找', exact: true }).click()
   await dialog.getByRole('textbox', { name: '在此代码块中查找' }).fill('value80')
   await expect(dialog.locator('.yy-code-search-count')).toHaveText('1/1')
@@ -228,3 +226,161 @@ test('reading code expands on a narrow screen with local search and line navigat
   await expect(dialog).toHaveCount(0)
   expect((await (await request.get(`api/docs/${id}`)).json()).revision).toBe(2)
 })
+
+for (const example of [
+  { language: 'cpp', input: 'int main(){int x=1;if(x){return x;}return 0;}', contains: '\n    int x = 1;' },
+  { language: 'javascript', input: 'function hello(){const x={a:1,b:2};return x}', contains: '\n    const x = { a: 1, b: 2 };' },
+  { language: 'json', input: '{"items":[1,2],"flag":true}', contains: '\n    "items": [\n        1,\n        2\n    ]' },
+  { language: 'python', input: 'def answer():\n return 1+2', contains: '\n    return 1 + 2' },
+  { language: 'go', input: 'package main\nfunc main(){text:=`first\n\tsecond`\nif text!=""{println(text)}}', contains: '\n    text := `first\n\tsecond`' },
+  { language: 'css', input: 'a{color:red;margin:0}', contains: '\n    color: red;' },
+]) {
+  test(`formatting ${example.language} edits only this block and is one undo step`, async ({ page, request }) => {
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
+    const id = await createCode(request, example.input, example.language)
+    await page.goto(`docs/${id}/edit`)
+    await page.getByRole('button', { name: '代码块更多操作' }).click()
+    await page.getByRole('menuitem', { name: '格式化代码', exact: true }).click()
+    await expect(page.locator('.yy-code-format-status')).toHaveText('已格式化，可撤销')
+    const formatted = await source(page)
+    expect(formatted).toContain(example.contains)
+    await expect(page.locator('.ProseMirror > p').first()).toHaveText('代码之前')
+    await expect(page.locator('.ProseMirror > p').last()).toHaveText('代码之后')
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect.poll(() => source(page)).toBe(example.input)
+    await page.keyboard.press('ControlOrMeta+Shift+z')
+    await expect.poll(() => source(page)).toBe(formatted)
+    await page.getByRole('button', { name: '完成', exact: true }).click()
+    const saved = await (await request.get(`api/docs/${id}`)).json()
+    expect(saved.content.content.find((node: any) => node.type === 'codeBlock').content[0].text).toBe(formatted)
+    expect(errors).toEqual([])
+  })
+}
+
+test('formatting rejects syntax errors and never overwrites typing while the formatter loads', async ({ page, request }) => {
+  const id = await createCode(request, 'function () {')
+  await page.goto(`docs/${id}/edit`)
+  await selectCode(page, 0)
+  await page.keyboard.press('ControlOrMeta+Alt+l')
+  await expect(page.locator('.yy-code-format-status')).toHaveText('无法格式化，请检查代码语法')
+  expect(await source(page)).toBe('function () {')
+  let release!: () => void
+  const waiting = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/format.worker-*.js', async route => { await waiting; await route.continue() })
+  const valid = await createCode(request, 'const keep=1')
+  await page.goto(`docs/${valid}/edit`)
+  await selectCode(page, 12)
+  await page.keyboard.press('ControlOrMeta+Alt+l')
+  await expect(page.locator('.yy-code-format-status')).toHaveText('正在格式化…')
+  await page.keyboard.type(' // typing')
+  release()
+  await expect(page.locator('.yy-code-format-status')).toHaveText('代码已变化，请重新格式化')
+  expect(await source(page)).toBe('const keep=1 // typing')
+})
+
+for (const width of [1360, 375]) {
+  test(`code menus follow their buttons and contain wheel gestures at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 667 })
+    const id = await createCode(request, 'const answer = 42')
+    const doc = await (await request.get(`api/docs/${id}`)).json()
+    const padding = Array.from({ length: 22 }, (_, i) => ({ type: 'paragraph', content: [{ type: 'text', text: `正文第 ${i + 1} 段` }] }))
+    await request.put(`api/docs/${id}`, { data: { title: doc.title, baseRevision: doc.revision, content: { type: 'doc', content: [...padding, ...doc.content.content, ...padding] } } })
+    for (const editing of [false, true]) {
+      await page.goto(`docs/${id}${editing ? '/edit' : ''}`)
+      const block = page.locator(editing ? '.yy-codeblock' : '.code-block')
+      await expect(block).toBeVisible()
+      for (const language of editing ? [false, true] : [false]) {
+        await block.evaluate(el => window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 220))
+        const trigger = block.getByRole('button', { name: language ? '代码语言' : '代码块更多操作', exact: true })
+        await trigger.click()
+        const popup = page.locator(language ? '.yy-lang-panel' : '.yy-code-menu')
+        await expect(popup).toBeVisible()
+        const before = await page.evaluate(() => scrollY)
+        const rect = (await popup.boundingBox())!
+        for (const delta of [-250, 250, -250]) {
+          for (let i = 0; i < 5; i++) {
+            await page.mouse.move(rect.x + 18 + i * 7, rect.y + 65 + (i % 3) * 22)
+            await page.mouse.wheel(0, delta)
+            await page.waitForTimeout(25)
+          }
+          expect(await page.evaluate(() => scrollY)).toBe(before)
+        }
+        if (language) expect(await popup.locator('.yy-lang-list').evaluate(el => el.scrollTop)).toBe(0)
+        const top = (await popup.boundingBox())!.y
+        // Move outside the popup; normal prose scrolling moves the anchored menu with it.
+        await page.mouse.move(width < 500 ? 12 : 80, 620)
+        await page.mouse.wheel(0, 90)
+        await expect.poll(() => page.evaluate(() => scrollY)).toBeGreaterThan(before)
+        await expect.poll(async () => Math.abs((await popup.boundingBox())!.y - top + (await page.evaluate(() => scrollY)) - before)).toBeLessThan(3)
+        await trigger.evaluate(el => {
+          const edge = (document.querySelector('.yy-toolbar') ?? document.querySelector('.yy-topbar'))!.getBoundingClientRect().bottom
+          window.scrollBy(0, el.getBoundingClientRect().bottom - edge + 1)
+        })
+        await expect(popup).not.toBeVisible()
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false')
+        await page.keyboard.press('Escape')
+      }
+    }
+  })
+}
+
+for (const platform of ['MacIntel', 'Win32']) {
+  test(`JetBrains shortcuts and their help agree on ${platform}`, async ({ page, request }) => {
+    await page.addInitScript(value => Object.defineProperty(navigator, 'platform', { get: () => value }), platform)
+    const mod = platform === 'MacIntel' ? 'Meta' : 'Control'
+    const original = 'const alpha = 1\nconst beta = 2\nconst gamma = 3'
+    const id = await createCode(request, original)
+    await page.goto(`docs/${id}/edit`)
+    await expect(page.locator('.cm-content')).toBeVisible()
+    await selectCode(page, original.indexOf('beta'))
+    await page.keyboard.press(`${mod}+d`)
+    await expect.poll(() => source(page)).toBe('const alpha = 1\nconst beta = 2\nconst beta = 2\nconst gamma = 3')
+    await page.keyboard.press(`${mod}+z`)
+    await expect.poll(() => source(page)).toBe(original)
+    await selectCode(page, 6, 11)
+    await page.keyboard.press(`${mod}+d`)
+    await expect.poll(() => source(page)).toBe(original.replace('alpha', 'alphaalpha'))
+    await page.keyboard.press(`${mod}+z`)
+    await expect.poll(() => source(page)).toBe(original)
+    await selectCode(page, 6, 11)
+    // A physical Shift+/ reports "?"; Playwright otherwise sends a literal "/" with Shift held.
+    await page.keyboard.press(platform === 'MacIntel' ? 'Meta+Alt+/' : 'Control+Shift+?')
+    await expect.poll(() => source(page)).toContain('/* alpha */')
+    await page.keyboard.press(`${mod}+z`)
+    await expect.poll(() => source(page)).toBe(original)
+    await page.keyboard.press(`${mod}+Shift+k`)
+    expect(await source(page)).toBe(original)
+    await selectCode(page, original.indexOf('beta'))
+    await page.keyboard.press(platform === 'MacIntel' ? 'Meta+Backspace' : 'Control+y')
+    await expect.poll(() => source(page)).toBe('const alpha = 1\nconst gamma = 3')
+    await page.keyboard.press(`${mod}+z`)
+    await expect.poll(() => source(page)).toBe(original)
+    await selectCode(page, original.indexOf('beta'))
+    await page.keyboard.press('Alt+Shift+ArrowDown')
+    await expect.poll(() => source(page)).toBe('const alpha = 1\nconst gamma = 3\nconst beta = 2')
+    await page.keyboard.press(`${mod}+Alt+l`)
+    await expect(page.locator('.yy-code-format-status')).toHaveText('已格式化，可撤销')
+    await selectCode(page, 0, 5)
+    await page.keyboard.press(platform === 'MacIntel' ? 'Control+g' : 'Alt+j')
+    await expect.poll(() => page.locator('.yy-code-editor-host').evaluate((el: any) => el.codeEditor.view.state.selection.ranges.length)).toBe(2)
+    await page.keyboard.press('Escape')
+    await page.keyboard.press(`${mod}+r`)
+    await expect(page.getByRole('textbox', { name: '代码替换为' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: '代码块更多操作' }).click()
+    await page.getByRole('menuitem', { name: '代码块快捷键' }).click()
+    const help = page.getByRole('dialog', { name: '代码块快捷键', exact: true })
+    await expect(help).toContainText('JetBrains 默认方案')
+    await expect(help).toContainText(platform === 'MacIntel' ? '⌘⌫' : 'Ctrl+Y')
+    await expect(help).not.toContainText('跳转到行')
+    await page.keyboard.press('Escape')
+    await expect(help).toHaveCount(0)
+    await page.getByRole('button', { name: '放大代码块' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '代码块更多操作' }).click()
+    await page.getByRole('menuitem', { name: '代码块快捷键' }).click()
+    await expect(help).toBeVisible()
+    await help.getByRole('button', { name: '关闭代码块快捷键' }).click()
+    await expect(page.locator('.yy-code-dialog')).toBeVisible()
+  })
+}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { keyLabel } from './keys'
+import { codeShortcutRows } from '../code/keymap'
 
 // The keyboard shortcuts and Markdown shortcuts the editor understands, opened with Cmd/Ctrl+/.
 const open = defineModel<boolean>('open', { required: true })
@@ -18,19 +19,8 @@ const groups: { title: string; items: [string, string][] }[] = [
     ],
   },
   {
-    title: '代码块内',
-    items: [
-      ['块内查找替换', 'Mod-F'],
-      ['跳转到行', 'Mod-G'],
-      ['缩进 / 取消缩进', 'Tab / Shift-Tab'],
-      ['切换注释', 'Mod-/'],
-      ['上移 / 下移行', 'Alt-↑ / Alt-↓'],
-      ['向上 / 向下复制行', 'Alt-Shift-↑ / Alt-Shift-↓'],
-      ['删除当前行', 'Mod-Shift-K'],
-      ['选中下一个相同词', 'Mod-D'],
-      ['折叠 / 展开区域', 'Mod-Shift-[ / Mod-Shift-]'],
-      ['在代码块后继续正文', 'Mod-Enter'],
-    ],
+    title: '代码块内 · JetBrains',
+    items: codeShortcutRows(),
   },
   {
     title: '文字',

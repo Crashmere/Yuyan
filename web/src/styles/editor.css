@@ -921,8 +921,9 @@ body.yy-row-dragging * {
   margin-bottom: 6px;
 }
 .yy-lang-list {
-  max-height: 260px;
+  max-height: min(260px, calc(var(--reka-popover-content-available-height, 310px) - 54px));
   overflow: auto;
+  overscroll-behavior: contain;
 }
 .yy-lang-list button {
   display: flex;

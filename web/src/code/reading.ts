@@ -99,7 +99,6 @@ export async function readingCode(block: HTMLElement, source: string, language: 
         render(false); code.destroy(); host.remove(); closeExpanded = undefined
       })
       if (action === 'find') code.find()
-      else if (action === 'goto') code.goto()
     },
     destroy() { destroyed = true; closeExpanded?.(); stopDrag?.(); block.removeEventListener('mousedown', clearSelected); block.removeEventListener('yy-reveal-code', reveal); buttons.forEach(button => button.remove()) },
   }
