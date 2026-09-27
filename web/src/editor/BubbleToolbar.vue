@@ -77,7 +77,11 @@ function anchor() {
       // Above the first few rows, a menu anchored to the row would cross the column rail.
       // Place it above the table there; farther down it can follow the selected rows.
       const above = selectedTop - table.top < height + 80 ? table.top : selectedTop
-      const top = Math.max(above, toolbar + height + 48)
+      const floor = toolbar + height + 48
+      // If the rail still fits but a menu above it does not, put the menu inside the table.
+      // Reserving its height in the rail itself would make the rail disappear much too early.
+      const top = above === table.top && above < floor && table.top > toolbar
+        ? table.top + height + 48 : Math.max(above, floor)
       const bottom = Math.max(top, Math.min(Math.max(a.bottom, b.bottom), innerHeight - 8))
       return new DOMRect(left, top, Math.max(0, right - left), bottom - top)
     },

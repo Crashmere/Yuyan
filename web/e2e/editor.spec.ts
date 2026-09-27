@@ -1521,6 +1521,78 @@ test('table rails select rows and columns, and insert at their boundaries', asyn
   expect(md).not.toContain('yy-table')
 })
 
+test('holding a table rail selects a reversible range of rows or columns', async ({ page, request }) => {
+  const id = await createDoc(request, '边栏拖动多选', '前置段落\n\n| A | B | C | D |\n| --- | --- | --- | --- |\n| a1 | b1 | c1 | d1 |\n| a2 | b2 | c2 | d2 |\n| a3 | b3 | c3 | d3 |\n| a4 | b4 | c4 | d4 |\n\n后续段落')
+  await openEditor(page, id)
+  const table = page.locator('.ProseMirror table')
+  const controls = page.locator('.yy-table-controls')
+  const point = async (axis: '行' | '列', index: number) => {
+    const r = (await controls.getByRole('button', { name: `选中第 ${index} ${axis}`, exact: true }).boundingBox())!
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 }
+  }
+  const start = async (axis: '行' | '列', index: number) => {
+    await table.locator('td').first().hover()
+    const p = await point(axis, index)
+    await page.mouse.move(p.x, p.y)
+    await page.mouse.down()
+  }
+  const move = async (axis: '行' | '列', index: number) => {
+    const p = await point(axis, index)
+    // Drift into the table while sliding: the narrow rail must not lose the gesture.
+    await page.mouse.move(p.x + (axis === '行' ? 24 : 0), p.y + (axis === '列' ? 24 : 0), { steps: 6 })
+  }
+  await start('列', 2)
+  await move('列', 4)
+  await expect(table.locator('.selectedCell')).toHaveCount(15)
+  await page.screenshot({ path: 'test-results/table-rail-multiselect.png' })
+  await move('列', 3)
+  await expect(table.locator('.selectedCell')).toHaveCount(10)
+  await move('列', 1)
+  await expect(table.locator('th.selectedCell')).toHaveText(['A', 'B'])
+  await page.mouse.up()
+  await page.locator('.ProseMirror > p').last().hover()
+  await expect(table.locator('th.selectedCell')).toHaveText(['A', 'B'])
+  await chooseAlignment(page, '单元格内容居中')
+  await expect(table.locator('th').first()).toHaveCSS('text-align', 'center')
+  await textBubble(page).getByRole('button', { name: '移除选中列' }).click()
+  await expect(table.locator('th')).toHaveText(['C', 'D'])
+  await undoRemoval(page)
+  await expect(table.locator('th')).toHaveText(['A', 'B', 'C', 'D'])
+
+  await start('行', 4)
+  await move('行', 2)
+  await expect(table.locator('.selectedCell')).toHaveCount(12)
+  await move('行', 3)
+  await expect(table.locator('.selectedCell')).toHaveCount(8)
+  await move('行', 5)
+  await expect(table.locator('tr').nth(3).locator('.selectedCell')).toHaveCount(4)
+  await expect(table.locator('tr').nth(4).locator('.selectedCell')).toHaveCount(4)
+  await page.mouse.up()
+  await textBubble(page).getByRole('button', { name: '移除选中行' }).click()
+  await expect(table.locator('tr')).toHaveCount(3)
+  await expect(table.locator('td').first()).toHaveText('a1')
+  await undoRemoval(page)
+  await expect(table.locator('tr')).toHaveCount(5)
+
+  // A later click and keyboard activation still select a single row or column.
+  await table.locator('td').first().hover()
+  await controls.getByRole('button', { name: '选中第 2 行', exact: true }).click()
+  await expect(table.locator('.selectedCell')).toHaveCount(4)
+  await controls.getByRole('button', { name: '选中第 3 列', exact: true }).focus()
+  await page.keyboard.press('Space')
+  await expect(table.locator('th.selectedCell')).toHaveText(['C'])
+  await expect(table.locator('.selectedCell')).toHaveCount(5)
+
+  // Losing window focus ends the gesture, even if a pointer-up never reaches the page.
+  await start('列', 2)
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')))
+  await move('列', 4)
+  await page.mouse.up()
+  await expect(table.locator('th.selectedCell')).toHaveText(['B'])
+  await expect(table.locator('tr')).toHaveCount(5)
+  await expect(table.locator('th')).toHaveCount(4)
+})
+
 for (const width of [1360, 375]) {
   test(`code numbers always show and title bars wrap individual blocks at ${width}px`, async ({ page, request }) => {
     await page.setViewportSize({ width, height: 860 })
@@ -1707,10 +1779,26 @@ test('table rails stay on real row boundaries as the table passes the toolbar', 
     await page.mouse.move(box.x + 80, Math.max(toolbarBottom + 100, box.y + 90))
     await expect(controls).toHaveClass(/is-visible/)
   }
-  // The table is still visible, but there is no room for the rail above it.
+  // The rail stays available until its own controls, not a floating menu, run out of room.
   await scrollTableTo(toolbarBottom + 48)
   await expect.poll(async () => Math.abs((await controls.boundingBox())!.y - (await table.boundingBox())!.y)).toBeLessThan(2)
-  await expect(controls.getByRole('button', { name: '选中第 1 列', exact: true })).toBeHidden()
+  const firstColumn = controls.getByRole('button', { name: '选中第 1 列', exact: true })
+  const columnInsert = controls.getByRole('button', { name: '在第 2 列前插入列', exact: true })
+  await expect(firstColumn).toBeVisible()
+  await expect(columnInsert).toBeVisible()
+  await firstColumn.click()
+  await expect.poll(async () => (await textBubble(page).boundingBox())!.y - (await table.boundingBox())!.y).toBeGreaterThan(0)
+  await expect.poll(() => columnInsert.evaluate((button) => {
+    const r = button.getBoundingClientRect()
+    return button.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+  })).toBe(true)
+  await page.screenshot({ path: 'test-results/table-rail-near-top.png' })
+  await scrollTableTo(toolbarBottom + 20)
+  await expect(firstColumn).toBeVisible()
+  await expect(columnInsert).toBeHidden()
+  await scrollTableTo(toolbarBottom + 10)
+  await expect(firstColumn).toBeHidden()
+  await scrollTableTo(toolbarBottom + 48)
   const rowControl = controls.getByRole('button', { name: '选中第 2 行', exact: true })
   await expect.poll(async () => Math.abs((await rowControl.boundingBox())!.y - (await table.locator('tr').nth(1).boundingBox())!.y)).toBeLessThan(2)
   // Once the top has gone under the toolbar, clip the rail without drawing a fake table edge.
@@ -1728,6 +1816,16 @@ test('table rails stay on real row boundaries as the table passes the toolbar', 
   const visibleRow = controls.getByRole('button', { name: '选中第 6 行', exact: true })
   await visibleRow.click()
   await expect(table.locator('tr').nth(5).locator('.selectedCell')).toHaveCount(2)
+  // Scrolling while held extends the same row range underneath the captured pointer.
+  const rowPoint = (await visibleRow.boundingBox())!
+  await page.mouse.move(rowPoint.x + rowPoint.width / 2, rowPoint.y + rowPoint.height / 2)
+  await page.mouse.down()
+  await page.evaluate(() => window.scrollBy(0, 120))
+  await expect.poll(() => table.locator('.selectedCell').count()).toBeGreaterThan(2)
+  await page.mouse.up()
+  const range = await table.locator('.selectedCell').count()
+  await page.mouse.move(rowPoint.x + 60, rowPoint.y + 200)
+  await expect(table.locator('.selectedCell')).toHaveCount(range)
   // Scrolling back restores the top controls at the actual table boundary.
   await scrollTableTo(toolbarBottom + 150)
   await expect(controls.getByRole('button', { name: '选中第 1 列', exact: true })).toBeVisible()

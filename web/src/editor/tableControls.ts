@@ -19,6 +19,8 @@ export function tableControls(): Plugin {
       let buttons: HTMLButtonElement[] = []
       let shape = ''
       let inserting: { axis: Axis; index: number } | null = null
+      let dragging: { axis: Axis; start: number; end: number; pointer: number; coordinate: number } | null = null
+      let boundaries: Record<Axis, number[]> = { column: [], row: [] }
       const observer = new ResizeObserver(schedule)
 
       function context() {
@@ -34,15 +36,53 @@ export function tableControls(): Plugin {
         return null
       }
 
-      function select(tr: Transaction, pos: number, axis: Axis, index: number) {
+      function select(tr: Transaction, pos: number, axis: Axis, index: number, end = index) {
         const node = tr.doc.nodeAt(pos)!
         const map = TableMap.get(node)
         const start = pos + 1
         const first = axis === 'column' ? index : index * map.width
-        const last = axis === 'column' ? (map.height - 1) * map.width + index : first + map.width - 1
+        const last = axis === 'column' ? (map.height - 1) * map.width + end : (end + 1) * map.width - 1
         const anchor = tr.doc.resolve(start + map.map[first])
         const head = tr.doc.resolve(start + map.map[last])
         return tr.setSelection(axis === 'column' ? CellSelection.colSelection(anchor, head) : CellSelection.rowSelection(anchor, head))
+      }
+
+      function stopDrag() {
+        const pointer = dragging?.pointer
+        dragging = null
+        root.classList.remove('is-selecting')
+        if (pointer !== undefined && root.hasPointerCapture(pointer)) root.releasePointerCapture(pointer)
+      }
+
+      function updateDrag() {
+        const drag = dragging
+        const ctx = context()
+        if (!drag || !ctx) return
+        const points = boundaries[drag.axis]
+        if (points.length < 2) return
+        let end = 0
+        while (end < points.length - 2 && drag.coordinate >= points[end + 1]) end++
+        if (end === drag.end) return
+        drag.end = end
+        view.dispatch(select(view.state.tr, ctx.pos, drag.axis, drag.start, end))
+      }
+
+      function startDrag(event: PointerEvent, axis: Axis, index: number) {
+        if (event.button !== 0 || !event.isPrimary) return
+        const ctx = context()
+        if (!ctx) return
+        event.preventDefault()
+        clearTimeout(leaving)
+        leaving = undefined
+        inserting = null
+        dragging = { axis, start: index, end: index, pointer: event.pointerId, coordinate: axis === 'column' ? event.clientX : event.clientY }
+        // Capture on the stable overlay so gaps, pointer drift and the floating toolbar cannot
+        // interrupt a range selection or turn releasing the pointer into an insertion click.
+        root.setPointerCapture(event.pointerId)
+        root.classList.add('is-selecting')
+        view.dispatch(select(view.state.tr, ctx.pos, axis, index))
+        view.focus()
+        schedule()
       }
 
       function button(axis: Axis, index: number, insert: boolean) {
@@ -51,9 +91,12 @@ export function tableControls(): Plugin {
         b.dataset.index = String(index)
         const noun = axis === 'column' ? '列' : '行'
         b.setAttribute('aria-label', insert ? `在第 ${index + 1} ${noun}前插入${noun}` : `选中第 ${index + 1} ${noun}`)
-        b.dataset.tip = insert ? `插入${noun}` : `选中整${noun}`
+        b.dataset.tip = insert ? `插入${noun}` : `选中整${noun}，按住拖动多选`
         b.addEventListener('mousedown', (e) => e.preventDefault())
-        b.addEventListener('click', () => {
+        if (!insert) b.addEventListener('pointerdown', (e) => startDrag(e, axis, index))
+        b.addEventListener('click', (e) => {
+          // Pointer selection is handled on press/drag; retain click for keyboard activation.
+          if (!insert && e.detail !== 0) return
           const ctx = context()
           if (!ctx) return
           let tr = view.state.tr
@@ -79,10 +122,6 @@ export function tableControls(): Plugin {
         const box = table.getBoundingClientRect()
         const scroll = table.closest('.yy-table-scroll')!.getBoundingClientRect()
         const toolbarBottom = document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0
-        // Reserve space for the selection toolbar only when deciding whether the column rail
-        // fits. Moving the whole frame down to that floor would draw a false edge through rows.
-        const menuHeight = document.querySelector<HTMLElement>('.yy-selection-toolbar')?.offsetHeight ?? 38
-        const columnsVisible = box.top >= toolbarBottom + Math.max(76, menuHeight + 42)
         const left = Math.max(box.left, scroll.left, 32)
         const right = Math.min(box.right, scroll.right, innerWidth - 16)
         const top = Math.max(box.top, toolbarBottom)
@@ -103,6 +142,7 @@ export function tableControls(): Plugin {
 
         const nextShape = `${ctx.map.width}:${ctx.map.height}`
         if (shape !== nextShape) {
+          stopDrag()
           buttons.forEach((b) => b.remove())
           buttons = []
           shape = nextShape
@@ -131,6 +171,7 @@ export function tableControls(): Plugin {
         }
         const rows = Array.from(table.rows, (r) => r.getBoundingClientRect().top)
         rows.push(box.bottom)
+        boundaries = { column: columns, row: rows }
         const selection = view.state.selection
         const selected = selection instanceof CellSelection && selection.$anchorCell.node(-1) === ctx.table
           ? ctx.map.rectBetween(selection.$anchorCell.pos - ctx.tableStart, selection.$headCell.pos - ctx.tableStart) : null
@@ -144,7 +185,10 @@ export function tableControls(): Plugin {
           const limit = column ? right : bottom
           const from = Math.max(points[i], origin)
           const to = Math.min(points[i + 1], limit)
-          const visible = (column ? columnsVisible : true) && (insert ? points[i] >= origin - 1 && points[i] <= limit + 1 && (column || points[i] >= toolbarBottom + 11) : to - from > 2)
+          // Only hide a top control when the fixed toolbar would actually cover it. The smaller
+          // selection rail fits closer to the toolbar than the insertion buttons above it.
+          const fitsAbove = !column || box.top >= toolbarBottom + (insert ? 32 : 14)
+          const visible = fitsAbove && (insert ? points[i] >= origin - 1 && points[i] <= limit + 1 && (column || points[i] >= toolbarBottom + 11) : to - from > 2)
           b.hidden = !visible
           if (!visible) continue
           const at = (insert ? points[i] : from) - origin
@@ -163,6 +207,8 @@ export function tableControls(): Plugin {
           preview.style.width = column ? '2px' : '100%'
           preview.style.height = column ? '100%' : '2px'
         }
+        // Scrolling during a drag moves the cells under the pointer, too.
+        updateDrag()
       }
 
       function schedule() {
@@ -170,6 +216,7 @@ export function tableControls(): Plugin {
         frame = requestAnimationFrame(measure)
       }
       function hide() {
+        stopDrag()
         clearTimeout(leaving)
         leaving = undefined
         root.classList.remove('is-visible')
@@ -194,6 +241,13 @@ export function tableControls(): Plugin {
         root.classList.add('is-visible')
       }
       function move(e: PointerEvent) {
+        if (dragging?.pointer === e.pointerId) {
+          if (!(e.buttons & 1)) { stopDrag(); return }
+          e.preventDefault()
+          dragging.coordinate = dragging.axis === 'column' ? e.clientX : e.clientY
+          updateDrag()
+          return
+        }
         if (e.buttons || e.pointerType === 'touch' || !view.editable) return
         const target = e.target instanceof Element ? e.target : null
         if (target && root.contains(target)) { clearTimeout(leaving); leaving = undefined; return }
@@ -202,25 +256,35 @@ export function tableControls(): Plugin {
         if (!leaving) leaving = setTimeout(() => { leaving = undefined; hide() }, 120)
       }
       const scrolled = () => { inserting = null; schedule() }
+      const pointerUp = (e: PointerEvent) => { if (dragging?.pointer === e.pointerId) stopDrag() }
       const pointerDown = (e: PointerEvent) => {
         if (e.target instanceof Element && !root.contains(e.target) && !e.target.closest('table')) hide()
       }
       document.addEventListener('pointermove', move)
       document.addEventListener('pointerdown', pointerDown)
+      document.addEventListener('pointerup', pointerUp)
+      document.addEventListener('pointercancel', pointerUp)
+      root.addEventListener('lostpointercapture', stopDrag)
+      addEventListener('blur', stopDrag)
       document.addEventListener('scroll', scrolled, true)
       addEventListener('resize', schedule)
       hide()
       return {
         update(_view, previous) {
+          if (previous.doc !== view.state.doc) stopDrag()
           if (previous.doc !== view.state.doc || !previous.selection.eq(view.state.selection)) schedule()
         },
         destroy() {
+          stopDrag()
           clearTimeout(leaving)
           cancelAnimationFrame(frame)
           observer.disconnect()
           root.remove()
           document.removeEventListener('pointermove', move)
           document.removeEventListener('pointerdown', pointerDown)
+          document.removeEventListener('pointerup', pointerUp)
+          document.removeEventListener('pointercancel', pointerUp)
+          removeEventListener('blur', stopDrag)
           document.removeEventListener('scroll', scrolled, true)
           removeEventListener('resize', schedule)
         },
