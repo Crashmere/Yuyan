@@ -1,15 +1,16 @@
 import { reveal } from './folds'
 
 // Highlights what was searched for in a document opened from search results, and brings the first
-// match into view, opening folded sections, collapsed callouts and folded code on the way. The
-// highlights use the CSS Custom Highlight API, which leaves the content untouched; without it the
-// page only scrolls.
+// match into view, opening folded sections, collapsed callouts and code blocks, and folded code on
+// the way. The highlights use the CSS Custom Highlight API, which leaves the content untouched;
+// without it the page only scrolls.
 
 const name = 'yy-search'
 // Matches do not run from one of these into the next, as the server's plain text breaks there too.
-const blocks = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .yy-line, pre'
-// Formulas and diagrams are redrawn from their source; buttons are not part of the text.
-const skipped = '[data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button'
+const blocks = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .code-title, .yy-line, pre'
+// Formulas and diagrams are redrawn from their source; buttons and language labels are not part of
+// the text.
+const skipped = '[data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang'
 const limit = 500
 
 export function findMatches(root: HTMLElement, query: string): Range[] {
@@ -54,7 +55,8 @@ export function showMatches(root: HTMLElement, query: string): number {
   const at = ranges[0]?.startContainer.parentElement
   if (!at) return 0
   reveal(at)
-  for (let c = at.closest('.callout.is-collapsed'); c; c = c.parentElement?.closest('.callout.is-collapsed') ?? null) {
+  const collapsed = '.callout.is-collapsed, .code-block.is-collapsed'
+  for (let c = at.closest(collapsed); c; c = c.parentElement?.closest(collapsed) ?? null) {
     c.classList.remove('is-collapsed')
   }
   const pre = at.closest<HTMLElement>('pre.is-folded')

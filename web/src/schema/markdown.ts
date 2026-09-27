@@ -7,9 +7,12 @@ import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import remarkStringify from 'remark-stringify'
+import { codeFromCallout, codeMeta, parseCodeMeta } from './codeBlock'
 
 // Markdown <-> Tiptap JSON using remark, with Obsidian's extensions: callouts, ==highlight==,
 // [[wiki links]], ![[embeds]], image sizes (![alt|300](src)) and single-newline line breaks.
+// Code block titles and collapsed state travel in the fence (```cpp title="…" collapsed); the
+// [!code] callouts once used in Obsidian for them are read as titled code blocks.
 
 export interface ImportContext {
   // Obsidian treats a single newline inside a paragraph as a line break unless "strict line breaks" is on.
@@ -140,7 +143,7 @@ class Converter {
     }
     const title = this.inline(trimPhrasing(titleNodes), [])
     const body = [...(bodyNodes.length ? this.paragraph(bodyNodes) : []), ...this.blocks(n.children.slice(1))]
-    return {
+    const callout: JSONContent = {
       type: 'callout',
       attrs: { type: m[1].toLowerCase(), fold: m[2] },
       content: [
@@ -148,6 +151,7 @@ class Converter {
         { type: 'calloutContent', content: body.length ? body : [{ type: 'paragraph' }] },
       ],
     }
+    return codeFromCallout(callout) ?? callout
   }
 
   private list(n: List): JSONContent {
@@ -169,7 +173,8 @@ class Converter {
 
   private code(n: Code): JSONContent {
     const language = normalizeLanguage(n.lang ?? '')
-    const node: JSONContent = { type: 'codeBlock', attrs: { language: language || null } }
+    const { title, collapsed } = parseCodeMeta(n.meta)
+    const node: JSONContent = { type: 'codeBlock', attrs: { language: language || null, ...(title !== null ? { title, collapsed } : {}) } }
     if (n.value) node.content = [{ type: 'text', text: n.value }]
     return node
   }
@@ -463,8 +468,11 @@ class Exporter {
             children: this.blocks(item.content ?? []) as ListItem['children'],
           })),
         }]
-      case 'codeBlock':
-        return [{ type: 'code', lang: (n.attrs?.language as string) || null, value: textOf(n) }]
+      case 'codeBlock': {
+        // A fence needs a language before the title; "text" reads back as no language.
+        const meta = codeMeta(n.attrs?.title, n.attrs?.collapsed)
+        return [{ type: 'code', lang: (n.attrs?.language as string) || (meta ? 'text' : null), meta, value: textOf(n) }]
+      }
       case 'blockMath':
         return [{ type: 'math', value: String(n.attrs?.latex ?? '') }]
       case 'table':

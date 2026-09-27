@@ -48,7 +48,7 @@ npm --prefix web run seed -- --server http://127.0.0.1:18084/yuyan/   # 可选�
 
 本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。测试只写 .local；仓库只放合成样例。
 
-`make e2e` 构建程序后，在临时目录启动新实例、写入合成示例数据，再用 Playwright + Chromium 运行 `web/e2e` 中的浏览器测试：首页、目录、回收站，编辑器交互、中文输入法模拟、长文档和编辑后的导出，以及搜索面板、从搜索结果定位、图片占位、版本对比、大纲的位置与隐藏、菜单滚动提示、按标题折叠、代码框样式、离开页面时取消图片加载和手机尺寸下的大纲抽屉。首次运行前执行一次 `npx --prefix web playwright install chromium`。CI 中这一步不通过就不发布。
+`make e2e` 构建程序后，在临时目录启动新实例、写入合成示例数据，再用 Playwright + Chromium 运行 `web/e2e` 中的浏览器测试：首页、目录、回收站，编辑器交互、中文输入法模拟、长文档和编辑后的导出，以及搜索面板、从搜索结果定位、图片占位、版本对比、大纲的位置与隐藏、菜单滚动提示、按标题折叠、语雀式代码块（标题栏、收起与展开、编辑标题）、离开页面时取消图片加载和手机尺寸下的大纲抽屉。首次运行前执行一次 `npx --prefix web playwright install chromium`。CI 中这一步不通过就不发布。
 
 ## 正式导入
 
@@ -61,11 +61,23 @@ npm --prefix web run import -- --source <笔记仓库副本> --server http://<�
 npm --prefix web run roundtrip -- --server http://<服务器>/yuyan/
 ```
 
-`roundtrip` 只读取服务器。它也检查编辑表格时不会改动任何现有表格（编辑器会保持 Markdown 表格的形状，见 DESIGN.md 12.12）；修改编辑器配置后，发布前对正式实例运行一次。2026-09-26 D3 发布前运行：315 篇文档、185 个表格全部通过。
-
-`roundtrip` 只读取服务器。它检查每篇文档能被编辑器 schema 原样接受，并且编辑表格时不会调整现有表格的表头或列对齐。修改编辑器配置后，发布前对线上实例运行一次；2026-09-26 D3 发布前的结果：315 篇文档、185 个表格全部通过。
+`roundtrip` 只读取服务器。它检查每篇文档能被编辑器 schema 原样接受，并且编辑表格时不会调整现有表格的表头或列对齐（编辑器会保持 Markdown 表格的形状，见 DESIGN.md 12.12）。修改编辑器配置后，发布前对线上实例运行一次；2026-09-26 D3 发布前的结果：315 篇文档、185 个表格全部通过。
 
 overrides 文件记录需要人工选择的项（同名不同图），不入库。2026-09-26 的正式导入只有一项：`{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`；本地文件已删除，重新导入空实例时按此重建。
+
+## 代码 Callout 迁移
+
+`migrate-code` 把 `[!code]` Callout 改回带标题栏的代码块（规则见 DESIGN.md 第 16 节）。它在开发电脑上运行，通过 SSH 隧道写入正式实例；需要先发布认识代码块标题的程序。它会改写真实文档，所以先做一次手动备份：
+
+```sh
+ssh ali 'runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-$(date +%Y%m%d-%H%M%S)'
+ssh -N -L 18199:127.0.0.1:18084 ali &                                          # 隧道，完成后结束
+npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/yuyan/ --dry   # 只报告
+npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/yuyan/
+npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/yuyan/
+```
+
+每篇改动的文档先保存一个版本再写入，写入时核对 revision；重复运行不会再改动。单篇文档要撤回时，在它的历史里恢复迁移前的版本。
 
 ## 导出
 

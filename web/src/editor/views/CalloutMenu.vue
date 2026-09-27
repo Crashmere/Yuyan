@@ -20,6 +20,8 @@ const props = defineProps<{ type: string; fold: string }>()
 const emit = defineEmits<{ type: [string]; fold: [string] }>()
 
 const current = computed(() => calloutMeta(props.type))
+// Code blocks have their own titles and collapsing now; [!code] only remains for old content.
+const offered = calloutTypes.filter((t) => t !== 'code')
 const folds = [
   { value: '', label: '不折叠' },
   { value: '+', label: '可折叠，默认展开' },
@@ -37,7 +39,7 @@ const folds = [
         <DropdownMenuLabel class="yy-menu-label">类型</DropdownMenuLabel>
         <div class="yy-callout-types">
           <DropdownMenuItem
-            v-for="t in calloutTypes"
+            v-for="t in offered"
             :key="t"
             class="yy-callout-type"
             :class="{ active: t === type }"

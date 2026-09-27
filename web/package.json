@@ -12,7 +12,8 @@
     "import": "tsx tools/import/import.ts",
     "export": "tsx tools/export/export.ts",
     "seed": "tsx tools/demo/seed.ts",
-    "roundtrip": "tsx tools/roundtrip/check.ts"
+    "roundtrip": "tsx tools/roundtrip/check.ts",
+    "migrate-code": "tsx tools/migrate/code-callouts.ts"
   },
   "dependencies": {
     "@floating-ui/dom": "1.8.0",

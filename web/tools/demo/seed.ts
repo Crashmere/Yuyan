@@ -275,7 +275,7 @@ int search(int[] a, int x) {
         title: '图论',
         group: true,
         children: [
-          { title: '最短路', md: '> [!code]- Dijkstra\n> ```cpp\n> int dijkstra();\n> ```\n\n边权非负时使用 Dijkstra，存在负权边时使用 Bellman-Ford 或 SPFA。' },
+          { title: '最短路', md: '```cpp title="Dijkstra" collapsed\nint dijkstra();\n```\n\n边权非负时使用 Dijkstra，存在负权边时使用 Bellman-Ford 或 SPFA。' },
           { title: '最小生成树', md: 'Prim 适合稠密图，Kruskal 适合稀疏图。' },
           { title: '长代码', md: `完整的 Dijkstra 实现：\n\n\`\`\`python\n${longCode}\n\`\`\`` },
         ],

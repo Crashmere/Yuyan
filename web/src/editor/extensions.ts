@@ -6,9 +6,11 @@ import FileHandler from '@tiptap/extension-file-handler'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { CharacterCount, Dropcursor, Gapcursor, Placeholder, TrailingNode, UndoRedo } from '@tiptap/extensions'
 import { Callout } from '../schema/callout'
+import { withTitles } from '../schema/codeBlock'
 import { schemaExtensions, YuyanImage } from '../schema/extensions'
 import { assetURL, unassetURL } from '../shared/api'
 import { CalloutKeys } from './calloutKeys'
+import { openCollapsedCode } from './codeBlocks'
 import type { EditorUi } from './context'
 import { ImageSizeStore } from './images'
 import { MarkdownShortcuts } from './inputRules'
@@ -29,11 +31,16 @@ export function editorExtensions(ui: EditorUi): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
-      codeBlock: CodeBlockLowlight.extend({
-        addNodeView() {
-          return VueNodeViewRenderer(CodeBlockView)
-        },
-      }).configure({ lowlight, defaultLanguage: null, enableTabIndentation: true, tabSize: 4 }),
+      codeBlock: withTitles(CodeBlockLowlight)
+        .extend({
+          addNodeView() {
+            return VueNodeViewRenderer(CodeBlockView)
+          },
+          addProseMirrorPlugins() {
+            return [...(this.parent?.() ?? []), openCollapsedCode]
+          },
+        })
+        .configure({ lowlight, defaultLanguage: null, enableTabIndentation: true, tabSize: 4 }),
       image: YuyanImage.extend({
         addNodeView() {
           return VueNodeViewRenderer(ImageView)

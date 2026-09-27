@@ -274,7 +274,24 @@ func (r *renderer) image(n doc.Node) {
 	r.open("img", attrs)
 }
 
+// codeBlock writes a code block; one with a title bar (a title attribute, possibly empty) is
+// wrapped with its title and collapsed state, as web/src/schema/codeBlock.ts renders it.
 func (r *renderer) codeBlock(n doc.Node) {
+	if title, ok := n.Attrs["title"].(string); ok {
+		class := "code-block"
+		if collapsed, _ := n.Attrs["collapsed"].(bool); collapsed {
+			class += " is-collapsed"
+		}
+		r.open("div", [][2]string{{"class", class}})
+		r.b.WriteString(`<div class="code-title">` + html.EscapeString(title) + "</div>")
+		r.code(n)
+		r.b.WriteString("</div>")
+		return
+	}
+	r.code(n)
+}
+
+func (r *renderer) code(n doc.Node) {
 	lang := NormalizeLanguage(n.Attr("language"))
 	code := doc.TextContent(n)
 	var codeAttrs [][2]string

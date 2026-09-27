@@ -64,8 +64,8 @@ const shown = ref<number | null>(null)
 
 function onClick(e: MouseEvent) {
   const target = e.target as HTMLElement
-  const title = target.closest('.callout[data-callout-fold] > .callout-title')
-  if (title) {
+  const title = target.closest('.callout[data-callout-fold] > .callout-title, .code-block > .code-title')
+  if (title && !target.closest('.yy-copy')) {
     title.parentElement?.classList.toggle('is-collapsed')
     return
   }

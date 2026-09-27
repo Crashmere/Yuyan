@@ -13,14 +13,42 @@ function valid(doc: JSONContent) {
 
 describe('markdownToDoc', () => {
   it('turns Obsidian callouts into callout nodes with title and fold state', () => {
-    const doc = valid(markdownToDoc('> [!code]- Java **实现**\n> ```java\n> int a = 1;\n> ```\n'))
+    const doc = valid(markdownToDoc('> [!tip]- Java **实现**\n> ```java\n> int a = 1;\n> ```\n'))
     const callout = doc.content![0]
-    expect(callout).toMatchObject({ type: 'callout', attrs: { type: 'code', fold: '-' } })
+    expect(callout).toMatchObject({ type: 'callout', attrs: { type: 'tip', fold: '-' } })
     expect(callout.content![0]).toEqual({
       type: 'calloutTitle',
       content: [{ type: 'text', text: 'Java ' }, { type: 'text', text: '实现', marks: [{ type: 'bold' }] }],
     })
     expect(callout.content![1].content![0]).toMatchObject({ type: 'codeBlock', attrs: { language: 'java' } })
+  })
+
+  it('reads [!code] callouts as the titled, collapsible code blocks they imitated', () => {
+    const code = (md: string) => valid(markdownToDoc(md)).content![0]
+    expect(code('> [!code]- 家谱树\n> ```cpp\n> int a;\n> ```\n')).toEqual({
+      type: 'codeBlock',
+      attrs: { language: 'cpp', title: '家谱树', collapsed: true },
+      content: [{ type: 'text', text: 'int a;' }],
+    })
+    expect(code('> [!code]+ 展开的\n> ```cpp\n> int a;\n> ```\n').attrs).toEqual({ language: 'cpp', title: '展开的', collapsed: false })
+    expect(code('> [!code]-\n> ```cpp\n> int a;\n> ```\n').attrs).toEqual({ language: 'cpp', title: '', collapsed: true })
+    expect(code('> [!code]\n> ```cpp\n> int a;\n> ```\n').attrs).toEqual({ language: 'cpp', title: null, collapsed: false })
+    // Anything besides one code block stays a callout.
+    expect(code('> [!code] 说明\n> 先看这里\n>\n> ```cpp\n> int a;\n> ```\n').type).toBe('callout')
+  })
+
+  it('reads code block titles and collapsed state from the fence', () => {
+    const block = valid(markdownToDoc("```cpp title='拓扑 \"排序\"' collapsed\nint a;\n```\n\n```py {1,3}\nx = 1\n```\n\n```go {2} title=\"x\" collapsed\ny\n```\n")).content!
+    expect(block[0].attrs).toEqual({ language: 'cpp', title: '拓扑 "排序"', collapsed: true })
+    expect(block[1].attrs).toEqual({ language: 'python' })
+    expect(block[2].attrs).toEqual({ language: 'go', title: 'x', collapsed: true })
+  })
+
+  it('keeps any title through Markdown', () => {
+    for (const title of ['家谱树', '拓扑 "排序"', `他说 "it's"`, 'C:\\path\\*', 'a\\\\b', 'A &amp; B & C', '`x`', '']) {
+      const doc = { type: 'doc', content: [{ type: 'codeBlock', attrs: { language: 'cpp', title, collapsed: true }, content: [{ type: 'text', text: 'x' }] }] }
+      expect(markdownToDoc(docToMarkdown(doc)).content![0].attrs, title).toEqual({ language: 'cpp', title, collapsed: true })
+    }
   })
 
   it('keeps body text that follows the callout marker line', () => {
@@ -102,11 +130,19 @@ describe('docToMarkdown', () => {
     const md = [
       '# 标题',
       '',
-      '> [!code]- Java 实现',
+      '> [!tip]- Java 实现',
       '>',
       '> ```java',
       '> int a = 1;',
       '> ```',
+      '',
+      "```java title='Java \"实现\"' collapsed",
+      'int b = 2;',
+      '```',
+      '',
+      '```text title=""',
+      '无语言、空标题',
+      '```',
       '',
       '==重点== 和 $a^2$ 以及 ![图|200](a.png)',
       '',
@@ -119,7 +155,9 @@ describe('docToMarkdown', () => {
     ].join('\n')
     const doc = valid(markdownToDoc(md))
     const back = docToMarkdown(doc)
-    expect(back).toContain('> [!code]- Java 实现')
+    expect(back).toContain('> [!tip]- Java 实现')
+    expect(back).toContain("```java title='Java \"实现\"' collapsed")
+    expect(back).toContain('```text title=""')
     expect(back).toContain('==重点==')
     expect(back).toContain('![图|200](a.png)')
     expect(valid(markdownToDoc(back))).toEqual(doc)

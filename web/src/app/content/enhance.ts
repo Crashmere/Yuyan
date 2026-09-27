@@ -1,3 +1,4 @@
+import { languages } from '../../editor/languages'
 import type { ImageSizes } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
 import { assetId, reservedSize } from '../../shared/images'
@@ -30,12 +31,22 @@ const foldLines = 30
 function enhanceCode(root: HTMLElement) {
   for (const pre of root.querySelectorAll<HTMLElement>('pre')) {
     const code = pre.querySelector('code')
-    if (!code || code.classList.contains('language-mermaid') || pre.dataset.enhanced) continue
+    if (!code || pre.dataset.enhanced) continue
     pre.dataset.enhanced = '1'
+    // A titled block (schema/codeBlock.ts) shows the language and copy button in its title bar,
+    // which also collapses it, so it never starts folded.
+    const bar = pre.parentElement?.classList.contains('code-block') ? pre.previousElementSibling : null
+    const language = /(?:^|\s)language-(\S+)/.exec(code.className)?.[1]
+    if (bar && language) {
+      const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
+      label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language))?.label ?? language
+      bar.appendChild(label)
+    }
+    if (language === 'mermaid') continue
     const text = code.textContent ?? ''
     const lines = splitLines(code)
-    addCopyButton(pre, text)
-    if (lines > foldLines + 5) addFold(pre, lines)
+    addCopyButton(bar ?? pre, text)
+    if (!bar && lines > foldLines + 5) addFold(pre, lines)
   }
 }
 
@@ -77,7 +88,7 @@ function splitLines(code: HTMLElement): number {
   return lines.length
 }
 
-function addCopyButton(pre: HTMLElement, text: string) {
+function addCopyButton(parent: Element, text: string) {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'yy-copy'
@@ -86,7 +97,7 @@ function addCopyButton(pre: HTMLElement, text: string) {
     button.textContent = (await copyText(text)) ? '已复制' : '复制失败'
     setTimeout(() => (button.textContent = '复制'), 1500)
   })
-  pre.appendChild(button)
+  parent.appendChild(button)
 }
 
 function addFold(pre: HTMLElement, lines: number) {

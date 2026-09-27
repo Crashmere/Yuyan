@@ -11,7 +11,7 @@
 .yy-content .ProseMirror > :first-child {
   margin-top: 0;
 }
-.yy-content :where(p, ul, ol, blockquote, pre, table, .callout, hr) {
+.yy-content :where(p, ul, ol, blockquote, pre, table, .callout, .code-block, hr) {
   margin: 0.75em 0;
 }
 .yy-content :where(h1, h2, h3, h4, h5, h6) {
@@ -146,12 +146,14 @@
 .yy-content pre {
   position: relative;
   padding: 14px 16px;
-  border: 1px solid var(--yy-border);
+  border: 1px solid var(--yy-codeblock-border);
   border-radius: var(--yy-radius-lg);
-  background: var(--yy-code-bg);
+  background: var(--yy-codeblock-bg);
+  color: var(--yy-codeblock-text);
   overflow-x: auto;
   font: 13px/1.65 var(--yy-mono);
   tab-size: 4;
+  scrollbar-color: #4b5263 transparent;
 }
 .yy-content pre code {
   font: inherit;
@@ -183,7 +185,7 @@
   position: absolute;
   left: 0;
   width: 2.2em;
-  color: var(--yy-text-4);
+  color: var(--yy-codeblock-muted);
   text-align: right;
   content: counter(yy-line);
   counter-increment: yy-line;
@@ -196,8 +198,14 @@
 .yy-content pre.is-folded {
   max-height: calc(var(--yy-fold-lines, 30) * 1.65em + 14px);
   overflow-y: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 72px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 72px), transparent);
+}
+.yy-content pre.is-folded::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 72px;
+  background: linear-gradient(transparent, var(--yy-codeblock-bg));
+  content: '';
+  pointer-events: none;
 }
 .yy-code-fold {
   display: block;
@@ -220,18 +228,86 @@
   right: 6px;
   height: 24px;
   padding: 0 8px;
-  border: 1px solid var(--yy-border);
+  border: 1px solid var(--yy-codeblock-line);
   border-radius: var(--yy-radius-sm);
-  background: var(--yy-bg);
-  color: var(--yy-text-2);
+  background: var(--yy-codeblock-hover);
+  color: var(--yy-codeblock-text);
   font: 12px var(--yy-font);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s;
 }
+.yy-copy:hover {
+  color: var(--yy-codeblock-title);
+}
 pre:hover > .yy-copy,
 .yy-copy:focus-visible {
   opacity: 1;
+}
+
+/* A titled code block (schema/codeBlock.ts) has Yuque's title bar: an arrow that collapses the
+   code, the title, and the language and copy button on the right (enhance.ts). */
+.yy-content .code-block {
+  overflow: hidden;
+  border: 1px solid var(--yy-codeblock-border);
+  border-radius: var(--yy-radius-lg);
+  background: var(--yy-codeblock-bg);
+}
+.yy-content .code-block > pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.code-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--yy-codeblock-line);
+  color: var(--yy-codeblock-title);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  cursor: pointer;
+  user-select: none;
+}
+/* The editor's arrow (lucide ChevronDown), drawn as a mask so it stays sharp at any pixel density. */
+.code-title::before {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  background: var(--yy-codeblock-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: transform 0.15s;
+  content: '';
+}
+.code-block.is-collapsed > .code-title {
+  border-bottom: 0;
+}
+.code-block.is-collapsed > .code-title::before {
+  transform: rotate(-90deg);
+}
+.code-block.is-collapsed > :not(.code-title) {
+  display: none;
+}
+.code-lang {
+  margin-left: auto;
+  color: var(--yy-codeblock-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.code-title > .yy-copy {
+  position: static;
+  border-color: transparent;
+  background: none;
+  color: var(--yy-codeblock-muted);
+  opacity: 1;
+}
+.code-title > .yy-copy:hover {
+  background: var(--yy-codeblock-hover);
+  color: var(--yy-codeblock-title);
 }
 
 .yy-content img {
@@ -378,70 +454,7 @@ pre:hover > .yy-copy,
 .callout[data-callout='bug'] { --callout-color: 245, 0, 87; }
 .callout[data-callout='example'] { --callout-color: 124, 77, 255; }
 .callout[data-callout='quote'], .callout[data-callout='cite'] { --callout-color: 158, 158, 158; }
-.callout[data-callout='code'] { --callout-color: 0, 185, 107; }
-
-/* Code callouts ([!code]) take the Monokai Pro code frame from the user's Obsidian snippet
-   (custom-callouts.css in the 算法课 vault): an accent border around a dark title bar joined to the
-   code. The editor's version is in editor.css. */
-.callout[data-callout='code'] {
-  overflow: hidden;
-  padding: 0;
-  border: 2px solid rgb(var(--callout-color));
-  background: transparent;
-}
-.callout[data-callout='code'] > .callout-title {
-  padding: 10px 16px;
-  border-bottom: 1px solid #19181a;
-  background: #2d2a2e;
-}
-.callout[data-callout='code'].is-collapsed > .callout-title {
-  border-bottom: 0;
-}
-.callout[data-callout='code'] > .callout-content {
-  background: #2d2a2e;
-  color: #fcfcfa;
-}
-.callout[data-callout='code'] > .callout-content > * {
-  margin: 0;
-}
-.callout[data-callout='code'] > .callout-content > :not(pre, .yy-code-fold) {
-  padding: 0.6em 16px;
-}
-.callout[data-callout='code'] pre {
-  margin: 0;
-  padding: 12px 16px 14px;
-  border: 0;
-  border-radius: 0;
-  background: #2d2a2e;
-  color: #fcfcfa;
-}
-.callout[data-callout='code'] pre code {
-  scrollbar-color: #727072 transparent;
-}
-.yy-code-numbers .callout[data-callout='code'] pre code .yy-line::before {
-  color: #5b595c;
-}
-.callout[data-callout='code'] .yy-copy {
-  border-color: #5b595c;
-  background: #403e41;
-  color: #fcfcfa;
-}
-.callout[data-callout='code'] .yy-code-fold {
-  margin: 0 auto 10px;
-  border-color: #5b595c;
-  background: #2d2a2e;
-  color: #c1c0c0;
-}
-/* Monokai Pro token colours, over the GitHub colours of the page (Chroma's short class names). */
-.yy-content .callout[data-callout='code'] .chroma :is(.k, .kd, .kn, .kp, .kr, .o, .ow, .cp) { color: #ff6188; }
-.yy-content .callout[data-callout='code'] .chroma :is(.s, .sa, .sb, .sc, .dl, .sd, .s1, .s2, .se, .sh, .si, .sx, .sr, .ss, .cpf) { color: #a9dc76; }
-.yy-content .callout[data-callout='code'] .chroma :is(.m, .mb, .mf, .mh, .mi, .il, .mo) { color: #fc9867; }
-.yy-content .callout[data-callout='code'] .chroma :is(.nf, .fm, .nb, .bp) { color: #78dce8; }
-.yy-content .callout[data-callout='code'] .chroma :is(.c, .ch, .cm, .c1, .cs) { color: #727072; }
-.yy-content .callout[data-callout='code'] .chroma :is(.kt, .nc, .na, .nd, .ne, .py) { color: #ffd866; }
-.yy-content .callout[data-callout='code'] .chroma :is(.kc, .no) { color: #ab9df2; }
-.yy-content .callout[data-callout='code'] .chroma .p { color: #939293; }
-.yy-content .callout[data-callout='code'] .chroma :is(.n, .nx, .nv, .nn, .ni, .nl, .vc, .vg, .vi, .vm, .w, .err) { color: #fcfcfa; }
+.callout[data-callout='code'] { --callout-color: 96, 125, 139; }
 
 /* Obsidian shows the capitalised type when a callout has no title. */
 .callout > .callout-title:empty::before { content: 'Callout'; }

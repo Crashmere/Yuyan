@@ -655,6 +655,92 @@
   border-color: var(--yy-border-strong);
   color: var(--yy-text);
 }
+/* Code block controls sit on the dark code (tokens.css). */
+.yy-lang-trigger,
+.yy-codeblock-btn,
+.yy-codeblock-bar .yy-codeblock-icon {
+  border: 1px solid var(--yy-codeblock-line);
+  background: var(--yy-codeblock-hover);
+  color: var(--yy-codeblock-text);
+}
+.yy-lang-trigger:hover,
+.yy-codeblock-btn:hover,
+.yy-codeblock .yy-codeblock-icon:hover,
+.yy-codeblock-toggle:hover {
+  border-color: #4b5263;
+  background: var(--yy-codeblock-hover);
+  color: var(--yy-codeblock-title);
+}
+.yy-codeblock-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The title bar of a titled block (schema/codeBlock.ts), as in Yuque. */
+.yy-codeblock-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px 0 6px;
+  border: 1px solid var(--yy-codeblock-border);
+  border-bottom-color: var(--yy-codeblock-line);
+  border-radius: var(--yy-radius-lg) var(--yy-radius-lg) 0 0;
+  background: var(--yy-codeblock-bg);
+}
+.yy-codeblock.is-collapsed .yy-codeblock-title {
+  border-bottom-color: var(--yy-codeblock-border);
+  border-radius: var(--yy-radius-lg);
+}
+.yy-codeblock.has-title pre {
+  padding-top: 14px;
+  border-top: 0;
+  border-radius: 0 0 var(--yy-radius-lg) var(--yy-radius-lg);
+}
+.yy-codeblock.has-title .yy-code-lines {
+  top: 14px;
+}
+.yy-codeblock-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--yy-radius-sm);
+  background: none;
+  color: var(--yy-codeblock-muted);
+  cursor: pointer;
+}
+.yy-codeblock-toggle svg {
+  transition: transform 0.15s;
+}
+.yy-codeblock.is-collapsed .yy-codeblock-toggle svg {
+  transform: rotate(-90deg);
+}
+.yy-codeblock-name {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--yy-codeblock-title);
+  font: 500 13px var(--yy-font);
+}
+.yy-codeblock-name::placeholder {
+  color: #5c6370;
+  font-weight: 400;
+}
+.yy-codeblock-title :is(.yy-lang-trigger, .yy-codeblock-btn, .yy-codeblock-icon) {
+  border-color: transparent;
+  background: none;
+  color: var(--yy-codeblock-muted);
+}
 .yy-lang-panel {
   z-index: 70;
   width: 250px;
@@ -730,7 +816,7 @@
   position: absolute;
   left: 0;
   width: 2.2em;
-  color: var(--yy-text-4);
+  color: var(--yy-codeblock-muted);
   text-align: right;
   content: attr(data-n);
 }
@@ -747,6 +833,10 @@
   border: 0;
   border-right: 1px solid var(--yy-border);
   border-radius: 0;
+}
+.yy-codeblock.is-mermaid.has-title .yy-codeblock-body {
+  border-top: 0;
+  border-radius: 0 0 var(--yy-radius-lg) var(--yy-radius-lg);
 }
 .yy-codeblock.is-mermaid .yy-codeblock-bar {
   right: calc(50% + 8px);
@@ -977,50 +1067,19 @@
   pointer-events: none;
 }
 
-/* Code callouts get the Monokai Pro frame of reading pages (content.css). In the editor the title
-   and content sit inside the node view's content element, and code blocks keep room for their bar. */
-.ProseMirror .callout[data-callout='code'] .callout-title {
-  padding: 10px 16px;
-  border-bottom: 1px solid #19181a;
-  background: #2d2a2e;
-}
-.ProseMirror .callout[data-callout='code'] .callout-content {
-  background: #2d2a2e;
-  color: #fcfcfa;
-}
-.ProseMirror .callout[data-callout='code'] .callout-content > * {
-  margin: 0;
-}
-.ProseMirror .callout[data-callout='code'] .callout-content > :not(.yy-codeblock) {
-  padding: 0.6em 16px;
-}
-.ProseMirror .callout[data-callout='code'] .yy-codeblock pre {
-  padding-top: 38px;
-}
-.ProseMirror .callout[data-callout='code'] :is(.yy-lang-trigger, .yy-codeblock-btn) {
-  border-color: #5b595c;
-  background: #403e41;
-  color: #fcfcfa;
-}
-.ProseMirror .callout[data-callout='code'] .yy-code-lines > div::before {
-  color: #5b595c;
-}
-.ProseMirror .callout[data-callout='code'] :is(.hljs-keyword, .hljs-selector-tag, .hljs-meta, .hljs-operator) { color: #ff6188; }
-.ProseMirror .callout[data-callout='code'] :is(.hljs-string, .hljs-regexp, .hljs-meta .hljs-string) { color: #a9dc76; }
-.ProseMirror .callout[data-callout='code'] .hljs-number { color: #fc9867; }
-.ProseMirror .callout[data-callout='code'] :is(.hljs-title, .hljs-built_in) { color: #78dce8; }
-.ProseMirror .callout[data-callout='code'] .hljs-comment { color: #727072; }
-.ProseMirror .callout[data-callout='code'] :is(.hljs-type, .hljs-title.class_, .hljs-attr, .hljs-attribute, .hljs-property) { color: #ffd866; }
-.ProseMirror .callout[data-callout='code'] .hljs-literal { color: #ab9df2; }
-.ProseMirror .callout[data-callout='code'] .hljs-punctuation { color: #939293; }
-.ProseMirror .callout[data-callout='code'] :is(.hljs-variable, .hljs-params) { color: #fcfcfa; }
-
-/* lowlight (highlight.js) token colours in the editor, close to the GitHub theme used on pages. */
-.hljs-comment, .hljs-quote { color: light-dark(#6a737d, #8b949e); font-style: italic; }
-.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type { color: light-dark(#d73a49, #ff7b72); }
-.hljs-string, .hljs-regexp, .hljs-addition { color: light-dark(#032f62, #a5d6ff); }
-.hljs-number, .hljs-symbol, .hljs-bullet { color: light-dark(#005cc5, #79c0ff); }
-.hljs-title, .hljs-section, .hljs-function .hljs-title { color: light-dark(#6f42c1, #d2a8ff); }
-.hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-built_in { color: light-dark(#005cc5, #79c0ff); }
-.hljs-meta, .hljs-name, .hljs-tag { color: light-dark(#22863a, #7ee787); }
-.hljs-deletion { color: light-dark(#b31d28, #ffa198); }
+/* lowlight (highlight.js) token colours in the editor: One Dark Pro, as Chroma colours reading pages
+   (internal/render/highlight.go). highlight.js leaves plain names untagged, so variables keep the
+   text colour here. */
+.hljs-comment, .hljs-quote { color: #7f848e; }
+.hljs-keyword, .hljs-doctag, .hljs-formula { color: #c678dd; }
+.hljs-type, .hljs-meta, .hljs-meta .hljs-keyword, .hljs-operator { color: #56b6c2; }
+.hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: #98c379; }
+.hljs-number, .hljs-selector-class, .hljs-selector-attr, .hljs-selector-pseudo { color: #d19a66; }
+.hljs-title, .hljs-symbol, .hljs-bullet, .hljs-link, .hljs-selector-id { color: #61afef; }
+.hljs-built_in, .hljs-literal, .hljs-title.class_ { color: #e5c07b; }
+/* highlight.js tags C++ calls such as q.push(i) as built-ins; Yuque shows them as functions. */
+.language-cpp .hljs-built_in { color: #61afef; }
+.hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-attribute, .hljs-name, .hljs-tag, .hljs-section, .hljs-selector-tag, .hljs-deletion, .hljs-subst { color: #e06c75; }
+.hljs-punctuation { color: #abb2bf; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }

@@ -110,6 +110,10 @@ export const insertItems: InsertItem[] = [
   { id: 'quote', label: '引用', description: '引用一段话', icon: Quote, group: '插入', markdown: '>', keywords: 'yy quote blockquote', run: (e) => e.chain().focus().toggleBlockquote().run() },
   { id: 'code', label: '代码块', description: '带语法高亮的代码', icon: SquareCode, group: '插入', markdown: '```', keywords: 'dmk code', run: (e) => e.chain().focus().toggleCodeBlock().run() },
   {
+    id: 'titledCode', label: '带标题的代码块', description: '有标题栏，可以收起', icon: SquareCode, group: '插入', keywords: 'dbtddmk btdmk code title',
+    run: (e) => e.chain().focus().toggleCodeBlock().updateAttributes('codeBlock', { title: '' }).run(),
+  },
+  {
     id: 'mermaid', label: 'Mermaid 图表', description: '用文字画流程图、时序图', icon: Workflow, group: '插入', markdown: '```mermaid', keywords: 'mermaid tb chart diagram lct',
     run: (e) => e.chain().focus().insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: 'graph TD\n  A[开始] --> B[结束]' }] }).run(),
   },
@@ -122,7 +126,6 @@ export const insertItems: InsertItem[] = [
   { id: 'note', label: '提示', description: 'Callout：提示', icon: MessageSquareText, group: '提示块', markdown: '[!note]', keywords: 'ts callout note', run: (e) => insertCallout(e, 'note') },
   { id: 'tip', label: '技巧', description: 'Callout：技巧', icon: MessageSquareText, group: '提示块', markdown: '[!tip]', keywords: 'jq callout tip', run: (e) => insertCallout(e, 'tip') },
   { id: 'warning', label: '警告', description: 'Callout：警告', icon: MessageSquareText, group: '提示块', markdown: '[!warning]', keywords: 'jg callout warning', run: (e) => insertCallout(e, 'warning') },
-  { id: 'codeCallout', label: '代码', description: 'Callout：可折叠的代码', icon: MessageSquareText, group: '提示块', markdown: '[!code]', keywords: 'dm callout code', run: (e) => insertCallout(e, 'code') },
 ]
 
 export function coordsRect(e: Editor): DOMRect {

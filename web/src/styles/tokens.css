@@ -23,6 +23,15 @@
   --yy-code-bg: light-dark(#f6f7f8, #25262a);
   --yy-mark: light-dark(#fff3a3, #5e5200);
 
+  /* Code blocks are One Dark Pro in both themes, as in Yuque. */
+  --yy-codeblock-bg: #282c34;
+  --yy-codeblock-text: #abb2bf;
+  --yy-codeblock-title: #d7dae0;
+  --yy-codeblock-muted: #7f848e;
+  --yy-codeblock-hover: #353b45;
+  --yy-codeblock-line: #3a3f4b;
+  --yy-codeblock-border: light-dark(#282c34, #3a3f4b);
+
   --yy-border: light-dark(#e7e9e8, #313236);
   --yy-border-strong: light-dark(#d8dad9, #43454a);
 

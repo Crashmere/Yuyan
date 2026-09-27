@@ -598,7 +598,7 @@ test('versions compare with the previous and the current version, line by line',
   await expect(diff).toHaveCount(0)
 })
 
-test('search results open at the first match, unfolding long code and collapsed callouts', async ({ page }) => {
+test('search results open at the first match, unfolding long code, code blocks and callouts', async ({ page }) => {
   await page.goto('search?q=heappush')
   await page.locator('.yy-result-title', { hasText: '长代码' }).click()
   await expect(page).toHaveURL(/[?&]hl=heappush/)
@@ -611,7 +611,12 @@ test('search results open at the first match, unfolding long code and collapsed 
   await page.goto('search?q=int dijkstra')
   await page.locator('.yy-result-title', { hasText: '最短路' }).click()
   await expect.poll(async () => (await searchHighlights(page)).map((h) => h.text)).toEqual(['int dijkstra'])
-  await expect(page.locator('.yy-content .callout')).not.toHaveClass(/is-collapsed/)
+  await expect(page.locator('.yy-content .code-block')).not.toHaveClass(/is-collapsed/)
+
+  await page.goto('search?q=自动重试')
+  await page.locator('.yy-result-title', { hasText: '常见问题' }).click()
+  await expect.poll(async () => (await searchHighlights(page)).map((h) => h.text)).toEqual(['自动重试'])
+  await expect(page.locator('.yy-content .callout[data-callout="failure"]')).not.toHaveClass(/is-collapsed/)
 })
 
 async function openLongDocument(page: Page) {
@@ -661,24 +666,61 @@ test('sections fold under their headings, stay folded, and open for the outline 
   await expect(background.getByRole('button', { name: '折叠这一节' })).toBeVisible()
 })
 
-test('code callouts use the Monokai Pro frame on reading pages and in the editor', async ({ page }) => {
-  await page.goto('search?q=int dijkstra')
-  await page.locator('.yy-result-title', { hasText: '最短路' }).click()
-  const colours = (callout: ReturnType<Page['locator']>, token: string) =>
-    callout.evaluate((c, t) => {
-      const style = (el: Element | null) => (el ? getComputedStyle(el) : null)
-      return {
-        border: style(c)?.borderTopColor,
-        title: style(c.querySelector('.callout-title'))?.backgroundColor,
-        code: style(c.querySelector('pre'))?.backgroundColor,
-        type: style(c.querySelector(t))?.color,
-      }
-    }, token)
-  const monokai = { border: 'rgb(0, 185, 107)', title: 'rgb(45, 42, 46)', code: 'rgb(45, 42, 46)', type: 'rgb(255, 216, 102)' }
-  expect(await colours(page.locator('.yy-content .callout'), '.chroma .kt')).toEqual(monokai)
+test('code blocks look like Yuque: One Dark, with a title bar that collapses them', async ({ page, request }) => {
+  const id = await createDoc(request, '代码标题测试', '```cpp title="Dijkstra" collapsed\nint dijkstra();\n```\n\n边权非负时使用。')
+  await page.goto(`docs/${id}`)
+  const colours = (block: ReturnType<Page['locator']>, token: string) =>
+    block.evaluate((b, t) => ({ code: getComputedStyle(b.querySelector('pre')!).backgroundColor, type: getComputedStyle(b.querySelector(t)!).color }), token)
+  const oneDark = { code: 'rgb(40, 44, 52)', type: 'rgb(86, 182, 194)' }
+  const block = page.locator('.yy-content .code-block')
+  const title = block.locator('.code-title')
+  await expect(title).toContainText('Dijkstra')
+  await expect(title.locator('.code-lang')).toHaveText('C++')
+  await expect(block.locator('pre')).toBeHidden()
+  await title.click()
+  await expect(block.locator('pre')).toBeVisible()
+  expect(await colours(block, '.chroma .kt')).toEqual(oneDark)
+  await title.getByRole('button', { name: '复制' }).click()
+  await expect(block.locator('pre')).toBeVisible()
+
+  // The editor keeps the block collapsed; the arrow opens it, and so does finding text inside it.
   await page.getByRole('link', { name: '编辑' }).click()
-  await expect(page.locator('.ProseMirror .callout pre')).toBeVisible()
-  expect(await colours(page.locator('.ProseMirror .callout'), '.hljs-type')).toEqual(monokai)
+  const code = page.locator('.ProseMirror .yy-codeblock')
+  await expect(code.locator('.yy-codeblock-name')).toHaveValue('Dijkstra')
+  await expect(code.locator('pre')).toBeHidden()
+  await code.getByRole('button', { name: '展开代码' }).click()
+  await expect(code.locator('pre')).toBeVisible()
+  expect(await colours(code, '.hljs-type')).toEqual(oneDark)
+  await code.getByRole('button', { name: '收起代码' }).click()
+  await expect(code.locator('pre')).toBeHidden()
+  await page.locator('.ProseMirror p').first().click()
+  await page.keyboard.press('ControlOrMeta+f')
+  await page.keyboard.type('dijkstra')
+  await expect(code.locator('pre')).toBeVisible()
+  await expect(page.locator('.ProseMirror .yy-find-match.current')).toBeInViewport()
+})
+
+test('code block titles are added, renamed and removed in the editor and kept in Markdown', async ({ page, request }) => {
+  const id = await createDoc(request, '代码标题编辑', '```cpp title="家谱树" collapsed\nint main() {}\n```\n\n```js\nlet a\n```')
+  await openEditor(page, id)
+  const titled = page.locator('.ProseMirror .yy-codeblock').first()
+  const plain = page.locator('.ProseMirror .yy-codeblock').nth(1)
+  await plain.getByRole('button', { name: '显示标题栏' }).click()
+  await expect(plain.locator('.yy-codeblock-name')).toBeFocused()
+  await page.keyboard.type('示例')
+  // Enter goes back to the start of the code, a frame later.
+  await page.keyboard.press('Enter')
+  await expect(page.locator('.ProseMirror')).toBeFocused()
+  await page.keyboard.type('x')
+  await expect(plain.locator('pre code')).toHaveText('xlet a')
+  await titled.getByRole('button', { name: '隐藏标题栏' }).click()
+  await expect(titled.locator('.yy-codeblock-title')).toHaveCount(0)
+  await expect(titled.locator('pre')).toBeVisible()
+
+  const md = await finishAndExport(page, '代码标题编辑')
+  expect(md).toContain('```cpp\nint main() {}\n```')
+  expect(md).toContain('```javascript title="示例"\nxlet a\n```')
+  await expect(page.locator('.yy-content .code-title')).toContainText('示例')
 })
 
 test('images still loading are cancelled when the page is left', async ({ page }) => {

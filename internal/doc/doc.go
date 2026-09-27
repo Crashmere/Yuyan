@@ -149,6 +149,10 @@ func PlainText(n Node) string {
 			b.WriteString(n.Attr("latex"))
 		case "image":
 			b.WriteString(n.Attr("alt"))
+		case "codeBlock":
+			if title := n.Attr("title"); title != "" {
+				b.WriteString(title + "\n")
+			}
 		}
 		for _, c := range n.Content {
 			walk(c)

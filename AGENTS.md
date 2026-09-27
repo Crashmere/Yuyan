@@ -5,7 +5,8 @@
 - Yuyan（语燕）是用户一人使用的网页知识库，功能参照语雀网页版中适合单人使用的部分：知识库与文档树、所见即所得编辑、阅读页。
 - Go 内嵌 Vue + Tiptap 前端 + SQLite。正文以 Tiptap 文档 JSON 保存并记录格式版本号；Markdown 只用于导入和导出。启动缺库必须报错，只有 `init` 会建库。
 - 前端是单页应用：Go 对所有页面地址返回 `internal/server/templates/shell.html`，由 `internal/server/app.go` 预加载首屏数据，预加载的键必须与前端请求的 API 路径完全一致；正文 HTML 仍由 Go 渲染。前端代码在 `web/src/app`（路由、布局、目录、页面）、`web/src/ui`（通用组件）、`web/src/editor`（编辑器，按需加载）。
-- 界面改版（阶段 D）按 docs/DESIGN.md 第 12 节进行，只在 Markdown 能表达的范围内优化，不扩展文档格式；开发前先读该节。阶段 E 第一批（搜索面板、版本对比等）见第 13 节，第二批小功能见第 14 节，第三批见第 15 节。
+- 界面改版（阶段 D）按 docs/DESIGN.md 第 12 节进行，只在 Markdown 能表达的范围内优化；开发前先读该节。文档格式只在用户要求时扩展，而且必须能用 Markdown 表达，例如代码块的标题和收起状态写在围栏信息串里（第 16 节）。阶段 E 第一批（搜索面板、版本对比等）见第 13 节，第二批小功能见第 14 节，第三批见第 15 节，第四批（语雀式代码块与 `[!code]` 迁移）见第 16 节。
+- 代码块的标题和收起状态由 `web/src/schema/codeBlock.ts` 定义，编辑器、静态渲染和 Markdown 共用；Go 端在 `internal/render/render.go`。配色是 One Dark Pro：阅读页由 `internal/render/highlight.go` 生成（Chroma 的 onedark 加上按语雀调整的标记），编辑器的 highlight.js 颜色在 `web/src/styles/editor.css`，改一边时对照另一边。
 - 阅读页在 Go 渲染的正文上由前端补充的行为集中在 `web/src/app/content`：`enhance.ts`（代码、公式、图表、图片占位）、`folds.ts`（按标题折叠，展开用 `reveal()`）、`matches.ts`（搜索高亮）。滚动到正文中某处之前先调用 `reveal()`，否则目标可能在折叠的节里。
 - 搜索面板的拼音由服务端 `internal/server/pinyin.go` 用 go-pinyin 词典生成（随 `/api/titles`、`/api/books` 返回，含多音字），前端 `web/src/app/search/match.ts` 只负责匹配；不要在前端再引入拼音字典或用排序规则推算。
 - 首次加载的脚本预算见 DESIGN 12.3。再增加按需加载的 Vue 组件时，Rolldown 会把 Vue 等共用代码拆出主包（首次加载多 2–4 KB）；按需加载的部分尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`。改动后用构建清单核对首次加载的分块。

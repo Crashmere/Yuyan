@@ -118,27 +118,32 @@ func canonical(t *testing.T, s string) string {
 	return b.String()
 }
 
-func TestChromaCSSFollowsTheTheme(t *testing.T) {
+func TestChromaCSSIsOneDark(t *testing.T) {
 	css := ChromaCSS()
-	for _, want := range []string{
-		`:root[data-theme="light"] .chroma .k {`,
-		`:root:not([data-theme="dark"]) .chroma .k {`,
-		`:root[data-theme="dark"] .chroma .k {`,
-		`:root:not([data-theme="light"]) .chroma .k {`,
-	} {
+	for _, want := range []string{".chroma .k { color: #c678dd }", ".chroma .s { color: #98c379 }", ".chroma .kt { color: #56b6c2 }"} {
 		if !strings.Contains(css, want) {
 			t.Errorf("stylesheet lacks %q", want)
-		}
-	}
-	// A light rule without a theme scope would stay active in dark mode.
-	for _, line := range strings.Split(css, "\n") {
-		if strings.HasPrefix(line, ".chroma") {
-			t.Errorf("unscoped rule %q", line)
 		}
 	}
 	for _, unwanted := range []string{"/* Background */", "/* PreWrapper */", ".bg {"} {
 		if strings.Contains(css, unwanted) {
 			t.Errorf("stylesheet still contains %q", unwanted)
+		}
+	}
+}
+
+func TestHighlightTagsLikeYuque(t *testing.T) {
+	got, ok := highlight("cpp", "int main() {\nvector<vector<int>> adj(n + 1);\nvector d(n);\nq.push(adj[1].size());\nsolve(n);\nint n;\n}\nint gcd(int a, int b);\nint dijkstra();")
+	if !ok {
+		t.Fatal("cpp was not highlighted")
+	}
+	for _, want := range []string{
+		`<span class="kt">vector</span>`, `<span class="n">adj</span><span class="p">(</span>`, `<span class="n">d</span>`,
+		`<span class="nf">push</span>`, `<span class="nf">size</span>`, `<span class="nf">solve</span>`, `<span class="n">n</span><span class="p">;</span>`,
+		`<span class="nf">main</span>`, `<span class="nf">gcd</span>`, `<span class="nf">dijkstra</span>`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %s in\n%s", want, got)
 		}
 	}
 }

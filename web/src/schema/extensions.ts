@@ -8,6 +8,7 @@ import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { Callout, CalloutContent, CalloutTitle } from './callout'
+import { withTitles } from './codeBlock'
 
 // The document schema shared by the editor, the importer and the parity snapshots.
 // Every node and mark here needs a matching case in internal/render/render.go.
@@ -85,7 +86,7 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     }),
     // Obsidian notes use bold or linked inline code, which Tiptap's default code mark forbids.
     Code.extend({ excludes: '' }),
-    o.codeBlock ?? CodeBlock,
+    o.codeBlock ?? withTitles(CodeBlock),
     o.image ?? YuyanImage,
     Highlight,
     TaskList,
