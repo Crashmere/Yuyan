@@ -236,16 +236,17 @@ async function copy() {
       </button>
       <span ref="actions" class="yy-code-actions"></span>
     </div>
+    <button
+      v-show="!collapsed"
+      type="button"
+      class="code-tab"
+      :class="{ 'is-down': !titled }"
+      contenteditable="false"
+      :aria-label="titled ? '隐藏标题栏' : '显示标题栏'"
+      :data-tip="titled ? '隐藏标题栏' : '显示标题栏'"
+      @click="titled ? hideTitle() : showTitle()"
+    ></button>
     <div v-show="!collapsed" class="yy-codeblock-body">
-      <button
-        type="button"
-        class="code-tab"
-        :class="{ 'is-down': !titled }"
-        contenteditable="false"
-        :aria-label="titled ? '隐藏标题栏' : '显示标题栏'"
-        :data-tip="titled ? '隐藏标题栏' : '显示标题栏'"
-        @click="titled ? hideTitle() : showTitle()"
-      ></button>
       <div ref="codeHost" contenteditable="false"></div>
       <div v-if="isMermaid" class="yy-mermaid-preview" contenteditable="false">
         <div v-if="preview" class="yy-mermaid-svg" :class="{ stale: !!error }" v-html="preview"></div>

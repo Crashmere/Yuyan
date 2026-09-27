@@ -90,7 +90,7 @@ function enhanceCode(root: HTMLElement) {
 }
 
 // Every code block gets Yuque's title bar (schema/codeBlock.ts), hidden on blocks saved without
-// one. The tab at the top of the code, just below the bar when it shows, shows or hides it for
+// one. The tab on the bar's lower edge shows or hides it for
 // this visit only; the document keeps what the editor saved.
 function addTitleBar(pre: HTMLElement, language: string | undefined, text: string, key: string): HTMLElement {
   let block = pre.parentElement!
@@ -171,8 +171,14 @@ function splitLines(code: HTMLElement): number {
   }
   code.childNodes.forEach(walk)
   if (line.textContent || !lines.length) lines.push(line)
-  lines.forEach((line, i) => { line.dataset.line = String(i + 1) })
-  code.replaceChildren(...lines)
+  lines.forEach((line, i) => {
+    line.dataset.line = String(i + 1)
+    const gutter = document.createElement('span'); gutter.className = 'yy-code-gutter'; gutter.dataset.line = String(i + 1)
+    const text = document.createElement('span'); text.className = 'yy-code-text'; text.append(...line.childNodes)
+    line.replaceChildren(gutter, text)
+  })
+  const rows = document.createElement('span'); rows.className = 'yy-code-lines'; rows.append(...lines)
+  code.replaceChildren(rows)
   return lines.length
 }
 

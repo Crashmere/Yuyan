@@ -1507,7 +1507,7 @@ a.yy-catalog-title:hover {
 
 .yy-pager {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   margin-top: 56px;
   padding-top: 24px;
@@ -2105,10 +2105,13 @@ a.yy-catalog-title:hover {
     display: none;
   }
   .yy-pager {
-    grid-template-columns: 1fr;
+    gap: 8px;
   }
-  .yy-pager .next {
-    grid-column: 1;
+  .yy-pager a {
+    padding: 10px;
+  }
+  .yy-pager a:only-child {
+    grid-column: 1 / -1;
   }
   .yy-move-body {
     grid-template-columns: 1fr;

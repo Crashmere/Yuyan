@@ -226,31 +226,44 @@
   overflow-x: auto;
 }
 /* Reading pages split code into lines (enhance.ts). Numbers always show; wrapping is per block. */
-.yy-content pre code .yy-line {
+/* All rows share the longest width, so short rows cannot pull their sticky gutter out of view. */
+.yy-code-lines {
   display: block;
+  width: max-content;
+  min-width: 100%;
+}
+.yy-content pre code .yy-line {
+  display: flex;
   min-height: 1.65em;
 }
-.yy-content pre code {
-  counter-reset: yy-line;
+.yy-code-text {
+  flex: 1;
+  min-width: max-content;
 }
-.yy-content pre code .yy-line {
-  position: relative;
-  padding-left: 4em;
+.yy-code-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: none;
+  width: 4em;
+  background: var(--yy-codeblock-bg);
+  user-select: none;
 }
-.yy-content pre code .yy-line::before {
+.yy-code-gutter::before {
   position: absolute;
   left: 12px;
   width: 2.2em;
   color: var(--yy-codeblock-muted);
   text-align: right;
   content: attr(data-line);
-  counter-increment: yy-line;
   user-select: none;
 }
 .yy-content .is-wrapped pre code {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.is-wrapped .yy-code-lines { width: auto; }
+.is-wrapped .yy-code-text { min-width: 0; }
 .yy-content pre.is-folded {
   max-height: calc(var(--yy-fold-lines, 30) * 1.65em + 14px);
   overflow-y: hidden;
@@ -403,9 +416,7 @@ pre:hover > .yy-copy,
 .code-block:not(.no-title) > pre > .yy-copy {
   display: none;
 }
-/* The tab that shows or hides the title bar sits at the top of the code, so it is just below the
-   bar when the bar shows and goes away with the code when collapsed, as in Yuque. The editor's
-   code blocks use it too. */
+/* The thin tab straddles the title bar's lower edge; when hidden it sits flush with the block's top. */
 .code-tab {
   position: absolute;
   top: 0;
@@ -415,7 +426,7 @@ pre:hover > .yy-copy,
   align-items: center;
   justify-content: center;
   width: 44px;
-  height: 14px;
+  height: 10px;
   padding: 0;
   border: 0;
   border-radius: 0 0 6px 6px;
@@ -427,15 +438,20 @@ pre:hover > .yy-copy,
   transition: opacity 0.15s;
 }
 .code-tab::before {
-  border: 4px solid transparent;
+  border: 3px solid transparent;
   border-top: 0;
-  border-bottom: 5px solid currentColor;
+  border-bottom: 4px solid currentColor;
   content: '';
 }
 .code-tab.is-down::before {
-  border-top: 5px solid currentColor;
+  border-top: 4px solid currentColor;
   border-bottom: 0;
 }
+.code-tab:not(.is-down) {
+  border-radius: 6px;
+  transform: translate(-50%, -50%);
+}
+.code-block.no-title .code-tab { top: -1px; }
 .code-tab:hover {
   background: #4b5263;
 }

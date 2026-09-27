@@ -3,7 +3,7 @@ import { codeHash, readCodePreferences, saveCodePreferences } from './preference
 import { expandCode, type CodeAction } from './actions'
 
 export async function readingCode(block: HTMLElement, source: string, language: string, key: string, title: string) {
-  const lines = [...block.querySelectorAll<HTMLElement>('pre > code > .yy-line')]
+  const lines = [...block.querySelectorAll<HTMLElement>('pre > code .yy-line')]
   const ranges = await codeFolds(source, language)
   let destroyed = false
   let closeExpanded: (() => void) | undefined
@@ -35,7 +35,7 @@ export async function readingCode(block: HTMLElement, source: string, language: 
     if (!line) continue
     const button = document.createElement('button'); button.type = 'button'; button.className = 'yy-code-region-fold'; button.onclick = () => toggle(range.from)
     const placeholder = document.createElement('button'); placeholder.type = 'button'; placeholder.className = 'yy-code-region-placeholder'; placeholder.textContent = `⋯ ${range.last - range.first} 行`; placeholder.dataset.tip = '展开代码区域'; placeholder.onclick = () => toggle(range.from)
-    line.prepend(button); line.append(placeholder); buttons.push(button, placeholder)
+    line.querySelector('.yy-code-gutter')!.append(button); line.querySelector('.yy-code-text')!.append(placeholder); buttons.push(button, placeholder)
     foldButtons.set(range.from, button); placeholders.set(range.from, placeholder)
   }
   let selectionAnchor = 0
@@ -67,7 +67,7 @@ export async function readingCode(block: HTMLElement, source: string, language: 
       stopDrag = stop; window.addEventListener('mousemove', move); window.addEventListener('mouseup', stop); window.addEventListener('blur', stop)
     }
     number.onclick = e => { if (e.detail === 0) { selectionAnchor = index; select(index, index) } }
-    line.prepend(number); buttons.push(number)
+    line.querySelector('.yy-code-gutter')!.append(number); buttons.push(number)
   })
   const clearSelected = (e: Event) => { if (!(e.target as Element)?.closest('.yy-code-line-select')) lines.forEach(line => line.classList.remove('yy-code-line-selected')) }
   block.addEventListener('mousedown', clearSelected)

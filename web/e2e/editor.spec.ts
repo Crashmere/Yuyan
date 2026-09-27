@@ -737,7 +737,7 @@ test('reading pages: image viewer, folded long code and line numbers', async ({ 
   await page.getByRole('button', { name: /^外观/ }).click()
   await expect(page.getByRole('menuitem', { name: /代码行号|代码自动换行/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
-  const number = await pre.locator('.yy-line').nth(9).evaluate((el) => getComputedStyle(el, '::before').content)
+  const number = await pre.locator('.yy-code-gutter').nth(9).evaluate((el) => getComputedStyle(el, '::before').content)
   expect(number).toBe('"10"')
 })
 
@@ -963,11 +963,10 @@ test('code blocks look like Yuque: One Dark, with a title bar that collapses the
   await title.getByRole('button', { name: '复制' }).click()
   await expect(block.locator('pre')).toBeVisible()
 
-  // The tab at the top of the code, just below the title bar, shows or hides the bar for this
-  // visit only.
+  // The thin tab straddles the title's lower edge and changes this visit only.
   const bar = (await title.boundingBox())!
   const tab = (await block.locator('.code-tab').boundingBox())!
-  expect(Math.abs(tab.y - (bar.y + bar.height))).toBeLessThan(1.5)
+  expect(Math.abs(tab.y + tab.height / 2 - (bar.y + bar.height))).toBeLessThan(1.5)
   const plain = page.locator('.yy-content .code-block').nth(1)
   await expect(plain.locator('.code-title')).toBeHidden()
   await plain.getByRole('button', { name: '显示标题栏' }).click()
@@ -1642,7 +1641,7 @@ for (const width of [1360, 375]) {
         const numbered = await numbers.evaluateAll(els => els.map(el => el.getBoundingClientRect().top))
         expect(Math.max(...lines.map((top, i) => Math.abs(top - numbered[i])))).toBeLessThan(2)
       } else {
-        expect(await first.locator('.yy-line').first().evaluate((el) => getComputedStyle(el, '::before').content)).toBe('"1"')
+        expect(await first.locator('.yy-code-gutter').first().evaluate((el) => getComputedStyle(el, '::before').content)).toBe('"1"')
       }
       await page.screenshot({ path: `test-results/code-controls-${width}-${editing ? 'edit' : 'read'}.png` })
       await first.getByRole('button', { name: '隐藏标题栏', exact: true }).click()

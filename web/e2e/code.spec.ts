@@ -53,7 +53,7 @@ test('code regions fold by syntax in reading and editing, retaining their origin
   await fold.click()
   await expect(page.locator('.yy-line').nth(1)).toBeHidden()
   await expect(page.locator('.yy-line').last()).toBeVisible()
-  expect(await page.locator('.yy-line').last().evaluate(el => getComputedStyle(el, '::before').content)).toBe('"7"')
+  expect(await page.locator('.yy-code-gutter').last().evaluate(el => getComputedStyle(el, '::before').content)).toBe('"7"')
   await page.getByRole('link', { name: '编辑', exact: true }).click()
   await expect(page.locator('.yy-code-fold-placeholder')).toHaveText('⋯ 5 行')
   await page.locator('.yy-code-fold-placeholder').click()
@@ -382,5 +382,38 @@ for (const platform of ['MacIntel', 'Win32']) {
     await expect(help).toBeVisible()
     await help.getByRole('button', { name: '关闭代码块快捷键' }).click()
     await expect(page.locator('.yy-code-dialog')).toBeVisible()
+  })
+}
+
+for (const width of [1360, 375]) {
+  test(`code gutters stay fixed while long lines scroll horizontally at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 667 })
+    const id = await createCode(request, `function example() {\n    return "${'long code '.repeat(90)}"\n}`)
+    for (const editing of [false, true]) {
+      await page.goto(`docs/${id}${editing ? '/edit' : ''}`)
+      const block = page.locator(editing ? '.yy-codeblock' : '.code-block')
+      await block.hover()
+      const scroller = block.locator(editing ? '.cm-scroller' : 'pre > code')
+      const gutter = block.locator(editing ? '.cm-lineNumbers .cm-gutterElement:not(:first-child)' : '.yy-code-line-select')
+      await expect(gutter).toHaveCount(3)
+      const start = (await gutter.first().boundingBox())!.x
+      const line = block.locator(editing ? '.cm-line' : '.yy-line').first()
+      const textStart = (await line.boundingBox())!.x
+      const rect = (await scroller.boundingBox())!
+      await page.mouse.move(rect.x + rect.width / 2, rect.y + 25)
+      await page.mouse.wheel(360, 0)
+      await expect.poll(() => scroller.evaluate(el => el.scrollLeft)).toBeGreaterThan(100)
+      expect((await line.boundingBox())!.x).toBeLessThan(textStart - 100)
+      for (const item of [gutter.first(), gutter.last()]) expect(Math.abs((await item.boundingBox())!.x - start)).toBeLessThan(1)
+      // Short lines keep their gutter even after scrolling to the end of a much longer line.
+      await scroller.evaluate(el => { el.scrollLeft = el.scrollWidth })
+      for (const item of [gutter.first(), gutter.last()]) expect(Math.abs((await item.boundingBox())!.x - start)).toBeLessThan(1)
+      await block.screenshot({ path: `test-results/code-gutters-${width}-${editing ? 'edit' : 'read'}.png` })
+      await gutter.last().click()
+      if (!editing) expect(await page.evaluate(() => getSelection()?.toString())).toBe('}')
+      else expect(await block.locator('.yy-code-editor-host').evaluate((el: any) => {
+        const view = el.codeEditor.view; return view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)
+      })).toBe('}')
+    }
   })
 }
