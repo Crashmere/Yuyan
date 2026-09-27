@@ -626,21 +626,40 @@ async function openLongDocument(page: Page) {
   await expect(page.locator('.yy-doc-title')).toHaveText('长文档示例')
 }
 
-test('the outline sits at the right edge; its eye hides it into the top bar button', async ({ page }) => {
+test('the outline sits at the right edge; unpinned, it is a line per heading that opens on hover', async ({ page }) => {
   await openLongDocument(page)
   const aside = page.locator('.yy-doc-aside')
   const article = page.locator('.yy-article')
-  await expect(aside.getByRole('link').first()).toBeVisible()
+  const links = aside.getByRole('link')
+  const lines = aside.locator('.yy-toc-lines')
+  const away = () => page.mouse.move(300, 500)
+  await expect(links.first()).toBeVisible()
+  const headings = await links.count()
   const box = (await aside.boundingBox())!
   expect(1360 - (box.x + box.width)).toBeLessThan(40)
   const left = (await article.boundingBox())!.x
+  await expect(page.locator('#yy-topbar-actions').getByRole('button', { name: '大纲' })).toHaveCount(0)
+
   await aside.getByRole('button', { name: '隐藏大纲' }).click()
-  await expect(aside).toBeHidden()
+  await away()
+  await expect(links.first()).toBeHidden()
+  await expect(lines.locator('span')).toHaveCount(headings)
+  const widths = await lines.locator('span').evaluateAll((spans) => spans.map((s) => parseFloat(getComputedStyle(s, '::before').width)))
+  expect(Math.max(...widths)).toBeGreaterThan(Math.min(...widths))
   expect((await article.boundingBox())!.x).toBe(left)
+  // The outline opens over the lines, which Playwright's hover would take as covering them.
+  await lines.hover({ force: true })
+  await expect(links.first()).toBeVisible()
+  await away()
+  await expect(links.first()).toBeHidden()
+
   await page.reload()
-  await expect(aside).toBeHidden()
-  await page.locator('#yy-topbar-actions').getByRole('button', { name: '显示大纲' }).click()
-  await expect(aside.getByRole('link').first()).toBeVisible()
+  await expect(links.first()).toBeHidden()
+  await lines.hover({ force: true })
+  await aside.getByRole('button', { name: '固定显示大纲' }).click()
+  await away()
+  await expect(links.first()).toBeVisible()
+  await expect(lines).toHaveCount(0)
   expect((await article.boundingBox())!.x).toBe(left)
 })
 

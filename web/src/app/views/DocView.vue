@@ -21,17 +21,12 @@ const missing = ref(false)
 const failure = ref('')
 const tocOpen = ref(false)
 // Up to this width (the breakpoint in app.css) the outline is a drawer opened from the top bar;
-// wider, the top bar button shows or hides it beside the text.
+// wider, it sits beside the text (Toc.vue).
 const drawerQuery = matchMedia('(max-width: 1180px)')
 const drawer = ref(drawerQuery.matches)
 const onDrawerQuery = (e: MediaQueryListEvent) => (drawer.value = e.matches)
 drawerQuery.addEventListener('change', onDrawerQuery)
 onBeforeUnmount(() => drawerQuery.removeEventListener('change', onDrawerQuery))
-const tocShown = computed(() => (drawer.value ? tocOpen.value : prefs.readingOutline))
-function toggleToc() {
-  if (drawer.value) tocOpen.value = !tocOpen.value
-  else prefs.readingOutline = !prefs.readingOutline
-}
 
 // The editor is a large download; start fetching it when the pointer reaches the edit button.
 const prefetchEditor = () => void import('./EditView.vue')
@@ -73,7 +68,7 @@ onMounted(async () => {
         <PencilLine :size="15" />编辑
       </RouterLink>
       <ActionMenu :items="menu"><IconButton label="更多操作"><Ellipsis :size="18" /></IconButton></ActionMenu>
-      <IconButton v-if="view.toc.length" class="yy-toc-btn" :label="drawer ? '大纲' : tocShown ? '隐藏大纲' : '显示大纲'" :active="tocShown" @click="toggleToc">
+      <IconButton v-if="view.toc.length && drawer" class="yy-toc-btn" label="大纲" :active="tocOpen" @click="tocOpen = !tocOpen">
         <TableOfContents :size="18" />
       </IconButton>
     </template>
@@ -81,7 +76,7 @@ onMounted(async () => {
 
   <main v-if="missing" class="yy-page"><NotFoundState /></main>
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
-  <main v-else-if="view" class="yy-doc-page" :class="{ 'has-toc': view.toc.length > 0, 'toc-open': tocOpen, 'toc-hidden': !prefs.readingOutline }">
+  <main v-else-if="view" class="yy-doc-page" :class="{ 'has-toc': view.toc.length > 0, 'toc-open': tocOpen, 'toc-peek': !prefs.readingOutline }">
     <article class="yy-article">
       <h1 class="yy-doc-title">{{ title }}</h1>
       <div class="yy-doc-meta">

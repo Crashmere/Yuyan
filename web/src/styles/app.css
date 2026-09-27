@@ -1416,7 +1416,7 @@ a.yy-catalog-title:hover {
   padding: 36px 40px 96px;
 }
 /* As in Yuque, the outline sits at the right edge of the page. Its column stays reserved while it
-   is hidden, so the text does not move; on wide screens the text is centred either way. */
+   is unpinned, so the text does not move; on wide screens the text is centred either way. */
 .yy-doc-page.has-toc {
   grid-template-columns: minmax(0, 1fr) minmax(0, var(--yy-content-width)) minmax(252px, 1fr);
 }
@@ -1522,8 +1522,65 @@ a.yy-catalog-title:hover {
   .yy-doc-page.has-toc {
     padding-right: 24px;
   }
-  .yy-doc-page.toc-hidden > .yy-doc-aside {
-    display: none;
+  /* Unpinned (Toc.vue), the outline is a line per heading, longer for higher levels, as in Yuque,
+     and opens over them while the pointer is near. The lines fit in the window, down to 4 pixels
+     apart; the opened outline scrolls by itself. */
+  .yy-doc-page.toc-peek > .yy-doc-aside {
+    overflow: visible;
+  }
+  .yy-toc.is-peek {
+    position: relative;
+  }
+  .yy-toc-lines {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - var(--yy-topbar) - 48px);
+    overflow: hidden;
+    padding: 4px 0;
+    outline: none;
+  }
+  .yy-toc-lines > span {
+    display: flex;
+    flex: 0 1 28px;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 4px;
+  }
+  .yy-toc-lines > span::before {
+    width: max(10px, calc(24px - var(--level) * 8px));
+    height: 2px;
+    border-radius: 1px;
+    background: var(--yy-border-strong);
+    content: '';
+  }
+  .yy-toc-lines > span.active::before {
+    background: var(--yy-text-3);
+  }
+  .yy-toc.is-peek .yy-toc-panel {
+    position: absolute;
+    top: 0;
+    right: -12px;
+    width: 246px;
+    max-height: calc(100vh - var(--yy-topbar) - 48px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+    border: 1px solid var(--yy-border);
+    border-radius: var(--yy-radius-lg);
+    background: var(--yy-bg-elevated);
+    box-shadow: var(--yy-shadow-popover);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s 0.2s, visibility 0s 0.35s;
+  }
+  .yy-toc.is-peek:hover .yy-toc-panel,
+  .yy-toc.is-peek:has(:focus-visible) .yy-toc-panel {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+  .yy-toc.is-peek .yy-toc-head {
+    background: var(--yy-bg-elevated);
   }
 }
 .yy-toc-head {
@@ -1848,7 +1905,8 @@ a.yy-catalog-title:hover {
   .yy-doc-page.toc-open > .yy-doc-aside {
     display: block;
   }
-  .yy-toc-eye {
+  .yy-toc-eye,
+  .yy-toc-lines {
     display: none;
   }
   .toc-open .yy-aside-mask {
