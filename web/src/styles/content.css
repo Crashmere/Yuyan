@@ -291,14 +291,15 @@ pre:hover > .yy-copy,
 .code-block.is-collapsed > .code-title::before {
   transform: rotate(-90deg);
 }
-.code-block.is-collapsed > :not(.code-title, .code-tab),
+.code-block.is-collapsed > :not(.code-title),
 .code-block.is-collapsed + .yy-code-fold,
 .code-block.no-title > .code-title,
 .code-block:not(.no-title) > pre > .yy-copy {
   display: none;
 }
-/* The tab on the top edge that shows or hides the title bar, as in Yuque; the editor's code blocks
-   use it too. */
+/* The tab that shows or hides the title bar sits at the top of the code, so it is just below the
+   bar when the bar shows and goes away with the code when collapsed, as in Yuque. The editor's
+   code blocks use it too. */
 .code-tab {
   position: absolute;
   top: 0;
@@ -332,7 +333,7 @@ pre:hover > .yy-copy,
 .code-tab:hover {
   background: #4b5263;
 }
-:is(.code-block, .yy-codeblock):hover > .code-tab,
+:is(.code-block, .yy-codeblock):hover .code-tab,
 .code-tab:focus-visible {
   opacity: 1;
 }

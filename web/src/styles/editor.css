@@ -669,8 +669,14 @@
   background: var(--yy-codeblock-hover);
   color: var(--yy-codeblock-title);
 }
-.yy-codeblock > .code-tab {
+.yy-codeblock-body {
+  position: relative;
+}
+.yy-codeblock-body > .code-tab {
   top: 1px;
+}
+.yy-codeblock.has-title .yy-codeblock-body > .code-tab {
+  top: 0;
 }
 
 /* The title bar of a titled block (schema/codeBlock.ts), as in Yuque. */

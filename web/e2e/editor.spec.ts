@@ -683,7 +683,11 @@ test('code blocks look like Yuque: One Dark, with a title bar that collapses the
   await title.getByRole('button', { name: '复制' }).click()
   await expect(block.locator('pre')).toBeVisible()
 
-  // The tab on the top edge shows or hides the title bar, for this visit only.
+  // The tab at the top of the code, just below the title bar, shows or hides the bar for this
+  // visit only.
+  const bar = (await title.boundingBox())!
+  const tab = (await block.locator('.code-tab').boundingBox())!
+  expect(Math.abs(tab.y - (bar.y + bar.height))).toBeLessThan(1.5)
   const plain = page.locator('.yy-content .code-block').nth(1)
   await expect(plain.locator('.code-title')).toBeHidden()
   await plain.getByRole('button', { name: '显示标题栏' }).click()
@@ -727,6 +731,8 @@ test('code block titles are added, renamed and removed in the editor and kept in
   await expect(page.locator('.ProseMirror')).toBeFocused()
   await page.keyboard.type('x')
   await expect(plain.locator('pre code')).toHaveText('xlet a')
+  // The tab sits on the code, so a collapsed block is opened first.
+  await titled.getByRole('button', { name: '展开代码' }).click()
   await titled.getByRole('button', { name: '隐藏标题栏' }).click()
   await expect(titled.locator('.yy-codeblock-title')).toHaveCount(0)
   await expect(titled.locator('pre')).toBeVisible()

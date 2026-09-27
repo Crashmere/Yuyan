@@ -45,8 +45,8 @@ function enhanceCode(root: HTMLElement) {
 }
 
 // Every code block gets Yuque's title bar (schema/codeBlock.ts), hidden on blocks saved without
-// one. The tab on the top edge shows or hides it for this visit only; the document keeps what the
-// editor saved.
+// one. The tab at the top of the code, just below the bar when it shows, shows or hides it for
+// this visit only; the document keeps what the editor saved.
 function addTitleBar(pre: HTMLElement, language: string | undefined, text: string): HTMLElement {
   let block = pre.parentElement!
   if (!block.classList.contains('code-block')) {
@@ -74,7 +74,7 @@ function addTitleBar(pre: HTMLElement, language: string | undefined, text: strin
     update()
   })
   update()
-  block.prepend(tab)
+  pre.prepend(tab)
   return block
 }
 

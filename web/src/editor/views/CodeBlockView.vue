@@ -102,15 +102,6 @@ async function copy() {
 
 <template>
   <node-view-wrapper class="yy-codeblock" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed }">
-    <button
-      type="button"
-      class="code-tab"
-      :class="{ 'is-down': !titled }"
-      contenteditable="false"
-      :aria-label="titled ? '隐藏标题栏' : '显示标题栏'"
-      :title="titled ? '隐藏标题栏' : '显示标题栏'"
-      @click="titled ? hideTitle() : showTitle()"
-    ></button>
     <div v-if="titled" class="yy-codeblock-title" contenteditable="false">
       <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :title="collapsed ? '展开' : '收起'" @click="toggle">
         <ChevronDown :size="15" />
@@ -124,6 +115,15 @@ async function copy() {
       <button type="button" class="yy-codeblock-btn" @click="copy">{{ copied ? '已复制' : '复制' }}</button>
     </div>
     <div v-show="!collapsed" class="yy-codeblock-body">
+      <button
+        type="button"
+        class="code-tab"
+        :class="{ 'is-down': !titled }"
+        contenteditable="false"
+        :aria-label="titled ? '隐藏标题栏' : '显示标题栏'"
+        :title="titled ? '隐藏标题栏' : '显示标题栏'"
+        @click="titled ? hideTitle() : showTitle()"
+      ></button>
       <!-- No whitespace inside <pre>: it would show up as blank lines. -->
       <pre ref="pre" :class="{ 'has-numbers': prefs.codeLineNumbers }" @scroll="scrollLeft = pre?.scrollLeft ?? 0"><div v-if="prefs.codeLineNumbers" class="yy-code-lines" contenteditable="false" aria-hidden="true" :style="{ transform: `translateX(${scrollLeft}px)` }"><div v-for="(line, i) in lines" :key="i" :data-n="i + 1">{{ line }}</div></div><node-view-content as="code" :class="language ? `language-${language}` : undefined" /></pre>
       <div v-if="isMermaid" class="yy-mermaid-preview" contenteditable="false">
