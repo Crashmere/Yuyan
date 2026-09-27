@@ -494,20 +494,24 @@ body.yy-row-dragging * {
 .yy-bubble-btn.danger:hover {
   color: var(--yy-danger);
 }
-.yy-bubble-text {
-  height: 28px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--yy-radius-sm);
-  background: transparent;
-  color: var(--yy-text-2);
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
+.yy-selection-toolbar {
+  z-index: 40;
+  max-width: calc(100vw - 16px);
+  flex-wrap: wrap;
 }
-.yy-bubble-text:hover {
-  background: var(--yy-bg-hover);
-  color: var(--yy-text);
+.yy-selection-toolbar .yy-remove-selection {
+  margin-left: auto;
+}
+@media (max-width: 480px) {
+  .yy-selection-toolbar {
+    gap: 1px;
+  }
+  .yy-selection-toolbar .yy-bubble-btn {
+    width: 24px;
+  }
+  .yy-selection-toolbar .yy-bubble-sep {
+    margin: 0 3px;
+  }
 }
 .yy-bubble-sep {
   width: 1px;

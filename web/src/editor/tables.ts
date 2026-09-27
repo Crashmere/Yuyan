@@ -1,13 +1,13 @@
-import { Extension, findParentNode, type Editor } from '@tiptap/core'
+import { Extension, findParentNode } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, Plugin, type Transaction } from '@tiptap/pm/state'
-import { columnResizingPluginKey, isInTable, selectedRect, TableMap } from '@tiptap/pm/tables'
+import { columnResizingPluginKey, TableMap } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
 import { TableView } from '@tiptap/extension-table'
 import { frameTable } from '../shared/tableFrame'
 import { alignment } from '../schema/alignment'
 
-export type Align = 'left' | 'center' | 'right' | null
+type Align = 'left' | 'center' | 'right' | null
 
 const findTable = findParentNode((n) => n.type.name === 'table')
 
@@ -189,49 +189,3 @@ export const followColumnBorder = new Plugin({
     }
   },
 })
-
-export type TableCommand = 'addRowBefore' | 'addRowAfter' | 'addColumnBefore' | 'addColumnAfter' | 'deleteRow' | 'deleteColumn' | 'deleteTable'
-
-export function runTable(e: Editor, command: TableCommand) {
-  e.chain().focus()[command]().run()
-}
-
-// The alignment of the first selected column, read from its header cell.
-export function columnAlign(e: Editor): Align {
-  if (!isInTable(e.state)) return null
-  const rect = selectedRect(e.state)
-  return (cellAt(rect.table, rect.map.map[rect.left])?.attrs.align ?? null) as Align
-}
-
-// Aligns whole columns, which is all Markdown can express.
-export function setColumnAlign(e: Editor, align: Align) {
-  if (!isInTable(e.state)) return
-  const rect = selectedRect(e.state)
-  const tr = e.state.tr
-  const seen = new Set<number>()
-  for (let row = 0; row < rect.map.height; row++) {
-    for (let col = rect.left; col < rect.right; col++) {
-      const rel = rect.map.map[row * rect.map.width + col]
-      if (seen.has(rel)) continue
-      seen.add(rel)
-      const node = cellAt(rect.table, rel)
-      if (node) {
-        tr.setNodeMarkup(rect.tableStart + rel, undefined, { ...node.attrs, align, cellAlign: null })
-        node.descendants((child, pos) => {
-          if (child.type.name === 'paragraph' && child.attrs.textAlign) tr.setNodeMarkup(rect.tableStart + rel + 1 + pos, undefined, { ...child.attrs, textAlign: null })
-        })
-      }
-    }
-  }
-  e.view.dispatch(tr)
-  e.commands.focus()
-}
-
-// The element of the table holding the cursor.
-export function tableElement(e: Editor): HTMLElement | null {
-  const found = findTable(e.state.selection)
-  if (!found) return null
-  const dom = e.view.nodeDOM(found.pos)
-  if (!(dom instanceof HTMLElement)) return null
-  return dom.tagName === 'TABLE' ? dom : (dom.querySelector('table') ?? dom)
-}

@@ -22,7 +22,6 @@ import LinkPopover from './LinkPopover.vue'
 import MathPopover from './MathPopover.vue'
 import ShortcutsDialog from './ShortcutsDialog.vue'
 import TableGrid from './TableGrid.vue'
-import TableToolbar from './TableToolbar.vue'
 import ImageToolbar from './ImageToolbar.vue'
 import { insertImages, pendingUploads } from './uploads'
 import { captureEditingPosition, restoreReadingPosition } from './readingPosition'
@@ -420,7 +419,6 @@ onBeforeUnmount(() => {
     <LinkPopover v-if="linkEdit" v-bind="linkEdit" @close="linkEdit = null" />
     <MathPopover v-if="mathTarget" :key="mathTarget.pos" :pos="mathTarget.pos" :fresh="mathTarget.fresh" @close="mathTarget = null" />
     <TableGrid v-if="tableGrid" :anchor="tableGrid" @pick="insertTable" @close="tableGrid = null" />
-    <TableToolbar />
     <ImageToolbar />
     <BlockHandle />
     <ShortcutsDialog v-model:open="shortcutsOpen" />

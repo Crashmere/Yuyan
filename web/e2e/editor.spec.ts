@@ -144,7 +144,7 @@ async function place(locator: ReturnType<Page['locator']>) {
     .toBe(true)
 }
 
-const textBubble = (page: Page) => page.locator('.yy-bubble:not(.yy-table-toolbar):not(.yy-image-toolbar)')
+const textBubble = (page: Page) => page.locator('.yy-selection-toolbar')
 
 test('the toolbars format the selection and show what is applied', async ({ page, request }) => {
   const id = await createDoc(request, '格式测试', '这一句需要加粗，这一句保持原样。')
@@ -183,84 +183,212 @@ test('the slash menu finds items by pinyin and inserts a table sized on the grid
   await expect(rows.first().locator('th')).toHaveCount(4)
   await page.keyboard.type('名称')
 
-  // Table tools: insert a row, centre a column, delete another column.
-  await place(rows.nth(1).locator('td').nth(1))
-  const tools = page.locator('.yy-table-toolbar')
-  await expect(tools).toBeVisible()
-  await tools.getByRole('button', { name: '在下方插入行' }).click()
+  // Insert through the rails and remove the selected row/column through the shared bubble.
+  const controls = page.locator('.yy-table-controls')
+  await table.locator('td').first().hover()
+  await controls.getByRole('button', { name: '在第 3 行前插入行', exact: true }).click()
   await expect(rows).toHaveCount(4)
-  await tools.getByRole('button', { name: '整列居中' }).click()
-  for (const row of await rows.all()) await expect(row.locator('th, td').nth(1)).toHaveCSS('text-align', 'center')
-  await place(rows.nth(1).locator('td').nth(3))
-  await tools.getByRole('button', { name: '删除列' }).click()
+  await controls.getByRole('button', { name: '选中第 4 列', exact: true }).click()
+  await textBubble(page).getByRole('button', { name: '移除选中列' }).click()
   await expect(rows.first().locator('th')).toHaveCount(3)
 
-  // A row inserted above the header becomes the header, and deleting the header row promotes the
-  // next one: Markdown has exactly one header row.
-  await place(rows.first().locator('th').first())
-  await tools.getByRole('button', { name: '在上方插入行' }).click()
+  // The new first row becomes the header; removing it promotes the old header again.
+  await table.locator('td').first().hover()
+  await controls.getByRole('button', { name: '在第 1 行前插入行', exact: true }).click()
   await expect(rows.first().locator('th')).toHaveCount(3)
   await expect(rows.nth(1).locator('th')).toHaveCount(0)
   await expect(rows.nth(1).locator('td').first()).toHaveText('名称')
-  await place(rows.first().locator('th').first())
-  await tools.getByRole('button', { name: '删除行' }).click()
+  await textBubble(page).getByRole('button', { name: '移除选中行' }).click()
   await expect(rows.first().locator('th').first()).toHaveText('名称')
 
   const md = await finishAndExport(page, '表格测试')
   expect(md).toMatch(/\| 名称 \|\s+\|\s+\|/)
-  expect(md).toMatch(/\| -+ \| :-+: \| -+ \|/)
+  expect(md).toMatch(/\| -+ \| -+ \| -+ \|/)
 })
 
-test('table and text tools take turns for column, row and text selections', async ({ page, request }) => {
+async function dragCells(page: Page, from: Locator, to: Locator) {
+  const a = (await from.boundingBox())!
+  const b = (await to.boundingBox())!
+  await page.mouse.move(a.x + 12, a.y + a.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(b.x + 12, b.y + b.height / 2, { steps: 8 })
+  await page.mouse.up()
+}
+
+async function undoRemoval(page: Page) {
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))).toBe(true)
+  await page.keyboard.press('ControlOrMeta+z')
+}
+
+test('one selection toolbar formats and removes dragged columns, rows and cell text', async ({ page, request }) => {
   const id = await createDoc(request, '表格浮动工具', '| 第一列 | 第二列 | 第三列 |\n| --- | --- | --- |\n| 甲一文本 | 甲二文本 | 甲三文本 |\n| 乙一文本 | 乙二文本 | 乙三文本 |\n\n表格后的正文。')
   await openEditor(page, id)
   const table = page.locator('.ProseMirror table')
   const rows = table.locator('tr')
   const cell = (row: number, col: number) => rows.nth(row).locator('th, td').nth(col)
-  const tools = page.locator('.yy-table-toolbar')
-  const drag = async (from: ReturnType<typeof cell>, to: ReturnType<typeof cell>) => {
-    const a = (await from.boundingBox())!
-    const b = (await to.boundingBox())!
-    await page.mouse.move(a.x + 12, a.y + a.height / 2)
-    await page.mouse.down()
-    await page.mouse.move(b.x + 12, b.y + b.height / 2, { steps: 8 })
-    await page.mouse.up()
-  }
-  const tableToolsOnly = async () => {
-    await expect(tools).toBeVisible()
-    await expect(textBubble(page)).toBeHidden()
-    await expect(page.locator('.yy-bubble:visible')).toHaveCount(1)
-  }
+  const tools = textBubble(page)
+  await expect(page.locator('.yy-table-toolbar')).toHaveCount(0)
 
-  // Real pointer drags produce cell selections, not a text range spanning the whole table.
-  await drag(cell(0, 1), cell(2, 1))
+  await dragCells(page, cell(0, 1), cell(2, 1))
   await expect(table.locator('.selectedCell')).toHaveCount(3)
-  await tableToolsOnly()
-  await tools.getByRole('button', { name: '整列居中' }).click()
-  for (const row of await rows.all()) await expect(row.locator('th, td').nth(1)).toHaveCSS('text-align', 'center')
-  // Formatting the whole column remains available without another floating toolbar.
-  await page.locator('.yy-toolbar').getByRole('button', { name: /^粗体/ }).click()
+  await expect(page.locator('.yy-bubble:visible')).toHaveCount(1)
+  await tools.getByRole('button', { name: '粗体', exact: true }).click()
   await expect(table.locator('.selectedCell strong')).toHaveCount(3)
-  await tableToolsOnly()
+  await chooseAlignment(page, '单元格内容居中')
+  for (const row of await rows.all()) await expect(row.locator('th, td').nth(1)).toHaveCSS('text-align', 'center')
+  await tools.getByRole('button', { name: '移除选中列' }).click()
+  await expect(rows.first().locator('th')).toHaveText(['第一列', '第三列'])
+  await undoRemoval(page)
+  await expect(rows.first().locator('th')).toHaveCount(3)
+  await expect(cell(1, 1).locator('strong')).toHaveText('甲二文本')
+  await expect(cell(1, 1)).toHaveCSS('text-align', 'center')
 
-  await drag(cell(1, 0), cell(1, 2))
-  await expect(table.locator('.selectedCell')).toHaveCount(3)
-  await tableToolsOnly()
-  await tools.getByRole('button', { name: '在下方插入行' }).click()
-  await expect(rows).toHaveCount(4)
+  await dragCells(page, cell(1, 0), cell(1, 2))
+  await tools.getByRole('button', { name: '移除选中行' }).click()
+  await expect(rows).toHaveCount(2)
+  await expect(cell(1, 0)).toHaveText('乙一文本')
+  await undoRemoval(page)
+  await expect(rows).toHaveCount(3)
 
-  // Text inside a cell switches to formatting tools; collapsing it returns to table tools.
   await cell(1, 0).click()
   await selectText(page, cell(1, 0), '甲一')
-  await expect(textBubble(page)).toBeVisible()
-  await expect(tools).toBeHidden()
-  await expect(page.locator('.yy-bubble:visible')).toHaveCount(1)
-  await textBubble(page).getByRole('button', { name: '粗体', exact: true }).click()
-  await expect(cell(1, 0).locator('strong')).toHaveText('甲一')
+  await tools.getByRole('button', { name: '移除选中内容' }).click()
+  await expect(cell(1, 0)).toHaveText('文本')
+  await expect(rows).toHaveCount(3)
+  await expect(rows.first().locator('th')).toHaveCount(3)
+  await undoRemoval(page)
+  await expect(cell(1, 0)).toHaveText('甲一文本')
   await page.keyboard.press('ArrowRight')
-  await tableToolsOnly()
-  await page.locator('.ProseMirror > p').last().click()
-  await expect(tools).toBeHidden()
+  await expect(page.locator('.yy-bubble:visible')).toHaveCount(0)
+})
+
+test('removal distinguishes cell contents, multiple rows and columns, and the whole table', async ({ page, request }) => {
+  const id = await createDoc(request, '移除表格选区', '| A | B | C |\n| --- | --- | --- |\n| a1 | b1 | c1 |\n| a2 | b2 | c2 |\n| a3 | b3 | c3 |\n\n后续正文')
+  await openEditor(page, id)
+  const table = page.locator('.ProseMirror table')
+  const rows = table.locator('tr')
+  const cell = (row: number, col: number) => rows.nth(row).locator('th, td').nth(col)
+  const original = await editorDoc(page)
+  const restored = async () => { await undoRemoval(page); await expect.poll(() => editorDoc(page)).toEqual(original) }
+  const remove = () => textBubble(page).locator('.yy-remove-selection').click()
+
+  await dragCells(page, cell(1, 0), cell(2, 1))
+  await expect(table.locator('.selectedCell')).toHaveCount(4)
+  await expect(textBubble(page).locator('.yy-remove-selection')).toHaveAttribute('data-tip', '清空选中单元格')
+  await remove()
+  await expect(rows).toHaveCount(4)
+  await expect(rows.nth(1).locator('td')).toHaveText(['', '', 'c1'])
+  await expect(rows.nth(2).locator('td')).toHaveText(['', '', 'c2'])
+  await expect(rows.nth(3).locator('td')).toHaveText(['a3', 'b3', 'c3'])
+  await restored()
+
+  await dragCells(page, cell(1, 0), cell(2, 2))
+  await remove()
+  await expect(rows).toHaveCount(2)
+  await expect(rows.nth(1).locator('td')).toHaveText(['a3', 'b3', 'c3'])
+  await restored()
+
+  await dragCells(page, cell(0, 0), cell(3, 1))
+  await remove()
+  await expect(rows.first().locator('th')).toHaveText(['C'])
+  await expect(table.locator('td')).toHaveText(['c1', 'c2', 'c3'])
+  // The remaining column is also the whole table.
+  await table.locator('td').first().hover()
+  await page.locator('.yy-table-controls').getByRole('button', { name: '选中第 1 列', exact: true }).click()
+  await textBubble(page).getByRole('button', { name: '移除表格', exact: true }).click()
+  await expect(table).toHaveCount(0)
+  await undoRemoval(page)
+  await expect(table.locator('th')).toHaveText(['C'])
+  await restored()
+
+  await dragCells(page, cell(1, 0), cell(3, 2))
+  await remove()
+  await expect(rows).toHaveCount(1)
+  await table.locator('th').first().hover()
+  await page.locator('.yy-table-controls').getByRole('button', { name: '选中第 1 行', exact: true }).click()
+  await remove()
+  await expect(table).toHaveCount(0)
+  await undoRemoval(page)
+  await expect(rows).toHaveCount(1)
+  await restored()
+
+  await dragCells(page, cell(3, 2), cell(0, 0))
+  await textBubble(page).getByRole('button', { name: '移除表格', exact: true }).click()
+  await expect(table).toHaveCount(0)
+  await expect(page.locator('.ProseMirror')).toHaveText('后续正文')
+  await restored()
+})
+
+for (const width of [1360, 375]) {
+  test(`shared removal deletes only selected text and images at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 860 })
+    await page.goto('./')
+    const src = await uploadImage(page, request)
+    const id = await createDoc(request, `通用移除-${width}`, '保留开头，移除这段，保留结尾。\n\n![示例](img.png)\n\n相邻段落', { 'img.png': src })
+    await openEditor(page, id)
+    const para = page.locator('.ProseMirror > p').first()
+    await para.click()
+    await selectText(page, para, '移除这段，')
+    const tools = textBubble(page)
+    const remove = tools.locator('.yy-remove-selection')
+    await expect(remove).toBeVisible()
+    const box = (await tools.boundingBox())!
+    expect(box.x).toBeGreaterThanOrEqual(0)
+    expect(box.x + box.width).toBeLessThanOrEqual(width)
+    await expect(tools.locator('button').last()).toHaveClass(/yy-remove-selection/)
+    expect(Math.abs((await remove.boundingBox())!.y - (await tools.locator('button').first().boundingBox())!.y)).toBeLessThan(1)
+    await page.screenshot({ path: `test-results/selection-removal-${width}.png` })
+    await remove.click()
+    await expect(para).toHaveText('保留开头，保留结尾。')
+    await expect(page.locator('.ProseMirror > p').last()).toHaveText('相邻段落')
+    await undoRemoval(page)
+    await expect(para).toHaveText('保留开头，移除这段，保留结尾。')
+
+    const img = page.locator('.ProseMirror .yy-image img')
+    await img.click()
+    await expect(page.locator('.yy-bubble:visible')).toHaveCount(1)
+    await page.locator('.yy-image-toolbar .yy-remove-selection').click()
+    await expect(img).toHaveCount(0)
+    await expect(para).toHaveText('保留开头，移除这段，保留结尾。')
+    await undoRemoval(page)
+    await expect(img).toBeVisible()
+  })
+}
+
+test('shared removal covers code text, selected blocks and the whole document', async ({ page, request }) => {
+  const id = await createDoc(request, '移除内容块', '第一段\n\n```js\nconst keep = 1; // remove\n```\n\n---\n\n最后一段')
+  await openEditor(page, id)
+  const original = await editorDoc(page)
+  const code = page.locator('.ProseMirror pre code')
+  await code.click()
+  await selectText(page, code, '// remove')
+  await textBubble(page).getByRole('button', { name: '移除选中内容' }).click()
+  await expect(code).toHaveText('const keep = 1; ')
+  await undoRemoval(page)
+  await expect.poll(() => editorDoc(page)).toEqual(original)
+
+  for (const type of ['horizontalRule', 'codeBlock', 'paragraph']) {
+    await page.locator('.ProseMirror').evaluate((el, name) => {
+      const e = (el as unknown as { editor: { state: { doc: { descendants: (fn: (node: { type: { name: string } }, pos: number) => boolean) => void } }; commands: { setNodeSelection: (pos: number) => void; focus: () => void } } }).editor
+      let found = false
+      e.state.doc.descendants((node, pos) => {
+        if (!found && node.type.name === name) { found = true; e.commands.setNodeSelection(pos) }
+        return !found
+      })
+      e.commands.focus()
+    }, type)
+    await textBubble(page).getByRole('button', { name: '移除选中内容' }).click()
+    expect((await editorDoc(page)).content!.filter((node) => node.type === type)).toHaveLength(type === 'paragraph' ? 1 : 0)
+    await undoRemoval(page)
+    await expect.poll(() => editorDoc(page)).toEqual(original)
+  }
+
+  await page.locator('.ProseMirror > p').first().click()
+  await page.keyboard.press('ControlOrMeta+a')
+  await textBubble(page).getByRole('button', { name: '移除选中内容' }).click()
+  await expect(page.locator('.ProseMirror')).toHaveText('')
+  await undoRemoval(page)
+  await expect.poll(() => editorDoc(page)).toEqual(original)
 })
 
 test('links: from the selection toolbar and the slash menu, with a card under the cursor', async ({ page, request }) => {
@@ -1350,8 +1478,7 @@ test('table rails select rows and columns, and insert at their boundaries', asyn
   await controls.getByRole('button', { name: '选中第 2 列', exact: true }).click()
   await expect(table.locator('.selectedCell')).toHaveCount(3)
   await expect(controls.getByRole('button', { name: '选中第 2 列', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await expect(textBubble(page)).not.toBeVisible()
-  const tools = page.locator('.yy-table-toolbar')
+  const tools = textBubble(page)
   await expect(tools).toBeVisible()
   const toolbar = (await tools.boundingBox())!
   const insert = controls.getByRole('button', { name: '在第 2 列前插入列', exact: true })
@@ -1512,11 +1639,12 @@ test('cell alignment and table position are independent and survive column edits
   await chooseAlignment(page, '单元格内容左对齐')
   await expect(table.locator('tr').nth(1).locator('td').nth(1)).toHaveCSS('text-align', 'left')
   await expect(table.locator('tr').nth(2).locator('td').nth(1)).toHaveCSS('text-align', 'right')
-  // A subsequent whole-column command clears cell overrides in that column only.
-  await caretAtEnd(table.locator('td p').first())
-  await page.locator('.yy-table-toolbar').getByRole('button', { name: '整列居中', exact: true }).click()
+  // Select a whole column and align its contents through the same alignment menu.
+  await table.locator('td').first().hover()
+  await page.locator('.yy-table-controls').getByRole('button', { name: '选中第 1 列', exact: true }).click()
+  await chooseAlignment(page, '单元格内容居中')
   await expect(table.locator('tr').nth(2).locator('td').first()).toHaveCSS('text-align', 'center')
-  await expect(table.locator('td').first()).not.toHaveAttribute('data-cell-align')
+  await expect(table.locator('td').first()).toHaveAttribute('data-cell-align', 'center')
   await caretAtEnd(table.locator('td p').first())
   await chooseAlignment(page, '单元格内容右对齐')
   const md = await finishAndExport(page, title)
@@ -1602,4 +1730,20 @@ test('table rails stay on real row boundaries as the table passes the toolbar', 
   await expect(controls.locator('.yy-table-ring')).toHaveCSS('border-top-style', 'solid')
   await expect.poll(async () => Math.abs((await controls.boundingBox())!.y - (await table.boundingBox())!.y)).toBeLessThan(2)
   await page.screenshot({ path: 'test-results/table-rails-restored.png' })
+  // A column spanning beyond the viewport must keep its removal action reachable while scrolling.
+  await controls.getByRole('button', { name: '选中第 1 列', exact: true }).click()
+  await scrollTableTo(toolbarBottom - 90)
+  const remove = textBubble(page).getByRole('button', { name: '移除选中列' })
+  await expect(remove).toBeVisible()
+  await expect.poll(async () => (await textBubble(page).boundingBox())!.y).toBeGreaterThanOrEqual(toolbarBottom)
+  await expect.poll(async () => { const r = (await remove.boundingBox())!; return r.y + r.height }).toBeLessThan(860)
+  await expect.poll(() => textBubble(page).locator('button').first().evaluate((button) => {
+    const r = button.getBoundingClientRect()
+    return button.contains(document.elementFromPoint(r.x + r.width / 3, r.y + r.height / 2))
+  })).toBe(true)
+  await page.screenshot({ path: 'test-results/selection-removal-long-table.png' })
+  await remove.click()
+  await expect(table.locator('th')).toHaveText(['说明'])
+  await undoRemoval(page)
+  await expect(table.locator('th')).toHaveText(['名称', '说明'])
 })

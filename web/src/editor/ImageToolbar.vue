@@ -4,13 +4,14 @@ import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { ChevronDown, Download, ExternalLink, Replace, TextCursorInput, Trash2 } from 'lucide-vue-next'
+import { ChevronDown, Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
 import { imageTypes } from './extensions'
 import { blockWidth, fileName } from './images'
 import { uploadFile } from './uploads'
+import RemoveSelectionButton from './RemoveSelectionButton.vue'
 
 // Shown while an image is selected: size, replace, download, open, alternative text, delete.
 const { editor, tick } = useEditorContext()
@@ -128,10 +129,6 @@ function cancelAlt() {
   altOpen.value = false
   editor.value?.commands.focus()
 }
-
-function remove() {
-  editor.value?.chain().focus().deleteSelection().run()
-}
 </script>
 
 <template>
@@ -152,9 +149,9 @@ function remove() {
       <button type="button" class="yy-bubble-btn" data-tip="下载" aria-label="下载" @mousedown.prevent @click="download"><Download :size="16" /></button>
       <button type="button" class="yy-bubble-btn" data-tip="查看原图" aria-label="查看原图" @mousedown.prevent @click="open"><ExternalLink :size="16" /></button>
       <button type="button" class="yy-bubble-btn" data-tip="替代文字" aria-label="替代文字" @mousedown.prevent @click="editAlt"><TextCursorInput :size="16" /></button>
-      <span class="yy-bubble-sep"></span>
-      <button type="button" class="yy-bubble-btn danger" data-tip="删除图片" aria-label="删除图片" @mousedown.prevent @click="remove"><Trash2 :size="16" /></button>
       <span v-if="replacing !== null" class="yy-bubble-note">上传中 {{ replacing }}%</span>
+      <span class="yy-bubble-sep"></span>
+      <RemoveSelectionButton />
     </template>
     <form v-else class="yy-image-alt" @submit.prevent="saveAlt">
       <input ref="altInput" v-model="alt" class="yy-input" placeholder="图片无法显示时显示的文字" aria-label="替代文字" @keydown.esc.prevent="cancelAlt" />

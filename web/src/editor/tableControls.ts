@@ -79,9 +79,10 @@ export function tableControls(): Plugin {
         const box = table.getBoundingClientRect()
         const scroll = table.closest('.yy-table-scroll')!.getBoundingClientRect()
         const toolbarBottom = document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0
-        // Reserve space for the floating toolbar only when deciding whether the column rail
+        // Reserve space for the selection toolbar only when deciding whether the column rail
         // fits. Moving the whole frame down to that floor would draw a false edge through rows.
-        const columnsVisible = box.top >= toolbarBottom + 76
+        const menuHeight = document.querySelector<HTMLElement>('.yy-selection-toolbar')?.offsetHeight ?? 38
+        const columnsVisible = box.top >= toolbarBottom + Math.max(76, menuHeight + 42)
         const left = Math.max(box.left, scroll.left, 32)
         const right = Math.min(box.right, scroll.right, innerWidth - 16)
         const top = Math.max(box.top, toolbarBottom)
