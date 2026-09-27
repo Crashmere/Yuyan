@@ -640,7 +640,14 @@ test('the outline sits at the right edge; unpinned, it is a line per heading tha
   const left = (await article.boundingBox())!.x
   await expect(page.locator('#yy-topbar-actions').getByRole('button', { name: '大纲' })).toHaveCount(0)
 
+  // Under the pointer, the outline stays where it is when the eye unpins or pins it.
+  const at = async () => {
+    const b = (await links.first().boundingBox())!
+    return [Math.round(b.x), Math.round(b.y)]
+  }
+  const pinned = await at()
   await aside.getByRole('button', { name: '隐藏大纲' }).click()
+  expect(await at()).toEqual(pinned)
   await away()
   await expect(links.first()).toBeHidden()
   await expect(lines.locator('span')).toHaveCount(headings)
@@ -656,7 +663,9 @@ test('the outline sits at the right edge; unpinned, it is a line per heading tha
   await page.reload()
   await expect(links.first()).toBeHidden()
   await lines.hover({ force: true })
+  const opened = await at()
   await aside.getByRole('button', { name: '固定显示大纲' }).click()
+  expect(await at()).toEqual(opened)
   await away()
   await expect(links.first()).toBeVisible()
   await expect(lines).toHaveCount(0)

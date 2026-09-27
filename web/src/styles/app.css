@@ -1556,11 +1556,13 @@ a.yy-catalog-title:hover {
   .yy-toc-lines > span.active::before {
     background: var(--yy-text-3);
   }
+  /* Offset by its padding and border, so the entries sit exactly where the pinned outline shows
+     them and do not move when the eye is clicked. */
   .yy-toc.is-peek .yy-toc-panel {
     position: absolute;
-    top: 0;
-    right: -12px;
-    width: 246px;
+    top: -13px;
+    right: -13px;
+    left: -13px;
     max-height: calc(100vh - var(--yy-topbar) - 48px);
     overflow: auto;
     overscroll-behavior: contain;
