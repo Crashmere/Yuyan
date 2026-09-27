@@ -2,8 +2,9 @@
 import { nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import { getMarkRange, type JSONContent } from '@tiptap/core'
-import { api, ApiError, base, type Doc } from '../shared/api'
+import { api, ApiError, base, errorMessage, type Doc } from '../shared/api'
 import { stopLoading } from '../shared/images'
+import { toast } from '../ui/toast'
 import { prefs } from '../app/prefs'
 import BlockHandle from './BlockHandle.vue'
 import BubbleToolbar from './BubbleToolbar.vue'
@@ -103,6 +104,7 @@ let inFlight = false
 let again = false
 let loaded = false
 let savedThisSession = false
+let discarded = false
 
 function statusText(): string {
   return {
@@ -137,14 +139,14 @@ function readDraft(): Draft | null {
 }
 
 function changed() {
-  if (!loaded) return
+  if (!loaded || discarded) return
   if (status.value !== 'conflict') status.value = 'dirty'
   clearTimeout(saveTimer)
   saveTimer = setTimeout(save, 1200)
 }
 
 async function save() {
-  if (!editor.value || status.value === 'conflict') return
+  if (!editor.value || status.value === 'conflict' || discarded) return
   if (inFlight) {
     again = true
     return
@@ -189,6 +191,7 @@ async function save() {
 // flush saves pending changes now and reports whether everything reached the server. Images still
 // uploading are waited for first, so they are part of what gets saved.
 async function flush(): Promise<boolean> {
+  if (discarded) return true
   while (editor.value && pendingUploads(editor.value) > 0) await new Promise((r) => setTimeout(r, 100))
   clearTimeout(saveTimer)
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -204,7 +207,37 @@ function setTitle(value: string) {
   title.value = value
 }
 
-defineExpose({ flush, setTitle })
+// Whether anything was edited since the editor opened.
+function touched(): boolean {
+  return revision.value !== props.doc.revision || status.value !== 'saved' || (!!editor.value && pendingUploads(editor.value) > 0)
+}
+
+// Cancelling puts the document back as it was when the editor opened, and drops the versions saved
+// since, so the session leaves nothing in the history (store.DiscardEdits). Nothing more is saved
+// afterwards, and leaving records no version.
+async function discard(): Promise<boolean> {
+  discarded = true
+  clearTimeout(saveTimer)
+  clearTimeout(retryTimer)
+  while (inFlight) await new Promise((r) => setTimeout(r, 50))
+  savedThisSession = false
+  localStorage.removeItem(draftKey)
+  if (revision.value === props.doc.revision) return true
+  const d = props.doc
+  try {
+    await api(`docs/${d.id}/discard`, {
+      method: 'POST',
+      json: { title: d.title, content: d.content, updatedAt: d.updatedAt, since: d.revision, baseRevision: revision.value },
+    })
+    return true
+  } catch (e) {
+    discarded = false
+    toast(`取消失败：${errorMessage(e)}`, 'error')
+    return false
+  }
+}
+
+defineExpose({ flush, setTitle, touched, discard })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {
@@ -343,7 +376,7 @@ onBeforeUnmount(() => {
       <button type="button" class="yy-btn small" @click="overwrite">用这里的内容覆盖</button>
     </div>
 
-    <div class="yy-editor-body" :class="{ 'has-outline': prefs.editorOutline }">
+    <div class="yy-editor-body">
       <div class="yy-editor-main">
         <textarea
           ref="titleInput"
@@ -355,7 +388,7 @@ onBeforeUnmount(() => {
         ></textarea>
         <editor-content v-if="editor" :editor="editor" class="yy-content" />
       </div>
-      <aside v-if="prefs.editorOutline && editor" class="yy-doc-aside yy-editor-outline">
+      <aside v-if="editor" class="yy-doc-aside yy-editor-outline" :class="{ 'is-peek': !prefs.editorOutline }">
         <EditorOutline />
       </aside>
     </div>

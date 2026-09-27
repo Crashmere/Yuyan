@@ -48,8 +48,8 @@ function unlink() {
     <button type="button" class="yy-link-card-url" :title="href" @mousedown.prevent @click="openHref(href)">
       <ExternalLink :size="14" /><span>{{ href }}</span>
     </button>
-    <button type="button" class="yy-bubble-btn" title="编辑链接" @mousedown.prevent @click="ui.openLink()"><PencilLine :size="15" /></button>
-    <button type="button" class="yy-bubble-btn" title="复制链接" @mousedown.prevent @click="copy"><ClipboardCopy :size="15" /></button>
-    <button type="button" class="yy-bubble-btn" title="取消链接" @mousedown.prevent @click="unlink"><Unlink :size="15" /></button>
+    <button type="button" class="yy-bubble-btn" data-tip="编辑链接" aria-label="编辑链接" @mousedown.prevent @click="ui.openLink()"><PencilLine :size="15" /></button>
+    <button type="button" class="yy-bubble-btn" data-tip="复制链接" aria-label="复制链接" @mousedown.prevent @click="copy"><ClipboardCopy :size="15" /></button>
+    <button type="button" class="yy-bubble-btn" data-tip="取消链接" aria-label="取消链接" @mousedown.prevent @click="unlink"><Unlink :size="15" /></button>
   </BubbleMenu>
 </template>

@@ -21,6 +21,24 @@ function toggle(id: number, open = !expanded.has(id)) {
   saveExpanded(props.bookId, expanded)
 }
 
+// The buttons above the tree fold or open every node.
+function foldAll() {
+  expanded.clear()
+  saveExpanded(props.bookId, expanded)
+}
+function unfoldAll() {
+  const walk = (nodes: TreeNode[]) => {
+    for (const n of nodes) {
+      if (!n.children?.length) continue
+      expanded.add(n.id)
+      walk(n.children)
+    }
+  }
+  walk(props.nodes)
+  saveExpanded(props.bookId, expanded)
+}
+defineExpose({ foldAll, unfoldAll })
+
 // Opening a document expands the path to it and scrolls its row into view.
 watch(
   () => [props.currentId, props.nodes] as const,

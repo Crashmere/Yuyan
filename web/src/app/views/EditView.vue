@@ -62,6 +62,17 @@ function onSaved(title: string) {
   setTitle(`编辑：${title}`)
 }
 
+// 取消 drops what this session changed, after asking when there is something to drop.
+async function cancel() {
+  const p = pane.value
+  if (!p || !doc.value) return
+  const ask = p.touched()
+  if (ask && !(await confirm({ title: '放弃这次编辑？', message: '这次打开编辑后所做的修改都会丢弃，历史版本里也不会留下记录。', confirmText: '放弃修改', danger: true }))) return
+  if (!(await p.discard())) return
+  setNodeTitle(doc.value.bookId, id, doc.value.title)
+  await router.push(`/docs/${id}`)
+}
+
 // Leaving saves first; only content that could not reach the server needs a decision.
 onBeforeRouteLeave(async () => {
   if (!pane.value || (await pane.value.flush())) return true
@@ -77,7 +88,7 @@ onBeforeRouteLeave(async () => {
 <template>
   <Teleport defer to="#yy-topbar-actions">
     <template v-if="doc">
-      <span class="yy-save-status" :class="status" :title="statusText">
+      <span class="yy-save-status" :class="status" :data-tip="statusText">
         <LoaderCircle v-if="status === 'saving' || status === 'loading'" :size="14" class="yy-spin" />
         <CircleAlert v-else-if="status === 'offline' || status === 'error' || status === 'conflict'" :size="14" />
         <CloudCheck v-else :size="14" />
@@ -85,6 +96,7 @@ onBeforeRouteLeave(async () => {
         <span class="yy-save-words">{{ words.toLocaleString() }} 字</span>
       </span>
       <ActionMenu :items="menu"><IconButton label="更多操作"><Ellipsis :size="18" /></IconButton></ActionMenu>
+      <button type="button" class="yy-btn" @click="cancel">取消</button>
       <button type="button" class="yy-btn primary" @click="router.push(`/docs/${id}`)"><Check :size="15" />完成</button>
     </template>
   </Teleport>

@@ -374,6 +374,21 @@ kbd {
   margin: 0 -8px;
   padding: 0 8px 24px;
 }
+.yy-tree-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px 2px 10px;
+  background: var(--yy-bg-sidebar);
+  color: var(--yy-text-3);
+  font-size: 12px;
+}
+.yy-tree-head > span {
+  margin-right: auto;
+}
 
 /* Tree ------------------------------------------------------------------------------------ */
 
@@ -899,9 +914,15 @@ a.yy-crumb:hover {
   }
 }
 
+/* The site's one tooltip (ui/tooltip.ts), placed by its transform. */
 .yy-tooltip {
-  z-index: 80;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  max-width: 320px;
   padding: 4px 8px;
+  pointer-events: none;
   border-radius: var(--yy-radius);
   background: light-dark(#262626, #e3e3e3);
   color: light-dark(#fff, #1b1c1f);
@@ -1522,10 +1543,13 @@ a.yy-catalog-title:hover {
   .yy-doc-page.has-toc {
     padding-right: 24px;
   }
-  /* Unpinned (Toc.vue), the outline is a line per heading, longer for higher levels, as in Yuque,
-     and opens over them while the pointer is near. The lines fit in the window, down to 4 pixels
-     apart; the opened outline scrolls by itself. */
-  .yy-doc-page.toc-peek > .yy-doc-aside {
+  /* Unpinned (OutlinePanel.vue), the outline is a line per heading, longer for higher levels, as
+     in Yuque, and opens over them while the pointer rests near. Their area reaches the edge of the
+     page: with overlay scrollbars the pointer there reaches the outline while the scrollbar is
+     hidden and the scrollbar while it shows. Passing through quickly, on the way to the scrollbar,
+     opens nothing. The lines fit in the window, down to 4 pixels apart; the opened outline scrolls
+     by itself. */
+  .yy-doc-aside.is-peek {
     overflow: visible;
   }
   .yy-toc.is-peek {
@@ -1536,7 +1560,8 @@ a.yy-catalog-title:hover {
     flex-direction: column;
     max-height: calc(100vh - var(--yy-topbar) - 48px);
     overflow: hidden;
-    padding: 4px 0;
+    margin-right: -24px;
+    padding: 4px 12px 4px 0;
     outline: none;
   }
   .yy-toc-lines > span {
@@ -1579,7 +1604,7 @@ a.yy-catalog-title:hover {
   .yy-toc.is-peek:has(:focus-visible) .yy-toc-panel {
     opacity: 1;
     visibility: visible;
-    transition-delay: 0s;
+    transition: opacity 0.15s 0.15s, visibility 0s 0.15s;
   }
   .yy-toc.is-peek .yy-toc-head {
     background: var(--yy-bg-elevated);
@@ -1601,6 +1626,11 @@ a.yy-catalog-title:hover {
 .yy-toc-eye {
   color: var(--yy-text-3);
 }
+.yy-toc-tools {
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--yy-text-3);
+}
 .yy-toc ul {
   list-style: none;
   margin: 0;
@@ -1610,7 +1640,7 @@ a.yy-catalog-title:hover {
 .yy-toc a {
   display: block;
   margin-left: -1px;
-  padding: 4px 0 4px calc(12px + var(--level, 0) * 12px);
+  padding: 4px 0 4px calc(16px + var(--level, 0) * 12px);
   overflow: hidden;
   border-left: 2px solid transparent;
   color: var(--yy-text-2);
@@ -1625,6 +1655,46 @@ a.yy-catalog-title:hover {
 .yy-toc a.active {
   border-left-color: var(--yy-primary);
   color: var(--yy-primary);
+}
+/* The arrow that folds the entries under one, in the indent before its text. */
+.yy-toc li {
+  position: relative;
+}
+.yy-toc-caret {
+  position: absolute;
+  top: 0;
+  left: calc(var(--level, 0) * 12px + 3px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--yy-text-3);
+  cursor: pointer;
+  opacity: 0;
+}
+.yy-toc-caret::before {
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-1px) rotate(45deg);
+  content: '';
+}
+.yy-toc-caret.folded::before {
+  transform: rotate(-45deg);
+}
+.yy-toc:hover .yy-toc-caret,
+.yy-toc-caret.folded,
+.yy-toc-caret:focus-visible {
+  opacity: 1;
+}
+.yy-toc-caret:hover {
+  color: var(--yy-text);
 }
 .yy-aside-mask {
   display: none;

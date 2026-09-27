@@ -12,9 +12,9 @@ interface Prefs {
   sidebarCollapsed: boolean
   // Content column: standard (800 px) or wide (1100 px), for reading and editing.
   pageWidth: 'standard' | 'wide'
-  // The outline beside the editor.
+  // Whether the outlines beside the editor and beside a document being read are pinned (their eye
+  // buttons); unpinned, they show as lines that open on hover.
   editorOutline: boolean
-  // Whether the outline beside a document being read lists its headings (its eye button).
   readingOutline: boolean
   // Editing without the sidebar.
   focusMode: boolean

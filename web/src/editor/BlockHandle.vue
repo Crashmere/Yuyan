@@ -13,6 +13,8 @@ import { useEditorContext } from './context'
 const { editor } = useEditorContext()
 const current = shallowRef<{ node: PMNode; pos: number } | null>(null)
 const menuOpen = ref(false)
+// As in Feishu, the grip of a heading shows its level.
+const level = computed(() => (current.value?.node.type.name === 'heading' ? (current.value.node.attrs.level as number) : 0))
 
 function onNodeChange({ node, pos }: { node: PMNode | null; pos: number }) {
   if (!menuOpen.value) current.value = node ? { node, pos } : null
@@ -61,9 +63,11 @@ function insertBelow() {
 
 <template>
   <DragHandle v-if="editor" :editor="editor" :on-node-change="onNodeChange" class="yy-block-handle">
-    <button type="button" class="yy-handle-btn" title="在下方插入" @mousedown.prevent @click="insertBelow"><Plus :size="16" /></button>
+    <button type="button" class="yy-handle-btn" data-tip="在下方插入" aria-label="在下方插入" @mousedown.prevent @click="insertBelow"><Plus :size="16" /></button>
     <ActionMenu v-model:open="menuOpen" :items="menu" align="start" :restore-focus="false">
-      <button type="button" class="yy-handle-btn grip" title="拖动调整位置，点击打开菜单"><GripVertical :size="16" /></button>
+      <button type="button" class="yy-handle-btn grip" :class="{ 'is-heading': level }" data-tip="拖动调整位置，点击打开菜单" aria-label="拖动调整位置，点击打开菜单">
+        <span v-if="level" class="yy-handle-level">H<sub>{{ level }}</sub></span><GripVertical :size="level ? 14 : 16" />
+      </button>
     </ActionMenu>
   </DragHandle>
 </template>

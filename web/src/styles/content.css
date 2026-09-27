@@ -372,10 +372,35 @@ pre:hover > .yy-copy,
 }
 
 .yy-content table {
+  border-collapse: collapse;
+}
+/* Columns given widths in the editor keep them exactly (the table then has a width). */
+.yy-content table[style^='width'] {
+  table-layout: fixed;
+}
+/* Tables scroll sideways in a wrapper: Tiptap's in the editor, and on reading pages one that
+   reaches left to the edge of the page (enhance.ts). A table scrolled left stays visible over the
+   margin until it meets the edge; from then on a border stays there to mark the cut. */
+.yy-content .tableWrapper,
+.yy-table-scroll {
+  margin: 0.75em 0;
+  overflow-x: auto;
+}
+.yy-content :is(.tableWrapper, .yy-table-scroll) > table {
+  margin: 0;
+}
+.yy-table-scroll {
+  margin-left: calc(-1 * var(--bleed, 0px));
+  padding-left: var(--bleed, 0px);
+}
+.yy-table-scroll.is-cut {
+  box-shadow: inset 1px 0 0 var(--yy-border-strong);
+}
+/* Anywhere else a wide table scrolls by itself. */
+.yy-content :not(.tableWrapper, .yy-table-scroll) > table {
   display: block;
   max-width: 100%;
   overflow-x: auto;
-  border-collapse: collapse;
 }
 .yy-content :where(th, td) {
   min-width: 80px;

@@ -11,7 +11,31 @@ import { renderMermaid } from '../../shared/mermaid'
 export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
   if (options.images) reserveImageSpace(root, options.images)
   enhanceCode(root)
+  wrapTables(root)
   await Promise.all([options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
+}
+
+// Wide tables scroll sideways in a wrapper whose scroll area reaches left to the edge of the page
+// (content.css). --bleed is the distance from where the table starts to that edge, measured again
+// when the page changes size; is-cut marks a table scrolled past the edge.
+function wrapTables(root: HTMLElement) {
+  const tables = [...root.querySelectorAll('table')]
+  const page = root.closest('main')
+  if (!tables.length || !page) return
+  const bleed = (box: HTMLElement) => parseFloat(box.style.getPropertyValue('--bleed')) || 0
+  const boxes = tables.map((table) => {
+    const box = Object.assign(document.createElement('div'), { className: 'yy-table-scroll' })
+    table.replaceWith(box)
+    box.append(table)
+    box.addEventListener('scroll', () => box.classList.toggle('is-cut', box.scrollLeft > bleed(box)), { passive: true })
+    return box
+  })
+  const observer = new ResizeObserver(() => {
+    if (!root.isConnected) return observer.disconnect()
+    const edge = page.getBoundingClientRect().left
+    for (const box of boxes) box.style.setProperty('--bleed', `${Math.max(0, box.getBoundingClientRect().left + bleed(box) - edge)}px`)
+  })
+  observer.observe(page)
 }
 
 // Lazily loaded images take no space until they arrive, which pushes the text below them down
@@ -65,8 +89,9 @@ function addTitleBar(pre: HTMLElement, language: string | undefined, text: strin
   const update = () => {
     const hidden = block.classList.contains('no-title')
     tab.classList.toggle('is-down', hidden)
-    tab.title = hidden ? '显示标题栏' : '隐藏标题栏'
-    tab.setAttribute('aria-label', tab.title)
+    const label = hidden ? '显示标题栏' : '隐藏标题栏'
+    tab.dataset.tip = label
+    tab.setAttribute('aria-label', label)
   }
   tab.addEventListener('click', () => {
     block.classList.toggle('no-title')

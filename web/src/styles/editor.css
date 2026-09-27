@@ -74,17 +74,16 @@
   margin: 16px auto 0;
 }
 
+/* As on reading pages (app.css), the outline sits at the right edge and its column stays reserved
+   while it is unpinned, so the text is centred and does not move. */
 .yy-editor-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--yy-content-width)) minmax(252px, 1fr);
   justify-content: center;
-  padding: 32px 40px 0;
-}
-.yy-editor-body.has-outline {
-  grid-template-columns: minmax(0, var(--yy-content-width)) 220px;
-  gap: 48px;
+  padding: 32px 24px 0 40px;
 }
 .yy-editor-main {
+  grid-column: 2;
   width: 100%;
   max-width: var(--yy-content-width);
   min-width: 0;
@@ -92,7 +91,14 @@
   padding-bottom: 50vh;
 }
 .yy-editor-outline {
+  grid-column: 3;
+  justify-self: end;
+  width: 220px;
   top: calc(var(--yy-topbar) + 44px + 24px);
+  max-height: calc(100vh - var(--yy-topbar) - 44px - 48px);
+}
+.yy-editor-outline .yy-toc-lines,
+.yy-editor-outline .yy-toc.is-peek .yy-toc-panel {
   max-height: calc(100vh - var(--yy-topbar) - 44px - 48px);
 }
 .yy-toc-empty {
@@ -101,11 +107,21 @@
   font-size: 13px;
 }
 @media (max-width: 1180px) {
-  .yy-editor-body.has-outline {
+  .yy-editor-body {
     grid-template-columns: minmax(0, 1fr);
+    padding: 32px 40px 0;
+  }
+  .yy-editor-main {
+    grid-column: auto;
   }
   .yy-editor-outline {
     display: none;
+  }
+}
+/* app.css loads first, so its rule for phones would lose to the ones above. */
+@media (max-width: 640px) {
+  .yy-editor-body {
+    padding: 16px 16px 0;
   }
 }
 
@@ -147,6 +163,36 @@
 }
 .ProseMirror .selectedCell {
   background: var(--yy-primary-soft);
+}
+/* Column and row borders drag to resize (prosemirror-tables and tables.ts). */
+.ProseMirror :is(td, th) {
+  position: relative;
+}
+.ProseMirror .column-resize-handle {
+  position: absolute;
+  top: -1px;
+  right: -2px;
+  bottom: -1px;
+  z-index: 2;
+  width: 3px;
+  background: var(--yy-primary);
+  pointer-events: none;
+}
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+.ProseMirror.yy-row-resize {
+  cursor: row-resize;
+}
+.yy-row-resize-line {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  height: 3px;
+  margin-top: -2px;
+  background: var(--yy-primary);
+  pointer-events: none;
 }
 .ProseMirror [data-type='inline-math'],
 .ProseMirror [data-type='block-math'] {
@@ -479,6 +525,24 @@
 }
 .yy-handle-btn.grip {
   cursor: grab;
+}
+.yy-handle-btn.grip.is-heading {
+  flex: none;
+  gap: 1px;
+  width: auto;
+  white-space: nowrap;
+  padding: 0 2px 0 5px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius);
+  background: var(--yy-bg);
+}
+.yy-handle-level {
+  color: var(--yy-primary);
+  font: 600 12px/1 var(--yy-font);
+}
+.yy-handle-level sub {
+  font-size: 9px;
+  vertical-align: -2px;
 }
 
 /* Slash menu ---------------------------------------------------------------------------------- */

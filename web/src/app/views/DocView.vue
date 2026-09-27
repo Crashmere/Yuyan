@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Ellipsis, FileText, Folder, PencilLine, TableOfContents } from 'lucide-vue-next'
 import { api, ApiError, errorMessage, type DocView } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
+import { toast } from '../../ui/toast'
 import { newDoc, nodeMenu } from '../actions'
 import DocContent from '../content/DocContent.vue'
 import Toc from '../content/Toc.vue'
@@ -15,6 +16,7 @@ import { formatTime } from '../time'
 import NotFoundState from './NotFoundState.vue'
 
 const route = useRoute()
+const router = useRouter()
 const id = Number(route.params.id)
 const view = ref<DocView | null>(null)
 const missing = ref(false)
@@ -30,6 +32,30 @@ onBeforeUnmount(() => drawerQuery.removeEventListener('change', onDrawerQuery))
 
 // The editor is a large download; start fetching it when the pointer reaches the edit button.
 const prefetchEditor = () => void import('./EditView.vue')
+
+// E pressed twice quickly opens the editor; pressed once, a hint says so after the moment in which
+// a second press would have come.
+let lastE = -Infinity
+let hintTimer: ReturnType<typeof setTimeout> | undefined
+function onKey(e: KeyboardEvent) {
+  if ((e.key !== 'e' && e.key !== 'E') || e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.isComposing) return
+  if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+  if (view.value?.doc.kind !== 'doc') return
+  clearTimeout(hintTimer)
+  if (performance.now() - lastE < 400) {
+    lastE = -Infinity
+    prefetchEditor()
+    void router.push(`/docs/${id}/edit`)
+    return
+  }
+  lastE = performance.now()
+  hintTimer = setTimeout(() => toast('连按两次 E 键进入编辑模式', 'info', { key: 'edit-hint', ms: 1800 }), 400)
+}
+addEventListener('keydown', onKey)
+onBeforeUnmount(() => {
+  removeEventListener('keydown', onKey)
+  clearTimeout(hintTimer)
+})
 
 // Search results open documents with ?hl=<query>, which is highlighted in the content.
 const highlight = computed(() => (typeof route.query.hl === 'string' ? route.query.hl : ''))
@@ -76,7 +102,7 @@ onMounted(async () => {
 
   <main v-if="missing" class="yy-page"><NotFoundState /></main>
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
-  <main v-else-if="view" class="yy-doc-page" :class="{ 'has-toc': view.toc.length > 0, 'toc-open': tocOpen, 'toc-peek': !prefs.readingOutline }">
+  <main v-else-if="view" class="yy-doc-page" :class="{ 'has-toc': view.toc.length > 0, 'toc-open': tocOpen }">
     <article class="yy-article">
       <h1 class="yy-doc-title">{{ title }}</h1>
       <div class="yy-doc-meta">
@@ -107,7 +133,7 @@ onMounted(async () => {
         </RouterLink>
       </nav>
     </article>
-    <aside v-if="view.toc.length" class="yy-doc-aside">
+    <aside v-if="view.toc.length" class="yy-doc-aside" :class="{ 'is-peek': !prefs.readingOutline }">
       <Toc :items="view.toc" @navigate="tocOpen = false" />
     </aside>
     <div v-if="tocOpen" class="yy-aside-mask" @click="tocOpen = false"></div>

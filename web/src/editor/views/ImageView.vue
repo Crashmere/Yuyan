@@ -66,8 +66,8 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
       data-drag-handle
     />
     <template v-if="selected && editor.isEditable">
-      <span class="yy-image-handle left" title="拖动调整宽度" @pointerdown="startResize($event, -1)"></span>
-      <span class="yy-image-handle right" title="拖动调整宽度" @pointerdown="startResize($event, 1)"></span>
+      <span class="yy-image-handle left" data-tip="拖动调整宽度" @pointerdown="startResize($event, -1)"></span>
+      <span class="yy-image-handle right" data-tip="拖动调整宽度" @pointerdown="startResize($event, 1)"></span>
     </template>
     <span v-if="live !== null" class="yy-image-size">{{ live }} px</span>
   </node-view-wrapper>

@@ -146,14 +146,14 @@ function remove() {
         </div>
       </div>
       <span class="yy-bubble-sep"></span>
-      <button type="button" class="yy-bubble-btn" :title="replacing === null ? '替换图片' : `上传中 ${replacing}%`" aria-label="替换图片" :disabled="replacing !== null" @mousedown.prevent @click="fileInput?.click()">
+      <button type="button" class="yy-bubble-btn" :data-tip="replacing === null ? '替换图片' : `上传中 ${replacing}%`" aria-label="替换图片" :disabled="replacing !== null" @mousedown.prevent @click="fileInput?.click()">
         <Replace :size="16" />
       </button>
-      <button type="button" class="yy-bubble-btn" title="下载" aria-label="下载" @mousedown.prevent @click="download"><Download :size="16" /></button>
-      <button type="button" class="yy-bubble-btn" title="查看原图" aria-label="查看原图" @mousedown.prevent @click="open"><ExternalLink :size="16" /></button>
-      <button type="button" class="yy-bubble-btn" title="替代文字" aria-label="替代文字" @mousedown.prevent @click="editAlt"><TextCursorInput :size="16" /></button>
+      <button type="button" class="yy-bubble-btn" data-tip="下载" aria-label="下载" @mousedown.prevent @click="download"><Download :size="16" /></button>
+      <button type="button" class="yy-bubble-btn" data-tip="查看原图" aria-label="查看原图" @mousedown.prevent @click="open"><ExternalLink :size="16" /></button>
+      <button type="button" class="yy-bubble-btn" data-tip="替代文字" aria-label="替代文字" @mousedown.prevent @click="editAlt"><TextCursorInput :size="16" /></button>
       <span class="yy-bubble-sep"></span>
-      <button type="button" class="yy-bubble-btn danger" title="删除图片" aria-label="删除图片" @mousedown.prevent @click="remove"><Trash2 :size="16" /></button>
+      <button type="button" class="yy-bubble-btn danger" data-tip="删除图片" aria-label="删除图片" @mousedown.prevent @click="remove"><Trash2 :size="16" /></button>
       <span v-if="replacing !== null" class="yy-bubble-note">上传中 {{ replacing }}%</span>
     </template>
     <form v-else class="yy-image-alt" @submit.prevent="saveAlt">

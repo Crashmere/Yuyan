@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { BookOpen, ChevronsUpDown, Ellipsis, Plus } from 'lucide-vue-next'
+import { BookOpen, ChevronsUpDown, Ellipsis, FoldVertical, Plus, UnfoldVertical } from 'lucide-vue-next'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
@@ -14,6 +14,7 @@ const route = useRoute()
 const router = useRouter()
 const book = computed(() => bookOf(props.bookId))
 const tree = computed(() => state.trees[props.bookId])
+const treeView = ref<InstanceType<typeof BookTree> | null>(null)
 const switcher = computed<MenuEntry[]>(() =>
   state.books.map((b) => ({ label: b.name, icon: BookOpen, disabled: b.id === props.bookId, run: () => void router.push(`/books/${b.id}`) })),
 )
@@ -39,7 +40,12 @@ onMounted(() => {
       <IconButton small label="新建文档" @click="newDoc(book.id, null)"><Plus :size="15" /></IconButton>
     </div>
     <div class="yy-tree-scroll">
-      <BookTree v-if="tree" :book-id="bookId" :nodes="tree" :current-id="state.docId" />
+      <div v-if="tree?.length" class="yy-tree-head">
+        <span>目录</span>
+        <IconButton small label="全部折叠" @click="treeView?.foldAll()"><FoldVertical :size="14" /></IconButton>
+        <IconButton small label="全部展开" @click="treeView?.unfoldAll()"><UnfoldVertical :size="14" /></IconButton>
+      </div>
+      <BookTree v-if="tree" ref="treeView" :book-id="bookId" :nodes="tree" :current-id="state.docId" />
     </div>
   </div>
 </template>

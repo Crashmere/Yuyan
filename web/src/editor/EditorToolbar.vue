@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, Ellipsis, Keyboard, Link, Maximize2, Minimize2, Plus, Redo2, RemoveFormatting, Search, TableOfContents, Undo2 } from 'lucide-vue-next'
+import { ChevronDown, Ellipsis, Keyboard, Link, Maximize2, Minimize2, Plus, Redo2, RemoveFormatting, Search, Undo2 } from 'lucide-vue-next'
 import { displayItems, prefs } from '../app/prefs'
 import ActionMenu from '../ui/ActionMenu.vue'
 import IconButton from '../ui/IconButton.vue'
@@ -110,7 +110,6 @@ const moreMenu = computed<MenuEntry[]>(() => [{ label: '快捷键说明', icon: 
       <IconButton :label="withKey('清除格式', 'Mod-\\')" @mousedown.prevent @click="clearFormatting(editor)"><RemoveFormatting :size="17" /></IconButton>
       <span class="yy-spacer"></span>
       <IconButton :label="withKey('查找替换', 'Mod-F')" @mousedown.prevent @click="ui.openFind()"><Search :size="17" /></IconButton>
-      <IconButton label="大纲" :active="prefs.editorOutline" @mousedown.prevent @click="prefs.editorOutline = !prefs.editorOutline"><TableOfContents :size="17" /></IconButton>
       <IconButton :label="prefs.focusMode ? '退出专注模式' : '专注模式（隐藏侧栏）'" :active="prefs.focusMode" @mousedown.prevent @click="prefs.focusMode = !prefs.focusMode">
         <Minimize2 v-if="prefs.focusMode" :size="17" /><Maximize2 v-else :size="17" />
       </IconButton>

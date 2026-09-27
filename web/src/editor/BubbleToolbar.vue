@@ -61,14 +61,15 @@ function applyStyle(apply: (e: Editor) => void) {
       type="button"
       class="yy-bubble-btn"
       :class="{ active: state.marks[m.name] }"
-      :title="withKey(m.label, m.shortcut)"
+      :data-tip="withKey(m.label, m.shortcut)"
+      :aria-label="m.label"
       @mousedown.prevent
       @click="m.toggle(editor)"
     >
       <component :is="m.icon" :size="16" />
     </button>
     <span class="yy-bubble-sep"></span>
-    <button type="button" class="yy-bubble-btn" :class="{ active: state.link }" title="链接" @mousedown.prevent @click="ui.openLink()"><Link :size="16" /></button>
-    <button type="button" class="yy-bubble-btn" :title="withKey('清除格式', 'Mod-\\')" @mousedown.prevent @click="clearFormatting(editor)"><RemoveFormatting :size="16" /></button>
+    <button type="button" class="yy-bubble-btn" :class="{ active: state.link }" data-tip="链接" aria-label="链接" @mousedown.prevent @click="ui.openLink()"><Link :size="16" /></button>
+    <button type="button" class="yy-bubble-btn" :data-tip="withKey('清除格式', 'Mod-\\')" aria-label="清除格式" @mousedown.prevent @click="clearFormatting(editor)"><RemoveFormatting :size="16" /></button>
   </BubbleMenu>
 </template>

@@ -33,7 +33,7 @@ function setFolded(heading: Element, folded: boolean) {
   const button = heading.querySelector(':scope > .yy-fold')
   button?.setAttribute('aria-expanded', String(!folded))
   button?.setAttribute('aria-label', folded ? '展开这一节' : '折叠这一节')
-  button?.setAttribute('title', folded ? '展开' : '折叠')
+  button?.setAttribute('data-tip', folded ? '展开这一节' : '折叠这一节')
 }
 
 // Adds the arrows to the top-level headings of root and folds what was folded before. key names

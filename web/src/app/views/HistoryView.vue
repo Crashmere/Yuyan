@@ -57,7 +57,7 @@ async function restore(v: VersionInfo) {
         <RouterLink :to="`/versions/${v.id}`" class="yy-version-time">{{ formatTime(v.createdAt) }}</RouterLink>
         <span class="yy-tag">{{ reasons[v.reason] ?? v.reason }}</span>
         <span class="yy-version-title">{{ v.title }}</span>
-        <RouterLink v-if="i < versions.length - 1" :to="`/versions/${v.id}?compare=previous`" class="yy-btn small" title="与上一版本对比">对比</RouterLink>
+        <RouterLink v-if="i < versions.length - 1" :to="`/versions/${v.id}?compare=previous`" class="yy-btn small" data-tip="与上一版本对比">对比</RouterLink>
         <span v-if="v.revision === doc.revision" class="yy-version-current">当前版本</span>
         <button v-else type="button" class="yy-btn small" @click="restore(v)">恢复</button>
       </li>

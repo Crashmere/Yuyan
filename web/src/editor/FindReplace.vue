@@ -86,10 +86,10 @@ onBeforeUnmount(() => {
     <div class="yy-find-row">
       <input ref="findInput" v-model="term" class="yy-input" placeholder="查找" aria-label="查找" @keydown="onFindKey" />
       <span class="yy-find-status">{{ status }}</span>
-      <button type="button" class="yy-icon-btn small" :class="{ active: caseSensitive }" title="区分大小写" @click="caseSensitive = !caseSensitive"><CaseSensitive :size="16" /></button>
-      <button type="button" class="yy-icon-btn small" title="上一个（Shift+Enter）" @click="editor && gotoMatch(editor.view, -1)"><ChevronUp :size="16" /></button>
-      <button type="button" class="yy-icon-btn small" title="下一个（Enter）" @click="editor && gotoMatch(editor.view, 1)"><ChevronDown :size="16" /></button>
-      <button type="button" class="yy-icon-btn small" title="关闭（Esc）" @click="close"><X :size="16" /></button>
+      <button type="button" class="yy-icon-btn small" :class="{ active: caseSensitive }" data-tip="区分大小写" aria-label="区分大小写" @click="caseSensitive = !caseSensitive"><CaseSensitive :size="16" /></button>
+      <button type="button" class="yy-icon-btn small" data-tip="上一个（Shift+Enter）" aria-label="上一个" @click="editor && gotoMatch(editor.view, -1)"><ChevronUp :size="16" /></button>
+      <button type="button" class="yy-icon-btn small" data-tip="下一个（Enter）" aria-label="下一个" @click="editor && gotoMatch(editor.view, 1)"><ChevronDown :size="16" /></button>
+      <button type="button" class="yy-icon-btn small" data-tip="关闭（Esc）" aria-label="关闭" @click="close"><X :size="16" /></button>
     </div>
     <div class="yy-find-row">
       <input v-model="replacement" class="yy-input" placeholder="替换为" aria-label="替换为" @keydown.enter.prevent="!$event.isComposing && replaceOne()" />

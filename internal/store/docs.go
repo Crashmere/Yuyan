@@ -204,6 +204,52 @@ UPDATE docs SET title = ?, content = ?, schema_version = ?, plain_text = ?, revi
 	return next, now, tx.Commit()
 }
 
+// DiscardEdits undoes an editing session. The document gets back the title, content and update
+// time it had when the editor opened it at revision since, and the versions recorded after that
+// revision are removed, so the session leaves nothing in the history. base is the revision the
+// editor last saved; anything else is a conflict, as for saves. The revision still advances, so
+// an editor elsewhere holding a later revision cannot write over the restored content.
+func (s *Store) DiscardEdits(ctx context.Context, id int64, title string, content doc.Node, updatedAt string, since, base int64) (int64, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "无标题文档"
+	}
+	if _, err := time.Parse("2006-01-02T15:04:05.000Z", updatedAt); err != nil || since > base {
+		return 0, ErrInvalid
+	}
+	data, err := content.Marshal()
+	if err != nil {
+		return 0, err
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	var current int64
+	var deleted sql.NullString
+	err = tx.QueryRowContext(ctx, `SELECT revision, deleted_at FROM docs WHERE id = ?`, id).Scan(&current, &deleted)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && deleted.Valid) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+	if current != base {
+		return current, ErrConflict
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM doc_versions WHERE doc_id = ? AND revision > ?`, id, since); err != nil {
+		return 0, err
+	}
+	next := current + 1
+	if _, err := tx.ExecContext(ctx, `
+UPDATE docs SET title = ?, content = ?, schema_version = ?, plain_text = ?, revision = ?, updated_at = ? WHERE id = ?`,
+		title, string(data), doc.SchemaVersion, doc.PlainText(content), next, updatedAt, id); err != nil {
+		return 0, err
+	}
+	return next, tx.Commit()
+}
+
 // RenameDoc changes only the title. The revision still advances, so an editor holding the old
 // revision sees a conflict instead of writing the old title back.
 func (s *Store) RenameDoc(ctx context.Context, id int64, title string) (int64, error) {

@@ -41,8 +41,8 @@ function onKey(e: KeyboardEvent) {
         <div class="yy-lightbox-bar">
           <DialogTitle class="yy-lightbox-count">{{ (index ?? 0) + 1 }} / {{ images.length }}</DialogTitle>
           <span class="yy-lightbox-alt">{{ current?.alt }}</span>
-          <a v-if="current" class="yy-lightbox-btn" :href="current.src" target="_blank" rel="noopener" title="查看原图" aria-label="查看原图"><ExternalLink :size="18" /></a>
-          <button type="button" class="yy-lightbox-btn" title="关闭" aria-label="关闭" @click="open = false"><X :size="20" /></button>
+          <a v-if="current" class="yy-lightbox-btn" :href="current.src" target="_blank" rel="noopener" data-tip="查看原图" aria-label="查看原图"><ExternalLink :size="18" /></a>
+          <button type="button" class="yy-lightbox-btn" data-tip="关闭" aria-label="关闭" @click="open = false"><X :size="20" /></button>
         </div>
         <img v-if="current" :key="current.src" :src="current.src" :alt="current.alt" class="yy-lightbox-img" @click="open = false" />
         <template v-if="images.length > 1">

@@ -103,6 +103,39 @@ func TestVersionsAndRestore(t *testing.T) {
 	}
 }
 
+func TestDiscardEditsLeavesNoTrace(t *testing.T) {
+	ctx := context.Background()
+	s := newStore(t)
+	clock := time.Date(2026, 9, 27, 8, 0, 0, 0, time.UTC)
+	s.now = func() time.Time { return clock }
+	b, _ := s.CreateBook(ctx, "读书笔记", "")
+	d, _ := s.CreateDoc(ctx, CreateDocInput{BookID: b.ID, Title: "条款 1"})
+	clock = clock.Add(11 * time.Minute)
+	_, _, _ = s.SaveDoc(ctx, d.ID, "条款 1", paragraph("原文"), d.Revision)
+	opened, _ := s.GetDoc(ctx, d.ID) // the editor opens here
+	before, _ := s.Versions(ctx, d.ID)
+	clock = clock.Add(11 * time.Minute)
+	rev, _, _ := s.SaveDoc(ctx, d.ID, "新标题", paragraph("改动"), opened.Revision) // records an autosave version
+	if err := s.Snapshot(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.DiscardEdits(ctx, d.ID, opened.Title, opened.Content, opened.UpdatedAt, opened.Revision, rev-1); !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale base revision: err = %v, want conflict", err)
+	}
+	next, err := s.DiscardEdits(ctx, d.ID, opened.Title, opened.Content, opened.UpdatedAt, opened.Revision, rev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := s.GetDoc(ctx, d.ID)
+	if got.Title != "条款 1" || doc.PlainText(got.Content) != "原文" || got.UpdatedAt != opened.UpdatedAt || got.Revision != next || next <= rev {
+		t.Fatalf("after discard: %q %q updated=%s rev=%d next=%d", got.Title, doc.PlainText(got.Content), got.UpdatedAt, got.Revision, next)
+	}
+	after, _ := s.Versions(ctx, d.ID)
+	if len(after) != len(before) {
+		t.Fatalf("versions = %d, want %d as before the session", len(after), len(before))
+	}
+}
+
 func TestTrashRestoresSubtree(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)

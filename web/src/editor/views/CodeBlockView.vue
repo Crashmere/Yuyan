@@ -103,7 +103,7 @@ async function copy() {
 <template>
   <node-view-wrapper class="yy-codeblock" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed }">
     <div v-if="titled" class="yy-codeblock-title" contenteditable="false">
-      <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :title="collapsed ? '展开' : '收起'" @click="toggle">
+      <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :data-tip="collapsed ? '展开代码' : '收起代码'" @click="toggle">
         <ChevronDown :size="15" />
       </button>
       <input ref="titleInput" v-model="titleText" class="yy-codeblock-name" placeholder="代码块标题" aria-label="代码块标题" @keydown.enter.prevent="titleEntered" />
@@ -121,7 +121,7 @@ async function copy() {
         :class="{ 'is-down': !titled }"
         contenteditable="false"
         :aria-label="titled ? '隐藏标题栏' : '显示标题栏'"
-        :title="titled ? '隐藏标题栏' : '显示标题栏'"
+        :data-tip="titled ? '隐藏标题栏' : '显示标题栏'"
         @click="titled ? hideTitle() : showTitle()"
       ></button>
       <!-- No whitespace inside <pre>: it would show up as blank lines. -->

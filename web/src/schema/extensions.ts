@@ -5,7 +5,7 @@ import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import Highlight from '@tiptap/extension-highlight'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
-import { Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
+import { createColGroup, Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { Callout, CalloutContent, CalloutTitle } from './callout'
 import { withTitles } from './codeBlock'
@@ -54,10 +54,32 @@ export const YuyanImage = Image.extend<ImageOptions>({
   },
 })
 
-// Tables render without Tiptap's colgroup/min-width styling; wide tables scroll via CSS.
+// Tables render without Tiptap's colgroup and min-width unless their columns were given widths in
+// the editor (editor/tables.ts); then they carry Tiptap's column group, as internal/render/render.go
+// writes it. Wide tables scroll sideways (content.css).
 export const YuyanTable = Table.extend({
-  renderHTML() {
-    return ['table', {}, ['tbody', 0]]
+  renderHTML({ node }) {
+    let widths = false
+    node.firstChild?.forEach((cell) => {
+      if ((cell.attrs.colwidth as number[] | null)?.some(Boolean)) widths = true
+    })
+    if (!widths) return ['table', {}, ['tbody', 0]]
+    const { colgroup, tableWidth, tableMinWidth } = createColGroup(node, this.options.cellMinWidth)
+    return ['table', { style: tableWidth ? `width: ${tableWidth}` : `min-width: ${tableMinWidth}` }, colgroup!, ['tbody', 0]]
+  },
+})
+
+// A row can be given a height in the editor (editor/tables.ts).
+export const YuyanTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      height: {
+        default: null,
+        parseHTML: (el: HTMLElement) => parseInt(el.style.height, 10) || null,
+        renderHTML: (attrs: Record<string, unknown>) => (attrs.height ? { style: `height: ${attrs.height}px` } : {}),
+      },
+    }
   },
 })
 
@@ -67,6 +89,7 @@ export interface SchemaOverrides {
   inlineMath?: AnyExtension
   blockMath?: AnyExtension
   callout?: AnyExtension
+  table?: AnyExtension
 }
 
 export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
@@ -91,8 +114,8 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     Highlight,
     TaskList,
     TaskItem.configure({ nested: true }),
-    YuyanTable.configure({ resizable: false }),
-    TableRow,
+    o.table ?? YuyanTable.configure({ resizable: false }),
+    YuyanTableRow,
     TableHeader,
     TableCell,
     o.callout ?? Callout,

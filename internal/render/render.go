@@ -130,11 +130,19 @@ func (r *renderer) node(n doc.Node) {
 	case "image":
 		r.image(n)
 	case "table":
-		r.b.WriteString("<table><tbody>")
+		if style, cols := tableColumns(n); style != "" {
+			r.b.WriteString(`<table style="` + style + `"><colgroup>` + cols + `</colgroup><tbody>`)
+		} else {
+			r.b.WriteString("<table><tbody>")
+		}
 		r.children(n)
 		r.b.WriteString("</tbody></table>")
 	case "tableRow":
-		r.wrap("tr", nil, n)
+		var attrs [][2]string
+		if h, ok := n.Attrs["height"].(float64); ok && h > 0 {
+			attrs = append(attrs, [2]string{"style", "height: " + px(h)})
+		}
+		r.wrap("tr", attrs, n)
 	case "tableHeader", "tableCell":
 		tag := "td"
 		if n.Type == "tableHeader" {
@@ -187,6 +195,51 @@ func calloutType(n doc.Node) string {
 		return "note"
 	}
 	return t
+}
+
+// cellMinWidth is Tiptap's default minimum column width, used by its column group.
+const cellMinWidth = 25
+
+// tableColumns writes the column group Tiptap gives a table whose columns have widths (createColGroup
+// in @tiptap/extension-table) and the table's width, or its minimum width while some columns have
+// none. Without any widths the table has neither.
+func tableColumns(n doc.Node) (style, cols string) {
+	if len(n.Content) == 0 {
+		return "", ""
+	}
+	var b strings.Builder
+	total, fixed, widths := 0.0, true, false
+	for _, cell := range n.Content[0].Content {
+		list, _ := cell.Attrs["colwidth"].([]any)
+		for j := 0; j < cell.AttrInt("colspan", 1); j++ {
+			w := 0.0
+			if j < len(list) {
+				w, _ = list[j].(float64)
+			}
+			if w > 0 {
+				widths = true
+				total += w
+				b.WriteString(`<col style="width: ` + px(max(w, cellMinWidth)) + `">`)
+			} else {
+				fixed = false
+				total += cellMinWidth
+				b.WriteString(`<col style="min-width: ` + px(cellMinWidth) + `">`)
+			}
+		}
+	}
+	switch {
+	case !widths:
+		return "", ""
+	case fixed:
+		return "width: " + px(total), b.String()
+	default:
+		return "min-width: " + px(total), b.String()
+	}
+}
+
+// px writes a length as JavaScript would print the number.
+func px(v float64) string {
+	return strconv.FormatFloat(v, 'f', -1, 64) + "px"
 }
 
 func colwidth(n doc.Node) string {

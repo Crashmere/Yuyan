@@ -140,7 +140,7 @@ test('the toolbars format the selection and show what is applied', async ({ page
   await para.click()
   await selectText(page, para, '这一句需要加粗')
   await expect(textBubble(page)).toBeVisible()
-  await textBubble(page).locator('[title^="粗体"]').click()
+  await textBubble(page).locator('[data-tip^="粗体"]').click()
   await expect(para.locator('strong')).toHaveText('这一句需要加粗')
   await expect(page.locator('.yy-toolbar [aria-label^="粗体"]')).toHaveClass(/active/)
 
@@ -204,7 +204,7 @@ test('links: from the selection toolbar and the slash menu, with a card under th
   const para = page.locator('.ProseMirror p').first()
   await para.click()
   await selectText(page, para, '示例网站')
-  await textBubble(page).locator('[title="链接"]').click()
+  await textBubble(page).locator('[data-tip="链接"]').click()
   const panel = page.locator('.yy-link-panel')
   await expect(panel).toBeVisible()
   await expect(panel.locator('input')).toBeFocused()
@@ -923,4 +923,151 @@ test('the longest documents stay responsive while editing', async ({ page, reque
   const typeMs = Date.now() - typed
   console.log(`long document: typed 18 characters through the keyboard in ${typeMs} ms`)
   expect(typeMs).toBeLessThan(3000)
+})
+
+test('buttons share one tooltip, shown soon after the pointer rests', async ({ page }) => {
+  await openLongDocument(page)
+  const tip = page.locator('.yy-tooltip')
+  await page.locator('#yy-topbar-actions').getByRole('button', { name: '更多操作' }).hover()
+  await expect(tip).toHaveText('更多操作', { timeout: 800 })
+  await page.locator('.yy-book-head').getByRole('button', { name: '新建文档' }).hover()
+  await expect(tip).toHaveText('新建文档', { timeout: 300 })
+  await page.mouse.move(700, 600)
+  await expect(tip).toHaveCount(0)
+})
+
+test('outline entries fold one by one or all at once, and so does the tree', async ({ page }) => {
+  await openLongDocument(page)
+  const aside = page.locator('.yy-doc-aside')
+  const links = aside.getByRole('link')
+  const all = await links.count()
+  await aside.locator('li', { hasText: '1. 背景' }).getByRole('button', { name: '折叠' }).click()
+  await expect(aside.getByRole('link', { name: '1.1 细节', exact: true })).toHaveCount(0)
+  await expect(links).toHaveCount(all - 2)
+  await aside.getByRole('button', { name: '全部折叠' }).click()
+  await expect(links).toHaveCount(1)
+  await aside.getByRole('button', { name: '全部展开' }).click()
+  await expect(links).toHaveCount(all)
+
+  await page.goto('./')
+  await page.locator('.yy-book-card', { hasText: '算法笔记（示例）' }).click()
+  const head = page.locator('.yy-tree-head')
+  const rows = page.locator('.yy-sidebar .yy-tree-row')
+  await head.getByRole('button', { name: '全部折叠' }).click()
+  const folded = await rows.count()
+  await head.getByRole('button', { name: '全部展开' }).click()
+  await expect.poll(() => rows.count()).toBeGreaterThan(folded)
+  await head.getByRole('button', { name: '全部折叠' }).click()
+  await expect(rows).toHaveCount(folded)
+})
+
+test('the editor: the outline as on reading pages, Mod-A within a block, heading levels at the handle', async ({ page, request }) => {
+  const id = await createDoc(request, '编辑器细节', '## 第一节\n\n开头段落。\n\n```js\nconst a = 1\nconst b = 2\n```\n\n### 小节\n\n结尾。')
+  await openEditor(page, id)
+  await expect(page.locator('.yy-toolbar').getByRole('button', { name: '大纲', exact: true })).toHaveCount(0)
+  const aside = page.locator('.yy-editor-outline')
+  await expect(aside.getByRole('link')).toHaveCount(2)
+  await aside.getByRole('button', { name: '隐藏大纲' }).click()
+  await page.mouse.move(400, 500)
+  await expect(aside.locator('.yy-toc-lines span')).toHaveCount(2)
+  await expect(aside.getByRole('link')).toHaveCount(0)
+  await aside.locator('.yy-toc-lines').hover({ force: true })
+  await aside.getByRole('button', { name: '固定显示大纲' }).click()
+  await page.mouse.move(400, 500)
+  await expect(aside.getByRole('link')).toHaveCount(2)
+
+  // Mod-A selects the code first, then the whole document.
+  await place(page.locator('.ProseMirror pre code'))
+  await page.keyboard.press('ControlOrMeta+a')
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe('const a = 1\nconst b = 2')
+  await page.keyboard.press('ControlOrMeta+a')
+  await expect.poll(() => page.evaluate(() => getSelection()?.toString() ?? '')).toContain('开头段落')
+
+  // The handle beside a heading shows its level.
+  await page.locator('.ProseMirror h3').hover()
+  await expect(page.locator('.yy-handle-level')).toHaveText('H3')
+})
+
+test('pressing E once gives a hint, twice opens the editor', async ({ page, request }) => {
+  const id = await createDoc(request, '快捷键测试', '内容。')
+  await page.goto(`docs/${id}`)
+  await expect(page.locator('.yy-content')).toContainText('内容。')
+  await page.keyboard.press('e')
+  await expect(page.locator('.yy-toast', { hasText: '连按两次 E 键进入编辑模式' })).toBeVisible()
+  await page.keyboard.press('e')
+  await page.keyboard.press('e')
+  await expect(page).toHaveURL(new RegExp(`docs/${id}/edit$`))
+})
+
+test('cancelling the editor drops the edits of this session and leaves no version', async ({ page, request }) => {
+  const id = await createDoc(request, '取消测试', '原来的内容。')
+  const versions = async () => ((await (await request.get(`api/docs/${id}/versions`)).json()) as { versions: unknown[] }).versions.length
+  const before = await versions()
+  // Nothing edited: 取消 just leaves.
+  await openEditor(page, id)
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`docs/${id}$`))
+
+  await openEditor(page, id)
+  await caretAtEnd(page.locator('.ProseMirror p').first())
+  await page.keyboard.type('又写了一句。')
+  await expect.poll(async () => JSON.stringify(((await (await request.get(`api/docs/${id}`)).json()) as { content: unknown }).content)).toContain('又写了一句')
+  await page.getByRole('button', { name: '取消', exact: true }).click()
+  await page.getByRole('button', { name: '放弃修改' }).click()
+  await expect(page).toHaveURL(new RegExp(`docs/${id}$`))
+  await expect(page.locator('.yy-content')).toContainText('原来的内容。')
+  await expect(page.locator('.yy-content')).not.toContainText('又写了一句')
+  expect(await versions()).toBe(before)
+})
+
+test('table columns and rows drag to size, and wide tables scroll into the left margin', async ({ page, request }) => {
+  const id = await createDoc(request, '表格尺寸', '| 名称 | 说明 |\n| --- | --- |\n| a | b |\n| c | d |')
+  await openEditor(page, id)
+  type Cell = { attrs: { colwidth: number[] | null } }
+  const table = () => page.evaluate(() => (document.querySelector('.ProseMirror') as unknown as { editor: { getJSON: () => { content: unknown[] } } }).editor.getJSON().content[0]) as Promise<{ content: { attrs?: { height?: number }; content: Cell[] }[] }>
+  const header = (await page.locator('.ProseMirror th').first().boundingBox())!
+  await page.mouse.move(header.x + header.width - 2, header.y + header.height / 2)
+  await expect(page.locator('.ProseMirror .column-resize-handle').first()).toBeAttached()
+  await page.mouse.down()
+  await page.mouse.move(header.x + header.width + 150, header.y + header.height / 2, { steps: 5 })
+  await page.mouse.up()
+  // Every column gets a width; the one dragged grows by the distance moved.
+  await expect
+    .poll(async () => (await table()).content.flatMap((r) => r.content.map((c) => c.attrs.colwidth?.[0] ?? 0)).every(Boolean))
+    .toBe(true)
+  const first = (await table()).content[0].content[0].attrs.colwidth![0]
+  expect(Math.abs(first - (header.width + 152))).toBeLessThan(3)
+
+  const row = (await page.locator('.ProseMirror tr').nth(1).boundingBox())!
+  await page.mouse.move(row.x + 20, row.y + row.height - 1)
+  await expect(page.locator('.yy-row-resize-line')).toBeVisible()
+  await page.mouse.down()
+  await page.mouse.move(row.x + 20, row.y + row.height + 40, { steps: 4 })
+  await page.mouse.up()
+  await expect.poll(async () => (await table()).content[1].attrs?.height ?? 0).toBeGreaterThan(row.height + 30)
+
+  await page.getByRole('button', { name: '完成' }).click()
+  const shown = page.locator('.yy-content table')
+  await expect(shown).toHaveAttribute('style', /^width: \d+px/)
+  await expect(shown.locator('tr').nth(1)).toHaveAttribute('style', /height: \d+px/)
+
+  // Columns wider than the page scroll sideways; the scroll area reaches left to the page edge.
+  const wide = (await (await request.post('api/docs', { data: { bookId: (await (await request.get(`api/docs/${id}`)).json()).bookId, parentId: null, kind: 'doc', title: '宽表格' } })).json()) as { id: number }
+  const cell = (type: string, i: number) => ({ type, attrs: { colspan: 1, rowspan: 1, colwidth: [480], align: null }, content: [{ type: 'paragraph', content: [{ type: 'text', text: `列 ${i}` }] }] })
+  const content = {
+    type: 'doc',
+    content: [
+      { type: 'table', content: [{ type: 'tableRow', content: [0, 1, 2].map((i) => cell('tableHeader', i)) }, { type: 'tableRow', content: [0, 1, 2].map((i) => cell('tableCell', i)) }] },
+      { type: 'paragraph' },
+    ],
+  }
+  expect((await request.put(`api/docs/${wide.id}`, { data: { title: '宽表格', content, baseRevision: 1 } })).ok()).toBeTruthy()
+  await page.goto(`docs/${wide.id}`)
+  const box = page.locator('.yy-table-scroll')
+  const main = (await page.locator('main').boundingBox())!
+  await expect.poll(async () => Math.round((await box.boundingBox())!.x - main.x)).toBe(0)
+  const bleed = await box.evaluate((b) => parseFloat(b.style.getPropertyValue('--bleed')))
+  expect(bleed).toBeGreaterThan(0)
+  await box.evaluate((b, x) => b.scrollTo(x, 0), bleed + 100)
+  await expect(box).toHaveClass(/is-cut/)
 })

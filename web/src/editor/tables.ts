@@ -1,7 +1,8 @@
 import { Extension, findParentNode, type Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, Plugin, type Transaction } from '@tiptap/pm/state'
-import { isInTable, selectedRect, TableMap } from '@tiptap/pm/tables'
+import { columnResizingPluginKey, isInTable, selectedRect, TableMap } from '@tiptap/pm/tables'
+import type { EditorView } from '@tiptap/pm/view'
 
 export type Align = 'left' | 'center' | 'right' | null
 
@@ -20,15 +21,27 @@ function cellAt(table: PMNode, rel: number): PMNode | null {
 // leave other shapes, so the table under the cursor is put back into that shape after each change:
 // the first row holds header cells, the other rows plain cells, and every cell takes its column's
 // alignment. Tables from Markdown already have this shape, so loading a document changes nothing.
+// Once columns have widths (from dragging a border), a column without one, such as a new column,
+// gets their average, so the table keeps a width for every column.
 function normalize(tr: Transaction, table: PMNode, start: number): boolean {
   const map = TableMap.get(table)
   const { tableHeader, tableCell } = table.type.schema.nodes
   const aligns: Align[] = []
+  const widths: (number | null)[] = []
   for (let col = 0; col < map.width; col++) {
     let align: Align = null
-    for (let row = 0; row < map.height && !align; row++) align = (cellAt(table, map.map[row * map.width + col])?.attrs.align ?? null) as Align
+    let width: number | null = null
+    for (let row = 0; row < map.height && (!align || !width); row++) {
+      const rel = map.map[row * map.width + col]
+      const cell = cellAt(table, rel)
+      align ||= (cell?.attrs.align ?? null) as Align
+      width ||= (cell?.attrs.colwidth as number[] | null)?.[col - map.findCell(rel).left] || null
+    }
     aligns.push(align)
+    widths.push(width)
   }
+  const known = widths.filter((w): w is number => !!w)
+  const fill = known.length ? Math.round(known.reduce((a, b) => a + b, 0) / known.length) : null
   const seen = new Set<number>()
   let changed = false
   for (let row = 0; row < map.height; row++) {
@@ -39,8 +52,10 @@ function normalize(tr: Transaction, table: PMNode, start: number): boolean {
       const node = cellAt(table, rel)
       if (!node) continue
       const type = row === 0 ? tableHeader : tableCell
-      if (node.type === type && node.attrs.align === aligns[col]) continue
-      tr.setNodeMarkup(start + rel, type, { ...node.attrs, align: aligns[col] })
+      const rect = map.findCell(rel)
+      const colwidth = fill ? widths.slice(rect.left, rect.right).map((w) => w ?? fill) : node.attrs.colwidth
+      if (node.type === type && node.attrs.align === aligns[col] && JSON.stringify(node.attrs.colwidth) === JSON.stringify(colwidth)) continue
+      tr.setNodeMarkup(start + rel, type, { ...node.attrs, align: aligns[col], colwidth })
       changed = true
     }
   }
@@ -76,6 +91,125 @@ export const TableShape = Extension.create({
     ]
   },
 })
+
+// Dragging a column border of a table whose columns have no widths yet first fixes every column at
+// its current width, so each one can then be made narrower or wider exactly, as in Feishu, and the
+// table can grow past the page (it scrolls sideways). It runs before prosemirror-tables' column
+// resizing, which then drags the border.
+export const fixColumnWidths = new Plugin({
+  props: {
+    handleDOMEvents: {
+      mousedown(view) {
+        const handle = columnResizingPluginKey.getState(view.state)?.activeHandle ?? -1
+        if (handle < 0) return false
+        const $cell = view.state.doc.resolve(handle)
+        const table = $cell.node(-1)
+        const start = $cell.start(-1)
+        const map = TableMap.get(table)
+        const cells = [...new Set(map.map)].flatMap((rel) => {
+          const node = cellAt(table, rel)
+          return node ? [{ rel, node, rect: map.findCell(rel) }] : []
+        })
+        if (cells.every((c) => (c.node.attrs.colwidth as number[] | null)?.every(Boolean))) return false
+        const widths: number[] = []
+        for (let col = 0; col < map.width; col++) {
+          const spanning = cells.filter((c) => c.rect.left <= col && col < c.rect.right)
+          const cell = spanning.find((c) => c.rect.right - c.rect.left === 1) ?? spanning[0]
+          const dom = cell && view.nodeDOM(start + cell.rel)
+          widths.push(dom instanceof HTMLElement ? Math.round(dom.getBoundingClientRect().width / (cell.rect.right - cell.rect.left)) : 100)
+        }
+        const tr = view.state.tr
+        for (const c of cells) tr.setNodeMarkup(start + c.rel, undefined, { ...c.node.attrs, colwidth: widths.slice(c.rect.left, c.rect.right) })
+        view.dispatch(tr)
+        return false
+      },
+    },
+  },
+})
+
+// Dragging the bottom border of a row sets its height, as dragging a column border sets a width. A
+// line follows the pointer and the row takes the height when the button is released; a row never
+// gets shorter than its content.
+export function rowResizing(): Plugin {
+  const edge = 4
+  let hover: { pos: number; row: HTMLTableRowElement } | null = null
+  let dragging = false
+  let line: HTMLDivElement | null = null
+
+  function show(view: EditorView, row: HTMLTableRowElement, bottom: number) {
+    line ??= Object.assign(document.createElement('div'), { className: 'yy-row-resize-line' })
+    document.body.appendChild(line)
+    const box = (row.closest('.tableWrapper') ?? row).getBoundingClientRect()
+    const table = row.closest('table')!.getBoundingClientRect()
+    line.style.transform = `translate(${box.left}px, ${bottom}px)`
+    line.style.width = `${Math.min(box.right, table.right) - box.left}px`
+    view.dom.classList.add('yy-row-resize')
+  }
+  function hide(view: EditorView) {
+    hover = null
+    line?.remove()
+    view.dom.classList.remove('yy-row-resize')
+  }
+
+  return new Plugin({
+    view: () => ({ destroy: () => line?.remove() }),
+    props: {
+      handleDOMEvents: {
+        mousemove(view, event) {
+          if (dragging || !view.editable) return false
+          const cell = event.target instanceof Element ? event.target.closest('td, th') : null
+          const row = cell?.parentElement
+          const box = cell?.getBoundingClientRect()
+          // Near a column border the column resizing takes the pointer.
+          const columnBorder = !!box && (event.clientX - box.left <= 5 || box.right - event.clientX <= 5)
+          if (!cell || !(row instanceof HTMLTableRowElement) || columnBorder || row.getBoundingClientRect().bottom - event.clientY > edge) {
+            if (hover) hide(view)
+            return false
+          }
+          const $pos = view.state.doc.resolve(view.posAtDOM(cell, 0))
+          for (let d = $pos.depth; d > 0; d--) {
+            if ($pos.node(d).type.name !== 'tableRow') continue
+            hover = { pos: $pos.before(d), row }
+            show(view, row, row.getBoundingClientRect().bottom)
+            break
+          }
+          return false
+        },
+        mouseleave(view) {
+          if (hover && !dragging) hide(view)
+          return false
+        },
+        mousedown(view, event) {
+          if (!hover || event.button !== 0) return false
+          event.preventDefault()
+          const { pos, row } = hover
+          const top = row.getBoundingClientRect().top
+          const startY = event.clientY
+          const start = row.getBoundingClientRect().height
+          let height = start
+          dragging = true
+          const move = (e: MouseEvent) => {
+            height = Math.max(24, start + e.clientY - startY)
+            show(view, row, top + height)
+          }
+          const up = () => {
+            removeEventListener('mousemove', move)
+            removeEventListener('mouseup', up)
+            dragging = false
+            hide(view)
+            const node = view.state.doc.nodeAt(pos)
+            if (node?.type.name === 'tableRow' && Math.round(height) !== Math.round(start)) {
+              view.dispatch(view.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, height: Math.round(height) }))
+            }
+          }
+          addEventListener('mousemove', move)
+          addEventListener('mouseup', up)
+          return true
+        },
+      },
+    },
+  })
+}
 
 export type TableCommand = 'addRowBefore' | 'addRowAfter' | 'addColumnBefore' | 'addColumnAfter' | 'deleteRow' | 'deleteColumn' | 'deleteTable'
 

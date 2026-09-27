@@ -425,6 +425,42 @@ func (s *Server) apiSaveDoc(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// apiDiscardEdits undoes an editing session when the editor's 取消 is confirmed
+// (store.DiscardEdits); the editor sends back what it opened.
+func (s *Server) apiDiscardEdits(w http.ResponseWriter, r *http.Request) error {
+	id, err := pathID(r)
+	if err != nil {
+		return err
+	}
+	var in struct {
+		Title        string          `json:"title"`
+		Content      json.RawMessage `json:"content"`
+		UpdatedAt    string          `json:"updatedAt"`
+		Since        int64           `json:"since"`
+		BaseRevision int64           `json:"baseRevision"`
+	}
+	if err := readJSON(w, r, &in); err != nil {
+		return err
+	}
+	content, err := doc.Parse(in.Content)
+	if err != nil {
+		return badRequest("%v", err)
+	}
+	revision, err := s.store.DiscardEdits(r.Context(), id, in.Title, content, in.UpdatedAt, in.Since, in.BaseRevision)
+	if errors.Is(err, store.ErrConflict) {
+		return conflictError{revision: revision}
+	}
+	if errors.Is(err, store.ErrInvalid) {
+		return badRequest("无效的更新时间或版本号")
+	}
+	if err != nil {
+		return err
+	}
+	s.forget(id)
+	writeJSON(w, http.StatusOK, map[string]any{"revision": revision})
+	return nil
+}
+
 func (s *Server) apiRenameDoc(w http.ResponseWriter, r *http.Request) error {
 	id, err := pathID(r)
 	if err != nil {

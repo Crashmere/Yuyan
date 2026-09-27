@@ -7,7 +7,7 @@ import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { CharacterCount, Dropcursor, Gapcursor, Placeholder, TrailingNode, UndoRedo } from '@tiptap/extensions'
 import { Callout } from '../schema/callout'
 import { withTitles } from '../schema/codeBlock'
-import { schemaExtensions, YuyanImage } from '../schema/extensions'
+import { schemaExtensions, YuyanImage, YuyanTable } from '../schema/extensions'
 import { assetURL, unassetURL } from '../shared/api'
 import { CalloutKeys } from './calloutKeys'
 import { openCollapsedCode } from './codeBlocks'
@@ -18,7 +18,8 @@ import { lowlight } from './lowlight'
 import { MarkdownPaste } from './markdownPaste'
 import { Search } from './search'
 import { SlashCommand } from './slash'
-import { TableShape } from './tables'
+import { SelectWithin } from './selectWithin'
+import { fixColumnWidths, rowResizing, TableShape } from './tables'
 import { UiShortcuts } from './uiShortcuts'
 import { insertImages, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
@@ -41,6 +42,13 @@ export function editorExtensions(ui: EditorUi): Extensions {
           },
         })
         .configure({ lowlight, defaultLanguage: null, enableTabIndentation: true, tabSize: 4 }),
+      // Column and row borders drag to resize; fixColumnWidths runs before prosemirror-tables' own
+      // column resizing (tables.ts).
+      table: YuyanTable.extend({
+        addProseMirrorPlugins() {
+          return [fixColumnWidths, rowResizing(), ...(this.parent?.() ?? [])]
+        },
+      }).configure({ resizable: true }),
       image: YuyanImage.extend({
         addNodeView() {
           return VueNodeViewRenderer(ImageView)
@@ -76,6 +84,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     CalloutKeys,
     Search,
     TableShape,
+    SelectWithin,
     UiShortcuts.configure({ openFind: ui.openFind, openShortcuts: ui.openShortcuts }),
   ]
 }
