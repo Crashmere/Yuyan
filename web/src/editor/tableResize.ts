@@ -3,6 +3,30 @@ import { columnResizingPluginKey } from '@tiptap/pm/tables'
 import type { EditorView } from '@tiptap/pm/view'
 
 const hoverDelay = 250
+export const resizeHitWidth = 8
+const activeHitWidth = 14
+
+// Keep a preview mounted while it fades out; ProseMirror removes its decorations immediately.
+function resizeLine(axis: 'row' | 'column') {
+  let line: HTMLDivElement | null = null
+  let frame = 0
+  return {
+    show(x: number, y: number, length: number) {
+      if (!line) {
+        line = Object.assign(document.createElement('div'), { className: `yy-${axis}-resize-line` })
+        document.body.appendChild(line)
+        // Commit the initial transparent state before fading in.
+        line.getBoundingClientRect()
+      }
+      line.style.transform = `translate(${x}px, ${y}px)`
+      line.style[axis === 'row' ? 'width' : 'height'] = `${Math.max(0, length)}px`
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => line?.classList.add('is-visible'))
+    },
+    hide() { cancelAnimationFrame(frame); line?.classList.remove('is-visible') },
+    destroy() { cancelAnimationFrame(frame); line?.remove(); line = null },
+  }
+}
 
 // Keep ProseMirror's resize calculations and transactions, but only give it a border after the
 // pointer rests there. Passing across a table must not flash handles or interrupt text selection.
@@ -13,11 +37,13 @@ export function withResizeDelay(plugin: Plugin): Plugin {
   let edge: { table: Element; x: number } | null = null
   let latest: MouseEvent | null = null
   let ready = false
+  const preview = resizeLine('column')
 
   function clear(view: EditorView) {
     clearTimeout(timer)
     edge = latest = null
     ready = false
+    preview.hide()
     const state = columnResizingPluginKey.getState(view.state)
     if (state && !state.dragging && state.activeHandle >= 0) view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setHandle: -1 }))
   }
@@ -31,9 +57,12 @@ export function withResizeDelay(plugin: Plugin): Plugin {
         mousemove(view, event) {
           if (columnResizingPluginKey.getState(view.state)?.dragging) return false
           if (event.buttons || !view.editable) { clear(view); return false }
+          const activeBox = edge?.table.getBoundingClientRect()
+          // Once acquired, a little hand movement should not lose the same border.
+          if (ready && edge && activeBox && Math.abs(event.clientX - edge.x) <= activeHitWidth && event.clientY >= activeBox.top && event.clientY <= activeBox.bottom) return false
           const cell = event.target instanceof Element ? event.target.closest('td, th') : null
           const box = cell?.getBoundingClientRect()
-          const x = box && (event.clientX - box.left <= 5 ? box.left : box.right - event.clientX <= 5 ? box.right : null)
+          const x = box && (event.clientX - box.left <= resizeHitWidth ? box.left : box.right - event.clientX <= resizeHitWidth ? box.right : null)
           if (x == null || !cell) { clear(view); return false }
           const table = cell.closest('table')!
           if (!edge || edge.table !== table || Math.abs(edge.x - x) > 1) {
@@ -63,10 +92,30 @@ export function withResizeDelay(plugin: Plugin): Plugin {
     },
     view(view) {
       let dragging = false
+      let frame = 0
+      const paint = () => {
+        cancelAnimationFrame(frame)
+        if ((columnResizingPluginKey.getState(view.state)?.activeHandle ?? -1) < 0) { preview.hide(); return }
+        frame = requestAnimationFrame(() => {
+          const state = columnResizingPluginKey.getState(view.state)
+          const handle = view.dom.querySelector('.column-resize-handle')
+          const table = handle?.closest('table')
+          if (!state || state.activeHandle < 0 || !handle || !table) { preview.hide(); return }
+          const box = table.getBoundingClientRect()
+          const x = handle.getBoundingClientRect().left + 1
+          if (ready && edge) edge = { table, x }
+          const clip = table.closest('.yy-table-scroll')?.getBoundingClientRect()
+          if (clip && (x < clip.left || x > clip.right)) { preview.hide(); return }
+          preview.show(x, box.top, box.height)
+        })
+      }
       const scrolled = () => {
         if (!columnResizingPluginKey.getState(view.state)?.dragging) clear(view)
+        else paint()
       }
+      const moved = () => { if (dragging) paint() }
       document.addEventListener('scroll', scrolled, true)
+      document.addEventListener('mousemove', moved)
       return {
         update(_view, previous) {
           const next = !!columnResizingPluginKey.getState(view.state)?.dragging
@@ -76,10 +125,14 @@ export function withResizeDelay(plugin: Plugin): Plugin {
           }
           // A pending hover cannot act on a cell removed or moved by an edit.
           if (!ready && previous.doc !== view.state.doc) clear(view)
+          paint()
         },
         destroy() {
           clearTimeout(timer)
+          cancelAnimationFrame(frame)
+          preview.destroy()
           document.removeEventListener('scroll', scrolled, true)
+          document.removeEventListener('mousemove', moved)
           document.body.classList.remove('yy-column-dragging')
         },
       }
@@ -93,24 +146,21 @@ export function rowResizing(): Plugin {
   let ready = false
   let dragging = false
   let timer: ReturnType<typeof setTimeout> | undefined
-  let line: HTMLDivElement | null = null
+  const preview = resizeLine('row')
   let endDrag: (() => void) | undefined
 
   function show(view: EditorView, row: HTMLTableRowElement, bottom: number) {
-    line ??= Object.assign(document.createElement('div'), { className: 'yy-row-resize-line' })
-    document.body.appendChild(line)
     const box = (row.closest('.yy-table-scroll') ?? row).getBoundingClientRect()
     const table = row.closest('table')!.getBoundingClientRect()
     const left = Math.max(box.left, table.left)
-    line.style.transform = `translate(${left}px, ${bottom}px)`
-    line.style.width = `${Math.min(box.right, table.right) - left}px`
+    preview.show(left, bottom, Math.min(box.right, table.right) - left)
     view.dom.classList.add('yy-row-resize')
   }
   function hide(view: EditorView) {
     clearTimeout(timer)
     hover = null
     ready = false
-    line?.remove()
+    preview.hide()
     if (view.dom.classList.contains('yy-row-resize')) view.dom.classList.remove('yy-row-resize')
   }
 
@@ -123,6 +173,7 @@ export function rowResizing(): Plugin {
         destroy() {
           endDrag?.()
           hide(view)
+          preview.destroy()
           document.removeEventListener('scroll', scrolled, true)
         },
       }
@@ -132,16 +183,22 @@ export function rowResizing(): Plugin {
         mousemove(view, event) {
           if (dragging || !view.editable) return false
           const cell = event.target instanceof Element ? event.target.closest('td, th') : null
-          const row = cell?.parentElement
+          let row = cell?.parentElement
           const box = cell?.getBoundingClientRect()
-          const columnBorder = !!box && (event.clientX - box.left <= 5 || box.right - event.clientX <= 5)
-          if (event.buttons || !cell || !(row instanceof HTMLTableRowElement) || columnBorder || row.getBoundingClientRect().bottom - event.clientY > 4) {
+          const columnBorder = !!box && (event.clientX - box.left <= resizeHitWidth || box.right - event.clientX <= resizeHitWidth)
+          const columnHandle = columnResizingPluginKey.getState(view.state)?.activeHandle ?? -1
+          const columnCell = columnHandle >= 0 ? view.nodeDOM(columnHandle) : null
+          const columnActive = columnCell instanceof HTMLElement && Math.abs(columnCell.getBoundingClientRect().right - event.clientX) <= activeHitWidth
+          const activeBox = hover?.row.getBoundingClientRect()
+          if (!event.buttons && !columnBorder && !columnActive && ready && activeBox && event.clientX >= activeBox.left && event.clientX <= activeBox.right && Math.abs(activeBox.bottom - event.clientY) <= activeHitWidth) return false
+          if (row instanceof HTMLTableRowElement && Math.abs(row.getBoundingClientRect().top - event.clientY) <= resizeHitWidth && row.previousElementSibling instanceof HTMLTableRowElement) row = row.previousElementSibling
+          if (event.buttons || !cell || !(row instanceof HTMLTableRowElement) || columnBorder || columnActive || Math.abs(row.getBoundingClientRect().bottom - event.clientY) > resizeHitWidth) {
             hide(view)
             return false
           }
           if (hover?.row === row) return false
           hide(view)
-          const $pos = view.state.doc.resolve(view.posAtDOM(cell, 0))
+          const $pos = view.state.doc.resolve(view.posAtDOM(row.firstElementChild!, 0))
           for (let d = $pos.depth; d > 0; d--) {
             if ($pos.node(d).type.name !== 'tableRow') continue
             hover = { pos: $pos.before(d), row }

@@ -128,6 +128,30 @@ describe('markdownToDoc', () => {
 })
 
 describe('docToMarkdown', () => {
+  it('preserves independent paragraph, image, table and cell alignment through HTML', () => {
+    const doc = valid({ type: 'doc', content: [
+      { type: 'paragraph', attrs: { textAlign: 'right' }, content: [
+        { type: 'text', text: '文字 & <格式>', marks: [{ type: 'bold' }] },
+        { type: 'text', text: '链接', marks: [{ type: 'link', attrs: { href: '/docs/12' } }] },
+      ] },
+      { type: 'paragraph', content: [{ type: 'image', attrs: { src: '/assets/a.png', alt: 'A "quote" & B', width: 120, blockAlign: 'center' } }] },
+      { type: 'table', attrs: { blockAlign: 'right' }, content: [
+        { type: 'tableRow', content: [{ type: 'tableHeader', attrs: { align: 'center' }, content: [{ type: 'paragraph', content: [{ type: 'text', text: '表头' }] }] }] },
+        { type: 'tableRow', content: [{ type: 'tableCell', attrs: { align: 'center', cellAlign: 'left' }, content: [{ type: 'paragraph', content: [{ type: 'text', text: '单格' }] }] }] },
+      ] },
+      { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', attrs: { textAlign: 'center' }, content: [{ type: 'text', text: '列表内的段落' }] }] }] },
+      { type: 'paragraph', content: [{ type: 'text', text: '普通段落' }] },
+    ] })
+    const md = docToMarkdown(doc, { imageSrc: () => 'a.png', linkHref: () => 'next.md' })
+    expect(md).toContain('text-align: right')
+    expect(md).toContain('data-cell-align="left"')
+    expect(md).toContain('data-column-align="center"')
+    expect(md).toContain('alt="A &quot;quote&quot; &amp; B"')
+    const back = valid(markdownToDoc(md, { resolveImage: () => '/assets/a.png', resolveLink: () => '/docs/12' }))
+    const filled = (d: JSONContent) => PMNode.fromJSON(schema, d).toJSON()
+    expect(filled(back)).toEqual(filled(doc))
+  })
+
   it('round-trips the Obsidian syntax Yuyan supports', () => {
     const md = [
       '# 标题',

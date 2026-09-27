@@ -4,6 +4,7 @@ import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { assetURL } from '../../shared/api'
 import { assetId, reservedSize } from '../../shared/images'
 import { blockWidth, imageSizes } from '../images'
+import { alignment, blockAlignment } from '../../schema/alignment'
 
 const props = defineProps(nodeViewProps)
 
@@ -53,7 +54,7 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
 </script>
 
 <template>
-  <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null }">
+  <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null, 'is-aligned': !!alignment(node.attrs.blockAlign) }" :style="blockAlignment(node.attrs.blockAlign, true).style">
     <img
       ref="img"
       :src="src"

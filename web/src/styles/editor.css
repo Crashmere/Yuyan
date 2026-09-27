@@ -177,31 +177,35 @@
   bottom: -1px;
   z-index: 2;
   width: 3px;
-  background: var(--yy-primary);
   pointer-events: none;
 }
 .ProseMirror.resize-cursor,
 .ProseMirror.resize-cursor *,
 body.yy-column-dragging,
 body.yy-column-dragging * {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Crect x='1' y='3' width='26' height='22' rx='6' fill='white' stroke='%2300a870'/%3E%3Cpath d='M14 7v14M4 14h7m-4-3-3 3 3 3m10-3h7m-3-3 3 3-3 3' fill='none' stroke='%23007850' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14, ew-resize;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M10 6v8M2 10h5m-2-3-3 3 3 3m8-3h5m-3-3 3 3-3 3' fill='none' stroke='%2300a870' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 10 10, ew-resize;
 }
 .ProseMirror.yy-row-resize,
 .ProseMirror.yy-row-resize *,
 body.yy-row-dragging,
 body.yy-row-dragging * {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Crect x='3' y='1' width='22' height='26' rx='6' fill='white' stroke='%2300a870'/%3E%3Cpath d='M7 14h14M14 4v7m-3-4 3-3 3 3m-3 10v7m-3-3 3 3 3-3' fill='none' stroke='%23007850' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14, ns-resize;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath d='M6 10h8M10 2v5M7 5l3-3 3 3m-3 8v5m-3-3 3 3 3-3' fill='none' stroke='%2300a870' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 10 10, ns-resize;
 }
-.yy-row-resize-line {
+.yy-row-resize-line,
+.yy-column-resize-line {
   position: fixed;
   top: 0;
   left: 0;
   z-index: 30;
-  height: 3px;
-  margin-top: -2px;
+  opacity: 0;
+  transition: opacity 140ms ease;
   background: var(--yy-primary);
   pointer-events: none;
 }
+.yy-row-resize-line { height: 2px; margin-top: -1px; }
+.yy-column-resize-line { width: 2px; margin-left: -1px; }
+.yy-row-resize-line.is-visible,
+.yy-column-resize-line.is-visible { opacity: 1; }
 
 /* Table rails live outside ProseMirror, so they remain reachable beside a scrolling table. */
 .ProseMirror .yy-table-frame {
@@ -278,6 +282,8 @@ body.yy-row-dragging * {
 @media (prefers-reduced-motion: reduce) {
   .yy-toolbar,
   .yy-table-controls,
+  .yy-row-resize-line,
+  .yy-column-resize-line,
   .yy-table-select,
   .yy-table-insert::before {
     transition: none;
@@ -1053,6 +1059,9 @@ body.yy-row-dragging * {
 }
 .ProseMirror img {
   cursor: default;
+}
+.yy-image.is-aligned {
+  width: fit-content;
 }
 .ProseMirror .yy-image.ProseMirror-selectednode {
   outline: none;

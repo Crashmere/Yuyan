@@ -20,7 +20,7 @@ import { Search } from './search'
 import { SlashCommand } from './slash'
 import { SelectWithin } from './selectWithin'
 import { fixColumnWidths, followColumnBorder, FramedTableView, TableShape } from './tables'
-import { rowResizing, withResizeDelay } from './tableResize'
+import { resizeHitWidth, rowResizing, withResizeDelay } from './tableResize'
 import { tableControls } from './tableControls'
 import { UiShortcuts } from './uiShortcuts'
 import { insertImages, UploadPlaceholders } from './uploads'
@@ -50,7 +50,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
         addProseMirrorPlugins() {
           return [fixColumnWidths, followColumnBorder, rowResizing(), tableControls(), ...(this.parent?.() ?? []).map(withResizeDelay)]
         },
-      }).configure({ resizable: true, View: FramedTableView }),
+      }).configure({ resizable: true, handleWidth: resizeHitWidth, View: FramedTableView }),
       image: YuyanImage.extend({
         addNodeView() {
           return VueNodeViewRenderer(ImageView)

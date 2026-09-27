@@ -622,6 +622,7 @@ a.yy-crumb:hover {
   min-width: 180px;
   max-height: min(420px, var(--reka-dropdown-menu-content-available-height, 420px));
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 1px solid var(--yy-border);
   border-radius: var(--yy-radius-lg);

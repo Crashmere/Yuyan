@@ -2,11 +2,22 @@ import { expect, test, type APIRequestContext, type Locator, type Page } from '@
 import { strFromU8, unzipSync } from 'fflate'
 import { markdownToDoc } from '../src/schema/markdown'
 import { openSidebar } from './sidebar'
+import type { JSONContent } from '@tiptap/core'
 
 // Editor interactions (docs/DESIGN.md 12.6 and 12.7). Each test writes its own document into the
 // synthetic 读书摘录 knowledge base, which the smoke tests leave alone.
 
 const bookName = '读书摘录（示例）'
+
+async function chooseAlignment(page: Page, label: string) {
+  await page.locator('.yy-toolbar').getByRole('button', { name: '对齐', exact: true }).click()
+  await page.getByRole('menuitem', { name: label, exact: true }).click()
+  await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))).toBe(true)
+}
+
+async function editorDoc(page: Page): Promise<JSONContent> {
+  return page.locator('.ProseMirror').evaluate((el) => (el as unknown as { editor: { getJSON: () => JSONContent } }).editor.getJSON())
+}
 
 async function createDoc(request: APIRequestContext, title: string, md = '', images: Record<string, string> = {}): Promise<number> {
   const books = (await (await request.get('api/books')).json()) as { id: number; name: string }[]
@@ -1219,7 +1230,22 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   await expect(page.locator('.ProseMirror .column-resize-handle')).toHaveCount(0)
   await page.mouse.move(header.x + header.width - 2, header.y + header.height / 2)
   await expect(page.locator('.ProseMirror .column-resize-handle').first()).toBeAttached()
-  expect(await page.locator('.ProseMirror').evaluate((el) => getComputedStyle(el).cursor)).toContain('data:image/svg+xml')
+  const cursor = await page.locator('.ProseMirror').evaluate((el) => getComputedStyle(el).cursor)
+  expect(cursor).toContain('data:image/svg+xml')
+  expect(cursor).toContain("width='20'")
+  expect(cursor).not.toContain('%3Crect')
+  const columnLine = page.locator('.yy-column-resize-line')
+  await expect(columnLine).toHaveCSS('opacity', '1')
+  await expect(columnLine).toHaveCSS('transition-duration', '0.14s')
+  await page.mouse.move(header.x + header.width - 12, header.y + header.height / 2)
+  await expect(page.locator('.ProseMirror')).toHaveClass(/resize-cursor/)
+  await page.mouse.move(header.x + header.width + 12, header.y + header.height / 2)
+  await expect(page.locator('.ProseMirror')).toHaveClass(/resize-cursor/)
+  await page.mouse.move(header.x + header.width + 20, header.y + header.height / 2)
+  await expect(columnLine).toHaveCSS('opacity', '0')
+  await page.mouse.move(header.x + header.width - 7, header.y + header.height / 2)
+  await expect(columnLine).toHaveCSS('opacity', '1')
+  await page.mouse.move(header.x + header.width - 2, header.y + header.height / 2)
   await page.mouse.down()
   await page.mouse.move(header.x + header.width + 150, header.y + header.height / 2, { steps: 5 })
   await page.mouse.up()
@@ -1231,12 +1257,16 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   expect(Math.abs(first - (header.width + 152))).toBeLessThan(3)
 
   const row = (await page.locator('.ProseMirror tr').nth(1).boundingBox())!
-  await page.mouse.move(row.x + 20, row.y + row.height - 1)
+  await page.mouse.move(row.x + 20, row.y + row.height - 7)
   await expect(page.locator('.yy-row-resize-line')).toHaveCount(0)
-  await expect(page.locator('.yy-row-resize-line')).toBeVisible()
+  await expect(page.locator('.yy-row-resize-line')).toHaveCSS('opacity', '1')
+  await page.mouse.move(row.x + 20, row.y + row.height + 12)
+  await expect(page.locator('.ProseMirror')).toHaveClass(/yy-row-resize/)
+  await page.mouse.move(row.x + 20, row.y + row.height - 1)
   await page.mouse.down()
   await page.mouse.move(row.x + 20, row.y + row.height + 40, { steps: 4 })
   await page.mouse.up()
+  await expect(page.locator('.yy-row-resize-line')).toHaveCSS('opacity', '0')
   await expect.poll(async () => (await table()).content[1].attrs?.height ?? 0).toBeGreaterThan(row.height + 30)
 
   // Markdown cannot hold the sizes, so the export writes the table as HTML.
@@ -1253,7 +1283,7 @@ test('table columns and rows drag to size, and wide tables scroll into the left 
   const content = {
     type: 'doc',
     content: [
-      { type: 'table', content: [{ type: 'tableRow', content: [0, 1, 2].map((i) => cell('tableHeader', i)) }, { type: 'tableRow', content: [0, 1, 2].map((i) => cell('tableCell', i)) }] },
+      { type: 'table', attrs: { blockAlign: 'right' }, content: [{ type: 'tableRow', content: [0, 1, 2].map((i) => cell('tableHeader', i)) }, { type: 'tableRow', content: [0, 1, 2].map((i) => cell('tableCell', i)) }] },
       { type: 'paragraph' },
     ],
   }
@@ -1407,3 +1437,127 @@ for (const width of [1360, 375]) {
     }
   })
 }
+
+for (const width of [1360, 375]) {
+  test(`alignment affects only the selected paragraph or image at ${width}px`, async ({ page, request }) => {
+    await page.setViewportSize({ width, height: 860 })
+    await page.goto('./')
+    const src = await uploadImage(page, request)
+    const title = `独立对齐 ${width}`
+    const id = await createDoc(request, title, '## 保持原样的标题\n\n第一段\n\n第二段\n\n![一|120](a.png) ![二|120](a.png)\n\n结尾', { 'a.png': src })
+    await openEditor(page, id)
+    const pm = page.locator('.ProseMirror')
+    await caretAtEnd(pm.locator('h2'))
+    await expect(page.locator('.yy-toolbar').getByRole('button', { name: '对齐', exact: true })).toBeDisabled()
+    await caretAtEnd(pm.locator('p').filter({ hasText: '第一段' }))
+    await chooseAlignment(page, '段落居中')
+    await expect(pm.locator('p').filter({ hasText: '第一段' })).toHaveCSS('text-align', 'center')
+    await expect(pm.locator('p').filter({ hasText: '第二段' })).not.toHaveAttribute('style', /text-align/)
+    await page.keyboard.press('ControlOrMeta+z')
+    await expect(pm.locator('p').filter({ hasText: '第一段' })).not.toHaveAttribute('style', /text-align/)
+    await chooseAlignment(page, '段落右对齐')
+    const first = pm.locator('.yy-image img').first()
+    await first.click()
+    await chooseAlignment(page, '图片居中')
+    const centered = async () => first.evaluate((img) => {
+      const r = img.getBoundingClientRect(), p = img.closest('p')!.getBoundingClientRect()
+      return Math.abs(r.left + r.width / 2 - p.left - p.width / 2)
+    })
+    await expect.poll(centered).toBeLessThan(2)
+    const images = (await editorDoc(page)).content!.flatMap((p) => p.content ?? []).filter((n) => n.type === 'image')
+    expect(images.map((n) => n.attrs?.blockAlign)).toEqual(['center', null])
+    await chooseAlignment(page, '图片右对齐')
+    await expect.poll(() => first.evaluate((img) => Math.abs(img.getBoundingClientRect().right - img.closest('p')!.getBoundingClientRect().right))).toBeLessThan(2)
+    await chooseAlignment(page, '图片居中')
+    const md = await finishAndExport(page, title)
+    expect(md).toContain('text-align: right')
+    expect(md).toContain('data-align="center"')
+    await expect(page.locator('.yy-content p').filter({ hasText: '第一段' })).toHaveCSS('text-align', 'right')
+    await expect.poll(() => page.locator('.yy-content img').first().evaluate((img) => {
+      const r = img.getBoundingClientRect(), p = img.closest('p')!.getBoundingClientRect()
+      return Math.abs(r.left + r.width / 2 - p.left - p.width / 2)
+    })).toBeLessThan(2)
+    await page.reload()
+    await expect(page.locator('.yy-content img').first()).toHaveAttribute('data-align', 'center')
+    await openEditor(page, id)
+    await expect(pm.locator('p').filter({ hasText: '第一段' })).toHaveCSS('text-align', 'right')
+    await expect.poll(centered).toBeLessThan(2)
+  })
+}
+
+test('cell alignment and table position are independent and survive column edits and export', async ({ page, request }) => {
+  const title = '表格独立对齐'
+  const id = await createDoc(request, title, '前置段落\n\n| 名称 | 说明 |\n| :-- | --: |\n| a | b |\n| c | d |\n\n后续段落')
+  await openEditor(page, id)
+  const table = page.locator('.ProseMirror table')
+  await caretAtEnd(table.locator('td p').first())
+  await chooseAlignment(page, '单元格内容居中')
+  await expect(table.locator('td').first()).toHaveCSS('text-align', 'center')
+  await expect(table.locator('td').nth(2)).toHaveCSS('text-align', 'left')
+  await expect(table.locator('th').first()).toHaveCSS('text-align', 'left')
+  await chooseAlignment(page, '表格位置居中')
+  const offset = async (align: 'center' | 'right') => table.evaluate((el, a) => {
+    const r = el.getBoundingClientRect(), body = el.closest('.ProseMirror')!.getBoundingClientRect()
+    return Math.abs(a === 'center' ? r.left + r.width / 2 - body.left - body.width / 2 : r.right - body.right)
+  }, align)
+  await expect.poll(() => offset('center')).toBeLessThan(2)
+  await expect(table.locator('td').first()).toHaveCSS('text-align', 'center')
+  await chooseAlignment(page, '表格位置右对齐')
+  await expect.poll(() => offset('right')).toBeLessThan(2)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect.poll(() => offset('center')).toBeLessThan(2)
+
+  await table.locator('td').first().hover()
+  await page.locator('.yy-table-controls').getByRole('button', { name: '选中第 2 行', exact: true }).click()
+  await chooseAlignment(page, '单元格内容左对齐')
+  await expect(table.locator('tr').nth(1).locator('td').nth(1)).toHaveCSS('text-align', 'left')
+  await expect(table.locator('tr').nth(2).locator('td').nth(1)).toHaveCSS('text-align', 'right')
+  // A subsequent whole-column command clears cell overrides in that column only.
+  await caretAtEnd(table.locator('td p').first())
+  await page.locator('.yy-table-toolbar').getByRole('button', { name: '整列居中', exact: true }).click()
+  await expect(table.locator('tr').nth(2).locator('td').first()).toHaveCSS('text-align', 'center')
+  await expect(table.locator('td').first()).not.toHaveAttribute('data-cell-align')
+  await caretAtEnd(table.locator('td p').first())
+  await chooseAlignment(page, '单元格内容右对齐')
+  const md = await finishAndExport(page, title)
+  expect(md).toContain('data-align="center"')
+  expect(md).toContain('data-cell-align="right"')
+  const shown = page.locator('.yy-content table')
+  await expect(shown.locator('td').first()).toHaveCSS('text-align', 'right')
+  await expect(shown.locator('td').nth(2)).toHaveCSS('text-align', 'center')
+  await expect.poll(() => shown.evaluate((el) => {
+    const r = el.getBoundingClientRect(), body = el.closest('.yy-content')!.getBoundingClientRect()
+    return Math.abs(r.left + r.width / 2 - body.left - body.width / 2)
+  })).toBeLessThan(2)
+  await openEditor(page, id)
+  await expect(table.locator('td').first()).toHaveCSS('text-align', 'right')
+  await expect.poll(() => offset('center')).toBeLessThan(2)
+})
+
+test('wheeling while moving inside the insert menu never scrolls the document', async ({ page, request }) => {
+  await page.setViewportSize({ width: 1360, height: 600 })
+  const id = await createDoc(request, '菜单滚动隔离', Array.from({ length: 60 }, (_, i) => `第 ${i + 1} 段内容。`).join('\n\n'))
+  await openEditor(page, id)
+  await page.evaluate(() => window.scrollTo(0, 600))
+  await page.locator('.yy-toolbar').getByRole('button', { name: '插入', exact: true }).click()
+  const menu = page.locator('.yy-menu')
+  await expect(menu).toBeVisible()
+  const before = await page.evaluate(() => window.scrollY)
+  const r = (await menu.boundingBox())!
+  for (const delta of [180, -180]) {
+    for (let i = 0; i < 10; i++) {
+      await page.mouse.move(r.x + 12 + (i % 3) * 25, r.y + 20 + (i % 4) * 40)
+      await page.mouse.wheel(0, delta)
+      await page.waitForTimeout(30)
+    }
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(before)
+    if (delta > 0) await expect.poll(() => menu.evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+    else await expect.poll(() => menu.evaluate((el) => el.scrollTop)).toBe(0)
+  }
+  await page.keyboard.press('Escape')
+  await expect(menu).not.toBeVisible()
+  const body = await page.locator('.ProseMirror').boundingBox()
+  await page.mouse.move(body!.x + 200, 350)
+  await page.mouse.wheel(0, 200)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before)
+})

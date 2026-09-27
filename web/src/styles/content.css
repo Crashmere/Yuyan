@@ -435,7 +435,8 @@ pre:hover > .yy-copy,
   display: none;
 }
 .yy-table-scroll > table {
-  margin: 0;
+  /* Align within the body column, preserving the extra scroll area of wide tables. */
+  margin: 0 0 0 var(--table-offset, 0px) !important;
 }
 .yy-table-frame::before,
 .yy-table-frame::after {

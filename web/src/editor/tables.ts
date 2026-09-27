@@ -5,6 +5,7 @@ import { columnResizingPluginKey, isInTable, selectedRect, TableMap } from '@tip
 import type { EditorView } from '@tiptap/pm/view'
 import { TableView } from '@tiptap/extension-table'
 import { frameTable } from '../shared/tableFrame'
+import { alignment } from '../schema/alignment'
 
 export type Align = 'left' | 'center' | 'right' | null
 
@@ -142,7 +143,15 @@ export class FramedTableView extends TableView {
     frame.className = 'yy-table-frame'
     frame.append(scroller)
     this.dom = frame
+    this.table.dataset.align = alignment(node.attrs.blockAlign) ?? ''
     this.release = frameTable(frame, scroller)
+  }
+
+  update(node: PMNode) {
+    if (!super.update(node)) return false
+    const align = alignment(node.attrs.blockAlign) ?? ''
+    if (this.table.dataset.align !== align) this.table.dataset.align = align
+    return true
   }
 
   stopEvent(event: Event) {
@@ -206,7 +215,12 @@ export function setColumnAlign(e: Editor, align: Align) {
       if (seen.has(rel)) continue
       seen.add(rel)
       const node = cellAt(rect.table, rel)
-      if (node) tr.setNodeMarkup(rect.tableStart + rel, undefined, { ...node.attrs, align })
+      if (node) {
+        tr.setNodeMarkup(rect.tableStart + rel, undefined, { ...node.attrs, align, cellAlign: null })
+        node.descendants((child, pos) => {
+          if (child.type.name === 'paragraph' && child.attrs.textAlign) tr.setNodeMarkup(rect.tableStart + rel + 1 + pos, undefined, { ...child.attrs, textAlign: null })
+        })
+      }
     }
   }
   e.view.dispatch(tr)

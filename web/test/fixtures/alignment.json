@@ -1,0 +1,257 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "paragraph",
+      "attrs": {
+        "textAlign": "left"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "left"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "image",
+          "attrs": {
+            "src": "/assets/alignment.png",
+            "width": 120,
+            "blockAlign": "left"
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "attrs": {
+        "blockAlign": "left"
+      },
+      "content": [
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableHeader",
+              "attrs": {
+                "align": "center",
+                "colwidth": [
+                  100
+                ]
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "表头"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "attrs": {
+                "align": "center",
+                "cellAlign": "left",
+                "colwidth": [
+                  100
+                ]
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "单元格"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "attrs": {
+        "textAlign": "center"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "center"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "image",
+          "attrs": {
+            "src": "/assets/alignment.png",
+            "width": 120,
+            "blockAlign": "center"
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "attrs": {
+        "blockAlign": "center"
+      },
+      "content": [
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableHeader",
+              "attrs": {
+                "align": "center",
+                "colwidth": [
+                  100
+                ]
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "表头"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "attrs": {
+                "align": "center",
+                "cellAlign": "center",
+                "colwidth": [
+                  100
+                ]
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "单元格"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "attrs": {
+        "textAlign": "right"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "right"
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "content": [
+        {
+          "type": "image",
+          "attrs": {
+            "src": "/assets/alignment.png",
+            "width": 120,
+            "blockAlign": "right"
+          }
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "attrs": {
+        "blockAlign": "right"
+      },
+      "content": [
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableHeader",
+              "attrs": {
+                "align": "center",
+                "colwidth": [
+                  100
+                ]
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "表头"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "tableRow",
+          "content": [
+            {
+              "type": "tableCell",
+              "attrs": {
+                "align": "center",
+                "cellAlign": "right",
+                "colwidth": [
+                  100
+                ]
+              },
+              "content": [
+                {
+                  "type": "paragraph",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "单元格"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

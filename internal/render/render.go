@@ -72,7 +72,11 @@ func (r *renderer) open(tag string, attrs [][2]string) {
 func (r *renderer) node(n doc.Node) {
 	switch n.Type {
 	case "paragraph":
-		r.wrap("p", nil, n)
+		var attrs [][2]string
+		if a := alignment(n.Attr("textAlign")); a != "" {
+			attrs = append(attrs, [2]string{"style", "text-align: " + a})
+		}
+		r.wrap("p", attrs, n)
 	case "heading":
 		level := n.AttrInt("level", 1)
 		if level < 1 || level > 6 {
@@ -130,11 +134,23 @@ func (r *renderer) node(n doc.Node) {
 	case "image":
 		r.image(n)
 	case "table":
-		if style, cols := tableColumns(n); style != "" {
-			r.b.WriteString(`<table style="` + style + `"><colgroup>` + cols + `</colgroup><tbody>`)
-		} else {
-			r.b.WriteString("<table><tbody>")
+		style, cols := tableColumns(n)
+		var attrs [][2]string
+		if a := alignment(n.Attr("blockAlign")); a != "" {
+			attrs = append(attrs, [2]string{"data-align", a})
+			if style != "" {
+				style += "; "
+			}
+			style += alignmentMargins(a)
 		}
+		if style != "" {
+			attrs = append(attrs, [2]string{"style", style})
+		}
+		r.open("table", attrs)
+		if cols != "" {
+			r.b.WriteString("<colgroup>" + cols + "</colgroup>")
+		}
+		r.b.WriteString("<tbody>")
 		r.children(n)
 		r.b.WriteString("</tbody></table>")
 	case "tableRow":
@@ -155,7 +171,12 @@ func (r *renderer) node(n doc.Node) {
 		if w := colwidth(n); w != "" {
 			attrs = append(attrs, [2]string{"colwidth", w})
 		}
-		if a := n.Attr("align"); a != "" {
+		a := alignment(n.Attr("align"))
+		if cell := alignment(n.Attr("cellAlign")); cell != "" {
+			attrs = append(attrs, [2]string{"data-cell-align", cell}, [2]string{"data-column-align", a})
+			a = cell
+		}
+		if a != "" {
 			attrs = append(attrs, [2]string{"style", "text-align: " + a})
 		}
 		r.wrap(tag, attrs, n)
@@ -321,10 +342,31 @@ func (r *renderer) image(n doc.Node) {
 			attrs = append(attrs, [2]string{k, v})
 		}
 	}
+	if a := alignment(n.Attr("blockAlign")); a != "" {
+		attrs = append(attrs, [2]string{"data-align", a}, [2]string{"style", "display: block; " + alignmentMargins(a)})
+	}
 	if !r.opt.Parity {
 		attrs = append(attrs, [2]string{"loading", "lazy"}, [2]string{"decoding", "async"})
 	}
 	r.open("img", attrs)
+}
+
+func alignment(value string) string {
+	if value == "left" || value == "center" || value == "right" {
+		return value
+	}
+	return ""
+}
+
+func alignmentMargins(align string) string {
+	left, right := "auto", "auto"
+	if align == "left" {
+		left = "0"
+	}
+	if align == "right" {
+		right = "0"
+	}
+	return "margin-left: " + left + "; margin-right: " + right
 }
 
 // codeBlock writes a code block; one with a title bar (a title attribute, possibly empty) is

@@ -11,12 +11,14 @@ import remarkMath from 'remark-math'
 import remarkStringify from 'remark-stringify'
 import { codeFromCallout, codeMeta, parseCodeMeta } from './codeBlock'
 import { schemaExtensions } from './extensions'
+import { alignment } from './alignment'
 
 // Markdown <-> Tiptap JSON using remark, with Obsidian's extensions: callouts, ==highlight==,
 // [[wiki links]], ![[embeds]], image sizes (![alt|300](src)) and single-newline line breaks.
 // Code block titles and collapsed state travel in the fence (```cpp title="…" collapsed); the
 // [!code] callouts once used in Obsidian for them are read as titled code blocks. Tables Markdown
-// cannot hold (column widths, row heights, merged cells) are written as HTML and read back.
+// cannot hold (column widths, row heights, merged cells), and aligned paragraphs/images, are
+// written as HTML and read back.
 
 export interface ImportContext {
   // Obsidian treats a single newline inside a paragraph as a line break unless "strict line breaks" is on.
@@ -201,8 +203,8 @@ class Converter {
   }
 
   private htmlBlock(n: Html): JSONContent[] {
-    const table = /^\s*<table[\s>]/i.test(n.value) ? this.htmlTable(n.value) : null
-    if (table) return [table]
+    const blocks = /^\s*<(?:table|p)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
+    if (blocks?.length) return blocks
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
     if (n.value.trim().startsWith('<!--')) return []
@@ -210,19 +212,17 @@ class Converter {
     return this.paragraph([{ type: 'text', value: n.value }])
   }
 
-  // A table written as HTML, as docToMarkdown writes the tables Markdown cannot hold, is read with
-  // the schema's own parse rules. Outside the browser the caller provides a DOMParser (the import
-  // tool does); without one the table stays text.
-  private htmlTable(html: string): JSONContent | null {
+  // Blocks written as HTML use the schema's own parse rules. Outside the browser the caller
+  // provides a DOMParser (the import tool does); without one the block stays text.
+  private htmlBlocks(html: string): JSONContent[] | null {
     if (typeof DOMParser === 'undefined') return null
     const body = new DOMParser().parseFromString(html, 'text/html').body
-    const table = (SchemaParser.fromSchema(documentSchema().schema).parse(body).toJSON() as JSONContent).content?.find((c) => c.type === 'table')
-    if (!table) return null
-    return mapTargets(
-      table,
+    const blocks = (SchemaParser.fromSchema(documentSchema().schema).parse(body).toJSON() as JSONContent).content ?? []
+    return blocks.map((node) => mapTargets(
+      node,
       (src) => (this.ctx.resolveImage ? this.ctx.resolveImage(src, 'html') : src),
       (href) => this.linkHref(href),
-    )
+    ))
   }
 
   // inlineHtml converts the HTML we know how to keep (<img>, <br>); null means "not understood".
@@ -231,13 +231,14 @@ class Converter {
     if (/^<br\s*\/?>$/i.test(trimmed)) return [{ type: 'hardBreak' }]
     const imgs = [...trimmed.matchAll(/<img\s[^>]*>/gi)]
     if (imgs.length && trimmed.replace(/<img\s[^>]*>/gi, '').trim() === '') {
+      if (typeof DOMParser !== 'undefined') return this.htmlBlocks(`<p>${trimmed}</p>`)?.[0]?.content ?? []
       return imgs.flatMap((m): JSONContent[] => {
         const attr = (name: string) => new RegExp(`${name}\\s*=\\s*["']?([^"'\\s>]+)`, 'i').exec(m[0])?.[1] ?? null
         const src = attr('src')
         if (!src) return []
         const resolved = this.ctx.resolveImage ? this.ctx.resolveImage(src, 'html') : src
         if (!resolved) return [{ type: 'text', text: m[0] }]
-        return [{ type: 'image', attrs: { src: resolved, alt: attr('alt'), title: attr('title'), width: numberOrNull(attr('width')), height: numberOrNull(attr('height')) } }]
+        return [{ type: 'image', attrs: { src: resolved, alt: attr('alt'), title: attr('title'), width: numberOrNull(attr('width')), height: numberOrNull(attr('height')), ...(alignment(attr('data-align')) ? { blockAlign: alignment(attr('data-align')) } : {}) } }]
       })
     }
     return null
@@ -467,6 +468,7 @@ class Exporter {
     const kids = n.content ?? []
     switch (n.type) {
       case 'paragraph':
+        if (alignment(n.attrs?.textAlign) || kids.some((c) => c.type === 'image' && alignment(c.attrs?.blockAlign))) return [{ type: 'html', value: this.nodeHtml(n) }]
         return [{ type: 'paragraph', children: this.inline(kids) }]
       case 'heading':
         return [{ type: 'heading', depth: (n.attrs?.level ?? 1) as 1, children: this.inline(kids) }]
@@ -497,7 +499,7 @@ class Exporter {
       case 'blockMath':
         return [{ type: 'math', value: String(n.attrs?.latex ?? '') }]
       case 'table':
-        return tableNeedsHtml(n) ? [{ type: 'html', value: this.tableHtml(n) }] : [this.table(n)]
+        return tableNeedsHtml(n) ? [{ type: 'html', value: this.nodeHtml(n) }] : [this.table(n)]
       case 'callout': {
         const [title, body] = kids
         const fold = String(n.attrs?.fold ?? '')
@@ -517,9 +519,9 @@ class Exporter {
 
   // Written with the schema's rendering, rows on lines of their own; a blank line, which would end
   // the HTML block in Markdown, is written as &#10;.
-  private tableHtml(n: JSONContent): string {
-    const table = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href)
-    return renderToHTMLString({ extensions: documentSchema().extensions, content: { type: 'doc', content: [table] } })
+  private nodeHtml(n: JSONContent): string {
+    const node = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href)
+    return renderToHTMLString({ extensions: documentSchema().extensions, content: { type: 'doc', content: [node] } })
       .replace('<tbody>', '<tbody>\n')
       .replace(/<\/tr>/g, '</tr>\n')
       .replace(/\n(?=\n)/g, '&#10;')
@@ -602,7 +604,7 @@ class Exporter {
     const a = n.attrs ?? {}
     const src = this.ctx.imageSrc ? this.ctx.imageSrc(String(a.src ?? '')) : String(a.src ?? '')
     if (a.height && !a.width) {
-      return { type: 'html', value: `<img src="${src}"${a.alt ? ` alt="${a.alt}"` : ''} height="${a.height}">` }
+      return { type: 'html', value: this.nodeHtml(n) }
     }
     const size = a.width ? `|${a.width}${a.height ? `x${a.height}` : ''}` : ''
     return { type: 'image', url: src, alt: `${a.alt ?? ''}${size}`, title: a.title ?? null }
@@ -618,12 +620,13 @@ function textOf(n: JSONContent): string {
 // merged cells, or cells holding more than paragraphs. Anything else Markdown cannot express that
 // the editor gains later is exported as HTML too, so nothing is lost.
 function tableNeedsHtml(n: JSONContent): boolean {
+  if (alignment(n.attrs?.blockAlign)) return true
   return (n.content ?? []).some(
     (row) =>
       !!row.attrs?.height ||
       (row.content ?? []).some((cell) => {
         const a = cell.attrs ?? {}
-        return (a.colspan ?? 1) > 1 || (a.rowspan ?? 1) > 1 || !!(a.colwidth as number[] | null)?.some(Boolean) || (cell.content ?? []).some((b) => b.type !== 'paragraph')
+        return !!alignment(a.cellAlign) || (a.colspan ?? 1) > 1 || (a.rowspan ?? 1) > 1 || !!(a.colwidth as number[] | null)?.some(Boolean) || (cell.content ?? []).some((b) => b.type !== 'paragraph' || !!alignment(b.attrs?.textAlign) || b.content?.some((c) => !!alignment(c.attrs?.blockAlign)))
       }),
   )
 }

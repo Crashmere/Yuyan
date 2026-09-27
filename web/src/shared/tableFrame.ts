@@ -13,6 +13,9 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => voi
   let extend = 0
   let attached = false
   let idle: ReturnType<typeof setTimeout> | undefined
+  const table = scroller.querySelector('table')
+  const attributes = new MutationObserver(measure)
+  if (table) attributes.observe(table, { attributes: true, attributeFilter: ['data-align'] })
   const observer = new ResizeObserver(measure)
   observer.observe(frame)
   if (scroller.firstElementChild) observer.observe(scroller.firstElementChild)
@@ -36,6 +39,9 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => voi
     extend = top ? Math.max(0, Math.round(limit - right)) : 0
     frame.style.setProperty('--bleed', `${bleed}px`)
     frame.style.setProperty('--extend', `${extend}px`)
+    const align = table?.dataset.align
+    const free = Math.max(0, right - left - (table?.getBoundingClientRect().width ?? 0))
+    frame.style.setProperty('--table-offset', `${align === 'right' ? free : align === 'center' ? free / 2 : 0}px`)
     update()
   }
 
@@ -91,6 +97,7 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => voi
 
   function release() {
     observer.disconnect()
+    attributes.disconnect()
     scroller.removeEventListener('scroll', onScroll)
     clearTimeout(idle)
   }

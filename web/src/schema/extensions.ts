@@ -9,6 +9,7 @@ import { createColGroup, Table, TableCell, TableHeader, TableRow } from '@tiptap
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { Callout, CalloutContent, CalloutTitle } from './callout'
 import { withTitles } from './codeBlock'
+import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignment'
 
 // The document schema shared by the editor, the importer and the parity snapshots.
 // Every node and mark here needs a matching case in internal/render/render.go.
@@ -47,10 +48,10 @@ export const YuyanImage = Image.extend<ImageOptions>({
       },
     }
   },
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ node, HTMLAttributes }) {
     const attrs = { ...HTMLAttributes }
     if (typeof attrs.src === 'string') attrs.src = this.options.resolveSrc(attrs.src)
-    return ['img', mergeAttributes(this.options.HTMLAttributes, attrs)]
+    return ['img', mergeAttributes(this.options.HTMLAttributes, attrs, blockAlignment(node.attrs.blockAlign, true))]
   },
 })
 
@@ -63,9 +64,10 @@ export const YuyanTable = Table.extend({
     node.firstChild?.forEach((cell) => {
       if ((cell.attrs.colwidth as number[] | null)?.some(Boolean)) widths = true
     })
-    if (!widths) return ['table', {}, ['tbody', 0]]
+    const align = blockAlignment(node.attrs.blockAlign)
+    if (!widths) return ['table', align, ['tbody', 0]]
     const { colgroup, tableWidth, tableMinWidth } = createColGroup(node, this.options.cellMinWidth)
-    return ['table', { style: tableWidth ? `width: ${tableWidth}` : `min-width: ${tableMinWidth}` }, colgroup!, ['tbody', 0]]
+    return ['table', mergeAttributes({ style: tableWidth ? `width: ${tableWidth}` : `min-width: ${tableMinWidth}` }, align), colgroup!, ['tbody', 0]]
   },
 })
 
@@ -94,6 +96,7 @@ export interface SchemaOverrides {
 
 export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
   return [
+    AlignmentAttributes,
     StarterKit.configure({
       code: false,
       codeBlock: false,
@@ -116,8 +119,8 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     TaskItem.configure({ nested: true }),
     o.table ?? YuyanTable.configure({ resizable: false }),
     YuyanTableRow,
-    TableHeader,
-    TableCell,
+    withCellAlignment(TableHeader),
+    withCellAlignment(TableCell),
     o.callout ?? Callout,
     CalloutTitle,
     CalloutContent,

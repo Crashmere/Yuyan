@@ -8,8 +8,9 @@ import type { MenuEntry } from '../ui/menu'
 import { clearFormatting, currentStyle, insertItems, listButtons, markButtons, textStyles } from './commands'
 import { useEditorContext } from './context'
 import { keyLabel, withKey } from './keys'
+import AlignmentMenu from './AlignmentMenu.vue'
 
-// The formatting toolbar above the document. It offers only what Markdown can express.
+// The formatting toolbar above the document.
 const { editor, tick, ui } = useEditorContext()
 const insertButton = ref<HTMLElement | null>(null)
 
@@ -93,6 +94,7 @@ const moreMenu: MenuEntry[] = [{ label: '快捷键说明', icon: Keyboard, hint:
       </IconButton>
       <IconButton label="链接" :active="state.link" :disabled="state.inCode" @mousedown.prevent @click="ui.openLink()"><Link :size="17" /></IconButton>
       <span class="yy-toolbar-sep"></span>
+      <AlignmentMenu />
       <IconButton
         v-for="m in listButtons"
         :key="m.name"
