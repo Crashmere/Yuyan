@@ -16,6 +16,7 @@ import NotFoundState from './NotFoundState.vue'
 const route = useRoute()
 const router = useRouter()
 const id = Number(route.params.id)
+const readingPosition = route.meta.readingPosition
 const doc = shallowRef<Doc | null>(null)
 const pane = ref<InstanceType<typeof EditorPane> | null>(null)
 const missing = ref(false)
@@ -103,6 +104,6 @@ onBeforeRouteLeave(async () => {
   <main v-if="missing" class="yy-page"><NotFoundState /></main>
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
   <main v-else-if="doc" class="yy-edit-page">
-    <EditorPane ref="pane" :doc="doc" @status="onStatus" @words="(n) => (words = n)" @saved="onSaved" />
+    <EditorPane ref="pane" :doc="doc" :reading-position="readingPosition" @status="onStatus" @words="(n) => (words = n)" @saved="onSaved" />
   </main>
 </template>

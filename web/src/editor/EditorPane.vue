@@ -6,6 +6,7 @@ import { api, ApiError, base, errorMessage, type Doc } from '../shared/api'
 import { stopLoading } from '../shared/images'
 import { toast } from '../ui/toast'
 import { prefs } from '../app/prefs'
+import type { ReadingPosition } from '../app/content/readingPosition'
 import BlockHandle from './BlockHandle.vue'
 import BubbleToolbar from './BubbleToolbar.vue'
 import { editorKey, type EditorUi } from './context'
@@ -23,12 +24,13 @@ import TableGrid from './TableGrid.vue'
 import TableToolbar from './TableToolbar.vue'
 import ImageToolbar from './ImageToolbar.vue'
 import { insertImages, pendingUploads } from './uploads'
+import { restoreReadingPosition } from './readingPosition'
 import 'katex/dist/katex.min.css'
 import '../styles/editor.css'
 
 export type SaveStatus = 'loading' | 'saved' | 'dirty' | 'saving' | 'offline' | 'error' | 'conflict'
 
-const props = defineProps<{ doc: Doc }>()
+const props = defineProps<{ doc: Doc; readingPosition?: ReadingPosition }>()
 const emit = defineEmits<{ status: [SaveStatus, string]; words: [number]; saved: [string] }>()
 
 interface Draft {
@@ -341,8 +343,17 @@ onMounted(async () => {
   loaded = true
   status.value = 'saved'
   autosizeTitle()
-  if (!d.content.content?.some((n) => n.content?.length)) titleInput.value?.focus()
-  else e.commands.focus('start')
+  const focusStart = () => {
+    if (!d.content.content?.some((n) => n.content?.length)) titleInput.value?.focus()
+    else e.commands.focus('start')
+  }
+  if (props.readingPosition) {
+    // EditorContent attaches the document and builds its Vue node views in another nextTick.
+    // Wait until those nested updates have finished before measuring the restored block.
+    requestAnimationFrame(() => {
+      if (!e.isDestroyed && !restoreReadingPosition(e, props.readingPosition!)) focusStart()
+    })
+  } else focusStart()
   window.addEventListener('beforeunload', beforeUnload)
   window.addEventListener('pagehide', snapshot)
   window.addEventListener('online', save)

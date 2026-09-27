@@ -999,6 +999,60 @@ test('pressing E once gives a hint, twice opens the editor', async ({ page, requ
   await expect(page).toHaveURL(new RegExp(`docs/${id}/edit$`))
 })
 
+for (const narrow of [false, true]) {
+  test(`entering the editor keeps the reading position (${narrow ? 'narrow, E twice' : 'desktop, edit link'})`, async ({ page, request }) => {
+    if (narrow) await page.setViewportSize({ width: 375, height: 667 })
+    const paragraph = '这是正在阅读的长段落，切换到编辑后应该继续看到这里。'.repeat(60)
+    const padding = Array.from({ length: 20 }, (_, i) => `第 ${i} 段前置内容。`.repeat(10))
+    const id = await createDoc(request, '阅读位置测试', [
+      '## 前面折叠', ...padding,
+      '## 代码示例', `\`\`\`js\n${'console.log("long code")\n'.repeat(80)}\`\`\``,
+      '| 列一 | 列二 |\n| --- | --- |\n| 单元格 | 单元格 |',
+      '## 阅读位置', paragraph, ...padding,
+    ].join('\n\n'))
+    await page.goto(`docs/${id}`)
+    const heading = page.locator('.yy-content > h2', { hasText: '前面折叠' })
+    await heading.getByRole('button', { name: '折叠这一节' }).click({ force: true })
+    // Auto-fold controls are extra DOM siblings, and hidden sections still count as document
+    // nodes. Both must be handled when finding the matching editor block.
+    await expect(page.locator('.yy-code-fold')).toHaveCount(1)
+    const reading = page.locator('.yy-content > p', { hasText: '这是正在阅读的长段落' })
+    await reading.evaluate((el) => window.scrollBy(0, el.getBoundingClientRect().top + 180))
+    const readingOffset = await reading.evaluate((el) => document.querySelector('.yy-topbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)
+    // Loading the editor's document is asynchronous; the scroll must wait for its content.
+    await page.route(`**/api/docs/${id}`, async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      await route.continue()
+    })
+    if (narrow) {
+      await page.keyboard.press('e')
+      await page.keyboard.press('e')
+    } else {
+      await page.getByRole('link', { name: '编辑', exact: true }).click()
+    }
+    const editing = page.locator('.ProseMirror > p', { hasText: '这是正在阅读的长段落' })
+    await expect(editing).toBeVisible()
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))).toBe(true)
+    await expect.poll(() => editing.evaluate((el) => document.querySelector('.yy-toolbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)).toBeCloseTo(readingOffset, 0)
+    expect(await page.locator('.ProseMirror').evaluate((el) => (el as HTMLElement & { editor: { state: { selection: { $from: { parent: { textContent: string } } } } } }).editor.state.selection.$from.parent.textContent)).toBe(paragraph)
+    const scroll = await page.evaluate(() => scrollY)
+    await page.keyboard.type('x')
+    await expect(editing).toContainText('x')
+    expect(await page.evaluate(() => scrollY)).toBeCloseTo(scroll, 0)
+    await page.getByRole('button', { name: '完成', exact: true }).click()
+    await expect(page.locator('.yy-doc-title')).toBeVisible()
+
+    // A fresh edit URL and entering from the top have no reading anchor to restore.
+    await openEditor(page, id)
+    expect(await page.evaluate(() => scrollY)).toBe(0)
+    await page.getByRole('button', { name: '完成', exact: true }).click()
+    await expect(page.locator('.yy-doc-title')).toBeVisible()
+    await page.getByRole('link', { name: '编辑', exact: true }).click()
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))).toBe(true)
+    expect(await page.evaluate(() => scrollY)).toBe(0)
+  })
+}
+
 test('cancelling the editor drops the edits of this session and leaves no version', async ({ page, request }) => {
   const id = await createDoc(request, '取消测试', '原来的内容。')
   const versions = async () => ((await (await request.get(`api/docs/${id}/versions`)).json()) as { versions: unknown[] }).versions.length

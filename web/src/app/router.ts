@@ -9,11 +9,13 @@ import VersionView from './views/VersionView.vue'
 import SearchView from './views/SearchView.vue'
 import TrashView from './views/TrashView.vue'
 import NotFoundView from './views/NotFoundView.vue'
+import { captureReadingPosition, type ReadingPosition } from './content/readingPosition'
 
 declare module 'vue-router' {
   interface RouteMeta {
     // Which sidebar the page shows: the workspace (home, knowledge bases) or the current book.
     sidebar: 'workspace' | 'book'
+    readingPosition?: ReadingPosition
   }
 }
 
@@ -31,13 +33,16 @@ export const router = createRouter({
     { path: '/trash', name: 'trash', component: TrashView, meta: { sidebar: 'workspace' } },
     { path: '/:pathMatch(.*)*', name: 'notfound', component: NotFoundView, meta: { sidebar: 'workspace' } },
   ],
-  // Views scroll to a #heading themselves once their content has loaded.
-  scrollBehavior: (to, _from, saved) => saved ?? (to.hash ? false : { top: 0 }),
+  // Views handle heading anchors and reading positions after their content has mounted.
+  scrollBehavior: (to, _from, saved) => to.meta.readingPosition ? false : saved ?? (to.hash ? false : { top: 0 }),
 })
 
 // The progress bar also covers loading a page's code, such as the editor on first use.
-router.beforeEach(() => {
+router.beforeEach((to, from) => {
   state.navigating = true
+  if (from.name === 'doc' && to.name === 'edit' && from.params.id === to.params.id) {
+    to.meta.readingPosition = captureReadingPosition()
+  }
 })
 router.afterEach(() => {
   state.navigating = false
