@@ -119,7 +119,8 @@ function focusTab() {
           <p v-if="active === 'markdown'" class="yy-shortcuts-note">中文全角符号（＃、》、···、￥）同样生效；代码围栏后可紧跟语言名。</p>
           <div v-else class="yy-shortcut-legend">
             <span v-for="key in modifierLegend" :key="key.label">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="key.path" /></svg>{{ key.label }}
+              <svg v-if="key.path" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="key.path" /></svg>
+              <span v-else class="yy-system-key-symbol" aria-hidden="true">{{ key.text }}</span>{{ key.label }}
             </span>
           </div>
           <span class="yy-shortcuts-escape"><ShortcutKeys combo="Esc" />关闭</span>

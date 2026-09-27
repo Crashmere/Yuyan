@@ -4,7 +4,6 @@ export const macKeyboard = /Mac|iPhone|iPad|iPod/.test(navigator.platform || nav
 export const keyboardPlatform = macKeyboard ? 'macOS' : 'Windows / Linux'
 
 const icons: Record<string, string> = {
-  Command: 'M9 7V5a2 2 0 1 0-2 2h10a2 2 0 1 0-2-2v14a2 2 0 1 0 2-2H7a2 2 0 1 0 2 2V7Z',
   Option: 'M3 5h5l8 14h5M14 5h7',
   Shift: 'm12 3 8 8h-5v10H9V11H4Z',
   Control: 'm6 14 6-6 6 6',
@@ -17,7 +16,7 @@ export interface ShortcutKey { label: string; text: string; path?: string }
 function key(token: string): ShortcutKey {
   const label = ({ Mod: macKeyboard ? 'Command' : 'Ctrl', Alt: macKeyboard ? 'Option' : 'Alt', Ctrl: macKeyboard ? 'Control' : 'Ctrl', '⌫': 'Backspace', '↑': 'ArrowUp', '↓': 'ArrowDown' } as Record<string, string>)[token] ?? token
   const path = (macKeyboard || ['Backspace', 'ArrowUp', 'ArrowDown'].includes(label)) ? icons[label] : undefined
-  return { label: label.length === 1 ? label.toUpperCase() : label, text: label === 'Space' ? '空格' : label === '1…6' ? '1–6' : label.length === 1 ? label.toUpperCase() : label, path }
+  return { label: label.length === 1 ? label.toUpperCase() : label, text: label === 'Command' ? '⌘' : label === 'Space' ? '空格' : label === '1…6' ? '1–6' : label.length === 1 ? label.toUpperCase() : label, path }
 }
 
 export function shortcutKeyGroups(combo: string) {
@@ -30,6 +29,9 @@ export function shortcutKeyGroups(combo: string) {
 export const modifierLegend = macKeyboard ? ['Command', 'Option', 'Shift', 'Control'].map(key) : []
 
 export function appendKeyIcon(parent: HTMLElement, key: ShortcutKey) {
+  if (key.label === 'Command') {
+    const symbol = document.createElement('span'); symbol.className = 'yy-system-key-symbol'; symbol.textContent = key.text; symbol.setAttribute('aria-hidden', 'true'); parent.append(symbol); return
+  }
   if (!key.path) { parent.textContent = key.text; return }
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   for (const [name, value] of Object.entries({ viewBox: '0 0 24 24', width: '15', height: '15', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(name, value)

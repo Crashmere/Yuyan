@@ -36,6 +36,8 @@
 .yy-shortcut-chord { display: inline-flex; align-items: center; gap: 4px; }
 .yy-keycap { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 26px; height: 25px; padding: 0 6px; border: 1px solid var(--yy-border-strong); border-radius: 5px; background: var(--yy-bg-muted); color: var(--yy-text); box-shadow: 0 1px 0 var(--yy-border); font: 500 12px/1 var(--yy-font); white-space: nowrap; }
 .yy-keycap svg { flex: none; }
+/* Let macOS draw its own Command glyph, including the system font's optical sizing. */
+.yy-system-key-symbol { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 15px; height: 15px; font: 400 16px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
 .yy-shortcut-or { color: var(--yy-text-3); font-size: 11px; }
 .yy-shortcut-input { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .yy-shortcut-input code { padding: 3px 6px; border-radius: 4px; background: var(--yy-bg-muted); font: 12px/1.4 var(--yy-mono); white-space: nowrap; }
