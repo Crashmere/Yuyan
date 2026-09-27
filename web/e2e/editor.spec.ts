@@ -667,12 +667,12 @@ test('sections fold under their headings, stay folded, and open for the outline 
 })
 
 test('code blocks look like Yuque: One Dark, with a title bar that collapses them', async ({ page, request }) => {
-  const id = await createDoc(request, '代码标题测试', '```cpp title="Dijkstra" collapsed\nint dijkstra();\n```\n\n边权非负时使用。')
+  const id = await createDoc(request, '代码标题测试', '```cpp title="Dijkstra" collapsed\nint dijkstra();\n```\n\n边权非负时使用。\n\n```cpp\nint main();\n```')
   await page.goto(`docs/${id}`)
   const colours = (block: ReturnType<Page['locator']>, token: string) =>
     block.evaluate((b, t) => ({ code: getComputedStyle(b.querySelector('pre')!).backgroundColor, type: getComputedStyle(b.querySelector(t)!).color }), token)
   const oneDark = { code: 'rgb(40, 44, 52)', type: 'rgb(86, 182, 194)' }
-  const block = page.locator('.yy-content .code-block')
+  const block = page.locator('.yy-content .code-block').first()
   const title = block.locator('.code-title')
   await expect(title).toContainText('Dijkstra')
   await expect(title.locator('.code-lang')).toHaveText('C++')
@@ -683,9 +683,23 @@ test('code blocks look like Yuque: One Dark, with a title bar that collapses the
   await title.getByRole('button', { name: '复制' }).click()
   await expect(block.locator('pre')).toBeVisible()
 
+  // The tab on the top edge shows or hides the title bar, for this visit only.
+  const plain = page.locator('.yy-content .code-block').nth(1)
+  await expect(plain.locator('.code-title')).toBeHidden()
+  await plain.getByRole('button', { name: '显示标题栏' }).click()
+  await expect(plain.locator('.code-title .code-lang')).toHaveText('C++')
+  await plain.locator('.code-title').click()
+  await expect(plain.locator('pre')).toBeHidden()
+  await block.getByRole('button', { name: '隐藏标题栏' }).click()
+  await expect(title).toBeHidden()
+  await expect(block.locator('pre > .yy-copy')).toBeVisible()
+  await page.reload()
+  await expect(title).toBeVisible()
+  await expect(plain.locator('.code-title')).toBeHidden()
+
   // The editor keeps the block collapsed; the arrow opens it, and so does finding text inside it.
   await page.getByRole('link', { name: '编辑' }).click()
-  const code = page.locator('.ProseMirror .yy-codeblock')
+  const code = page.locator('.ProseMirror .yy-codeblock').first()
   await expect(code.locator('.yy-codeblock-name')).toHaveValue('Dijkstra')
   await expect(code.locator('pre')).toBeHidden()
   await code.getByRole('button', { name: '展开代码' }).click()
@@ -720,7 +734,7 @@ test('code block titles are added, renamed and removed in the editor and kept in
   const md = await finishAndExport(page, '代码标题编辑')
   expect(md).toContain('```cpp\nint main() {}\n```')
   expect(md).toContain('```javascript title="示例"\nxlet a\n```')
-  await expect(page.locator('.yy-content .code-title')).toContainText('示例')
+  await expect(page.locator('.yy-content .code-title', { hasText: '示例' })).toBeVisible()
 })
 
 test('images still loading are cancelled when the page is left', async ({ page }) => {

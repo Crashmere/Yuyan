@@ -657,24 +657,20 @@
 }
 /* Code block controls sit on the dark code (tokens.css). */
 .yy-lang-trigger,
-.yy-codeblock-btn,
-.yy-codeblock-bar .yy-codeblock-icon {
+.yy-codeblock-btn {
   border: 1px solid var(--yy-codeblock-line);
   background: var(--yy-codeblock-hover);
   color: var(--yy-codeblock-text);
 }
 .yy-lang-trigger:hover,
 .yy-codeblock-btn:hover,
-.yy-codeblock .yy-codeblock-icon:hover,
 .yy-codeblock-toggle:hover {
   border-color: #4b5263;
   background: var(--yy-codeblock-hover);
   color: var(--yy-codeblock-title);
 }
-.yy-codeblock-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.yy-codeblock > .code-tab {
+  top: 1px;
 }
 
 /* The title bar of a titled block (schema/codeBlock.ts), as in Yuque. */
@@ -736,7 +732,7 @@
   color: #5c6370;
   font-weight: 400;
 }
-.yy-codeblock-title :is(.yy-lang-trigger, .yy-codeblock-btn, .yy-codeblock-icon) {
+.yy-codeblock-title :is(.yy-lang-trigger, .yy-codeblock-btn) {
   border-color: transparent;
   background: none;
   color: var(--yy-codeblock-muted);

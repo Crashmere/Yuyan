@@ -33,21 +33,49 @@ function enhanceCode(root: HTMLElement) {
     const code = pre.querySelector('code')
     if (!code || pre.dataset.enhanced) continue
     pre.dataset.enhanced = '1'
-    // A titled block (schema/codeBlock.ts) shows the language and copy button in its title bar,
-    // which also collapses it, so it never starts folded.
-    const bar = pre.parentElement?.classList.contains('code-block') ? pre.previousElementSibling : null
     const language = /(?:^|\s)language-(\S+)/.exec(code.className)?.[1]
-    if (bar && language) {
-      const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
-      label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language))?.label ?? language
-      bar.appendChild(label)
-    }
     if (language === 'mermaid') continue
     const text = code.textContent ?? ''
     const lines = splitLines(code)
-    addCopyButton(bar ?? pre, text)
-    if (!bar && lines > foldLines + 5) addFold(pre, lines)
+    const block = addTitleBar(pre, language, text)
+    addCopyButton(pre, text)
+    // A block saved with a title bar collapses from it instead of starting folded.
+    if (block.classList.contains('no-title') && lines > foldLines + 5) addFold(pre, block, lines)
   }
+}
+
+// Every code block gets Yuque's title bar (schema/codeBlock.ts), hidden on blocks saved without
+// one. The tab on the top edge shows or hides it for this visit only; the document keeps what the
+// editor saved.
+function addTitleBar(pre: HTMLElement, language: string | undefined, text: string): HTMLElement {
+  let block = pre.parentElement!
+  if (!block.classList.contains('code-block')) {
+    block = Object.assign(document.createElement('div'), { className: 'code-block no-title' })
+    pre.replaceWith(block)
+    block.append(Object.assign(document.createElement('div'), { className: 'code-title' }), pre)
+  }
+  const bar = block.querySelector(':scope > .code-title')!
+  if (language) {
+    const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
+    label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language))?.label ?? language
+    bar.appendChild(label)
+  }
+  addCopyButton(bar, text)
+  const tab = Object.assign(document.createElement('button'), { type: 'button', className: 'code-tab' })
+  const update = () => {
+    const hidden = block.classList.contains('no-title')
+    tab.classList.toggle('is-down', hidden)
+    tab.title = hidden ? '显示标题栏' : '隐藏标题栏'
+    tab.setAttribute('aria-label', tab.title)
+  }
+  tab.addEventListener('click', () => {
+    block.classList.toggle('no-title')
+    block.classList.remove('is-collapsed')
+    update()
+  })
+  update()
+  block.prepend(tab)
+  return block
 }
 
 // splitLines wraps each line of highlighted code in its own element, so line numbers and wrapped
@@ -100,7 +128,7 @@ function addCopyButton(parent: Element, text: string) {
   parent.appendChild(button)
 }
 
-function addFold(pre: HTMLElement, lines: number) {
+function addFold(pre: HTMLElement, block: HTMLElement, lines: number) {
   pre.classList.add('is-folded')
   pre.style.setProperty('--yy-fold-lines', String(foldLines))
   const button = document.createElement('button')
@@ -112,9 +140,9 @@ function addFold(pre: HTMLElement, lines: number) {
     const folded = pre.classList.toggle('is-folded')
     button.textContent = label()
     // Collapsing a block read to its end would otherwise leave the page far below it.
-    if (folded && pre.getBoundingClientRect().top < 0) pre.scrollIntoView({ block: 'start' })
+    if (folded && block.getBoundingClientRect().top < 0) block.scrollIntoView({ block: 'start' })
   })
-  pre.after(button)
+  block.after(button)
 }
 
 async function renderMath(root: HTMLElement) {

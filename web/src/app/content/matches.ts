@@ -63,7 +63,7 @@ export function showMatches(root: HTMLElement, query: string): number {
   const line = at.closest('.yy-line')
   const shown = Number(pre?.style.getPropertyValue('--yy-fold-lines'))
   if (pre && line && [...line.parentElement!.children].indexOf(line) >= shown) {
-    const fold = pre.nextElementSibling
+    const fold = pre.closest('.code-block')?.nextElementSibling
     if (fold instanceof HTMLButtonElement && fold.classList.contains('yy-code-fold')) fold.click()
   }
   at.scrollIntoView({ block: 'center' })

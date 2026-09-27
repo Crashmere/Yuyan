@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { NodeViewContent, NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
-import { ChevronDown, PanelTop, PanelTopClose } from 'lucide-vue-next'
+import { ChevronDown } from 'lucide-vue-next'
 import { prefs } from '../../app/prefs'
 import { copyText } from '../../shared/clipboard'
 import { renderMermaid } from '../../shared/mermaid'
-import IconButton from '../../ui/IconButton.vue'
 import { setCollapsed } from '../codeBlocks'
 import LanguagePicker from './LanguagePicker.vue'
 
@@ -103,6 +102,15 @@ async function copy() {
 
 <template>
   <node-view-wrapper class="yy-codeblock" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed }">
+    <button
+      type="button"
+      class="code-tab"
+      :class="{ 'is-down': !titled }"
+      contenteditable="false"
+      :aria-label="titled ? '隐藏标题栏' : '显示标题栏'"
+      :title="titled ? '隐藏标题栏' : '显示标题栏'"
+      @click="titled ? hideTitle() : showTitle()"
+    ></button>
     <div v-if="titled" class="yy-codeblock-title" contenteditable="false">
       <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :title="collapsed ? '展开' : '收起'" @click="toggle">
         <ChevronDown :size="15" />
@@ -110,14 +118,10 @@ async function copy() {
       <input ref="titleInput" v-model="titleText" class="yy-codeblock-name" placeholder="代码块标题" aria-label="代码块标题" @keydown.enter.prevent="titleEntered" />
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
       <button type="button" class="yy-codeblock-btn" @click="copy">{{ copied ? '已复制' : '复制' }}</button>
-      <IconButton small class="yy-codeblock-icon" label="隐藏标题栏" @click="hideTitle"><PanelTopClose :size="14" /></IconButton>
     </div>
     <div v-else class="yy-codeblock-bar" contenteditable="false">
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
-      <span class="yy-codeblock-actions">
-        <IconButton small class="yy-codeblock-icon" label="显示标题栏" @click="showTitle"><PanelTop :size="14" /></IconButton>
-        <button type="button" class="yy-codeblock-btn" @click="copy">{{ copied ? '已复制' : '复制' }}</button>
-      </span>
+      <button type="button" class="yy-codeblock-btn" @click="copy">{{ copied ? '已复制' : '复制' }}</button>
     </div>
     <div v-show="!collapsed" class="yy-codeblock-body">
       <!-- No whitespace inside <pre>: it would show up as blank lines. -->
