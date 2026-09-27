@@ -1415,9 +1415,13 @@ a.yy-catalog-title:hover {
   justify-content: center;
   padding: 36px 40px 96px;
 }
+/* As in Yuque, the outline sits at the right edge of the page. Its column stays reserved while it
+   is hidden, so the text does not move; on wide screens the text is centred either way. */
 .yy-doc-page.has-toc {
-  grid-template-columns: minmax(0, var(--yy-content-width)) 220px;
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--yy-content-width)) minmax(252px, 1fr);
+}
+.yy-doc-page.has-toc > .yy-article {
+  grid-column: 2;
 }
 .yy-article {
   width: 100%;
@@ -1507,6 +1511,20 @@ a.yy-catalog-title:hover {
   align-self: start;
   max-height: calc(100vh - var(--yy-topbar) - 48px);
   overflow: auto;
+  overscroll-behavior: contain;
+}
+.yy-doc-page > .yy-doc-aside {
+  grid-column: 3;
+  justify-self: end;
+  width: 220px;
+}
+@media (min-width: 1181px) {
+  .yy-doc-page.has-toc {
+    padding-right: 24px;
+  }
+  .yy-doc-page.toc-hidden > .yy-doc-aside {
+    display: none;
+  }
 }
 .yy-toc-head {
   position: sticky;
@@ -1523,9 +1541,6 @@ a.yy-catalog-title:hover {
 }
 .yy-toc-eye {
   color: var(--yy-text-3);
-}
-.yy-toc.is-hidden ul {
-  display: none;
 }
 .yy-toc ul {
   list-style: none;
@@ -1551,9 +1566,6 @@ a.yy-catalog-title:hover {
 .yy-toc a.active {
   border-left-color: var(--yy-primary);
   color: var(--yy-primary);
-}
-.yy-toc-btn {
-  display: none;
 }
 .yy-aside-mask {
   display: none;
@@ -1811,13 +1823,21 @@ a.yy-catalog-title:hover {
   .yy-doc-page.has-toc {
     grid-template-columns: minmax(0, 1fr);
   }
-  .yy-doc-aside {
+  .yy-doc-page.has-toc > .yy-article {
+    grid-column: auto;
+  }
+  /* A drawer opened from the top bar. align-self is reset: on a fixed box, the start alignment of
+     the sticky outline would size it to its content instead of the window, so it never scrolled. */
+  .yy-doc-aside,
+  .yy-doc-page > .yy-doc-aside {
     position: fixed;
     top: var(--yy-topbar);
     right: 0;
     bottom: 0;
     z-index: 30;
     display: none;
+    align-self: auto;
+    justify-self: auto;
     width: min(300px, 85vw);
     max-height: none;
     padding: 20px;
@@ -1825,24 +1845,17 @@ a.yy-catalog-title:hover {
     background: var(--yy-bg);
     box-shadow: var(--yy-shadow-popover);
   }
-  .toc-open .yy-doc-aside {
+  .yy-doc-page.toc-open > .yy-doc-aside {
     display: block;
   }
-  /* Opened from the top bar as a drawer, the outline is always shown in full. */
   .yy-toc-eye {
     display: none;
-  }
-  .yy-toc.is-hidden ul {
-    display: block;
   }
   .toc-open .yy-aside-mask {
     position: fixed;
     inset: var(--yy-topbar) 0 0 0;
     z-index: 29;
     display: block;
-  }
-  .yy-toc-btn {
-    display: inline-flex;
   }
 }
 

@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch }
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import { getMarkRange, type JSONContent } from '@tiptap/core'
 import { api, ApiError, base, type Doc } from '../shared/api'
+import { stopLoading } from '../shared/images'
 import { prefs } from '../app/prefs'
 import BlockHandle from './BlockHandle.vue'
 import BubbleToolbar from './BubbleToolbar.vue'
@@ -323,6 +324,7 @@ onBeforeUnmount(() => {
   clearTimeout(saveTimer)
   clearTimeout(retryTimer)
   snapshot()
+  if (editor.value) stopLoading(editor.value.view.dom)
   editor.value?.destroy()
 })
 </script>

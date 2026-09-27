@@ -1,6 +1,9 @@
+import { reveal } from './folds'
+
 // Highlights what was searched for in a document opened from search results, and brings the first
-// match into view, opening folded code and collapsed callouts on the way. The highlights use the
-// CSS Custom Highlight API, which leaves the content untouched; without it the page only scrolls.
+// match into view, opening folded sections, collapsed callouts and folded code on the way. The
+// highlights use the CSS Custom Highlight API, which leaves the content untouched; without it the
+// page only scrolls.
 
 const name = 'yy-search'
 // Matches do not run from one of these into the next, as the server's plain text breaks there too.
@@ -50,6 +53,7 @@ export function showMatches(root: HTMLElement, query: string): number {
   if ('highlights' in CSS) CSS.highlights.set(name, new Highlight(...ranges))
   const at = ranges[0]?.startContainer.parentElement
   if (!at) return 0
+  reveal(at)
   for (let c = at.closest('.callout.is-collapsed'); c; c = c.parentElement?.closest('.callout.is-collapsed') ?? null) {
     c.classList.remove('is-collapsed')
   }

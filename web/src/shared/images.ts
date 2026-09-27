@@ -12,3 +12,14 @@ export function reservedSize(natural: [number, number] | undefined, width: numbe
   if (!w || !h) return {}
   return { width: width || height ? undefined : w, aspectRatio: `${w} / ${h}` }
 }
+
+// Cancels the downloads of images still loading in a page that is being left. They would go on in
+// the background, and over HTTP/1.1 the few connections a browser opens to one server then hold up
+// the next page's requests.
+export function stopLoading(root: Element) {
+  for (const img of root.querySelectorAll('img')) {
+    if (img.complete) continue
+    img.removeAttribute('srcset')
+    img.removeAttribute('src')
+  }
+}

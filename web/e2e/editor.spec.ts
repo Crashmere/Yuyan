@@ -614,19 +614,110 @@ test('search results open at the first match, unfolding long code and collapsed 
   await expect(page.locator('.yy-content .callout')).not.toHaveClass(/is-collapsed/)
 })
 
-test('the outline beside a document hides and shows with its eye button', async ({ page }) => {
+async function openLongDocument(page: Page) {
   await page.goto('./')
   await page.locator('.yy-book-card', { hasText: '产品手册（示例）' }).click()
   await page.locator('.yy-catalog-title', { hasText: '长文档示例' }).click()
-  const toc = page.locator('.yy-doc-aside .yy-toc')
-  await expect(toc.getByRole('link').first()).toBeVisible()
-  await toc.getByRole('button', { name: '隐藏大纲' }).click()
-  await expect(toc.locator('ul')).toBeHidden()
+  await expect(page.locator('.yy-doc-title')).toHaveText('长文档示例')
+}
+
+test('the outline sits at the right edge; its eye hides it into the top bar button', async ({ page }) => {
+  await openLongDocument(page)
+  const aside = page.locator('.yy-doc-aside')
+  const article = page.locator('.yy-article')
+  await expect(aside.getByRole('link').first()).toBeVisible()
+  const box = (await aside.boundingBox())!
+  expect(1360 - (box.x + box.width)).toBeLessThan(40)
+  const left = (await article.boundingBox())!.x
+  await aside.getByRole('button', { name: '隐藏大纲' }).click()
+  await expect(aside).toBeHidden()
+  expect((await article.boundingBox())!.x).toBe(left)
   await page.reload()
-  await expect(toc.getByRole('button', { name: '显示大纲' })).toBeVisible()
-  await expect(toc.locator('ul')).toBeHidden()
-  await toc.getByRole('button', { name: '显示大纲' }).click()
-  await expect(toc.getByRole('link').first()).toBeVisible()
+  await expect(aside).toBeHidden()
+  await page.locator('#yy-topbar-actions').getByRole('button', { name: '显示大纲' }).click()
+  await expect(aside.getByRole('link').first()).toBeVisible()
+  expect((await article.boundingBox())!.x).toBe(left)
+})
+
+test('sections fold under their headings, stay folded, and open for the outline and search', async ({ page }) => {
+  await openLongDocument(page)
+  const background = page.locator('.yy-content > h2', { hasText: '1. 背景' })
+  const detail = page.locator('.yy-content > h3', { hasText: '1.2 小结' })
+  await background.hover()
+  await background.getByRole('button', { name: '折叠这一节' }).click()
+  await expect(detail).toBeHidden()
+  await expect(page.locator('.yy-content > h2', { hasText: '2. 目标' })).toBeVisible()
+  await page.reload()
+  await expect(detail).toBeHidden()
+  await page.locator('.yy-doc-aside a', { hasText: '1.2 小结' }).click()
+  await expect(detail).toBeInViewport()
+
+  await background.getByRole('button', { name: '折叠这一节' }).click()
+  await expect(detail).toBeHidden()
+  await page.goto('search?q=第 1 节')
+  await page.locator('.yy-result-title', { hasText: '长文档示例' }).click()
+  await expect.poll(async () => (await searchHighlights(page)).length).toBeGreaterThan(0)
+  await expect(detail).toBeVisible()
+  await expect(background.getByRole('button', { name: '折叠这一节' })).toBeVisible()
+})
+
+test('code callouts use the Monokai Pro frame on reading pages and in the editor', async ({ page }) => {
+  await page.goto('search?q=int dijkstra')
+  await page.locator('.yy-result-title', { hasText: '最短路' }).click()
+  const colours = (callout: ReturnType<Page['locator']>, token: string) =>
+    callout.evaluate((c, t) => {
+      const style = (el: Element | null) => (el ? getComputedStyle(el) : null)
+      return {
+        border: style(c)?.borderTopColor,
+        title: style(c.querySelector('.callout-title'))?.backgroundColor,
+        code: style(c.querySelector('pre'))?.backgroundColor,
+        type: style(c.querySelector(t))?.color,
+      }
+    }, token)
+  const monokai = { border: 'rgb(0, 185, 107)', title: 'rgb(45, 42, 46)', code: 'rgb(45, 42, 46)', type: 'rgb(255, 216, 102)' }
+  expect(await colours(page.locator('.yy-content .callout'), '.chroma .kt')).toEqual(monokai)
+  await page.getByRole('link', { name: '编辑' }).click()
+  await expect(page.locator('.ProseMirror .callout pre')).toBeVisible()
+  expect(await colours(page.locator('.ProseMirror .callout'), '.hljs-type')).toEqual(monokai)
+})
+
+test('images still loading are cancelled when the page is left', async ({ page }) => {
+  const held: string[] = []
+  const aborted: string[] = []
+  await page.route(/\/yuyan\/assets\/[0-9a-f]{32}\./, (route) => void held.push(route.request().url()))
+  page.on('requestfailed', (r) => {
+    if (/\/assets\//.test(r.url())) aborted.push(r.url())
+  })
+  await openLongDocument(page)
+  await page.locator('.yy-content img').first().scrollIntoViewIfNeeded()
+  await expect.poll(() => held.length).toBeGreaterThan(0)
+  await page.locator('.yy-pager a').first().click()
+  await expect.poll(() => aborted.length).toBe(held.length)
+})
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 412, height: 520 }, hasTouch: true, isMobile: true })
+
+  test('the outline drawer scrolls, and code scrolls under a fixed copy button', async ({ page }) => {
+    await openLongDocument(page)
+    await page.getByRole('button', { name: '大纲', exact: true }).tap()
+    const aside = page.locator('.yy-doc-aside')
+    await expect(aside).toBeVisible()
+    const drawer = await aside.evaluate((a) => {
+      a.scrollTop = 100
+      return { top: a.scrollTop, height: a.clientHeight }
+    })
+    expect(drawer.top).toBe(100)
+    expect(drawer.height).toBeLessThanOrEqual(520 - 52)
+
+    await page.goto('search?q=heappush')
+    await page.locator('.yy-result-title', { hasText: '长代码' }).click()
+    const pre = page.locator('.yy-content pre').first()
+    const copy = pre.locator('.yy-copy')
+    const before = await copy.boundingBox()
+    expect(await pre.locator('code').evaluate((c) => ((c.scrollLeft = 200), c.scrollLeft))).toBe(200)
+    expect(await copy.boundingBox()).toEqual(before)
+  })
 })
 
 test('a menu that has to scroll shows half of its last item', async ({ page }) => {

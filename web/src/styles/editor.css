@@ -977,6 +977,44 @@
   pointer-events: none;
 }
 
+/* Code callouts get the Monokai Pro frame of reading pages (content.css). In the editor the title
+   and content sit inside the node view's content element, and code blocks keep room for their bar. */
+.ProseMirror .callout[data-callout='code'] .callout-title {
+  padding: 10px 16px;
+  border-bottom: 1px solid #19181a;
+  background: #2d2a2e;
+}
+.ProseMirror .callout[data-callout='code'] .callout-content {
+  background: #2d2a2e;
+  color: #fcfcfa;
+}
+.ProseMirror .callout[data-callout='code'] .callout-content > * {
+  margin: 0;
+}
+.ProseMirror .callout[data-callout='code'] .callout-content > :not(.yy-codeblock) {
+  padding: 0.6em 16px;
+}
+.ProseMirror .callout[data-callout='code'] .yy-codeblock pre {
+  padding-top: 38px;
+}
+.ProseMirror .callout[data-callout='code'] :is(.yy-lang-trigger, .yy-codeblock-btn) {
+  border-color: #5b595c;
+  background: #403e41;
+  color: #fcfcfa;
+}
+.ProseMirror .callout[data-callout='code'] .yy-code-lines > div::before {
+  color: #5b595c;
+}
+.ProseMirror .callout[data-callout='code'] :is(.hljs-keyword, .hljs-selector-tag, .hljs-meta, .hljs-operator) { color: #ff6188; }
+.ProseMirror .callout[data-callout='code'] :is(.hljs-string, .hljs-regexp, .hljs-meta .hljs-string) { color: #a9dc76; }
+.ProseMirror .callout[data-callout='code'] .hljs-number { color: #fc9867; }
+.ProseMirror .callout[data-callout='code'] :is(.hljs-title, .hljs-built_in) { color: #78dce8; }
+.ProseMirror .callout[data-callout='code'] .hljs-comment { color: #727072; }
+.ProseMirror .callout[data-callout='code'] :is(.hljs-type, .hljs-title.class_, .hljs-attr, .hljs-attribute, .hljs-property) { color: #ffd866; }
+.ProseMirror .callout[data-callout='code'] .hljs-literal { color: #ab9df2; }
+.ProseMirror .callout[data-callout='code'] .hljs-punctuation { color: #939293; }
+.ProseMirror .callout[data-callout='code'] :is(.hljs-variable, .hljs-params) { color: #fcfcfa; }
+
 /* lowlight (highlight.js) token colours in the editor, close to the GitHub theme used on pages. */
 .hljs-comment, .hljs-quote { color: light-dark(#6a737d, #8b949e); font-style: italic; }
 .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type { color: light-dark(#d73a49, #ff7b72); }

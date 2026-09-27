@@ -35,6 +35,75 @@
 .yy-content :where(h5, h6) {
   font-size: 1em;
 }
+/* Reading pages fold the section under a heading with the arrow before it (content/folds.ts). */
+.yy-content > :is(h1, h2, h3, h4, h5, h6):has(> .yy-fold) {
+  position: relative;
+}
+.yy-fold {
+  position: absolute;
+  top: 0;
+  left: -26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 1.45em;
+  padding: 0;
+  border: 0;
+  border-radius: var(--yy-radius-sm);
+  background: none;
+  color: var(--yy-text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.yy-fold::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s;
+}
+.is-folded > .yy-fold::before {
+  transform: rotate(-45deg);
+}
+.yy-content > :hover > .yy-fold,
+.yy-fold:focus-visible,
+.is-folded > .yy-fold {
+  opacity: 1;
+}
+.yy-fold:hover {
+  background: var(--yy-bg-hover);
+  color: var(--yy-text);
+}
+.yy-content > .is-folded::after {
+  content: '⋯';
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: var(--yy-radius-sm);
+  background: var(--yy-bg-muted);
+  color: var(--yy-text-3);
+  font-size: 0.6em;
+  line-height: 1.6;
+  vertical-align: middle;
+}
+.yy-folded-away {
+  display: none !important;
+}
+@media (hover: none) {
+  .yy-fold {
+    opacity: 0.6;
+  }
+}
+@media (max-width: 720px) {
+  .yy-fold {
+    left: -16px;
+    width: 16px;
+  }
+}
 .yy-content a {
   color: var(--yy-primary);
 }
@@ -87,6 +156,15 @@
 .yy-content pre code {
   font: inherit;
   white-space: pre;
+}
+/* On reading pages (enhance.ts) the code scrolls inside the block, so the copy button in the
+   corner stays put instead of scrolling away with long lines. */
+.yy-content pre[data-enhanced] {
+  overflow-x: visible;
+}
+.yy-content pre[data-enhanced] > code {
+  display: block;
+  overflow-x: auto;
 }
 /* Reading pages split code into lines (enhance.ts); line numbers and wrapping are display
    settings on <html>. */
@@ -300,11 +378,70 @@ pre:hover > .yy-copy,
 .callout[data-callout='bug'] { --callout-color: 245, 0, 87; }
 .callout[data-callout='example'] { --callout-color: 124, 77, 255; }
 .callout[data-callout='quote'], .callout[data-callout='cite'] { --callout-color: 158, 158, 158; }
-.callout[data-callout='code'] { --callout-color: 96, 125, 139; }
-.callout[data-callout='code'] .callout-content pre {
-  margin: 0.4em 0;
-  background: var(--yy-bg);
+.callout[data-callout='code'] { --callout-color: 0, 185, 107; }
+
+/* Code callouts ([!code]) take the Monokai Pro code frame from the user's Obsidian snippet
+   (custom-callouts.css in the 算法课 vault): an accent border around a dark title bar joined to the
+   code. The editor's version is in editor.css. */
+.callout[data-callout='code'] {
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid rgb(var(--callout-color));
+  background: transparent;
 }
+.callout[data-callout='code'] > .callout-title {
+  padding: 10px 16px;
+  border-bottom: 1px solid #19181a;
+  background: #2d2a2e;
+}
+.callout[data-callout='code'].is-collapsed > .callout-title {
+  border-bottom: 0;
+}
+.callout[data-callout='code'] > .callout-content {
+  background: #2d2a2e;
+  color: #fcfcfa;
+}
+.callout[data-callout='code'] > .callout-content > * {
+  margin: 0;
+}
+.callout[data-callout='code'] > .callout-content > :not(pre, .yy-code-fold) {
+  padding: 0.6em 16px;
+}
+.callout[data-callout='code'] pre {
+  margin: 0;
+  padding: 12px 16px 14px;
+  border: 0;
+  border-radius: 0;
+  background: #2d2a2e;
+  color: #fcfcfa;
+}
+.callout[data-callout='code'] pre code {
+  scrollbar-color: #727072 transparent;
+}
+.yy-code-numbers .callout[data-callout='code'] pre code .yy-line::before {
+  color: #5b595c;
+}
+.callout[data-callout='code'] .yy-copy {
+  border-color: #5b595c;
+  background: #403e41;
+  color: #fcfcfa;
+}
+.callout[data-callout='code'] .yy-code-fold {
+  margin: 0 auto 10px;
+  border-color: #5b595c;
+  background: #2d2a2e;
+  color: #c1c0c0;
+}
+/* Monokai Pro token colours, over the GitHub colours of the page (Chroma's short class names). */
+.yy-content .callout[data-callout='code'] .chroma :is(.k, .kd, .kn, .kp, .kr, .o, .ow, .cp) { color: #ff6188; }
+.yy-content .callout[data-callout='code'] .chroma :is(.s, .sa, .sb, .sc, .dl, .sd, .s1, .s2, .se, .sh, .si, .sx, .sr, .ss, .cpf) { color: #a9dc76; }
+.yy-content .callout[data-callout='code'] .chroma :is(.m, .mb, .mf, .mh, .mi, .il, .mo) { color: #fc9867; }
+.yy-content .callout[data-callout='code'] .chroma :is(.nf, .fm, .nb, .bp) { color: #78dce8; }
+.yy-content .callout[data-callout='code'] .chroma :is(.c, .ch, .cm, .c1, .cs) { color: #727072; }
+.yy-content .callout[data-callout='code'] .chroma :is(.kt, .nc, .na, .nd, .ne, .py) { color: #ffd866; }
+.yy-content .callout[data-callout='code'] .chroma :is(.kc, .no) { color: #ab9df2; }
+.yy-content .callout[data-callout='code'] .chroma .p { color: #939293; }
+.yy-content .callout[data-callout='code'] .chroma :is(.n, .nx, .nv, .nn, .ni, .nl, .vc, .vg, .vi, .vm, .w, .err) { color: #fcfcfa; }
 
 /* Obsidian shows the capitalised type when a callout has no title. */
 .callout > .callout-title:empty::before { content: 'Callout'; }

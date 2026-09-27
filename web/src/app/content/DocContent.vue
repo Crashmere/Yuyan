@@ -2,14 +2,17 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { base, type ImageSizes } from '../../shared/api'
+import { stopLoading } from '../../shared/images'
 import { prefs } from '../prefs'
 import { enhance } from './enhance'
+import { reveal, setupFolds } from './folds'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
 import { clearMatches, showMatches } from './matches'
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app. highlight is
-// the text searched for when the page was opened from search results.
-const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes; highlight?: string }>()
+// the text searched for when the page was opened from search results; foldKey names the document
+// whose folded sections are remembered.
+const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes; highlight?: string; foldKey?: string }>()
 const router = useRouter()
 const root = ref<HTMLElement | null>(null)
 // Diagrams are drawn in the theme's colours; a theme change re-creates the content to redraw them.
@@ -20,7 +23,16 @@ async function run() {
   await nextTick()
   if (!root.value) return
   drawn = enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images }).catch((e: unknown) => console.warn('enhance', e))
+  setupFolds(root.value, props.foldKey)
+  if (location.hash) scrollTo(decodeURIComponent(location.hash.slice(1)))
   await mark()
+}
+
+function scrollTo(id: string, smooth = false) {
+  const target = document.getElementById(id)
+  if (!target || !root.value?.contains(target)) return
+  reveal(target)
+  target.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
 }
 
 // Matches are found once formulas and diagrams are drawn, so the page does not move afterwards.
@@ -34,7 +46,10 @@ async function mark() {
 onMounted(run)
 watch(() => props.html, run)
 watch(() => props.highlight, mark)
-onBeforeUnmount(clearMatches)
+onBeforeUnmount(() => {
+  clearMatches()
+  if (root.value) stopLoading(root.value)
+})
 watch(
   () => prefs.theme,
   () => {
@@ -66,7 +81,7 @@ function onClick(e: MouseEvent) {
   const href = a.getAttribute('href') ?? ''
   if (href.startsWith('#')) {
     e.preventDefault()
-    document.getElementById(decodeURIComponent(href.slice(1)))?.scrollIntoView({ behavior: 'smooth' })
+    scrollTo(decodeURIComponent(href.slice(1)), true)
   } else if (href.startsWith(base)) {
     e.preventDefault()
     void router.push(href.slice(base.length - 1))
