@@ -14,6 +14,7 @@ const active = ref(0)
 const input = ref<HTMLInputElement | null>(null)
 const list = ref<HTMLElement | null>(null)
 const results = computed(() => searchLanguages(query.value, props.value))
+const portalTarget = computed(() => open.value ? document.querySelector<HTMLElement>('.yy-code-dialog[open]') ?? 'body' : 'body')
 
 watch(open, (o) => {
   if (!o) return
@@ -55,7 +56,7 @@ function onKey(e: KeyboardEvent) {
     <PopoverTrigger class="yy-lang-trigger" aria-label="代码语言">
       {{ languageLabel(value) }}<ChevronDown :size="12" />
     </PopoverTrigger>
-    <PopoverPortal>
+    <PopoverPortal :to="portalTarget">
       <PopoverContent class="yy-float yy-lang-panel" align="start" :side-offset="4" @open-auto-focus.prevent="input?.focus()" @close-auto-focus.prevent>
         <input ref="input" v-model="query" class="yy-input" placeholder="搜索语言，如 js、py" aria-label="搜索语言" @keydown="onKey" />
         <div ref="list" class="yy-lang-list" role="listbox" aria-label="代码语言">

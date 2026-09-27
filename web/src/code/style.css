@@ -1,0 +1,25 @@
+.yy-code-editor-host { min-width: 0; }
+.yy-code-editor-host .cm-editor { font: 13px/1.65 var(--yy-mono); background: var(--yy-codeblock-bg); color: var(--yy-codeblock-text); }
+.yy-code-editor-host .cm-scroller { overflow-x: auto; font-family: inherit; }
+.yy-code-editor-host .cm-content { padding: 12px 0; caret-color: #abb2bf; }
+.yy-code-editor-host .cm-line { padding: 0 16px 0 6px; }
+.yy-code-editor-host .cm-gutters { border: 0; background: var(--yy-codeblock-bg); color: var(--yy-codeblock-muted); user-select: none; }
+.yy-code-editor-host .cm-lineNumbers .cm-gutterElement { min-width: 2.7em; padding: 0 6px 0 10px; cursor: default; }
+.yy-code-editor-host .cm-foldGutter .cm-gutterElement { padding: 0 4px; width: 18px; }
+.yy-code-editor-host .cm-activeLine, .yy-code-editor-host .cm-activeLineGutter { background: #ffffff05; }
+.yy-code-editor-host .cm-focused { outline: none; }
+.yy-code-editor-host .tok-typeName { color: #56b6c2; }
+.yy-code-fold-marker { display: block; opacity: .65; cursor: pointer; }
+.yy-code-fold-marker:hover { opacity: 1; }
+.yy-code-fold-placeholder { border: 1px solid #ffffff20; border-radius: 3px; padding: 0 5px; margin: 0 4px; background: #ffffff0b; color: #8c98ab; font: 11px/1.5 var(--yy-font); cursor: pointer; vertical-align: 1px; }
+.yy-code-editor-host .cm-panels { color: #abb2bf; background: #252830; border-color: #ffffff12; }
+.yy-code-search { padding: 7px 9px; font: 12px/1.5 var(--yy-font); }
+.yy-code-search > div { display: flex; align-items: center; gap: 5px; }
+.yy-code-search > div + div { margin-top: 5px; }
+.yy-code-search input { min-width: 70px; width: 200px; flex: 1; max-width: 360px; padding: 4px 7px; border: 1px solid #ffffff22; border-radius: 4px; background: #1e2027; color: #abb2bf; font: inherit; }
+.yy-code-search button { flex: none; padding: 3px 5px; border: 0; border-radius: 3px; color: #abb2bf; background: none; font: inherit; cursor: pointer; }
+.yy-code-search button:hover, .yy-code-search button[aria-pressed=true] { background: #ffffff18; color: #fff; }
+.yy-code-search-count { white-space: nowrap; font-size: 11px; color: #8c98ab; }
+.yy-code-editor-host .cm-panel.cm-goto-line { padding: 8px; font: 12px/1.5 var(--yy-font); }
+.yy-code-editor-host .cm-panel.cm-goto-line input { width: 90px; }
+.yy-code-editor-host .cm-tooltip-autocomplete { font-family: var(--yy-mono); }

@@ -3,6 +3,7 @@ import { Selection } from '@tiptap/pm/state'
 import type { Node } from '@tiptap/pm/model'
 import type { Mapping } from '@tiptap/pm/transform'
 import { captureBlockPosition, type ReadingPosition } from '../app/content/readingPosition'
+import { codeEditorIn } from '../code/editor'
 
 export function captureEditingPosition(editor: Editor, original?: { doc: Node; mapping: Mapping }): ReadingPosition | undefined {
   const blocks: (Element | null)[] = []
@@ -38,6 +39,13 @@ export function restoreReadingPosition(editor: Editor, position: ReadingPosition
   const rect = block.getBoundingClientRect()
   window.scrollBy({ top: rect.top + Math.min(position.offset, rect.height - 1) - top, behavior: 'instant' })
   const visible = block.getBoundingClientRect()
+  const code = editor.state.doc.nodeAt(pos)?.type.name === 'codeBlock' ? codeEditorIn(block) : undefined
+  if (code) {
+    const at = code.view.posAtCoords({ x: code.view.contentDOM.getBoundingClientRect().left + 8, y: Math.max(top, visible.top) + 8 }, false) ?? 0
+    editor.view.dispatch(editor.state.tr.setSelection(Selection.near(editor.state.doc.resolve(pos + 1 + at))))
+    code.setSelection(at, at, true)
+    return true
+  }
   const caret = editor.view.posAtCoords({ left: visible.left + 8, top: Math.max(top, visible.top) + 8 })
   // Focusing the old selection at the start would undo the restored scroll, and typing should
   // start in the visible content. Atom nodes can fall back to the start of this block.

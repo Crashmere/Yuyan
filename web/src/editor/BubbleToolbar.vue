@@ -11,6 +11,7 @@ import { useEditorContext } from './context'
 import { withKey } from './keys'
 import { hasTextTools } from './textSelection'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
+import { codeEditorIn } from '../code/editor'
 
 // The toolbar over selected content. Its style list lives inside the bubble, since a menu in a
 // separate layer would take focus away from the editor and hide the bubble.
@@ -41,12 +42,17 @@ const state = computed(() => {
 })
 
 function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTMLElement; view: EditorView }) {
-  const focused = view.hasFocus() || element.contains(document.activeElement)
+  const insideCode = !!document.activeElement?.closest('.ProseMirror .cm-content, .yy-code-dialog .cm-content')
+  const focused = view.hasFocus() || insideCode || element.contains(document.activeElement)
   const selection = e.state.selection
   const image = selection instanceof NodeSelection && selection.node.type.name === 'image'
   const show = !props.hidden && focused && e.isEditable && !selection.empty && !image
   if (!show) stylesOpen.value = false
   return show
+}
+
+function bubbleParent() {
+  return document.querySelector<HTMLElement>('.yy-code-dialog') ?? editor.value!.view.dom.parentElement!
 }
 
 function applyStyle(apply: (e: Editor) => void) {
@@ -59,7 +65,17 @@ function applyStyle(apply: (e: Editor) => void) {
 function anchor() {
   const e = editor.value
   const selection = e?.state.selection
-  if (!e || !(selection instanceof CellSelection)) return null
+  if (!e || !selection) return null
+  if (selection.$from.parent.type.name === 'codeBlock' && selection.$from.sameParent(selection.$to)) {
+    const dom = e.view.nodeDOM(selection.$from.before())
+    const code = dom instanceof Element ? codeEditorIn(dom) : undefined
+    if (code) return { contextElement: code.view.dom, getBoundingClientRect() {
+      const a = code.view.coordsAtPos(selection.from - selection.$from.start()), b = code.view.coordsAtPos(selection.to - selection.$from.start())
+      if (!a || !b) return code.view.dom.getBoundingClientRect()
+      return new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.max(1, Math.abs(a.right - b.left)), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))
+    } }
+  }
+  if (!(selection instanceof CellSelection)) return null
   const first = e.view.nodeDOM(selection.$anchorCell.pos)
   const last = e.view.nodeDOM(selection.$headCell.pos)
   if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) return null
@@ -90,7 +106,7 @@ function anchor() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor && state" :editor="editor" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :options="options" class="yy-bubble yy-selection-toolbar">
+  <BubbleMenu v-if="editor && state" :editor="editor" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar">
     <template v-if="state.text">
       <div class="yy-bubble-styles">
         <button type="button" class="yy-bubble-select" @mousedown.prevent @click="stylesOpen = !stylesOpen">{{ state.style }}<ChevronDown :size="13" /></button>

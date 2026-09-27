@@ -96,6 +96,12 @@ type EditorElement = HTMLElement & { editor: { view: { domAtPos: (p: number) => 
 // writes the editor's own selection back into the DOM.
 async function selectText(page: Page, locator: ReturnType<Page['locator']>, text: string) {
   await locator.evaluate(async (el, t) => {
+    const code = (el.closest('.yy-code-editor-host') as HTMLElement & { codeEditor?: { view: any } } | null)?.codeEditor
+    if (code) {
+      const from = code.view.state.doc.toString().indexOf(t)
+      if (from < 0) throw new Error(`text not found: ${t}`)
+      code.view.dispatch({ selection: { anchor: from, head: from + t.length } }); code.view.focus(); return
+    }
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       const i = n.textContent!.indexOf(t)
@@ -116,6 +122,8 @@ async function selectText(page: Page, locator: ReturnType<Page['locator']>, text
 // into an empty paragraph.
 async function caretAtEnd(locator: ReturnType<Page['locator']>) {
   await locator.evaluate(async (el) => {
+    const code = (el.closest('.yy-code-editor-host') as HTMLElement & { codeEditor?: { view: any } } | null)?.codeEditor
+    if (code) { code.view.dispatch({ selection: { anchor: code.view.state.doc.length } }); code.view.focus(); return }
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
     let last: Node | null = null
     for (let n = walker.nextNode(); n; n = walker.nextNode()) last = n
@@ -137,12 +145,15 @@ async function place(locator: ReturnType<Page['locator']>) {
   await expect
     .poll(() =>
       locator.evaluate((el) => {
+        if (el.matches('.cm-content')) return el === document.activeElement
         const { editor } = document.querySelector<EditorElement>('.ProseMirror')!
         return el.contains(editor.view.domAtPos(editor.state.selection.from).node)
       }),
     )
     .toBe(true)
 }
+
+const codeText = (locator: Locator) => locator.evaluate((el: any) => el.closest('.yy-code-editor-host').codeEditor.view.state.doc.toString() as string)
 
 const textBubble = (page: Page) => page.locator('.yy-selection-toolbar')
 
@@ -359,11 +370,11 @@ test('shared removal covers code text, selected blocks and the whole document', 
   const id = await createDoc(request, '移除内容块', '第一段\n\n```js\nconst keep = 1; // remove\n```\n\n---\n\n最后一段')
   await openEditor(page, id)
   const original = await editorDoc(page)
-  const code = page.locator('.ProseMirror pre code')
+  const code = page.locator('.ProseMirror .cm-content')
   await code.click()
   await selectText(page, code, '// remove')
   await textBubble(page).getByRole('button', { name: '移除选中内容' }).click()
-  await expect(code).toHaveText('const keep = 1; ')
+  await expect.poll(() => codeText(code)).toBe('const keep = 1; ')
   await undoRemoval(page)
   await expect.poll(() => editorDoc(page)).toEqual(original)
 
@@ -649,17 +660,17 @@ test('code blocks: language search, Tab indentation, line numbers', async ({ pag
   await page.keyboard.press('Enter')
   await expect(trigger).toHaveText('Python')
 
-  const code = page.locator('.ProseMirror pre code')
+  const code = page.locator('.ProseMirror .cm-content')
   await code.click()
   await caretAtEnd(code)
   await page.keyboard.press('Enter')
   await page.keyboard.press('Tab')
   await page.keyboard.type('x')
-  await expect(code).toHaveText('const a = 1\nconsole.log(a)\n    x')
+  await expect.poll(() => codeText(code)).toBe('const a = 1\nconsole.log(a)\n    x')
   await page.keyboard.press('Shift+Tab')
-  await expect(code).toHaveText('const a = 1\nconsole.log(a)\nx')
+  await expect.poll(() => codeText(code)).toBe('const a = 1\nconsole.log(a)\nx')
 
-  await expect(page.locator('.yy-code-lines > div')).toHaveCount(3)
+  await expect(page.locator('.cm-lineNumbers .cm-gutterElement:visible')).toHaveCount(3)
 
   const md = await finishAndExport(page, '代码测试')
   expect(md).toContain('```python\nconst a = 1\nconsole.log(a)\nx\n```')
@@ -689,8 +700,8 @@ test('Mermaid previews beside its source and keeps the last diagram on errors', 
   await openEditor(page, id)
   const block = page.locator('.yy-codeblock.is-mermaid')
   await expect(block.locator('.yy-mermaid-svg svg')).toBeVisible()
-  await block.locator('pre code').click()
-  await caretAtEnd(block.locator('pre code'))
+  await block.locator('.cm-content').click()
+  await caretAtEnd(block.locator('.cm-content'))
   await page.keyboard.type('\n  B --> {{{')
   await expect(block.locator('.yy-mermaid-error')).toBeVisible()
   await expect(block.locator('.yy-mermaid-svg.stale svg')).toBeVisible()
@@ -727,7 +738,7 @@ test('reading pages: image viewer, folded long code and line numbers', async ({ 
   await expect(page.getByRole('menuitem', { name: /代码行号|代码自动换行/ })).toHaveCount(0)
   await page.keyboard.press('Escape')
   const number = await pre.locator('.yy-line').nth(9).evaluate((el) => getComputedStyle(el, '::before').content)
-  expect(number).toBe('counter(yy-line)')
+  expect(number).toBe('"10"')
 })
 
 test('images keep their space before they load', async ({ page }) => {
@@ -939,7 +950,7 @@ test('code blocks look like Yuque: One Dark, with a title bar that collapses the
   const id = await createDoc(request, '代码标题测试', '```cpp title="Dijkstra" collapsed\nint dijkstra();\n```\n\n边权非负时使用。\n\n```cpp\nint main();\n```')
   await page.goto(`docs/${id}`)
   const colours = (block: ReturnType<Page['locator']>, token: string) =>
-    block.evaluate((b, t) => ({ code: getComputedStyle(b.querySelector('pre')!).backgroundColor, type: getComputedStyle(b.querySelector(t)!).color }), token)
+    block.evaluate((b, t) => ({ code: getComputedStyle(b.querySelector('pre, .cm-editor')!).backgroundColor, type: getComputedStyle(b.querySelector(t)!).color }), token)
   const oneDark = { code: 'rgb(40, 44, 52)', type: 'rgb(86, 182, 194)' }
   const block = page.locator('.yy-content .code-block').first()
   const title = block.locator('.code-title')
@@ -974,16 +985,16 @@ test('code blocks look like Yuque: One Dark, with a title bar that collapses the
   await page.getByRole('link', { name: '编辑' }).click()
   const code = page.locator('.ProseMirror .yy-codeblock').first()
   await expect(code.locator('.yy-codeblock-name')).toHaveValue('Dijkstra')
-  await expect(code.locator('pre')).toBeHidden()
+  await expect(code.locator('.cm-editor')).toBeHidden()
   await code.getByRole('button', { name: '展开代码' }).click()
-  await expect(code.locator('pre')).toBeVisible()
-  expect(await colours(code, '.hljs-type')).toEqual(oneDark)
+  await expect(code.locator('.cm-editor')).toBeVisible()
+  expect(await colours(code, '.tok-typeName')).toEqual(oneDark)
   await code.getByRole('button', { name: '收起代码' }).click()
-  await expect(code.locator('pre')).toBeHidden()
+  await expect(code.locator('.cm-editor')).toBeHidden()
   await page.locator('.ProseMirror p').first().click()
   await page.keyboard.press('ControlOrMeta+f')
   await page.keyboard.type('dijkstra')
-  await expect(code.locator('pre')).toBeVisible()
+  await expect(code.locator('.cm-editor')).toBeVisible()
   await expect(page.locator('.ProseMirror .yy-find-match.current')).toBeInViewport()
 })
 
@@ -997,14 +1008,14 @@ test('code block titles are added, renamed and removed in the editor and kept in
   await page.keyboard.type('示例')
   // Enter goes back to the start of the code, a frame later.
   await page.keyboard.press('Enter')
-  await expect(page.locator('.ProseMirror')).toBeFocused()
+  await expect(plain.locator('.cm-content')).toBeFocused()
   await page.keyboard.type('x')
-  await expect(plain.locator('pre code')).toHaveText('xlet a')
+  await expect.poll(() => codeText(plain.locator('.cm-content'))).toBe('xlet a')
   // The tab sits on the code, so a collapsed block is opened first.
   await titled.getByRole('button', { name: '展开代码' }).click()
   await titled.getByRole('button', { name: '隐藏标题栏' }).click()
   await expect(titled.locator('.yy-codeblock-title')).toHaveCount(0)
-  await expect(titled.locator('pre')).toBeVisible()
+  await expect(titled.locator('.cm-editor')).toBeVisible()
 
   const md = await finishAndExport(page, '代码标题编辑')
   expect(md).toContain('```cpp\nint main() {}\n```')
@@ -1194,7 +1205,7 @@ test('the editor: the outline as on reading pages, Mod-A within a block, heading
   await expect(aside.getByRole('link')).toHaveCount(2)
 
   // Mod-A selects the code first, then the whole document.
-  await place(page.locator('.ProseMirror pre code'))
+  await place(page.locator('.ProseMirror .cm-content'))
   await page.keyboard.press('ControlOrMeta+a')
   await expect.poll(() => page.evaluate(() => getSelection()?.toString())).toBe('const a = 1\nconst b = 2')
   await page.keyboard.press('ControlOrMeta+a')
@@ -1311,7 +1322,7 @@ test('browser back reveals the edited position inside folded sections, callouts 
   await heading.getByRole('button', { name: '折叠这一节' }).click({ force: true })
   await page.getByRole('link', { name: '编辑', exact: true }).click()
   await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest('.ProseMirror'))).toBe(true)
-  await page.locator('.ProseMirror pre code').evaluate((el) => {
+  await page.locator('.ProseMirror .cm-content').evaluate((el) => {
     window.scrollBy(0, el.getBoundingClientRect().top + 65 * parseFloat(getComputedStyle(el).lineHeight) - 150)
   })
   const offset = await page.locator('.ProseMirror > .callout').evaluate((el) => document.querySelector('.yy-toolbar')!.getBoundingClientRect().bottom + 16 - el.getBoundingClientRect().top)
@@ -1608,24 +1619,30 @@ for (const width of [1360, 375]) {
       const blocks = page.locator(editing ? '.yy-codeblock' : '.yy-content .code-block')
       const first = blocks.nth(0)
       const second = blocks.nth(1)
-      const scroller = (b: Locator) => b.locator(editing ? 'pre' : 'pre > code')
+      const scroller = (b: Locator) => b.locator(editing ? '.cm-scroller' : 'pre > code')
       const overflow = (b: Locator) => scroller(b).evaluate((el) => el.scrollWidth - el.clientWidth)
       const wrap = first.getByRole('button', { name: '自动换行', exact: true })
+      if (editing) {
+        await expect(wrap).toHaveAttribute('aria-pressed', 'true')
+        await expect.poll(() => overflow(first)).toBeLessThanOrEqual(1)
+        await wrap.click()
+      }
       await expect(wrap).toHaveAttribute('aria-pressed', 'false')
       await expect.poll(() => overflow(first)).toBeGreaterThan(100)
       await wrap.click()
-      await expect(first.locator('pre')).toBeVisible()
+      await expect(scroller(first)).toBeVisible()
       await expect(wrap).toHaveAttribute('aria-pressed', 'true')
       await expect.poll(() => overflow(first)).toBeLessThanOrEqual(1)
       await expect.poll(() => overflow(second)).toBeGreaterThan(100)
       await expect(second.getByRole('button', { name: '自动换行', exact: true })).toHaveAttribute('aria-pressed', 'false')
       if (editing) {
-        await expect(first.locator('.yy-code-lines > div')).toHaveCount(2)
-        const height = await first.locator('pre > code').evaluate((el) => el.getBoundingClientRect().height)
-        const numbered = await first.locator('.yy-code-lines > div').evaluateAll((els) => els.reduce((h, el) => h + el.getBoundingClientRect().height, 0))
-        expect(Math.abs(height - numbered)).toBeLessThan(2)
+        const numbers = first.locator('.cm-lineNumbers .cm-gutterElement:visible')
+        await expect(numbers).toHaveCount(2)
+        const lines = await first.locator('.cm-line').evaluateAll(els => els.map(el => el.getBoundingClientRect().top))
+        const numbered = await numbers.evaluateAll(els => els.map(el => el.getBoundingClientRect().top))
+        expect(Math.max(...lines.map((top, i) => Math.abs(top - numbered[i])))).toBeLessThan(2)
       } else {
-        expect(await first.locator('.yy-line').first().evaluate((el) => getComputedStyle(el, '::before').content)).toBe('counter(yy-line)')
+        expect(await first.locator('.yy-line').first().evaluate((el) => getComputedStyle(el, '::before').content)).toBe('"1"')
       }
       await page.screenshot({ path: `test-results/code-controls-${width}-${editing ? 'edit' : 'read'}.png` })
       await first.getByRole('button', { name: '隐藏标题栏', exact: true }).click()

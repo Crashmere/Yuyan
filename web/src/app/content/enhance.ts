@@ -6,15 +6,21 @@ import { assetId, reservedSize } from '../../shared/images'
 import { needsDisplay } from '../../shared/latex'
 import { renderMermaid } from '../../shared/mermaid'
 import { frameTable } from '../../shared/tableFrame'
+import { codeActions, type CodeAction } from '../../code/actions'
+import { codeKey, readCodePreferences, saveCodePreferences } from '../../code/preferences'
+
+const cleanups = new WeakMap<HTMLElement, (() => void)[]>()
+export function cleanupCode(root: HTMLElement) { cleanups.get(root)?.forEach(cleanup => cleanup()); cleanups.delete(root) }
 
 // What the server-rendered HTML leaves to the browser: space for images, code lines, folding and
 // copy buttons, formulas and diagrams. KaTeX and Mermaid load only for pages that contain them.
 // The returned promise settles once formulas and diagrams are drawn.
 export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
+  cleanupCode(root)
   if (options.images) reserveImageSpace(root, options.images)
-  enhanceCode(root)
+  const codeReady = enhanceCode(root)
   frameTables(root)
-  await Promise.all([options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
+  await Promise.all([codeReady, options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
 }
 
 // Wide tables scroll sideways in a frame (shared/tableFrame.ts).
@@ -43,25 +49,50 @@ function reserveImageSpace(root: HTMLElement, sizes: ImageSizes) {
 const foldLines = 30
 
 function enhanceCode(root: HTMLElement) {
+  const cleanup: (() => void)[] = []
+  const restoring: Promise<unknown>[] = []
+  cleanups.set(root, cleanup)
+  let index = 0
   for (const pre of root.querySelectorAll<HTMLElement>('pre')) {
     const code = pre.querySelector('code')
     if (!code || pre.dataset.enhanced) continue
     pre.dataset.enhanced = '1'
     const language = /(?:^|\s)language-(\S+)/.exec(code.className)?.[1]
+    const key = codeKey(index++)
     if (language === 'mermaid') continue
     const text = code.textContent ?? ''
     const lines = splitLines(code)
-    const block = addTitleBar(pre, language, text)
+    const block = addTitleBar(pre, language, text, key)
     addCopyButton(pre, text)
+    const title = block.querySelector('.code-title')?.firstChild?.textContent ?? ''
+    let loading: Promise<Awaited<ReturnType<typeof import('../../code/reading')['readingCode']>> | undefined> | undefined
+    let disposed = false
+    const activate = () => loading ??= import('../../code/reading').then(async module => {
+      if (disposed || !block.isConnected) return
+      const reader = await module.readingCode(block, text, language ?? '', key, title)
+      if (disposed) { reader.destroy(); return }
+      return reader
+    })
+    const run = (action: CodeAction) => { void activate().then(reader => reader?.action(action)) }
+    const actions = document.createElement('span'); actions.className = 'yy-code-actions'
+    block.append(actions)
+    cleanup.push(codeActions(actions, run))
+    const hover = () => { void activate() }
+    block.addEventListener('pointerenter', hover, { once: true })
+    block.addEventListener('focusin', hover, { once: true })
+    // Restore local folds before positioning a returning reader, without waiting for a hover.
+    if (readCodePreferences(key).folds?.length) restoring.push(activate())
+    cleanup.push(() => { disposed = true; block.removeEventListener('pointerenter', hover); block.removeEventListener('focusin', hover); void loading?.then(reader => reader?.destroy()) })
     // A block saved with a title bar collapses from it instead of starting folded.
     if (block.classList.contains('no-title') && lines > foldLines + 5) addFold(pre, block, lines)
   }
+  return Promise.all(restoring)
 }
 
 // Every code block gets Yuque's title bar (schema/codeBlock.ts), hidden on blocks saved without
 // one. The tab at the top of the code, just below the bar when it shows, shows or hides it for
 // this visit only; the document keeps what the editor saved.
-function addTitleBar(pre: HTMLElement, language: string | undefined, text: string): HTMLElement {
+function addTitleBar(pre: HTMLElement, language: string | undefined, text: string, key: string): HTMLElement {
   let block = pre.parentElement!
   if (!block.classList.contains('code-block')) {
     block = Object.assign(document.createElement('div'), { className: 'code-block no-title' })
@@ -75,12 +106,15 @@ function addTitleBar(pre: HTMLElement, language: string | undefined, text: strin
   const wrap = Object.assign(document.createElement('button'), { type: 'button', className: 'yy-code-wrap-btn' })
   wrap.append(codeIcon('wrap'), Object.assign(document.createElement('span'), { textContent: '自动换行' }))
   wrap.setAttribute('aria-label', '自动换行')
-  wrap.setAttribute('aria-pressed', 'false')
-  wrap.dataset.tip = '开启自动换行'
+  const wrapped = readCodePreferences(key).wrapped
+  block.classList.toggle('is-wrapped', wrapped)
+  wrap.setAttribute('aria-pressed', String(wrapped))
+  wrap.dataset.tip = wrapped ? '关闭自动换行' : '开启自动换行'
   wrap.addEventListener('click', () => {
     const on = block.classList.toggle('is-wrapped')
     wrap.setAttribute('aria-pressed', String(on))
     wrap.dataset.tip = on ? '关闭自动换行' : '开启自动换行'
+    saveCodePreferences(key, { ...readCodePreferences(key), wrapped: on })
     if (on) pre.querySelector('code')!.scrollLeft = 0
   })
   bar.appendChild(wrap)
@@ -137,6 +171,7 @@ function splitLines(code: HTMLElement): number {
   }
   code.childNodes.forEach(walk)
   if (line.textContent || !lines.length) lines.push(line)
+  lines.forEach((line, i) => { line.dataset.line = String(i + 1) })
   code.replaceChildren(...lines)
   return lines.length
 }

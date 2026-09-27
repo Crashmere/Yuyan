@@ -788,13 +788,6 @@ body.yy-row-dragging * {
   position: relative;
   margin: 0.75em 0;
 }
-.yy-codeblock pre {
-  margin: 0;
-  padding-top: 38px;
-}
-.yy-codeblock pre > code {
-  display: block;
-}
 .yy-codeblock-bar {
   position: absolute;
   top: 7px;
@@ -805,6 +798,8 @@ body.yy-row-dragging * {
   justify-content: space-between;
   gap: 8px;
 }
+.yy-codeblock-bar .yy-lang-trigger { margin-right: auto; }
+.yy-codeblock:not(.has-title) .cm-content { padding-top: 38px; }
 .yy-lang-trigger,
 .yy-codeblock-btn,
 .yy-callout-trigger {
@@ -843,6 +838,15 @@ body.yy-row-dragging * {
 .yy-codeblock-body {
   position: relative;
 }
+.yy-codeblock-body > .yy-code-editor-host {
+  border: 1px solid var(--yy-codeblock-border);
+  border-radius: var(--yy-radius-lg);
+  overflow: hidden;
+}
+.yy-codeblock.has-title .yy-codeblock-body > .yy-code-editor-host {
+  border-top: 0;
+  border-radius: 0 0 var(--yy-radius-lg) var(--yy-radius-lg);
+}
 .yy-codeblock-body > .code-tab {
   top: 1px;
 }
@@ -865,14 +869,6 @@ body.yy-row-dragging * {
 .yy-codeblock.is-collapsed .yy-codeblock-title {
   border-bottom-color: var(--yy-codeblock-border);
   border-radius: var(--yy-radius-lg);
-}
-.yy-codeblock.has-title pre {
-  padding-top: 14px;
-  border-top: 0;
-  border-radius: 0 0 var(--yy-radius-lg) var(--yy-radius-lg);
-}
-.yy-codeblock.has-title .yy-code-lines {
-  top: 14px;
 }
 .yy-codeblock-toggle {
   display: inline-flex;
@@ -960,44 +956,10 @@ body.yy-row-dragging * {
   font-size: 12px;
 }
 
-/* Line numbers: a transparent copy of the code (CodeBlockView.vue) with a number before each line. */
-.yy-codeblock pre.has-numbers {
-  padding-left: calc(16px + 3em);
-}
-.yy-code-lines {
-  position: absolute;
-  top: 38px;
-  right: 16px;
-  bottom: 14px;
-  left: 16px;
-  overflow: hidden;
-  pointer-events: none;
-  user-select: none;
-}
-.yy-code-lines > div {
-  position: relative;
-  min-height: 1.65em;
-  padding-left: 3em;
-  color: transparent;
-  white-space: pre;
-}
-.yy-codeblock.is-wrapped pre code,
-.yy-codeblock.is-wrapped .yy-code-lines > div {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 .yy-code-copy-icon {
   justify-content: center;
   width: 28px;
   padding: 0;
-}
-.yy-code-lines > div::before {
-  position: absolute;
-  left: 0;
-  width: 2.2em;
-  color: var(--yy-codeblock-muted);
-  text-align: right;
-  content: attr(data-n);
 }
 
 /* Mermaid: source and preview side by side. */
@@ -1008,7 +970,7 @@ body.yy-row-dragging * {
   border: 1px solid var(--yy-border);
   border-radius: var(--yy-radius-lg);
 }
-.yy-codeblock.is-mermaid pre {
+.yy-codeblock.is-mermaid .yy-code-editor-host {
   border: 0;
   border-right: 1px solid var(--yy-border);
   border-radius: 0;
@@ -1049,7 +1011,7 @@ body.yy-row-dragging * {
   .yy-codeblock.is-mermaid .yy-codeblock-body {
     grid-template-columns: minmax(0, 1fr);
   }
-  .yy-codeblock.is-mermaid pre {
+  .yy-codeblock.is-mermaid .yy-code-editor-host {
     border-right: 0;
     border-bottom: 1px solid var(--yy-border);
   }
@@ -1248,20 +1210,3 @@ body.yy-row-dragging * {
   opacity: 0.5;
   pointer-events: none;
 }
-
-/* lowlight (highlight.js) token colours in the editor: One Dark Pro, as Chroma colours reading pages
-   (internal/render/highlight.go). highlight.js leaves plain names untagged, so variables keep the
-   text colour here. */
-.hljs-comment, .hljs-quote { color: #7f848e; }
-.hljs-keyword, .hljs-doctag, .hljs-formula { color: #c678dd; }
-.hljs-type, .hljs-meta, .hljs-meta .hljs-keyword, .hljs-operator { color: #56b6c2; }
-.hljs-string, .hljs-regexp, .hljs-addition, .hljs-meta .hljs-string { color: #98c379; }
-.hljs-number, .hljs-selector-class, .hljs-selector-attr, .hljs-selector-pseudo { color: #d19a66; }
-.hljs-title, .hljs-symbol, .hljs-bullet, .hljs-link, .hljs-selector-id { color: #61afef; }
-.hljs-built_in, .hljs-literal, .hljs-title.class_ { color: #e5c07b; }
-/* highlight.js tags C++ calls such as q.push(i) as built-ins; Yuque shows them as functions. */
-.language-cpp .hljs-built_in { color: #61afef; }
-.hljs-variable, .hljs-template-variable, .hljs-attr, .hljs-attribute, .hljs-name, .hljs-tag, .hljs-section, .hljs-selector-tag, .hljs-deletion, .hljs-subst { color: #e06c75; }
-.hljs-punctuation { color: #abb2bf; }
-.hljs-emphasis { font-style: italic; }
-.hljs-strong { font-weight: 600; }

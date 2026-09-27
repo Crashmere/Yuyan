@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { base, type ImageSizes } from '../../shared/api'
 import { stopLoading } from '../../shared/images'
 import { prefs } from '../prefs'
-import { enhance } from './enhance'
+import { cleanupCode, enhance } from './enhance'
 import { reveal, setupFolds } from './folds'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
 import { clearMatches, showMatches } from './matches'
@@ -56,7 +56,7 @@ watch(() => props.html, run)
 watch(() => props.highlight, mark)
 onBeforeUnmount(() => {
   clearMatches()
-  if (root.value) stopLoading(root.value)
+  if (root.value) { cleanupCode(root.value); stopLoading(root.value) }
 })
 watch(
   () => prefs.theme,
@@ -73,7 +73,7 @@ const shown = ref<number | null>(null)
 function onClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   const title = target.closest('.callout[data-callout-fold] > .callout-title, .code-block > .code-title')
-  if (title && !target.closest('.yy-copy, .yy-code-wrap-btn')) {
+  if (title && !target.closest('.yy-copy, .yy-code-wrap-btn, .yy-code-actions')) {
     title.parentElement?.classList.toggle('is-collapsed')
     return
   }

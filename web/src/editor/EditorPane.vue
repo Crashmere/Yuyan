@@ -309,6 +309,7 @@ function snapshot() {
 
 // Find and the shortcut list also open from the title field, where the editor's keymap is not active.
 function pageKeys(e: KeyboardEvent) {
+  if (e.defaultPrevented || (e.target as Element)?.closest('.cm-editor, .yy-code-dialog')) return
   if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return
   if (e.key === 'f' || e.key === 'F') {
     e.preventDefault()

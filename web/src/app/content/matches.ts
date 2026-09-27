@@ -54,6 +54,7 @@ export function showMatches(root: HTMLElement, query: string): number {
   if ('highlights' in CSS) CSS.highlights.set(name, new Highlight(...ranges))
   const at = ranges[0]?.startContainer.parentElement
   if (!at) return 0
+  at.dispatchEvent(new Event('yy-reveal-code', { bubbles: true }))
   reveal(at)
   const collapsed = '.callout.is-collapsed, .code-block.is-collapsed'
   for (let c = at.closest(collapsed); c; c = c.parentElement?.closest(collapsed) ?? null) {

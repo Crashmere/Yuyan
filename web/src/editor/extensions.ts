@@ -1,7 +1,7 @@
 import type { Extensions } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { VueNodeViewRenderer } from '@tiptap/vue-3'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import CodeBlock from '@tiptap/extension-code-block'
 import FileHandler from '@tiptap/extension-file-handler'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { CharacterCount, Dropcursor, Gapcursor, Placeholder, TrailingNode, UndoRedo } from '@tiptap/extensions'
@@ -14,7 +14,7 @@ import { openCollapsedCode } from './codeBlocks'
 import type { EditorUi } from './context'
 import { ImageSizeStore } from './images'
 import { MarkdownShortcuts } from './inputRules'
-import { lowlight } from './lowlight'
+import { codeNodeView } from './codeNodeView'
 import { MarkdownPaste } from './markdownPaste'
 import { Search } from './search'
 import { SlashCommand } from './slash'
@@ -25,7 +25,6 @@ import { tableControls } from './tableControls'
 import { UiShortcuts } from './uiShortcuts'
 import { insertImages, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
-import CodeBlockView from './views/CodeBlockView.vue'
 import ImageView from './views/ImageView.vue'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
@@ -34,16 +33,16 @@ export function editorExtensions(ui: EditorUi): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
-      codeBlock: withTitles(CodeBlockLowlight)
+      codeBlock: withTitles(CodeBlock)
         .extend({
           addNodeView() {
-            return VueNodeViewRenderer(CodeBlockView)
+            return codeNodeView
           },
           addProseMirrorPlugins() {
             return [...(this.parent?.() ?? []), openCollapsedCode]
           },
         })
-        .configure({ lowlight, defaultLanguage: null, enableTabIndentation: true, tabSize: 4 }),
+        .configure({ defaultLanguage: null, enableTabIndentation: true, tabSize: 4 }),
       // Column and row borders drag to resize; fixColumnWidths runs before prosemirror-tables' own
       // column resizing (tables.ts). Wide tables sit in the same frame as on reading pages.
       table: YuyanTable.extend({
