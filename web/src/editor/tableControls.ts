@@ -78,16 +78,27 @@ export function tableControls(): Plugin {
         if (!ctx || !table) { hide(); return }
         const box = table.getBoundingClientRect()
         const scroll = table.closest('.yy-table-scroll')!.getBoundingClientRect()
-        const floor = (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 76
+        const toolbarBottom = document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0
+        // Reserve space for the floating toolbar only when deciding whether the column rail
+        // fits. Moving the whole frame down to that floor would draw a false edge through rows.
+        const columnsVisible = box.top >= toolbarBottom + 76
         const left = Math.max(box.left, scroll.left, 32)
         const right = Math.min(box.right, scroll.right, innerWidth - 16)
-        const top = Math.max(box.top, floor)
+        const top = Math.max(box.top, toolbarBottom)
         const bottom = Math.min(box.bottom, innerHeight - 16)
         if (right <= left || bottom <= top) { root.classList.remove('is-visible'); return }
         root.style.transform = `translate(${left}px, ${top}px)`
         root.style.width = `${right - left}px`
         root.style.height = `${bottom - top}px`
-        ring.style.borderTopLeftRadius = box.top >= floor && box.left >= left ? '4px' : '0'
+        const clippedTop = box.top < toolbarBottom + 4
+        const clippedBottom = box.bottom > bottom
+        ring.style.top = clippedTop ? '0' : '-4px'
+        ring.style.borderTopStyle = clippedTop ? 'none' : 'solid'
+        ring.style.borderBottomStyle = clippedBottom ? 'none' : 'solid'
+        ring.style.borderTopLeftRadius = !clippedTop && box.left >= left ? '4px' : '0'
+        ring.style.borderTopRightRadius = !clippedTop && box.right <= right ? '4px' : '0'
+        ring.style.borderBottomLeftRadius = !clippedBottom && box.left >= left ? '4px' : '0'
+        ring.style.borderBottomRightRadius = !clippedBottom && box.right <= right ? '4px' : '0'
 
         const nextShape = `${ctx.map.width}:${ctx.map.height}`
         if (shape !== nextShape) {
@@ -132,7 +143,7 @@ export function tableControls(): Plugin {
           const limit = column ? right : bottom
           const from = Math.max(points[i], origin)
           const to = Math.min(points[i + 1], limit)
-          const visible = insert ? points[i] >= origin - 1 && points[i] <= limit + 1 : to - from > 2
+          const visible = (column ? columnsVisible : true) && (insert ? points[i] >= origin - 1 && points[i] <= limit + 1 && (column || points[i] >= toolbarBottom + 11) : to - from > 2)
           b.hidden = !visible
           if (!visible) continue
           const at = (insert ? points[i] : from) - origin

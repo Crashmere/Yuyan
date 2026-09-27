@@ -1561,3 +1561,45 @@ test('wheeling while moving inside the insert menu never scrolls the document', 
   await page.mouse.wheel(0, 200)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before)
 })
+
+test('table rails stay on real row boundaries as the table passes the toolbar', async ({ page, request }) => {
+  const md = `${Array.from({ length: 12 }, (_, i) => `前置段落 ${i}`).join('\n\n')}\n\n| 名称 | 说明 |\n| --- | --- |\n${Array.from({ length: 24 }, (_, i) => `| 行 ${i + 1} | 内容 ${i + 1} |`).join('\n')}\n\n表后内容`
+  const id = await createDoc(request, '长表格外围定位', md)
+  await openEditor(page, id)
+  const table = page.locator('.ProseMirror table')
+  const controls = page.locator('.yy-table-controls')
+  const toolbarBottom = (await page.locator('.yy-toolbar').boundingBox())!.y + (await page.locator('.yy-toolbar').boundingBox())!.height
+  const scrollTableTo = async (top: number) => {
+    await table.evaluate((el, y) => window.scrollBy(0, el.getBoundingClientRect().top - y), top)
+    const box = (await table.boundingBox())!
+    await page.mouse.move(box.x + 80, Math.max(toolbarBottom + 100, box.y + 90))
+    await expect(controls).toHaveClass(/is-visible/)
+  }
+  // The table is still visible, but there is no room for the rail above it.
+  await scrollTableTo(toolbarBottom + 48)
+  await expect.poll(async () => Math.abs((await controls.boundingBox())!.y - (await table.boundingBox())!.y)).toBeLessThan(2)
+  await expect(controls.getByRole('button', { name: '选中第 1 列', exact: true })).toBeHidden()
+  const rowControl = controls.getByRole('button', { name: '选中第 2 行', exact: true })
+  await expect.poll(async () => Math.abs((await rowControl.boundingBox())!.y - (await table.locator('tr').nth(1).boundingBox())!.y)).toBeLessThan(2)
+  // Once the top has gone under the toolbar, clip the rail without drawing a fake table edge.
+  await scrollTableTo(toolbarBottom - 90)
+  await expect.poll(async () => Math.abs((await controls.boundingBox())!.y - toolbarBottom)).toBeLessThan(2)
+  await expect(controls.locator('.yy-table-ring')).toHaveCSS('border-top-style', 'none')
+  const resizeCell = (await table.locator('tr').nth(6).locator('td').first().boundingBox())!
+  await page.mouse.move(resizeCell.x + resizeCell.width - 2, resizeCell.y + resizeCell.height / 2)
+  const resizeLine = page.locator('.yy-column-resize-line')
+  await expect(resizeLine).toHaveCSS('opacity', '1')
+  expect((await resizeLine.boundingBox())!.y).toBeGreaterThanOrEqual(toolbarBottom)
+  await page.mouse.move(resizeCell.x + 20, resizeCell.y + resizeCell.height / 2)
+  await expect(resizeLine).toHaveCSS('opacity', '0')
+  await page.screenshot({ path: 'test-results/table-rails-clipped.png' })
+  const visibleRow = controls.getByRole('button', { name: '选中第 6 行', exact: true })
+  await visibleRow.click()
+  await expect(table.locator('tr').nth(5).locator('.selectedCell')).toHaveCount(2)
+  // Scrolling back restores the top controls at the actual table boundary.
+  await scrollTableTo(toolbarBottom + 150)
+  await expect(controls.getByRole('button', { name: '选中第 1 列', exact: true })).toBeVisible()
+  await expect(controls.locator('.yy-table-ring')).toHaveCSS('border-top-style', 'solid')
+  await expect.poll(async () => Math.abs((await controls.boundingBox())!.y - (await table.boundingBox())!.y)).toBeLessThan(2)
+  await page.screenshot({ path: 'test-results/table-rails-restored.png' })
+})

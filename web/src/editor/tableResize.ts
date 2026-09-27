@@ -106,7 +106,8 @@ export function withResizeDelay(plugin: Plugin): Plugin {
           if (ready && edge) edge = { table, x }
           const clip = table.closest('.yy-table-scroll')?.getBoundingClientRect()
           if (clip && (x < clip.left || x > clip.right)) { preview.hide(); return }
-          preview.show(x, box.top, box.height)
+          const top = Math.max(box.top, document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0)
+          preview.show(x, top, Math.min(box.bottom, innerHeight) - top)
         })
       }
       const scrolled = () => {
