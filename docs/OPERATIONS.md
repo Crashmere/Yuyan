@@ -1,5 +1,7 @@
 # 安装与运行
 
+公网入口使用可信 IP 证书的 HTTPS，原有 /yuyan/ 路径保持。公网 HTTP 返回 308；API 客户端直接使用 HTTPS。Nginx 覆盖 `X-Forwarded-Proto`，供后续认证使用。证书、续期、回退和整机验收见 [共享 HTTPS 运维](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/https.md)（服务器副本 /opt/server-context/references/https.md）。本项目的后端与发布检查保留本机 HTTP，127.0.0.1:80 的代理检查入口不能从公网访问。HTTPS 只加密传输，登录认证尚未接入。
+
 操作 ali 前加载 server-operations 并显式读取 `/opt/AGENTS.md`。公开仓库不写正式公网地址；通过受信 SSH 别名取得现场信息。
 
 ## 布局
@@ -10,7 +12,7 @@
 
 Nginx location 对 HTML、JSON、JS、CSS 开启 gzip：服务器下行只有约 0.5 MB/s，最长的文档页面约 970 KB，压缩后约 300 KB。Go 把 `.js` 返回为 `text/javascript`，`gzip_types` 必须列出它，见共享的 [Go 程序返回的 JavaScript 没有被 Nginx 压缩](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#go-程序返回的-javascript-没有被-nginx-压缩)。请求体上限 26 MiB（程序单张图片上限 25 MiB）。
 
-本期按用户确认使用 HTTP、无登录，知道地址的人都可以查看和修改内容；版本历史、回收站和每日备份用于恢复。
+当前公网使用 HTTPS、无登录，知道地址的人都可以查看和修改内容；版本历史、回收站和每日备份用于恢复。
 
 ## 首次安装
 
@@ -74,13 +76,13 @@ npm --prefix web run seed -- --server http://127.0.0.1:18084/yuyan/   # 可选�
 
 ## 正式导入
 
-导入只做一次，目标必须是空实例；工具在开发电脑上运行，通过 HTTP 上传。
+导入只做一次，目标必须是空实例；工具在开发电脑上运行，通过 HTTPS 上传。
 
 ```sh
-npm --prefix web run import -- --source <笔记仓库副本> --server http://<服务器>/yuyan/ \
+npm --prefix web run import -- --source <笔记仓库副本> --server https://<服务器>/yuyan/ \
   --overrides .local/import-overrides.json --report .local/import-prod.md --dry
 # 去掉 --dry 正式导入，完成后检查每篇文档都能被编辑器原样接受：
-npm --prefix web run roundtrip -- --server http://<服务器>/yuyan/
+npm --prefix web run roundtrip -- --server https://<服务器>/yuyan/
 ```
 
 `roundtrip` 只读取服务器。它检查每篇文档能被编辑器 schema 原样接受，并且编辑表格时不会调整现有表格的表头或列对齐（编辑器会保持 Markdown 表格的形状，见 DESIGN.md 12.12）。修改编辑器配置后，发布前对线上实例运行一次；2026-09-27 核对：316 篇文档、185 个表格全部通过。
@@ -106,8 +108,8 @@ npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
 导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹（Markdown 表达不了的内容写成 HTML，例如设置了列宽行高的表格，见 DESIGN.md 第 18 节）：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。
 
 ```sh
-npm --prefix web run export -- --server http://<服务器>/yuyan/ --dry          # 只转换和检查，不写文件
-npm --prefix web run export -- --server http://<服务器>/yuyan/ --out ~/YuyanExport
+npm --prefix web run export -- --server https://<服务器>/yuyan/ --dry          # 只转换和检查，不写文件
+npm --prefix web run export -- --server https://<服务器>/yuyan/ --out ~/YuyanExport
 ```
 
 目标文件夹必须是新的、空的，或者是之前的导出结果。再次导出到同一文件夹时会刷新 Markdown，只下载缺少或校验不符的图片，并删除上次导出而本次已不存在的文件；导出之外的文件不会被改动，因此中断后重新运行即可继续。`.yuyan-export/` 里是清单和报告，报告列出下载失败的图片、指向回收站中文档的链接，以及因含有非法字符或同级重名而改过名的文件。全部图片约 340 MB，按服务器约 0.5 MB/s 的下行速度约需 12 分钟；2026-09-26 对正式实例演练，315 篇文档全部转换成功，1,511 张图片都存在。
