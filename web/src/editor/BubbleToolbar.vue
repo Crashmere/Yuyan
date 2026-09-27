@@ -67,12 +67,17 @@ function anchor() {
     contextElement: first,
     getBoundingClientRect() {
       const a = first.getBoundingClientRect(), b = last.getBoundingClientRect()
+      const table = first.closest('table')!.getBoundingClientRect()
       const scroll = first.closest('.yy-table-scroll')!.getBoundingClientRect()
       const toolbar = document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0
       const height = document.querySelector<HTMLElement>('.yy-selection-toolbar')?.offsetHeight ?? 38
       const left = Math.max(Math.min(a.left, b.left), scroll.left, 8)
       const right = Math.min(Math.max(a.right, b.right), scroll.right, innerWidth - 8)
-      const top = Math.max(Math.min(a.top, b.top), toolbar + height + 48)
+      const selectedTop = Math.min(a.top, b.top)
+      // Above the first few rows, a menu anchored to the row would cross the column rail.
+      // Place it above the table there; farther down it can follow the selected rows.
+      const above = selectedTop - table.top < height + 80 ? table.top : selectedTop
+      const top = Math.max(above, toolbar + height + 48)
       const bottom = Math.max(top, Math.min(Math.max(a.bottom, b.bottom), innerHeight - 8))
       return new DOMRect(left, top, Math.max(0, right - left), bottom - top)
     },

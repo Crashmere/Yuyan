@@ -1486,6 +1486,10 @@ test('table rails select rows and columns, and insert at their boundaries', asyn
 
   await controls.getByRole('button', { name: '选中第 2 行', exact: true }).click()
   await expect(table.locator('.selectedCell')).toHaveCount(2)
+  await expect.poll(async () => {
+    const bubble = (await tools.boundingBox())!
+    return bubble.y + bubble.height - (await insert.boundingBox())!.y
+  }).toBeLessThan(0)
   await insert.hover()
   await expect(controls.locator('.yy-table-insert-line')).toBeVisible()
   await expect.poll(() => insert.evaluate((el) => getComputedStyle(el, '::before').top)).toBe('0px')
