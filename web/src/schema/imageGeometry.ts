@@ -42,9 +42,10 @@ export function imageFrameStyle(attrs: Record<string, any>, natural?: [number, n
     : `position: relative; width: ${round(d.width)}px; aspect-ratio: ${round(d.width)} / ${round(d.height)}; max-width: 100%`
   return `display: inline-block; overflow: hidden; vertical-align: middle; border-radius: 4px; line-height: 0; ${geometry}`
 }
-export function splitRects(value: unknown, axis: 'horizontal' | 'vertical', parts: number, first = 0.5): ImageRect[] {
+export function splitRects(value: unknown, axis: 'horizontal' | 'vertical', parts: number, first = 0.5, cuts?: readonly number[]): ImageRect[] {
   const crop = cropRect(value), count = Math.round(clamp(parts, 2, 8))
-  const edges = count === 2 ? [0, clamp(first, 0.05, 0.95), 1] : Array.from({ length: count + 1 }, (_, i) => i / count)
+  const validCuts = cuts?.length === count - 1 && cuts.every((n, i) => Number.isFinite(n) && n > (cuts[i - 1] ?? 0) && n < 1)
+  const edges = validCuts ? [0, ...cuts, 1] : count === 2 ? [0, clamp(first, 0.05, 0.95), 1] : Array.from({ length: count + 1 }, (_, i) => i / count)
   return edges.slice(0, -1).map((start, i) => axis === 'vertical'
     ? { ...crop, x: round(crop.x + crop.width * start), width: round(crop.width * (edges[i + 1] - start)) }
     : { ...crop, y: round(crop.y + crop.height * start), height: round(crop.height * (edges[i + 1] - start)) })

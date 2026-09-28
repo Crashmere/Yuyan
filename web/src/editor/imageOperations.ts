@@ -82,9 +82,9 @@ export function applyImageParameters(e: Editor, source: ImageTarget, targets: Im
     return changes
   })
 }
-export function splitImage(e: Editor, target: ImageTarget, axis: 'horizontal' | 'vertical', parts: number, first: number) {
+export function splitImage(e: Editor, target: ImageTarget, axis: 'horizontal' | 'vertical', parts: number, first: number, cuts?: readonly number[]) {
   const attrs = sourceAttrs(e, target), before = cropRect(attrs.crop), d = imageDimensions(attrs), p = rect(attrs.placement)
-  const crops = splitRects(attrs.crop, axis, parts, first), nodes: PMNode[] = []
+  const crops = splitRects(attrs.crop, axis, parts, first, cuts), nodes: PMNode[] = []
   for (const [i, crop] of crops.entries()) {
     if (i && axis === 'horizontal' && !p) nodes.push(e.schema.nodes.hardBreak.create())
     const width = round(d.width * crop.width / before.width), height = round(d.height * crop.height / before.height)

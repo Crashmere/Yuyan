@@ -900,6 +900,7 @@ a.yy-crumb:hover {
   animation: yy-fade 0.15s ease-out;
 }
 .yy-lightbox {
+  --yy-preview-height: calc(100dvh - 88px);
   position: fixed;
   inset: 0;
   z-index: 91;
@@ -917,6 +918,14 @@ a.yy-crumb:hover {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   cursor: zoom-out;
 }
+.yy-lightbox-crop {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  width: min(var(--yy-preview-width), 100%, calc(var(--yy-preview-height) * var(--yy-preview-ratio)));
+  aspect-ratio: var(--yy-preview-ratio);
+}
+.yy-lightbox-crop > img { max-height: none; }
 .yy-lightbox-bar {
   position: fixed;
   top: 0;
@@ -978,6 +987,7 @@ a.yy-crumb:hover {
 }
 @media (max-width: 720px) {
   .yy-lightbox {
+    --yy-preview-height: calc(100dvh - 132px);
     padding: 52px 8px 80px;
   }
   .yy-lightbox-nav {

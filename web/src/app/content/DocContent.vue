@@ -9,6 +9,7 @@ import { reveal, setupFolds } from './folds'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
 import { clearMatches, showMatches } from './matches'
 import { restoreReadingPosition, type ReadingPosition } from './readingPosition'
+import { parseRect } from '../../schema/imageGeometry'
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app. highlight is
 // the text searched for when the page was opened from search results; foldKey names the document
@@ -80,7 +81,12 @@ function onClick(e: MouseEvent) {
   // Linked images keep following their link.
   if (target instanceof HTMLImageElement && !target.closest('a') && root.value) {
     const all = [...root.value.querySelectorAll<HTMLImageElement>('img')].filter((img) => !img.closest('a'))
-    images.value = all.map((img) => ({ src: img.currentSrc || img.src, alt: img.alt }))
+    images.value = all.map((img) => ({
+      src: img.currentSrc || img.src, alt: img.alt,
+      crop: parseRect(img.getAttribute('data-crop'), true),
+      sourceWidth: Number(img.getAttribute('data-source-width')) || img.naturalWidth,
+      sourceHeight: Number(img.getAttribute('data-source-height')) || img.naturalHeight,
+    }))
     shown.value = all.indexOf(target)
     return
   }

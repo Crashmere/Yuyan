@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
-import { cropRect, imageDimensions, splitRects, storedCrop, type ImageRect } from '../schema/imageGeometry'
+import { clamp, cropRect, imageDimensions, round, splitRects, storedCrop, type ImageRect } from '../schema/imageGeometry'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
@@ -18,7 +18,39 @@ const source = computed(() => targets.find((t) => t.pos === reference.value)!)
 const attrs = computed(() => source.value ? sourceAttrs(e, source.value) : {})
 const dimensions = computed(() => imageDimensions(attrs.value))
 const crop = ref<ImageRect>(cropRect(attrs.value.crop)), lock = ref<number | null>(null)
-const axis = ref<'horizontal' | 'vertical'>('vertical'), parts = ref(2), first = ref(50)
+const axis = ref<'horizontal' | 'vertical'>('vertical'), parts = ref(2), cuts = ref([0.5])
+const partCount = computed(() => Math.round(clamp(Number(parts.value) || 2, 2, 8)))
+const first = computed({ get: () => Math.round(cuts.value[0] * 1000) / 10, set: value => setCut(0, value / 100) })
+const splitPreview = ref<HTMLElement | null>(null)
+function equalCuts() { cuts.value = Array.from({ length: partCount.value - 1 }, (_, i) => (i + 1) / partCount.value) }
+watch(partCount, equalCuts)
+function cutBounds(i: number) {
+  const gap = partCount.value === 2 ? 0.05 : 0.01
+  return { min: (cuts.value[i - 1] ?? 0) + gap, max: (cuts.value[i + 1] ?? 1) - gap }
+}
+function setCut(i: number, value: number) {
+  const { min, max } = cutBounds(i)
+  cuts.value = cuts.value.map((n, at) => at === i ? round(clamp(value, min, max)) : n)
+}
+let stopSplitDrag: (() => void) | undefined
+onBeforeUnmount(() => stopSplitDrag?.())
+function dragSplitLine(event: PointerEvent, i: number) {
+  if (event.button !== 0 || !splitPreview.value) return
+  event.preventDefault(); stopSplitDrag?.()
+  const handle = event.currentTarget as HTMLElement, bounds = splitPreview.value.getBoundingClientRect()
+  const initial = [...cuts.value], vertical = axis.value === 'vertical'
+  handle.focus({ preventScroll: true }); handle.setPointerCapture(event.pointerId)
+  const move = (e: PointerEvent) => setCut(i, vertical ? (e.clientX - bounds.left) / bounds.width : (e.clientY - bounds.top) / bounds.height)
+  const end = (e: PointerEvent) => { if (e.type !== 'pointerup') cuts.value = initial; stopSplitDrag?.() }
+  stopSplitDrag = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', end); handle.removeEventListener('pointercancel', end); handle.removeEventListener('lostpointercapture', end); stopSplitDrag = undefined }
+  handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', end); handle.addEventListener('pointercancel', end); handle.addEventListener('lostpointercapture', end)
+}
+function moveSplitLine(event: KeyboardEvent, i: number) {
+  const keys = axis.value === 'vertical' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowUp', 'ArrowDown']
+  if (!keys.includes(event.key)) return
+  event.preventDefault(); event.stopPropagation()
+  setCut(i, cuts.value[i] + (event.key === keys[0] ? -1 : 1) * (event.shiftKey ? 0.05 : 0.01))
+}
 const scope = ref<ImageScope>(targets.length > 1 ? 'selection' : boardAt(e, reference.value) ? 'board' : 'document')
 const params = ref<ImageParameter[]>(['size', 'align', ...(attrs.value.crop ? ['crop' as const] : [])])
 const parameterOptions = [{ key: 'size', label: '大小' }, { key: 'align', label: '对齐' }, { key: 'crop', label: '裁切' }, { key: 'shadow', label: '阴影边框' }] as const
@@ -26,7 +58,7 @@ const affected = computed(() => scopeImages(e, scope.value, props.positions, ref
 const section = computed(() => sectionAt(e, reference.value).title)
 const inBoard = computed(() => !!boardAt(e, reference.value))
 const title = computed(() => props.mode === 'apply' ? '批量应用图片参数' : props.mode === 'split' ? '切分图片' : `裁切${targets.length > 1 ? ` ${targets.length} 张图片` : '图片'}`)
-const splits = computed(() => splitRects(null, axis.value, parts.value, first.value / 100))
+const splits = computed(() => splitRects(null, axis.value, partCount.value, first.value / 100, cuts.value))
 function ratio(value: number | null) {
   lock.value = value
   if (!value) return
@@ -38,7 +70,7 @@ function apply() {
   if (e.isDestroyed || e.state.doc !== originalDoc) { toast('文档已变化，请重新打开图片工具后重试', 'info'); emit('close'); return }
   if (!source.value) return
   if (props.mode === 'crop') { cropImages(e, targets, storedCrop(crop.value)); toast(`已裁切 ${targets.length} 张图片`, 'success') }
-  else if (props.mode === 'split') { splitImage(e, source.value, axis.value, parts.value, first.value / 100); toast(`已切分为 ${parts.value} 张图片`, 'success') }
+  else if (props.mode === 'split') { splitImage(e, source.value, axis.value, partCount.value, first.value / 100, cuts.value); toast(`已切分为 ${partCount.value} 张图片`, 'success') }
   else { const count = applyImageParameters(e, source.value, affected.value, params.value); toast(count ? `已更新 ${count} 张图片` : '所选参数已一致', count ? 'success' : 'info') }
   emit('close')
 }
@@ -68,13 +100,15 @@ function restoreFocus(event: Event) {
           <div class="yy-image-dialog-options">
             <label>方向 <select v-model="axis" class="yy-input" aria-label="切分方向"><option value="vertical">左右切分</option><option value="horizontal">上下切分</option></select></label>
             <label>份数 <input v-model.number="parts" type="number" class="yy-input" aria-label="切分份数" min="2" max="8" @change="parts = Math.max(2, Math.min(8, Math.round(parts || 2)))" /></label>
-            <label v-if="parts === 2">第一份 {{ first }}% <input v-model.number="first" type="range" min="5" max="95" aria-label="切分位置" /></label>
+            <label v-if="partCount === 2">第一份 {{ first }}% <input v-model.number="first" type="range" min="5" max="95" step="0.1" aria-label="切分位置" /></label>
+            <button type="button" class="yy-btn small" @click="equalCuts">均分</button>
           </div>
-          <div class="yy-image-preview"><div class="yy-split-preview" :style="{ width: `${Math.min(640, dimensions.ratio * 380)}px`, aspectRatio: String(dimensions.ratio) }">
+          <div class="yy-image-preview"><div ref="splitPreview" class="yy-split-preview" :style="{ width: `${Math.min(640, dimensions.ratio * 380)}px`, aspectRatio: String(dimensions.ratio) }">
             <ImageSurface :attrs="{ ...attrs, width: 640, height: null }" />
             <div v-for="(piece, i) in splits" :key="i" class="yy-split-piece" :style="{ left: `${piece.x * 100}%`, top: `${piece.y * 100}%`, width: `${piece.width * 100}%`, height: `${piece.height * 100}%` }"><span>{{ i + 1 }}</span></div>
+            <div v-for="(cut, i) in cuts" :key="`cut-${i}`" class="yy-split-line" :class="axis" :style="axis === 'vertical' ? { left: `${cut * 100}%` } : { top: `${cut * 100}%` }" role="slider" tabindex="0" :aria-label="`第 ${i + 1} 条切分线`" :aria-orientation="axis === 'vertical' ? 'horizontal' : 'vertical'" :aria-valuemin="Math.round(cutBounds(i).min * 100)" :aria-valuemax="Math.round(cutBounds(i).max * 100)" :aria-valuenow="Math.round(cut * 1000) / 10" @pointerdown="dragSplitLine($event, i)" @keydown="moveSplitLine($event, i)"><span>{{ Math.round(cut * 1000) / 10 }}%</span></div>
           </div></div>
-          <p class="yy-dialog-message">把当前可见区域切成互补的 {{ parts }} 份，每份都可独立调整，原图保留。</p>
+          <p class="yy-dialog-message">拖动切分线调整各份大小。把当前可见区域切成互补的 {{ partCount }} 份，原图保留。</p>
         </template>
         <template v-else>
           <label v-if="targets.length > 1" class="yy-image-source">以哪张为准 <select v-model="reference" class="yy-input" aria-label="参数来源"><option v-for="(t, i) in targets" :key="t.pos" :value="t.pos">第 {{ i + 1 }} 张{{ t.node.attrs.alt ? ` · ${t.node.attrs.alt}` : '' }}</option></select></label>

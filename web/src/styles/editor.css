@@ -1235,7 +1235,7 @@ body.yy-row-dragging * {
 .yy-image.ProseMirror-selectednode [data-image-frame] { outline: 2px solid var(--yy-primary); outline-offset: 1px; }
 .yy-image [data-image-frame] img { outline: none; }
 
-.yy-image-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.yy-image-dialog { top: 50%; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; transform: translate(-50%, -50%); animation: yy-fade 0.15s ease-out; }
 .yy-image-dialog-options { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .yy-image-dialog-options label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .yy-image-dialog-options .yy-input { width: auto; max-width: 120px; height: 32px; }
@@ -1258,8 +1258,16 @@ body.yy-row-dragging * {
 .yy-crop-values .yy-input { display: block; width: 100%; height: 32px; margin-top: 4px; }
 .yy-split-preview { position: relative; max-width: 100%; overflow: hidden; }
 .yy-split-preview > [data-image-frame] { display: block !important; width: 100% !important; }
-.yy-split-piece { position: absolute; box-shadow: inset 0 0 0 1px #fff; display: grid; place-items: center; }
+.yy-split-piece { position: absolute; box-shadow: inset 0 0 0 1px #fff; display: grid; place-items: center; pointer-events: none; }
 .yy-split-piece span { padding: 2px 8px; border-radius: 4px; color: white; background: #0008; }
+.yy-split-line { position: absolute; display: grid; place-items: center; touch-action: none; outline: none; }
+.yy-split-line.vertical { top: 0; bottom: 0; width: 20px; transform: translateX(-50%); cursor: col-resize; }
+.yy-split-line.horizontal { left: 0; right: 0; height: 20px; transform: translateY(-50%); cursor: row-resize; }
+.yy-split-line::before { content: ''; position: absolute; background: white; box-shadow: 0 0 2px #000; }
+.yy-split-line.vertical::before { width: 2px; height: 100%; }
+.yy-split-line.horizontal::before { width: 100%; height: 2px; }
+.yy-split-line span { position: relative; padding: 2px 5px; border: 1px solid white; border-radius: 4px; font-size: 11px; line-height: 18px; color: white; background: var(--yy-primary); white-space: nowrap; user-select: none; }
+.yy-split-line:focus-visible span { outline: 2px solid white; outline-offset: 2px; }
 .yy-image-source { display: flex; gap: 12px; align-items: center; }
 .yy-image-source .yy-input { flex: 1; min-width: 0; }
 .yy-image-source-preview { display: flex; gap: 14px; align-items: center; margin: 16px 0; font-size: 13px; color: var(--yy-text-2); }
