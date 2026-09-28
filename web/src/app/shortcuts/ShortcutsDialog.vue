@@ -1,21 +1,36 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { DialogClose, DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle, TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
 import { X } from 'lucide-vue-next'
-import ShortcutKeys from '../ui/ShortcutKeys.vue'
-import { keyboardPlatform, modifierLegend } from '../ui/shortcutKeys'
-import { codeShortcutRows } from '../code/keymap'
+import ShortcutKeys from '../../ui/ShortcutKeys.vue'
+import { keyboardPlatform, modifierLegend } from '../../ui/shortcutKeys'
+import { codeShortcutRows } from '../../code/keymap'
 
-// The keyboard shortcuts and Markdown shortcuts the editor understands, opened with Cmd/Ctrl+/.
+// Loaded by the app shell on demand, without loading the editor.
 const open = defineModel<boolean>('open', { required: true })
 const active = ref('common')
+const portalTarget = ref<HTMLElement | string>('body')
+let previousFocus: HTMLElement | null = null
+watch(open, value => {
+  if (!value) return
+  previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  // Native code dialogs live in the browser's top layer; help must mount inside that layer.
+  portalTarget.value = previousFocus?.closest<HTMLElement>('dialog[open]') ?? 'body'
+}, { immediate: true })
+
+function restoreFocus(e: Event) {
+  e.preventDefault()
+  if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true })
+}
 
 const groups: { id: string; title: string; description: string; items: [string, string][] }[] = [
   {
     id: 'common',
     title: '常用',
-    description: '在正文中使用，组合中的按键需同时按下。',
+    description: 'E 和 Esc 需在 0.4 秒内连按两次；其余组合同时按下。代码块内的 Cmd/Ctrl + / 保留为行注释。',
     items: [
+      ['进入编辑模式（阅读时）', 'E → E'],
+      ['保存并回到阅读模式（编辑时）', 'Esc → Esc'],
       ['撤销', 'Mod-Z'],
       ['重做', 'Mod-Shift-Z'],
       ['查找替换', 'Mod-F'],
@@ -89,9 +104,9 @@ function focusTab() {
 
 <template>
   <DialogRoot v-model:open="open">
-    <DialogPortal>
+    <DialogPortal :to="portalTarget">
       <DialogOverlay class="yy-overlay" />
-      <DialogContent class="yy-dialog yy-shortcuts yy-shortcuts-shell" :aria-describedby="undefined" @open-auto-focus.prevent="focusTab">
+      <DialogContent class="yy-dialog yy-shortcuts yy-shortcuts-shell" :aria-describedby="undefined" @open-auto-focus.prevent="focusTab" @close-auto-focus="restoreFocus" @escape-key-down.prevent="open = false">
         <header class="yy-shortcuts-header">
           <DialogTitle>快捷键</DialogTitle>
           <span class="yy-shortcuts-platform">{{ keyboardPlatform }}</span>

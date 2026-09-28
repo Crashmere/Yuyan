@@ -86,6 +86,6 @@ export function editorExtensions(ui: EditorUi): Extensions {
     Search,
     TableShape,
     SelectWithin,
-    UiShortcuts.configure({ openFind: ui.openFind, openShortcuts: ui.openShortcuts }),
+    UiShortcuts.configure({ openFind: ui.openFind }),
   ]
 }

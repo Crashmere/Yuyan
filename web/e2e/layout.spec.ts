@@ -73,13 +73,9 @@ for (const outline of [true, false]) {
       expect((await geometry(page.locator('.yy-sidebar'))).width).toBeLessThan(before.x)
       await page.screenshot({ path: `test-results/layout-${outline}-${editing ? 'edit' : 'read'}.png` })
 
-      if (!editing) {
-        await page.getByRole('button', { name: /^外观/ }).click()
-        await noPageWidthOptions(page)
-      } else {
-        await page.locator('.yy-toolbar').getByRole('button', { name: '更多', exact: true }).click()
-        await noPageWidthOptions(page)
-      }
+      await page.getByRole('button', { name: /^外观/ }).click()
+      await expect(page.getByRole('menuitem', { name: '快捷键说明' })).toBeVisible()
+      await noPageWidthOptions(page)
       await page.getByRole('button', { name: '收起侧栏', exact: true }).click()
       await expect.poll(() => geometry(body)).toEqual(before)
     }

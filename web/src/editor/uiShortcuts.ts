@@ -2,21 +2,17 @@ import { Extension } from '@tiptap/core'
 
 // Shortcuts that open the editor's panels, plus the Yuque shortcuts Tiptap binds differently or
 // not at all. Cmd/Ctrl+K is left to the page, where it opens the search panel.
-export const UiShortcuts = Extension.create<{ openFind: () => void; openShortcuts: () => void }>({
+export const UiShortcuts = Extension.create<{ openFind: () => void }>({
   name: 'uiShortcuts',
 
   addOptions() {
-    return { openFind: () => {}, openShortcuts: () => {} }
+    return { openFind: () => {} }
   },
 
   addKeyboardShortcuts() {
     return {
       'Mod-f': () => {
         this.options.openFind()
-        return true
-      },
-      'Mod-/': () => {
-        this.options.openShortcuts()
         return true
       },
       'Mod-\\': () => this.editor.chain().focus().unsetAllMarks().run(),

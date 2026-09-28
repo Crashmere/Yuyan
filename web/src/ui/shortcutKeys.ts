@@ -21,8 +21,9 @@ function key(token: string): ShortcutKey {
 
 export function shortcutKeyGroups(combo: string) {
   return combo.split(' / ').map(alternative => {
-    const keys = alternative.split(/-(?!$)/).map(key)
-    return { keys, label: keys.map(key => key.label).join(' + ') }
+    const sequence = alternative.includes(' → ')
+    const keys = alternative.split(sequence ? ' → ' : /-(?!$)/).map(key)
+    return { keys, sequence, label: keys.map(key => key.label).join(sequence ? ' 然后 ' : ' + ') }
   })
 }
 
@@ -43,7 +44,8 @@ export function appendShortcutKeys(parent: HTMLElement, combo: string) {
   shortcutKeyGroups(combo).forEach((group, index) => {
     if (index) parent.append(Object.assign(document.createElement('span'), { className: 'yy-shortcut-or', textContent: '或' }))
     const chord = document.createElement('span'); chord.className = 'yy-shortcut-chord'; chord.setAttribute('aria-label', group.label)
-    for (const key of group.keys) {
+    for (const [index, key] of group.keys.entries()) {
+      if (group.sequence && index) chord.append(Object.assign(document.createElement('span'), { className: 'yy-shortcut-or', textContent: '→' }))
       const cap = document.createElement('kbd'); cap.className = 'yy-keycap'; cap.setAttribute('aria-label', key.label); cap.dataset.tip = key.label
       appendKeyIcon(cap, key); chord.append(cap)
     }

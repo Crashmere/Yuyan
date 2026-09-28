@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Ellipsis, FileText, Folder, PencilLine, TableOfC
 import { api, ApiError, errorMessage, type DocView } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
-import { toast } from '../../ui/toast'
+import { useModeShortcut } from '../modeShortcut'
 import { newDoc, nodeMenu } from '../actions'
 import DocContent from '../content/DocContent.vue'
 import Toc from '../content/Toc.vue'
@@ -34,28 +34,11 @@ onBeforeUnmount(() => drawerQuery.removeEventListener('change', onDrawerQuery))
 // The editor is a large download; start fetching it when the pointer reaches the edit button.
 const prefetchEditor = () => void import('./EditView.vue')
 
-// E pressed twice quickly opens the editor; pressed once, a hint says so after the moment in which
-// a second press would have come.
-let lastE = -Infinity
-let hintTimer: ReturnType<typeof setTimeout> | undefined
-function onKey(e: KeyboardEvent) {
-  if ((e.key !== 'e' && e.key !== 'E') || e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.isComposing) return
-  if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
-  if (view.value?.doc.kind !== 'doc') return
-  clearTimeout(hintTimer)
-  if (performance.now() - lastE < 400) {
-    lastE = -Infinity
-    prefetchEditor()
-    void router.push(`/docs/${id}/edit`)
-    return
-  }
-  lastE = performance.now()
-  hintTimer = setTimeout(() => toast('连按两次 E 键进入编辑模式', 'info', { key: 'edit-hint', ms: 1800 }), 400)
-}
-addEventListener('keydown', onKey)
-onBeforeUnmount(() => {
-  removeEventListener('keydown', onKey)
-  clearTimeout(hintTimer)
+useModeShortcut('e', '连按两次 E 键进入编辑模式', (e) => {
+  return view.value?.doc.kind === 'doc' && !(e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]'))
+}, () => {
+  prefetchEditor()
+  void router.push(`/docs/${id}/edit`)
 })
 
 // Search results open documents with ?hl=<query>, which is highlighted in the content.

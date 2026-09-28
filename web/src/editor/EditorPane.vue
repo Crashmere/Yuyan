@@ -20,7 +20,6 @@ import FindReplace from './FindReplace.vue'
 import LinkCard from './LinkCard.vue'
 import LinkPopover from './LinkPopover.vue'
 import MathPopover from './MathPopover.vue'
-import ShortcutsDialog from './ShortcutsDialog.vue'
 import TableGrid from './TableGrid.vue'
 import ImageToolbar from './ImageToolbar.vue'
 import { insertImages, pendingUploads } from './uploads'
@@ -56,7 +55,6 @@ const linkEdit = ref<{ from: number; to: number; href: string; withText: boolean
 const mathTarget = ref<{ pos: number; fresh: boolean } | null>(null)
 const findOpen = ref(false)
 const find = ref<InstanceType<typeof FindReplace> | null>(null)
-const shortcutsOpen = ref(false)
 const tableGrid = shallowRef<Anchor | null>(null)
 
 const ui: EditorUi = {
@@ -80,9 +78,6 @@ const ui: EditorUi = {
     findOpen.value = true
     await nextTick()
     find.value?.focusFind()
-  },
-  openShortcuts: () => {
-    shortcutsOpen.value = true
   },
   openTableGrid(anchor) {
     const e = editor.value
@@ -307,16 +302,13 @@ function snapshot() {
   if (savedThisSession) navigator.sendBeacon(`${base}api/docs/${props.doc.id}/snapshot`)
 }
 
-// Find and the shortcut list also open from the title field, where the editor's keymap is not active.
+// Find also opens from the title field, where the editor's keymap is not active.
 function pageKeys(e: KeyboardEvent) {
   if (e.defaultPrevented || (e.target as Element)?.closest('.cm-editor, .yy-code-dialog')) return
   if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return
   if (e.key === 'f' || e.key === 'F') {
     e.preventDefault()
     void ui.openFind()
-  } else if (e.key === '/') {
-    e.preventDefault()
-    ui.openShortcuts()
   }
 }
 
@@ -422,7 +414,6 @@ onBeforeUnmount(() => {
     <TableGrid v-if="tableGrid" :anchor="tableGrid" @pick="insertTable" @close="tableGrid = null" />
     <ImageToolbar />
     <BlockHandle />
-    <ShortcutsDialog v-model:open="shortcutsOpen" />
 
     <input ref="fileInput" type="file" :accept="imageTypes.join(',')" multiple hidden @change="onFilePicked" />
   </div>

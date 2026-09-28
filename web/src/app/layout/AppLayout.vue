@@ -4,16 +4,26 @@ import { isNavigationFailure, NavigationFailureType, RouterView, useRoute, useRo
 import { prefs } from '../prefs'
 import { openSearch, searchLoaded } from '../search/panel'
 import { state } from '../store'
+import { openShortcuts, shortcutsLoaded, shortcutsOpen } from '../shortcuts/panel'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 
 const SearchPanel = defineAsyncComponent(() => import('../search/SearchPanel.vue'))
+const ShortcutsDialog = defineAsyncComponent(() => import('../shortcuts/ShortcutsDialog.vue'))
 
 const route = useRoute()
 const router = useRouter()
 
 // Cmd/Ctrl+K opens the search panel everywhere, including in the editor.
 function onKey(e: KeyboardEvent) {
+  if (e.defaultPrevented || e.repeat || e.isComposing) return
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === '/') {
+    // CodeMirror owns Mod-/ for line comments; every other page and input opens help.
+    if (e.target instanceof Element && e.target.closest('.cm-editor')) return
+    e.preventDefault()
+    openShortcuts()
+    return
+  }
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k' && !e.isComposing) {
     e.preventDefault()
     openSearch()
@@ -61,5 +71,6 @@ function resize(e: PointerEvent) {
       </RouterView>
     </div>
     <SearchPanel v-if="searchLoaded" />
+    <ShortcutsDialog v-if="shortcutsLoaded" v-model:open="shortcutsOpen" />
   </div>
 </template>

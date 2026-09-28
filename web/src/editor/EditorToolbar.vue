@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ChevronDown, Ellipsis, Keyboard, Link, Maximize2, Minimize2, Plus, Redo2, RemoveFormatting, Search, Undo2 } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, ChevronDown, Link, Maximize2, Minimize2, Plus, Redo2, RemoveFormatting, Search, Undo2 } from 'lucide-vue-next'
 import { prefs } from '../app/prefs'
 import ActionMenu from '../ui/ActionMenu.vue'
 import IconButton from '../ui/IconButton.vue'
@@ -9,6 +9,7 @@ import { clearFormatting, currentStyle, insertItems, listButtons, markButtons, t
 import { useEditorContext } from './context'
 import { keyLabel, withKey } from './keys'
 import AlignmentMenu from './AlignmentMenu.vue'
+import { shiftHeadingLevel } from './headingLevels'
 
 // The formatting toolbar above the document.
 const { editor, tick, ui } = useEditorContext()
@@ -25,6 +26,8 @@ const state = computed(() => {
     link: e.isActive('link'),
     canUndo: e.can().undo(),
     canRedo: e.can().redo(),
+    canPromote: e.can().command(shiftHeadingLevel(-1)),
+    canDemote: e.can().command(shiftHeadingLevel(1)),
     // Formatting commands make no sense inside a code block.
     inCode: e.isActive('codeBlock'),
   }
@@ -65,8 +68,6 @@ const insertMenu = computed<MenuEntry[]>(() => {
   }
   return out
 })
-
-const moreMenu: MenuEntry[] = [{ label: '快捷键说明', icon: Keyboard, hint: keyLabel('Mod-/'), run: () => ui.openShortcuts() }]
 </script>
 
 <template>
@@ -80,6 +81,8 @@ const moreMenu: MenuEntry[] = [{ label: '快捷键说明', icon: Keyboard, hint:
           <span>{{ state.style }}</span><ChevronDown :size="14" />
         </button>
       </ActionMenu>
+      <IconButton label="提升标题等级" :disabled="!state.canPromote" @mousedown.prevent @click="editor.chain().focus().command(shiftHeadingLevel(-1)).run()"><ArrowUp :size="17" /></IconButton>
+      <IconButton label="降低标题等级" :disabled="!state.canDemote" @mousedown.prevent @click="editor.chain().focus().command(shiftHeadingLevel(1)).run()"><ArrowDown :size="17" /></IconButton>
       <span class="yy-toolbar-sep"></span>
       <IconButton
         v-for="m in markButtons"
@@ -115,9 +118,6 @@ const moreMenu: MenuEntry[] = [{ label: '快捷键说明', icon: Keyboard, hint:
       <IconButton :label="prefs.focusMode ? '退出专注模式' : '专注模式（隐藏侧栏）'" :active="prefs.focusMode" @mousedown.prevent @click="prefs.focusMode = !prefs.focusMode">
         <Minimize2 v-if="prefs.focusMode" :size="17" /><Maximize2 v-else :size="17" />
       </IconButton>
-      <ActionMenu :items="moreMenu" :restore-focus="false">
-        <IconButton label="更多" @mousedown.prevent><Ellipsis :size="17" /></IconButton>
-      </ActionMenu>
     </div>
   </div>
 </template>

@@ -160,6 +160,24 @@
 }
 .yy-content :where(ul, ol) {
   padding-left: 1.6em;
+  /* Snapshot the inherited marker cycle before each item passes it to the next depth.
+     Rotating on li also works for mixed ordered/bullet nesting, with no depth limit. */
+  --yy-ol-current: var(--yy-ol-a, decimal);
+  --yy-ol-next: var(--yy-ol-b, lower-alpha);
+  --yy-ol-last: var(--yy-ol-c, lower-roman);
+  --yy-ul-current: var(--yy-ul-a, disc);
+  --yy-ul-next: var(--yy-ul-b, circle);
+  --yy-ul-last: var(--yy-ul-c, square);
+}
+.yy-content :where(ol) { list-style-type: var(--yy-ol-current); }
+.yy-content :where(ul) { list-style-type: var(--yy-ul-current); }
+.yy-content :where(li) {
+  --yy-ol-a: var(--yy-ol-next);
+  --yy-ol-b: var(--yy-ol-last);
+  --yy-ol-c: var(--yy-ol-current);
+  --yy-ul-a: var(--yy-ul-next);
+  --yy-ul-b: var(--yy-ul-last);
+  --yy-ul-c: var(--yy-ul-current);
 }
 .yy-content li > p {
   margin: 0.2em 0;

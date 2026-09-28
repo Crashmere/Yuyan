@@ -14,7 +14,6 @@ export interface EditorUi {
   openLink: () => void
   openMath: (pos: number, fresh?: boolean) => void
   openFind: () => void
-  openShortcuts: () => void
   openTableGrid: (anchor: HTMLElement | DOMRect) => void
 }
 
