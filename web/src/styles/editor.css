@@ -994,10 +994,23 @@ body.yy-row-dragging * {
   cursor: default;
 }
 .yy-image-toolbar { max-width: calc(100vw - 24px); flex-wrap: wrap; }
+@media (max-width: 480px) {
+  .yy-image-toolbar { gap: 1px; }
+  .yy-image-toolbar .yy-bubble-sep { margin: 0 2px; }
+}
 .yy-image.is-aligned {
   /* Keep the inline node on one full line. display:block would put ProseMirror's caret
      separators on two additional lines inside the same paragraph. */
   width: 100%;
+}
+/* Match reading spacing, including browsers that insert an invisible caret separator. */
+.ProseMirror .yy-image:has(+ .yy-image, + .ProseMirror-separator + .yy-image) {
+  margin-bottom: 0.75em;
+  vertical-align: top;
+}
+.ProseMirror .yy-image + .yy-image,
+.ProseMirror .yy-image + .ProseMirror-separator + .yy-image {
+  vertical-align: top;
 }
 .yy-image-content {
   position: relative;

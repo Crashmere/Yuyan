@@ -6,7 +6,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { ChevronDown, Download, ExternalLink, Replace, Square, TextCursorInput } from 'lucide-vue-next'
+import { ChevronDown, CopyCheck, Download, ExternalLink, Replace, Square, TextCursorInput } from 'lucide-vue-next'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
@@ -100,6 +100,31 @@ function resize(fraction: number) {
   setAttrs(img.pos, { width: Math.round(blockWidth(dom) * fraction), height: null })
 }
 
+function applyToAllImages() {
+  const e = editor.value
+  const sel = e?.state.selection
+  if (!e?.isEditable || !(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return
+  const { blockAlign = null, width = null, height = null } = sel.node.attrs
+  const tr = closeHistory(e.state.tr)
+  let changed = 0
+  e.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    if ((node.attrs.blockAlign ?? null) === blockAlign && (node.attrs.width ?? null) === width && (node.attrs.height ?? null) === height) return
+    tr.setNodeMarkup(pos, undefined, { ...node.attrs, blockAlign, width, height })
+    changed++
+  })
+  if (!changed) {
+    toast('全文图片的对齐和大小设置已一致', 'info')
+    return
+  }
+  tr.setSelection(NodeSelection.create(tr.doc, sel.from))
+  e.view.dispatch(tr)
+  // Keep this batch separate from both the source adjustment and the next edit.
+  e.view.dispatch(closeHistory(e.state.tr))
+  sizesOpen.value = false
+  toast(`已将对齐和大小应用到 ${changed} 张图片`, 'success')
+}
+
 async function replace(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -175,6 +200,7 @@ function cancelAlt() {
       </div>
       <span class="yy-bubble-sep"></span>
       <AlignmentMenu />
+      <button type="button" class="yy-bubble-btn" data-tip="应用对齐和大小到全文图片" aria-label="应用对齐和大小到全文图片" @mousedown.prevent @click="applyToAllImages"><CopyCheck :size="16" /></button>
       <button type="button" class="yy-bubble-btn" :class="{ active: image?.attrs.shadow === true }" :aria-pressed="image?.attrs.shadow === true" :data-tip="image?.attrs.shadow ? '关闭阴影边框' : '显示阴影边框'" aria-label="阴影边框" @mousedown.prevent @click="image && setAttrs(image.pos, { shadow: image.attrs.shadow ? null : true })"><Square :size="16" /></button>
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :data-tip="replacing === null ? '替换图片' : `上传中 ${replacing}%`" aria-label="替换图片" :disabled="replacing !== null" @mousedown.prevent @click="fileInput?.click()">

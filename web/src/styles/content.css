@@ -502,6 +502,15 @@ pre:hover > .yy-copy,
   border-radius: 4px;
   cursor: zoom-in;
 }
+/* Paragraph margins already space separate blocks. Adjacent images also need a gap
+   when they align or wrap onto separate lines; top alignment keeps inline pairs level. */
+.yy-content img:has(+ img) {
+  margin-bottom: 0.75em;
+  vertical-align: top;
+}
+.yy-content img + img {
+  vertical-align: top;
+}
 .yy-content a img {
   cursor: pointer;
 }
