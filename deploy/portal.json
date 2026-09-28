@@ -84,6 +84,16 @@
     },
     {
       "method": "GET",
+      "path": "/api/book-groups",
+      "description": "知识库分组配置与版本"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/book-groups",
+      "description": "保存知识库分组，检测版本冲突"
+    },
+    {
+      "method": "GET",
       "path": "/api/books",
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },

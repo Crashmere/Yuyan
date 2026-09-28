@@ -2,6 +2,17 @@ import type { JSONContent } from '@tiptap/core'
 
 export const base = document.querySelector<HTMLMetaElement>('meta[name="yuyan-base"]')?.content ?? '/'
 
+export interface BookGroup {
+  id: string
+  name: string
+  bookIds: number[]
+}
+
+export interface BookGroups {
+  revision: number
+  groups: BookGroup[]
+}
+
 export interface Book {
   id: number
   name: string

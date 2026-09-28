@@ -238,7 +238,7 @@ class Converter {
         if (!src) return []
         const resolved = this.ctx.resolveImage ? this.ctx.resolveImage(src, 'html') : src
         if (!resolved) return [{ type: 'text', text: m[0] }]
-        return [{ type: 'image', attrs: { src: resolved, alt: attr('alt'), title: attr('title'), width: numberOrNull(attr('width')), height: numberOrNull(attr('height')), ...(alignment(attr('data-align')) ? { blockAlign: alignment(attr('data-align')) } : {}) } }]
+        return [{ type: 'image', attrs: { src: resolved, alt: attr('alt'), title: attr('title'), width: numberOrNull(attr('width')), height: numberOrNull(attr('height')), ...(alignment(attr('data-align')) ? { blockAlign: alignment(attr('data-align')) } : {}), ...(attr('data-frame') === 'shadow' ? { shadow: true } : {}) } }]
       })
     }
     return null
@@ -603,7 +603,7 @@ class Exporter {
   private image(n: JSONContent): PhrasingContent {
     const a = n.attrs ?? {}
     const src = this.ctx.imageSrc ? this.ctx.imageSrc(String(a.src ?? '')) : String(a.src ?? '')
-    if (a.height && !a.width) {
+    if ((a.height && !a.width) || a.shadow === true || a.blockAlign) {
       return { type: 'html', value: this.nodeHtml(n) }
     }
     const size = a.width ? `|${a.width}${a.height ? `x${a.height}` : ''}` : ''

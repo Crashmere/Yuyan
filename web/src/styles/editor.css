@@ -993,6 +993,7 @@ body.yy-row-dragging * {
 .ProseMirror img {
   cursor: default;
 }
+.yy-image-toolbar { max-width: calc(100vw - 24px); flex-wrap: wrap; }
 .yy-image.is-aligned {
   /* Keep the inline node on one full line. display:block would put ProseMirror's caret
      separators on two additional lines inside the same paragraph. */

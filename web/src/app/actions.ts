@@ -1,6 +1,6 @@
 import { shallowRef } from 'vue'
-import { ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2 } from 'lucide-vue-next'
-import { base, errorMessage, type Book, type TreeNode } from '../shared/api'
+import { ArrowDown, ArrowUp, ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2 } from 'lucide-vue-next'
+import { base, errorMessage, type Book, type BookGroup, type TreeNode } from '../shared/api'
 import { copyText } from '../shared/clipboard'
 import { confirm, prompt } from '../ui/dialog'
 import type { MenuEntry } from '../ui/menu'
@@ -173,8 +173,68 @@ export function bookMenu(book: Book): MenuEntry[] {
     null,
     { label: '重命名', icon: PencilLine, run: () => renameBook(book) },
     { label: '编辑简介', icon: SquarePen, run: () => editBookDescription(book) },
+    { label: '移至知识库分组', icon: FolderInput, children: bookGroupChoices(book.id) },
     { label: '导出知识库', icon: Download, run: () => exportBook(book) },
     null,
     { label: '删除知识库', icon: Trash2, danger: true, run: () => deleteBook(book) },
   ]
+}
+
+export function newBookGroup(bookId?: number) {
+  return attempt(async () => {
+    const name = await prompt({ title: '新建知识库分组', placeholder: '分组名称', confirmText: '新建' })
+    if (!name) return
+    if (name.trim() === '未分组') throw new Error('请使用其他名称，“未分组”用于尚未归类的知识库')
+    if (store.state.bookGroups.groups.some((g) => g.name === name.trim())) throw new Error('已存在同名分组')
+    const groups = store.state.bookGroups.groups.map((g) => ({ ...g, bookIds: g.bookIds.filter((id) => id !== bookId) }))
+    await store.saveBookGroups([...groups, { id: crypto.randomUUID(), name: name.trim(), bookIds: bookId ? [bookId] : [] }])
+  }, '新建分组失败')
+}
+
+export function moveBookGroup(bookId: number, groupId: string) {
+  return attempt(() => store.moveBookToGroup(bookId, groupId), '移动分组失败')
+}
+
+export function bookGroupChoices(bookId: number): MenuEntry[] {
+  const current = store.state.bookGroups.groups.find((g) => g.bookIds.includes(bookId))?.id ?? ''
+  return [
+    ...store.bookSections.value.map((g) => ({ label: g.name, checked: current === g.id, run: () => moveBookGroup(bookId, g.id) })),
+    null,
+    { label: '新建知识库分组', icon: FolderPlus, run: () => newBookGroup(bookId) },
+  ]
+}
+
+export function bookGroupMenu(id: string): MenuEntry[] {
+  const groups = store.state.bookGroups.groups
+  const group = groups.find((g) => g.id === id)
+  if (!group) return []
+  const index = groups.indexOf(group)
+  const reorder = (direction: number) => attempt(async () => {
+    const next = [...store.state.bookGroups.groups]
+    const from = next.findIndex((g) => g.id === id)
+    if (from < 0 || from + direction < 0 || from + direction >= next.length) return
+    next.splice(from, 1)
+    next.splice(from + direction, 0, group)
+    await store.saveBookGroups(next)
+  }, '分组排序失败')
+  return [
+    { label: '重命名分组', icon: PencilLine, run: () => renameBookGroup(group) },
+    { label: '上移分组', icon: ArrowUp, disabled: index === 0, run: () => reorder(-1) },
+    { label: '下移分组', icon: ArrowDown, disabled: index === groups.length - 1, run: () => reorder(1) },
+    null,
+    { label: '删除分组', icon: Trash2, danger: true, run: () => attempt(async () => {
+      if (!await confirm({ title: `删除分组“${group.name}”？`, message: '分组内的知识库会移至“未分组”，文档内容保留。', confirmText: '删除分组', danger: true })) return
+      await store.saveBookGroups(store.state.bookGroups.groups.filter((g) => g.id !== id))
+    }, '删除分组失败') },
+  ]
+}
+
+function renameBookGroup(group: BookGroup) {
+  return attempt(async () => {
+    const name = await prompt({ title: '重命名分组', value: group.name, confirmText: '保存' })
+    if (!name || name.trim() === group.name) return
+    if (name.trim() === '未分组') throw new Error('请使用其他名称，“未分组”用于尚未归类的知识库')
+    if (store.state.bookGroups.groups.some((g) => g.id !== group.id && g.name === name.trim())) throw new Error('已存在同名分组')
+    await store.saveBookGroups(store.state.bookGroups.groups.map((g) => g.id === group.id ? { ...g, name: name.trim() } : g))
+  }, '重命名分组失败')
 }

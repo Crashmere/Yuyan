@@ -10,6 +10,7 @@ import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { Callout, CalloutContent, CalloutTitle } from './callout'
 import { withTitles } from './codeBlock'
 import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignment'
+import { imageFrame } from './imageStyle'
 
 // The document schema shared by the editor, the importer and the parity snapshots.
 // Every node and mark here needs a matching case in internal/render/render.go.
@@ -46,12 +47,17 @@ export const YuyanImage = Image.extend<ImageOptions>({
           return src ? this.options.unresolveSrc(src) : null
         },
       },
+      shadow: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-frame') === 'shadow' ? true : null,
+        rendered: false,
+      },
     }
   },
   renderHTML({ node, HTMLAttributes }) {
     const attrs = { ...HTMLAttributes }
     if (typeof attrs.src === 'string') attrs.src = this.options.resolveSrc(attrs.src)
-    return ['img', mergeAttributes(this.options.HTMLAttributes, attrs, blockAlignment(node.attrs.blockAlign, true))]
+    return ['img', mergeAttributes(this.options.HTMLAttributes, attrs, blockAlignment(node.attrs.blockAlign, true), imageFrame(node.attrs.shadow))]
   },
 })
 

@@ -70,6 +70,7 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		p := preload{}
 		p.add("books", r, s.books)
+		p.add("book-groups", r, s.bookGroups)
 		id := r.PathValue("id")
 		status, title := http.StatusOK, ""
 		// main loads the object the page is about; its failure decides the page status.

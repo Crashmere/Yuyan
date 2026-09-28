@@ -1,5 +1,5 @@
-import { reactive, shallowRef } from 'vue'
-import { api, type Book, type Doc, type TreeNode } from '../shared/api'
+import { computed, reactive, shallowRef } from 'vue'
+import { api, ApiError, type Book, type BookGroup, type BookGroups, type Doc, type TreeNode } from '../shared/api'
 import { forgetViewed } from './prefs'
 
 // Shared client state: the knowledge base list, the trees seen so far, and what the current page
@@ -9,6 +9,7 @@ import { forgetViewed } from './prefs'
 export const state = reactive({
   books: [] as Book[],
   booksLoaded: false,
+  bookGroups: { revision: 0, groups: [] } as BookGroups,
   trees: {} as Record<number, TreeNode[] | undefined>,
   bookId: null as number | null,
   docId: null as number | null,
@@ -32,9 +33,34 @@ export function setPage(bookId: number | null, docId: number | null = null) {
 
 export async function loadBooks(force = false): Promise<Book[]> {
   if (state.booksLoaded && !force) return state.books
-  state.books = await api<Book[]>('books')
+  const [books, groups] = await Promise.all([api<Book[]>('books'), api<BookGroups>('book-groups')])
+  state.books = books
+  state.bookGroups = groups
   state.booksLoaded = true
   return state.books
+}
+
+export const bookSections = computed(() => {
+  const assigned = new Set(state.bookGroups.groups.flatMap((g) => g.bookIds))
+  return [
+    ...state.bookGroups.groups.map((g) => ({ id: g.id, name: g.name, books: state.books.filter((b) => g.bookIds.includes(b.id)) })),
+    { id: '', name: '未分组', books: state.books.filter((b) => !assigned.has(b.id)) },
+  ]
+})
+
+export async function saveBookGroups(groups: BookGroup[]) {
+  try {
+    state.bookGroups = await api<BookGroups>('book-groups', { method: 'PUT', json: { groups, baseRevision: state.bookGroups.revision } })
+  } catch (e) {
+    await loadBooks(true)
+    if (e instanceof ApiError && e.status === 409) throw new Error('分组已在别处修改，已刷新列表，请重试')
+    throw e
+  }
+}
+
+export async function moveBookToGroup(bookId: number, groupId: string) {
+  const groups = state.bookGroups.groups.map((g) => ({ ...g, bookIds: [...g.bookIds.filter((id) => id !== bookId), ...(g.id === groupId ? [bookId] : [])] }))
+  await saveBookGroups(groups)
 }
 
 const staleTrees = new Set<number>()

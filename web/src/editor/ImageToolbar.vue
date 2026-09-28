@@ -2,9 +2,10 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { ChevronDown, Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
+import { ChevronDown, Download, ExternalLink, Replace, Square, TextCursorInput } from 'lucide-vue-next'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
@@ -12,6 +13,7 @@ import { imageTypes } from './extensions'
 import { blockWidth, fileName } from './images'
 import { uploadFile } from './uploads'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
+import AlignmentMenu from './AlignmentMenu.vue'
 
 // Shown while an image is selected: size, replace, download, open, alternative text, delete.
 const { editor, tick } = useEditorContext()
@@ -54,7 +56,7 @@ function setAttrs(pos: number, attrs: Record<string, unknown>) {
   const node = e?.state.doc.nodeAt(pos)
   if (!e || node?.type.name !== 'image') return
   const tr = e.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs })
-  e.view.dispatch(tr.setSelection(NodeSelection.create(tr.doc, pos)))
+  e.view.dispatch(closeHistory(tr.setSelection(NodeSelection.create(tr.doc, pos))))
 }
 
 const sizes = [
@@ -149,6 +151,9 @@ function cancelAlt() {
           <button v-for="s in sizes" :key="s.label" type="button" @mousedown.prevent @click="resize(s.fraction)">{{ s.label }}</button>
         </div>
       </div>
+      <span class="yy-bubble-sep"></span>
+      <AlignmentMenu />
+      <button type="button" class="yy-bubble-btn" :class="{ active: image?.attrs.shadow === true }" :aria-pressed="image?.attrs.shadow === true" :data-tip="image?.attrs.shadow ? '关闭阴影边框' : '显示阴影边框'" aria-label="阴影边框" @mousedown.prevent @click="image && setAttrs(image.pos, { shadow: image.attrs.shadow ? null : true })"><Square :size="16" /></button>
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :data-tip="replacing === null ? '替换图片' : `上传中 ${replacing}%`" aria-label="替换图片" :disabled="replacing !== null" @mousedown.prevent @click="fileInput?.click()">
         <Replace :size="16" />

@@ -64,6 +64,7 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
         :title="node.attrs.title ?? undefined"
         :width="width"
         :height="height"
+        :data-frame="node.attrs.shadow === true ? 'shadow' : undefined"
         :style="reserved.aspectRatio ? { aspectRatio: reserved.aspectRatio } : undefined"
         draggable="true"
         data-drag-handle

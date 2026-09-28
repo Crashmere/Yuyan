@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { BookOpen, ChevronsUpDown, Ellipsis, Plus } from 'lucide-vue-next'
+import { BookOpen, ChevronsUpDown, Ellipsis, Folder, LocateFixed, Plus } from 'lucide-vue-next'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
 import { bookMenu, newDoc } from '../actions'
-import { bookOf, loadBooks, loadTree, state } from '../store'
+import { bookOf, bookSections, loadBooks, loadTree, state } from '../store'
 import BookTree from '../tree/BookTree.vue'
 
 const props = defineProps<{ bookId: number }>()
@@ -16,9 +16,12 @@ const router = useRouter()
 const book = computed(() => bookOf(props.bookId))
 const tree = computed(() => state.trees[props.bookId])
 const treeView = ref<InstanceType<typeof BookTree> | null>(null)
-const switcher = computed<MenuEntry[]>(() =>
-  state.books.map((b) => ({ label: b.name, icon: BookOpen, disabled: b.id === props.bookId, run: () => void router.push(`/books/${b.id}`) })),
-)
+const switcher = computed<MenuEntry[]>(() => {
+  const items = (books: typeof state.books) => books.map((b) => ({ label: b.name, icon: BookOpen, disabled: b.id === props.bookId, run: () => void router.push(`/books/${b.id}`) }))
+  return state.bookGroups.groups.length
+    ? bookSections.value.filter((g) => g.books.length).map((g) => ({ label: g.name, icon: Folder, children: items(g.books) }))
+    : items(state.books)
+})
 
 onMounted(() => {
   void loadBooks()
@@ -43,6 +46,7 @@ onMounted(() => {
     <div class="yy-tree-scroll">
       <div v-if="tree?.length" class="yy-tree-head">
         <span>目录</span>
+        <IconButton small label="定位当前文档" :disabled="!treeView?.canLocate" @click="treeView?.locateCurrent()"><LocateFixed :size="15" /></IconButton>
         <FoldAllButton v-if="treeView?.hasBranches" :expanded="treeView.hasExpanded" @click="treeView.toggleAll()" />
       </div>
       <BookTree v-if="tree" ref="treeView" :book-id="bookId" :nodes="tree" :current-id="state.docId" />

@@ -9,6 +9,7 @@ import TreeItem from './TreeItem.vue'
 import { treeKey, type DropPosition } from './context'
 
 const props = defineProps<{ bookId: number; nodes: TreeNode[]; currentId: number | null }>()
+const root = ref<HTMLElement | null>(null)
 
 const expanded = reactive(loadExpanded(props.bookId))
 const renaming = ref<number | null>(null)
@@ -44,18 +45,27 @@ function toggleAll() {
   if (hasExpanded.value) foldAll()
   else unfoldAll()
 }
-defineExpose({ hasBranches, hasExpanded, toggleAll })
+const canLocate = computed(() => props.currentId !== null && !!store.locate(props.bookId, props.currentId))
+
+async function locateCurrent(center = true) {
+  const id = props.currentId
+  const found = store.locate(props.bookId, id)
+  if (!found) return
+  for (const p of found.path) if (!expanded.has(p.id)) toggle(p.id, true)
+  await nextTick()
+  const row = root.value?.querySelector<HTMLElement>(`[data-tree-id="${id}"]`)
+  const scroll = root.value?.closest('.yy-tree-scroll')
+  if (!row || !(scroll instanceof HTMLElement)) return
+  const box = row.getBoundingClientRect(), frame = scroll.getBoundingClientRect()
+  if (center) scroll.scrollTo({ top: scroll.scrollTop + box.top - frame.top - (scroll.clientHeight - box.height) / 2, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  else row.scrollIntoView({ block: 'nearest' })
+}
+defineExpose({ hasBranches, hasExpanded, toggleAll, canLocate, locateCurrent })
 
 // Opening a document expands the path to it and scrolls its row into view.
 watch(
   () => [props.currentId, props.nodes] as const,
-  async ([id]) => {
-    const found = store.locate(props.bookId, id)
-    if (!found) return
-    for (const p of found.path) if (!expanded.has(p.id)) toggle(p.id, true)
-    await nextTick()
-    document.querySelector(`.yy-sidebar [data-tree-id="${id}"]`)?.scrollIntoView({ block: 'nearest' })
-  },
+  () => locateCurrent(false),
   { immediate: true },
 )
 
@@ -149,7 +159,7 @@ provide(treeKey, {
 </script>
 
 <template>
-  <ul v-if="nodes.length" class="yy-tree" role="tree" @dragleave.self="drag.overId = null">
+  <ul v-if="nodes.length" ref="root" class="yy-tree" role="tree" @dragleave.self="drag.overId = null">
     <TreeItem v-for="n in nodes" :key="n.id" :node="n" :depth="0" />
   </ul>
   <p v-else class="yy-tree-empty">还没有文档</p>

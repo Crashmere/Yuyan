@@ -337,13 +337,22 @@ func (r *renderer) url(href string) string {
 
 func (r *renderer) image(n doc.Node) {
 	attrs := [][2]string{{"src", r.url(n.Attr("src"))}}
+	var style []string
 	for _, k := range []string{"alt", "title", "width", "height"} {
 		if v := n.Attr(k); v != "" {
 			attrs = append(attrs, [2]string{k, v})
 		}
 	}
 	if a := alignment(n.Attr("blockAlign")); a != "" {
-		attrs = append(attrs, [2]string{"data-align", a}, [2]string{"style", "display: block; " + alignmentMargins(a)})
+		attrs = append(attrs, [2]string{"data-align", a})
+		style = append(style, "display: block; "+alignmentMargins(a))
+	}
+	if n.AttrBool("shadow") {
+		attrs = append(attrs, [2]string{"data-frame", "shadow"})
+		style = append(style, "box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.12)")
+	}
+	if len(style) > 0 {
+		attrs = append(attrs, [2]string{"style", strings.Join(style, "; ")})
 	}
 	if !r.opt.Parity {
 		attrs = append(attrs, [2]string{"loading", "lazy"}, [2]string{"decoding", "async"})

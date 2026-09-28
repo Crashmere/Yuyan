@@ -268,6 +268,9 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			if attrsChanged("blockAlign") {
 				add("调整图片对齐", places...)
 			}
+			if attrsChanged("shadow") {
+				add("调整图片边框", places...)
+			}
 			if attrsChanged("alt", "title") {
 				add("修改图片说明", places...)
 			}

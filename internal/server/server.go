@@ -134,6 +134,8 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 
 	mux.Handle("GET /api/meta", s.read(s.apiMeta))
 	mux.Handle("GET /api/books", s.get(s.books))
+	mux.Handle("GET /api/book-groups", s.get(s.bookGroups))
+	mux.Handle("PUT /api/book-groups", s.write(s.apiBookGroups))
 	mux.Handle("POST /api/books", s.write(s.apiCreateBook))
 	mux.Handle("PUT /api/books/order", s.write(s.apiReorderBooks))
 	mux.Handle("GET /api/books/{id}", s.get(s.book))

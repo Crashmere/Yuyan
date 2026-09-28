@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 )
 
@@ -87,6 +88,37 @@ INSERT INTO purge SELECT id FROM docs WHERE deleted_at IS NOT NULL;`); err != ni
 
 func purgeBooks(ctx context.Context, tx *sql.Tx, where string, args ...any) error {
 	books := `SELECT id FROM books WHERE ` + where
+	groups, err := readBookGroups(ctx, tx)
+	if err != nil {
+		return err
+	}
+	changed := false
+	for i := range groups.Groups {
+		kept := []int64{}
+		for _, id := range groups.Groups[i].BookIDs {
+			var purge bool
+			params := append([]any{id}, args...)
+			if err := tx.QueryRowContext(ctx, `SELECT ? IN (`+books+`)`, params...).Scan(&purge); err != nil {
+				return err
+			}
+			if purge {
+				changed = true
+			} else {
+				kept = append(kept, id)
+			}
+		}
+		groups.Groups[i].BookIDs = kept
+	}
+	if changed {
+		groups.Revision++
+		data, err := json.Marshal(groups)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE meta SET value = ? WHERE key = 'book_groups'`, string(data)); err != nil {
+			return err
+		}
+	}
 	for _, q := range []string{
 		`DELETE FROM doc_versions WHERE doc_id IN (SELECT id FROM docs WHERE book_id IN (` + books + `))`,
 		`DELETE FROM docs WHERE book_id IN (` + books + `)`,

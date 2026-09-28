@@ -1220,6 +1220,7 @@ a.yy-crumb:hover {
   gap: 14px;
 }
 .yy-book-card {
+  position: relative;
   display: grid;
   grid-template-columns: 36px 1fr;
   grid-template-rows: auto auto auto;
@@ -1277,6 +1278,7 @@ a.yy-crumb:hover {
   border-radius: 14px;
 }
 .yy-book-card-name {
+  padding-right: 20px;
   overflow: hidden;
   font-size: 15px;
   font-weight: 600;
@@ -1298,6 +1300,24 @@ a.yy-crumb:hover {
   margin-top: 2px;
   color: var(--yy-text-3);
   font-size: 12px;
+}
+.yy-book-card-link { position: absolute; inset: 0; border-radius: inherit; }
+.yy-book-card-link:focus-visible { outline: 2px solid var(--yy-primary); outline-offset: 2px; }
+.yy-book-card-menu { position: absolute; top: 12px; right: 10px; z-index: 1; }
+.yy-section-actions { display: flex; gap: 8px; }
+.yy-book-group + .yy-book-group { margin-top: 24px; }
+.yy-book-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.yy-book-group-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 0; border: 0; background: none; color: var(--yy-text); font: inherit; font-weight: 600; cursor: pointer; min-width: 0; }
+.yy-book-group-toggle > span:not(.yy-group-count) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yy-book-group-toggle > svg { flex: none; transition: transform 120ms; }
+.yy-book-group-toggle > svg.expanded { transform: rotate(90deg); }
+.yy-book-group-toggle.sidebar { width: 100%; padding: 8px 12px; color: var(--yy-text-3); font-size: 12px; }
+.yy-group-count { color: var(--yy-text-3); font-size: 12px; font-weight: 400; }
+.yy-book-group-empty { margin: 0; padding: 24px 16px; grid-column: 1 / -1; border: 1px dashed var(--yy-border); border-radius: var(--yy-radius); color: var(--yy-text-3); font-size: 13px; }
+@media (max-width: 640px) {
+  .yy-section-actions { gap: 4px; }
+  .yy-section-actions .yy-btn { padding: 6px 8px; font-size: 12px; }
+  .yy-book-card-name { grid-column: 1 / -1; margin-top: 8px; padding-right: 0; }
 }
 
 .yy-tabs {
