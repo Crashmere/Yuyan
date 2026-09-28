@@ -1745,7 +1745,9 @@ a.yy-catalog-title:hover {
 }
 .yy-version-list li {
   display: grid;
-  gap: 10px;
+  grid-template-columns: 152px minmax(0, 1fr) 216px;
+  align-items: start;
+  gap: 24px;
   padding: 20px 0;
   border-bottom: 1px solid var(--yy-border);
 }
@@ -1761,6 +1763,16 @@ a.yy-catalog-title:hover {
   color: var(--yy-text-3);
   font-size: 13px;
 }
+.yy-version-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--yy-text-3);
+  font-size: 13px;
+}
+.yy-version-body { min-width: 0; }
+.yy-version-actions { justify-content: flex-end; gap: 6px; }
 .yy-version-labels { gap: 6px; }
 .yy-version-labels .yy-tag { white-space: normal; }
 .yy-version-sections {
@@ -1770,14 +1782,19 @@ a.yy-catalog-title:hover {
   overflow-wrap: anywhere;
 }
 .yy-history-current {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 24px;
   margin: 20px 0 8px;
   padding: 16px;
   border: 1px solid var(--yy-border);
   border-radius: var(--yy-radius);
   background: var(--yy-bg-muted);
 }
+.yy-history-current strong { color: var(--yy-text); font-size: 14px; }
 .yy-history-current p { margin: 8px 0; color: var(--yy-text-2); font-size: 13px; }
-.yy-history-current > .yy-btn { margin-top: 10px; }
+.yy-history-current .yy-version-body > p:last-child { margin-bottom: 0; }
 .yy-article > .yy-version-summary { margin-bottom: 20px; }
 .yy-version-time {
   flex: none;
@@ -1788,16 +1805,27 @@ a.yy-catalog-title:hover {
   text-decoration: underline;
 }
 .yy-version-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--yy-text-2);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+  margin-bottom: 8px;
+  color: var(--yy-text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 .yy-version-current {
   color: var(--yy-primary);
   font-size: 13px;
+}
+@media (max-width: 960px) {
+  .yy-version-list li { grid-template-columns: 136px minmax(0, 1fr); gap: 10px 20px; }
+  .yy-version-list .yy-version-info { grid-row: span 2; }
+  .yy-version-list .yy-version-actions { grid-column: 2; }
+}
+@media (max-width: 600px) {
+  .yy-version-list li { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .yy-version-list .yy-version-info { grid-row: auto; flex-direction: row; flex-wrap: wrap; gap: 4px 12px; }
+  .yy-version-list .yy-version-actions { grid-column: 1; }
+  .yy-history-current { grid-template-columns: minmax(0, 1fr); }
+  .yy-history-page .yy-version-actions { justify-content: flex-start; }
 }
 
 .yy-diff-summary,

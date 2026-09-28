@@ -52,27 +52,34 @@ async function restore(v: VersionInfo) {
 <template>
   <main v-if="missing" class="yy-page"><NotFoundState /></main>
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
-  <main v-else-if="doc" class="yy-page yy-narrow">
+  <main v-else-if="doc" class="yy-page yy-history-page">
     <h1 class="yy-page-title">历史版本</h1>
     <p class="yy-page-sub">快照保存的是当时修改后的完整内容。编辑中每隔 10 分钟保存一次，结束编辑时再保存；摘要和“本次改动”均以上一条快照为基准。</p>
     <section class="yy-history-current" aria-label="当前内容">
-      <div class="yy-version-meta"><strong>当前内容</strong><span>r{{ doc.revision }} · {{ formatTime(doc.updatedAt) }}</span><RouterLink :to="`/docs/${id}`" class="yy-btn small">查看文档</RouterLink></div>
-      <template v-if="pending && versions[0]">
-        <p>已自动保存，尚未生成快照。相对最近快照：</p>
-        <VersionSummary :summary="pending" />
-        <RouterLink :to="`/versions/${versions[0].id}?compare=current`" class="yy-btn small">查看差异</RouterLink>
-      </template>
-      <p v-else>与最新快照内容一致。</p>
+      <div class="yy-version-body">
+        <div class="yy-version-meta"><strong>当前内容</strong><span>r{{ doc.revision }} · {{ formatTime(doc.updatedAt) }}</span></div>
+        <template v-if="pending && versions[0]">
+          <p>已自动保存，尚未生成快照。相对最近快照：</p>
+          <VersionSummary :summary="pending" />
+        </template>
+        <p v-else>与最新快照内容一致。</p>
+      </div>
+      <div class="yy-version-actions">
+        <RouterLink :to="`/docs/${id}`" class="yy-btn small">查看文档</RouterLink>
+        <RouterLink v-if="pending && versions[0]" :to="`/versions/${versions[0].id}?compare=current`" class="yy-btn small">查看差异</RouterLink>
+      </div>
     </section>
     <ul class="yy-version-list">
       <li v-for="(v, i) in versions" :key="v.id">
-        <div class="yy-version-meta">
+        <div class="yy-version-info">
           <RouterLink :to="`/versions/${v.id}`" class="yy-version-time">{{ formatTime(v.createdAt) }}</RouterLink>
           <span>r{{ v.revision }} · {{ reasons[v.reason] ?? v.reason }}</span>
           <span v-if="v.matchesCurrent" class="yy-version-current">与当前内容一致</span>
         </div>
-        <span class="yy-version-title">{{ v.title }}</span>
-        <VersionSummary :summary="v.summary" />
+        <div class="yy-version-body">
+          <span class="yy-version-title">{{ v.title }}</span>
+          <VersionSummary :summary="v.summary" />
+        </div>
         <div class="yy-version-actions">
           <RouterLink :to="`/versions/${v.id}`" class="yy-btn small">预览快照</RouterLink>
           <RouterLink v-if="i < versions.length - 1" :to="`/versions/${v.id}?compare=previous`" class="yy-btn small" data-tip="上一条快照 → 本条快照">本次改动</RouterLink>
