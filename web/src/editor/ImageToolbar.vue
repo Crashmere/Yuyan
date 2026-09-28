@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { autoUpdate } from '@floating-ui/dom'
 import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
@@ -17,6 +18,14 @@ import AlignmentMenu from './AlignmentMenu.vue'
 
 // Shown while an image is selected: size, replace, download, open, alternative text, delete.
 const { editor, tick } = useEditorContext()
+const menu = ref<InstanceType<typeof BubbleMenu> | null>(null)
+const menuVisible = ref(false)
+const positionOptions = {
+  placement: 'top' as const,
+  offset: 8,
+  onShow: () => { menuVisible.value = true },
+  onHide: () => { menuVisible.value = false },
+}
 const sizesOpen = ref(false)
 const altOpen = ref(false)
 const alt = ref('')
@@ -45,11 +54,24 @@ function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTM
 }
 
 function anchor() {
-  const pos = image.value?.pos
-  const dom = pos === undefined ? null : editor.value?.view.nodeDOM(pos)
+  const e = editor.value
+  const sel = e?.state.selection
+  const dom = sel instanceof NodeSelection && sel.node.type.name === 'image' ? e?.view.nodeDOM(sel.from) : null
   const img = dom instanceof HTMLElement ? dom.querySelector('img') : null
   return img ? { getBoundingClientRect: () => img.getBoundingClientRect(), contextElement: img } : null
 }
+
+// Corner drags update the node view before committing a size to the document. Follow its
+// painted geometry, including Vue's alignment updates, only while the image menu is visible.
+watch([menuVisible, () => image.value?.pos], ([visible], _, onCleanup) => {
+  const e = editor.value
+  const reference = anchor()
+  const element = menu.value?.$el
+  if (!visible || !e || !reference || !(element instanceof HTMLElement)) return
+  onCleanup(autoUpdate(reference, element, () => {
+    if (!e.isDestroyed) e.view.dispatch(e.state.tr.setMeta('imageMenu', 'updatePosition'))
+  }, { animationFrame: true }))
+}, { flush: 'post' })
 
 function setAttrs(pos: number, attrs: Record<string, unknown>) {
   const e = editor.value
@@ -141,7 +163,7 @@ function cancelAlt() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor" :editor="editor" plugin-key="imageMenu" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :options="{ placement: 'top', offset: 8 }" class="yy-bubble yy-image-toolbar">
+  <BubbleMenu v-if="editor" ref="menu" :editor="editor" plugin-key="imageMenu" :update-delay="0" :resize-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :options="positionOptions" class="yy-bubble yy-image-toolbar">
     <template v-if="!altOpen">
       <div class="yy-bubble-styles">
         <button type="button" class="yy-bubble-select" @mousedown.prevent @click="sizesOpen = !sizesOpen">

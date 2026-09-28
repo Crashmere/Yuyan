@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { BookOpen, ChevronRight, FolderPlus, House, Plus } from 'lucide-vue-next'
+import { ChevronRight, FolderPlus, House, Plus } from 'lucide-vue-next'
 import IconButton from '../../ui/IconButton.vue'
 import { newBook, newBookGroup } from '../actions'
 import { bookSections, loadBooks, state } from '../store'
@@ -25,8 +25,8 @@ onMounted(() => void loadBooks())
         <ChevronRight :size="14" :class="{ expanded: !closedBookGroups.has(group.id) }" /><span>{{ group.name }}</span><span class="yy-group-count">{{ group.books.length }}</span>
       </button>
       <template v-if="!state.bookGroups.groups.length || !closedBookGroups.has(group.id)">
-      <RouterLink v-for="b in group.books" :key="b.id" :to="`/books/${b.id}`" class="yy-nav-item" active-class="active">
-        <BookOpen :size="16" /><span class="yy-nav-label">{{ b.name }}</span><span class="yy-nav-count">{{ b.docCount }}</span>
+      <RouterLink v-for="b in group.books" :key="b.id" :to="`/books/${b.id}`" class="yy-nav-item" :class="{ 'in-book-group': state.bookGroups.groups.length }" active-class="active">
+        <span class="yy-nav-label">{{ b.name }}</span><span class="yy-nav-count">{{ b.docCount }}</span>
       </RouterLink>
       </template>
     </nav>

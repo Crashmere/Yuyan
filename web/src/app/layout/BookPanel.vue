@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { BookOpen, ChevronsUpDown, Ellipsis, Folder, LocateFixed, Plus } from 'lucide-vue-next'
+import { BookOpen, ChevronsUpDown, Ellipsis, Folder, Plus } from 'lucide-vue-next'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
@@ -33,7 +33,7 @@ onMounted(() => {
   <div class="yy-sidebar-body">
     <div v-if="book" class="yy-book-head">
       <RouterLink :to="`/books/${book.id}`" class="yy-book-name" :class="{ active: route.name === 'book' }" :title="book.name">
-        <BookOpen :size="16" /><span>{{ book.name }}</span>
+        <span>{{ book.name }}</span>
       </RouterLink>
       <ActionMenu :items="switcher" align="start">
         <IconButton small label="切换知识库"><ChevronsUpDown :size="14" /></IconButton>
@@ -46,7 +46,12 @@ onMounted(() => {
     <div class="yy-tree-scroll">
       <div v-if="tree?.length" class="yy-tree-head">
         <span>目录</span>
-        <IconButton small label="定位当前文档" :disabled="!treeView?.canLocate" @click="treeView?.locateCurrent()"><LocateFixed :size="15" /></IconButton>
+        <IconButton small label="定位当前文档" :disabled="!treeView?.canLocate" @click="treeView?.locateCurrent()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="8" />
+            <path d="M12 1v6m0 10v6M1 12h6m10 0h6" />
+          </svg>
+        </IconButton>
         <FoldAllButton v-if="treeView?.hasBranches" :expanded="treeView.hasExpanded" @click="treeView.toggleAll()" />
       </div>
       <BookTree v-if="tree" ref="treeView" :book-id="bookId" :nodes="tree" :current-id="state.docId" />

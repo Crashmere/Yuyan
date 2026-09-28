@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { BookOpen, ChevronRight, Ellipsis, FileText, FolderPlus, Plus } from 'lucide-vue-next'
+import { BookOpen, ChevronRight, Ellipsis, FileText, FolderInput, FolderPlus, GripVertical, Plus } from 'lucide-vue-next'
 import { api, errorMessage, type DocSummary } from '../../shared/api'
 import { toast } from '../../ui/toast'
 import { bookGroupChoices, bookGroupMenu, moveBookGroup, newBook, newBookGroup } from '../actions'
@@ -11,7 +11,7 @@ import { closedBookGroups, toggleBookGroup } from '../bookGroups'
 import { bookColor } from '../bookColor'
 import { recentlyViewed } from '../prefs'
 import { setTitle } from '../router'
-import { bookSections, loadBooks, loading, reorderBooks, setPage, state } from '../store'
+import { bookSections, loadBooks, loading, reorderBooks, saveBookGroups, setPage, state } from '../store'
 import { fromNow } from '../time'
 
 setPage(null)
@@ -21,7 +21,85 @@ const viewed = ref(recentlyViewed())
 const edited = ref<DocSummary[]>([])
 const tab = ref<'viewed' | 'edited'>(viewed.value.length ? 'viewed' : 'edited')
 const dragId = ref<number | null>(null)
+const dragGroupId = ref<string | null>(null)
 const overId = ref<number | null>(null)
+const overGroupId = ref<string | null>(null)
+const draggedGroupId = ref<string | null>(null)
+const groupOrderTarget = ref<string | null>(null)
+const groupOrderSide = ref<'before' | 'after'>('before')
+
+function resetDrag() {
+  dragId.value = overId.value = null
+  dragGroupId.value = overGroupId.value = null
+  draggedGroupId.value = groupOrderTarget.value = null
+}
+
+function startGroupDrag(event: DragEvent, groupId: string) {
+  if (!groupId) { event.preventDefault(); return }
+  resetDrag()
+  draggedGroupId.value = groupId
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('application/x-yuyan-book-group', groupId)
+  }
+}
+
+function startDrag(event: DragEvent, bookId: number, groupId: string) {
+  resetDrag()
+  dragId.value = bookId
+  dragGroupId.value = groupId
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('application/x-yuyan-book', String(bookId))
+  }
+}
+
+function dragOver(event: DragEvent, groupId: string, bookId: number | null = null) {
+  if (draggedGroupId.value !== null) {
+    if (!groupId || groupId === draggedGroupId.value) { groupOrderTarget.value = null; return }
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+    const group = (event.currentTarget as HTMLElement).closest('[data-book-group]')!
+    const rect = group.getBoundingClientRect()
+    groupOrderTarget.value = groupId
+    groupOrderSide.value = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    return
+  }
+  if (dragId.value === null) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  overGroupId.value = groupId !== dragGroupId.value ? groupId : null
+  overId.value = groupId === dragGroupId.value ? bookId : null
+}
+
+function leaveGroup(event: DragEvent, groupId: string) {
+  const group = event.currentTarget as HTMLElement
+  // Moving between the heading, a card and its controls stays inside this drop target.
+  if (event.relatedTarget instanceof Node && group.contains(event.relatedTarget)) return
+  if (overGroupId.value === groupId) overGroupId.value = null
+  if (groupOrderTarget.value === groupId) groupOrderTarget.value = null
+  overId.value = null
+}
+
+async function dropGroup(groupId: string) {
+  const from = draggedGroupId.value
+  const side = groupOrderSide.value
+  const target = groupOrderTarget.value
+  resetDrag()
+  if (!from || !groupId || from === groupId || target !== groupId) return
+  const moved = state.bookGroups.groups.find((g) => g.id === from)
+  if (!moved) return
+  const groups = state.bookGroups.groups.filter((g) => g.id !== from)
+  const index = groups.findIndex((g) => g.id === groupId)
+  if (index < 0) return
+  groups.splice(index + (side === 'after' ? 1 : 0), 0, moved)
+  if (groups.every((g, i) => g.id === state.bookGroups.groups[i]?.id)) return
+  try {
+    await saveBookGroups(groups)
+  } catch (e) {
+    toast(`分组排序失败：${errorMessage(e)}`, 'error')
+  }
+}
 
 onMounted(async () => {
   try {
@@ -34,8 +112,9 @@ onMounted(async () => {
 // Dropping a card on another puts it in that card's place: after the target when moving
 // forward, before it when moving back.
 async function dropOn(target: number, groupId: string) {
+  if (draggedGroupId.value !== null) return dropGroup(groupId)
   const from = dragId.value
-  dragId.value = overId.value = null
+  resetDrag()
   if (from == null || from === target) return
   const oldGroup = state.bookGroups.groups.find((g) => g.bookIds.includes(from))?.id ?? ''
   if (oldGroup !== groupId) { await moveBookGroup(from, groupId); return }
@@ -51,8 +130,11 @@ async function dropOn(target: number, groupId: string) {
   }
 }
 async function dropInGroup(groupId: string) {
+  if (draggedGroupId.value !== null) return dropGroup(groupId)
   const from = dragId.value
-  dragId.value = overId.value = null
+  const oldGroup = dragGroupId.value
+  resetDrag()
+  if (oldGroup === groupId) return
   if (from !== null) await moveBookGroup(from, groupId)
 }
 </script>
@@ -67,27 +149,31 @@ async function dropInGroup(groupId: string) {
           <button type="button" class="yy-btn" @click="newBook"><Plus :size="15" />新建知识库</button>
         </div>
       </div>
-      <section v-for="group in bookSections" :key="group.id" class="yy-book-group" :data-book-group="group.id" @dragover.prevent @drop.prevent="dropInGroup(group.id)">
-        <div v-if="state.bookGroups.groups.length" class="yy-book-group-head">
-          <button type="button" class="yy-book-group-toggle" :aria-expanded="!closedBookGroups.has(group.id)" @click="toggleBookGroup(group.id)">
-            <ChevronRight :size="16" :class="{ expanded: !closedBookGroups.has(group.id) }" /><span>{{ group.name }}</span><span class="yy-group-count">{{ group.books.length }}</span>
-          </button>
-          <ActionMenu v-if="group.id" :items="bookGroupMenu(group.id)"><IconButton small :label="group.name + '分组操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
-        </div>
-        <div v-if="!state.bookGroups.groups.length || !closedBookGroups.has(group.id)" class="yy-book-grid">
-          <div v-for="b in group.books" :key="b.id" class="yy-book-card" :class="{ dragging: dragId === b.id, over: overId === b.id && dragId !== b.id }" :style="bookColor(b.id)" draggable="true"
-            @dragstart="dragId = b.id" @dragover.prevent.stop="overId = b.id" @dragleave="overId === b.id && (overId = null)" @drop.prevent.stop="dropOn(b.id, group.id)" @dragend="dragId = overId = null">
-            <RouterLink :to="`/books/${b.id}`" class="yy-book-card-link" :aria-label="b.name" draggable="false" />
-            <span class="yy-book-icon"><BookOpen :size="18" /></span>
-            <span class="yy-book-card-name">{{ b.name }}</span>
-            <span class="yy-book-card-desc">{{ b.description || '暂无简介' }}</span>
-            <span class="yy-book-card-meta">{{ b.docCount }} 篇文档</span>
-            <ActionMenu :items="bookGroupChoices(b.id)"><IconButton small class="yy-book-card-menu" :label="b.name + '移至分组'"><Ellipsis :size="16" /></IconButton></ActionMenu>
+      <TransitionGroup tag="div" name="yy-book-groups">
+        <section v-for="group in bookSections" :key="group.id" class="yy-book-group" :class="{ 'drop-over': overGroupId === group.id, 'group-dragging': draggedGroupId === group.id, 'drop-before': groupOrderTarget === group.id && groupOrderSide === 'before', 'drop-after': groupOrderTarget === group.id && groupOrderSide === 'after' }" :data-book-group="group.id" @dragenter="dragOver($event, group.id)" @dragover="dragOver($event, group.id)" @dragleave="leaveGroup($event, group.id)" @drop.prevent="dropInGroup(group.id)">
+          <div v-if="state.bookGroups.groups.length" class="yy-book-group-head" :draggable="!!group.id" @dragstart.stop="startGroupDrag($event, group.id)" @dragend="resetDrag">
+            <GripVertical v-if="group.id" :size="14" class="yy-book-group-grip" data-tip="拖动调整分组顺序" aria-hidden="true" />
+            <button type="button" class="yy-book-group-toggle" :aria-expanded="!closedBookGroups.has(group.id)" @click="toggleBookGroup(group.id)">
+              <ChevronRight :size="16" :class="{ expanded: !closedBookGroups.has(group.id) }" /><span>{{ group.name }}</span><span class="yy-group-count">{{ group.books.length }}</span>
+            </button>
+            <ActionMenu v-if="group.id" :items="bookGroupMenu(group.id)"><IconButton small :label="group.name + '分组操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
+            <span v-if="overGroupId === group.id" class="yy-book-group-drop-hint"><FolderInput :size="14" />松开以移入此分组</span>
           </div>
-          <button v-if="!group.id" type="button" class="yy-book-card add" @click="newBook"><Plus :size="20" />新建知识库</button>
-          <p v-else-if="!group.books.length" class="yy-book-group-empty">拖动知识库到这里，或通过知识库菜单移入</p>
-        </div>
+          <TransitionGroup v-if="!state.bookGroups.groups.length || !closedBookGroups.has(group.id)" tag="div" name="yy-book-list" class="yy-book-grid">
+            <div v-for="b in group.books" :key="b.id" class="yy-book-card" :class="{ dragging: dragId === b.id, over: overId === b.id && dragId !== b.id }" :style="bookColor(b.id)" draggable="true"
+              @dragstart="startDrag($event, b.id, group.id)" @dragenter.stop="dragOver($event, group.id, b.id)" @dragover.stop="dragOver($event, group.id, b.id)" @drop.prevent.stop="dropOn(b.id, group.id)" @dragend="resetDrag">
+              <RouterLink :to="`/books/${b.id}`" class="yy-book-card-link" :aria-label="b.name" draggable="false" />
+              <span class="yy-book-icon"><BookOpen :size="18" /></span>
+              <span class="yy-book-card-name">{{ b.name }}</span>
+              <span class="yy-book-card-desc">{{ b.description || '暂无简介' }}</span>
+              <span class="yy-book-card-meta">{{ b.docCount }} 篇文档</span>
+              <ActionMenu :items="bookGroupChoices(b.id)"><IconButton small class="yy-book-card-menu" :label="b.name + '移至分组'"><Ellipsis :size="16" /></IconButton></ActionMenu>
+            </div>
+            <button v-if="!group.id" key="add" type="button" class="yy-book-card add" @click="newBook"><Plus :size="20" />新建知识库</button>
+            <p v-else-if="!group.books.length" key="empty" class="yy-book-group-empty">拖动知识库到这里，或通过知识库菜单移入</p>
+          </TransitionGroup>
       </section>
+      </TransitionGroup>
     </section>
 
     <section>
