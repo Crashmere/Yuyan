@@ -502,20 +502,22 @@ pre:hover > .yy-copy,
   border-radius: 4px;
   cursor: zoom-in;
 }
-/* Paragraph margins already space separate blocks. Adjacent images also need a gap
-   when they align or wrap onto separate lines; top alignment keeps inline pairs level. */
-.yy-content img:has(+ img) {
+/* Run classes are shared by reading enhancement and editor decorations, including linked
+   images. The horizontal spacer collapses at a wrap and never changes an image's hit box. */
+.yy-content .yy-image-run-next {
   margin-bottom: 0.75em;
+}
+.yy-content .yy-image-run {
   vertical-align: top;
 }
-.yy-content img + img {
-  vertical-align: top;
+.yy-image-gap {
+  font-size: 0;
+  line-height: 0;
+  word-spacing: 8px;
+  white-space: normal;
+  user-select: none;
 }
-/* Inline photos keep flowing across rows. Put the gap after the preceding photo so a
-   wrapped row starts flush with the paragraph rather than inheriting a leading margin. */
-.yy-content img:not([data-align]):has(+ img:not([data-align])) {
-  margin-inline-end: 0.5em;
-}
+.yy-image-gap::before { content: ' '; }
 /* Match the editor's preservation of typed spaces in paragraphs of inline images. */
 .yy-content p:has(img):not(:has(img[data-align], .yy-image.is-aligned)) {
   white-space: break-spaces;

@@ -1027,18 +1027,57 @@ body.yy-row-dragging * {
      separators on two additional lines inside the same paragraph. */
   width: 100%;
 }
-/* Match reading spacing, including browsers that insert an invisible caret separator. */
-.ProseMirror .yy-image:has(+ .yy-image, + .ProseMirror-separator + .yy-image) {
-  margin-bottom: 0.75em;
-  vertical-align: top;
+.yy-image-space { position: relative; }
+.yy-image-flow-only .yy-image-space { vertical-align: top; }
+.ProseMirror-focused .yy-image-space::after {
+  content: attr(data-space);
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  color: var(--yy-text-3);
+  pointer-events: none;
 }
-.ProseMirror .yy-image + .yy-image,
-.ProseMirror .yy-image + .ProseMirror-separator + .yy-image {
-  vertical-align: top;
+.yy-image-editing-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
 }
-.ProseMirror .yy-image:not(.is-aligned):has(+ .yy-image:not(.is-aligned), + .ProseMirror-separator + .yy-image:not(.is-aligned)) {
-  margin-inline-end: 0.5em;
+.yy-image-flow-marker {
+  position: absolute;
+  font-size: 10px;
+  line-height: 12px;
+  white-space: nowrap;
+  color: var(--yy-text-3);
+  user-select: none;
 }
+.yy-image-flow-marker.is-delete-hint {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--yy-bg-elevated);
+  color: var(--yy-danger);
+  box-shadow: var(--yy-shadow-popover);
+}
+.yy-image-caret-active { caret-color: transparent; }
+.yy-image-insertion-caret {
+  position: absolute;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--yy-primary);
+  box-shadow: 0 0 0 1px var(--yy-bg);
+}
+.yy-image-insertion-caret::before,
+.yy-image-insertion-caret::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  width: 6px;
+  height: 2px;
+  background: inherit;
+}
+.yy-image-insertion-caret::before { top: 0; }
+.yy-image-insertion-caret::after { bottom: 0; }
 .yy-image-content {
   position: relative;
   display: inline-block;

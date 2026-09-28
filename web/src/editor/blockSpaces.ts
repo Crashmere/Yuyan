@@ -2,7 +2,6 @@ import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
 import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state'
-import { canSplit } from '@tiptap/pm/transform'
 import type { EditorView } from '@tiptap/pm/view'
 
 function needsSpace(node: PMNode): boolean {
@@ -11,7 +10,7 @@ function needsSpace(node: PMNode): boolean {
   let image = false, other = false
   node.forEach((child) => {
     if (child.type.name === 'image') image = true
-    else if (child.type.name !== 'hardBreak') other = true
+    else if (child.type.name !== 'hardBreak' && !(child.isText && !/\S/.test(child.text!))) other = true
   })
   return image && !other
 }
@@ -45,7 +44,7 @@ export const BlockSpaces = Extension.create({
             }
 
             const { clientX: x, clientY: y } = event
-            type Space = { pos: number; empty: number | null; distance: number; split?: boolean }
+            type Space = { pos: number; empty: number | null; distance: number }
             let found: Space | null = null
             view.state.doc.descendants((node, pos) => {
               if (!needsSpace(node)) return
@@ -54,20 +53,8 @@ export const BlockSpaces = Extension.create({
               const box = dom.getBoundingClientRect()
               const parentBox = dom.parentElement!.getBoundingClientRect()
               if (x < parentBox.left || x > parentBox.right) return
-              // Images remain inline in stored JSON. Two full-width image views can therefore
-              // occupy adjacent visual lines inside one paragraph; split that paragraph too.
-              if (node.isTextblock) {
-                let previous: DOMRect | null = null
-                node.forEach((child, offset) => {
-                  const image = child.type.name === 'image' ? elementAt(view, pos + 1 + offset)?.getBoundingClientRect() : null
-                  if (previous && image && y > previous.bottom && y < image.top && x >= box.left && x <= box.right) {
-                    const distance = Math.min(y - previous.bottom, image.top - y)
-                    const at = pos + 1 + offset
-                    if ((!found || distance < found.distance) && canSplit(view.state.doc, at)) found = { pos: at, empty: null, distance, split: true }
-                  }
-                  previous = image ?? null
-                })
-              }
+              // Visual rows inside one paragraph are handled by the image insertion guide.
+              // Clicking their automatic spacing must never silently split the paragraph.
               const $pos = view.state.doc.resolve(pos)
               const parent = $pos.parent
               const index = $pos.index()
@@ -86,10 +73,9 @@ export const BlockSpaces = Extension.create({
               }
             })
             if (!found) return false
-            const { pos, empty, split } = found as Space
+            const { pos, empty } = found as Space
             let tr = view.state.tr
-            const insertAt = pos + (split ? 1 : 0)
-            if (split) tr.split(pos)
+            const insertAt = pos
             if (empty === null) tr = closeHistory(tr.insert(insertAt, view.state.schema.nodes.paragraph.create()))
             tr.setSelection(TextSelection.create(tr.doc, empty ?? insertAt + 1))
             event.preventDefault()
