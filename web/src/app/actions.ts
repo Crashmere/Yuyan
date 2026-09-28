@@ -68,6 +68,9 @@ export function copyDocLink(id: number) {
 export interface MoveRequest {
   bookId: number
   node: TreeNode
+  nodes?: TreeNode[]
+  count?: number
+  action?: 'copy' | 'move'
   resolve: (target: { bookId: number; parentId: number | null } | null) => void
 }
 
@@ -85,7 +88,7 @@ export function moveDocTo(bookId: number, node: TreeNode) {
 }
 
 // runExport downloads the given nodes of a knowledge base, reporting progress in one toast.
-async function runExport(bookName: string, nodes: TreeNode[], zipName: string) {
+export async function runExport(bookName: string, nodes: TreeNode[], zipName: string) {
   const progress = (message: string) => toast(message, 'loading', { key: 'export' })
   progress('正在准备导出…')
   try {

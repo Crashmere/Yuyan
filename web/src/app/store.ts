@@ -125,7 +125,7 @@ export async function createDoc(bookId: number, parentId: number | null, kind: '
 
 // The open editor registers here, so a rename from elsewhere goes through its title field instead
 // of changing the revision under its autosave.
-export const editing = shallowRef<{ docId: number; setTitle: (title: string) => void } | null>(null)
+export const editing = shallowRef<{ docId: number; setTitle: (title: string) => void; flush: () => Promise<boolean> } | null>(null)
 
 export async function renameDoc(bookId: number, id: number, title: string) {
   const t = title.trim()
@@ -151,6 +151,20 @@ export async function deleteDoc(bookId: number, id: number) {
 
 function collectIds(n: TreeNode): number[] {
   return [n.id, ...(n.children ?? []).flatMap(collectIds)]
+}
+
+export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 'move' | 'trash', target?: { bookId: number; parentId: number | null }) {
+  let result: { ids: number[] }
+  try {
+    result = await api('docs/batch', { method: 'POST', json: { bookId, ids, action, targetBookId: target?.bookId, parentId: target?.parentId } })
+  } catch (e) {
+    await refresh(bookId, ...(target ? [target.bookId] : [])).catch(() => {})
+    if (e instanceof ApiError && e.status === 409) throw new Error('目录已变化，请重新选择后重试')
+    throw e
+  }
+  if (action === 'trash') forgetViewed(ids)
+  try { await refresh(bookId, ...(target ? [target.bookId] : [])); return { ...result, refreshed: true } }
+  catch { return { ...result, refreshed: false } }
 }
 
 export async function createBook(name: string): Promise<Book> {

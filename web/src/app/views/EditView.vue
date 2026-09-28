@@ -54,7 +54,7 @@ onMounted(async () => {
     setPage(d.bookId, d.id)
     setTitle(`编辑：${d.title}`)
     void loadTree(d.bookId)
-    editing.value = { docId: d.id, setTitle: (t) => pane.value?.setTitle(t) }
+    editing.value = { docId: d.id, setTitle: (t) => pane.value?.setTitle(t), flush: saveBeforeReload }
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) missing.value = true
     else failure.value = errorMessage(e)

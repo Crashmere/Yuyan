@@ -17,6 +17,8 @@ const router = useRouter()
 const hasChildren = computed(() => !!props.node.children?.length)
 const open = computed(() => tree.isOpen(props.node.id))
 const current = computed(() => tree.currentId() === props.node.id)
+const selecting = computed(() => tree.selecting())
+const selected = computed(() => tree.selectionState(props.node))
 const renaming = computed(() => tree.renaming.value === props.node.id)
 const items = computed(() => tree.menu(props.node))
 const drop = computed(() => (tree.drag.overId === props.node.id && tree.drag.position ? `drop-${tree.drag.position}` : ''))
@@ -34,7 +36,8 @@ watch(renaming, async (r) => {
   input.value?.select()
 })
 
-function activate() {
+function activate(e: MouseEvent) {
+  if (selecting.value) { tree.select(props.node, e.shiftKey); return }
   if (renaming.value) return
   if (props.node.kind === 'group') tree.toggle(props.node.id)
   else void router.push(`/docs/${props.node.id}`)
@@ -48,14 +51,14 @@ function onTitleClick(e: MouseEvent) {
 </script>
 
 <template>
-  <li class="yy-tree-item" role="treeitem" :aria-expanded="hasChildren ? open : undefined" :aria-selected="current">
-    <ContextActions :items="items" @open="(v) => (contextOpen = v)">
+  <li class="yy-tree-item" role="treeitem" :aria-expanded="hasChildren ? open : undefined" :aria-selected="selecting ? selected === true : current" :aria-checked="selecting ? selected : undefined">
+    <ContextActions :items="items" :disabled="selecting" @open="(v) => (contextOpen = v)">
       <div
         class="yy-tree-row"
-        :class="[node.kind, drop, { current, active: menuOpen || contextOpen, dragging: tree.drag.id === node.id }]"
+        :class="[node.kind, drop, { current, selecting, checked: selecting && selected === true, active: menuOpen || contextOpen, dragging: tree.drag.id === node.id }]"
         :style="{ '--depth': depth }"
         :data-tree-id="node.id"
-        :draggable="!renaming"
+        :draggable="!renaming && !selecting"
         @click="activate"
         @dragstart="tree.onDragStart(node, $event)"
         @dragover="tree.onDragOver(node, $event)"
@@ -66,6 +69,8 @@ function onTitleClick(e: MouseEvent) {
           <ChevronRight :size="14" />
         </button>
         <span v-else class="yy-tree-caret"></span>
+        <input v-if="selecting" type="checkbox" class="yy-tree-check" :checked="selected === true" :indeterminate="selected === 'mixed'"
+          :aria-label="`选择 ${node.title}`" :disabled="tree.busy()" @click.stop="tree.select(node, $event.shiftKey)" />
         <input
           v-if="renaming"
           ref="input"
@@ -77,9 +82,9 @@ function onTitleClick(e: MouseEvent) {
           @keydown.esc.prevent="tree.finishRename(node, null)"
           @blur="tree.finishRename(node, draft)"
         />
-        <a v-else-if="node.kind === 'doc'" class="yy-tree-title" :href="href" draggable="false" :title="node.title" @click="onTitleClick">{{ node.title }}</a>
+        <a v-else-if="node.kind === 'doc' && !selecting" class="yy-tree-title" :href="href" draggable="false" :title="node.title" @click="onTitleClick">{{ node.title }}</a>
         <span v-else class="yy-tree-title" :title="node.title">{{ node.title }}</span>
-        <span v-if="!renaming" class="yy-tree-actions" @click.stop>
+        <span v-if="!renaming && !selecting" class="yy-tree-actions" @click.stop>
           <ActionMenu v-model:open="menuOpen" :items="items">
             <IconButton small label="更多操作" :tooltip="false"><Ellipsis :size="15" /></IconButton>
           </ActionMenu>

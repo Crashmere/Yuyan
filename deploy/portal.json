@@ -148,6 +148,11 @@
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },
     {
+      "method": "POST",
+      "path": "/api/docs/batch",
+      "description": "在同一事务内批量复制、移动或移入回收站"
+    },
+    {
       "method": "GET",
       "path": "/api/docs/{id}",
       "description": "以项目 API 路由和 DESIGN.md 为准"

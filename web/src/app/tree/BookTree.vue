@@ -7,11 +7,14 @@ import { loadExpanded, saveExpanded } from '../prefs'
 import * as store from '../store'
 import TreeItem from './TreeItem.vue'
 import { treeKey, type DropPosition } from './context'
+import { useTreeSelection } from './selection'
 
-const props = defineProps<{ bookId: number; nodes: TreeNode[]; currentId: number | null }>()
+const props = defineProps<{ bookId: number; nodes: TreeNode[]; currentId: number | null; busy?: boolean }>()
 const root = ref<HTMLElement | null>(null)
 
 const expanded = reactive(loadExpanded(props.bookId))
+const selection = useTreeSelection(() => props.nodes, (id) => expanded.has(id))
+const { active: selecting, selectedNodes, roots: selectedRoots, allState: selectionState } = selection
 const renaming = ref<number | null>(null)
 const drag = reactive({ id: null as number | null, overId: null as number | null, position: null as DropPosition | null })
 let expandTimer: ReturnType<typeof setTimeout> | undefined
@@ -60,7 +63,9 @@ async function locateCurrent(center = true) {
   if (center) scroll.scrollTo({ top: scroll.scrollTop + box.top - frame.top - (scroll.clientHeight - box.height) / 2, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
   else row.scrollIntoView({ block: 'nearest' })
 }
-defineExpose({ hasBranches, hasExpanded, toggleAll, canLocate, locateCurrent })
+function startSelecting() { renaming.value = null; reset(); selecting.value = true }
+defineExpose({ hasBranches, hasExpanded, toggleAll, canLocate, locateCurrent, selecting, selectedNodes, selectedRoots,
+  selectionState, startSelecting, exitSelecting: selection.exit, selectAll: selection.selectAll, clearSelection: () => selection.selected.clear() })
 
 // Opening a document expands the path to it and scrolls its row into view.
 watch(
@@ -115,11 +120,16 @@ provide(treeKey, {
   currentId: () => props.currentId,
   isOpen: (id) => expanded.has(id),
   toggle,
+  selecting: () => selecting.value,
+  selectionState: selection.state,
+  select: (node, range) => { if (!props.busy) selection.toggle(node, range) },
+  busy: () => !!props.busy,
   renaming,
   finishRename,
   menu: (node) => nodeMenu(props.bookId, node, { rename: () => (renaming.value = node.id) }),
   drag,
   onDragStart(node, e) {
+    if (selecting.value) { e.preventDefault(); return }
     drag.id = node.id
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
@@ -159,7 +169,7 @@ provide(treeKey, {
 </script>
 
 <template>
-  <ul v-if="nodes.length" ref="root" class="yy-tree" role="tree" @dragleave.self="drag.overId = null">
+  <ul v-if="nodes.length" ref="root" class="yy-tree" role="tree" :aria-multiselectable="selecting || undefined" @dragleave.self="drag.overId = null">
     <TreeItem v-for="n in nodes" :key="n.id" :node="n" :depth="0" />
   </ul>
   <p v-else class="yy-tree-empty">还没有文档</p>

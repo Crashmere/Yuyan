@@ -5,13 +5,13 @@ import { vHalfRow } from './halfRow'
 import type { MenuEntry } from './menu'
 
 // A right-click menu for the element in the default slot, with the same entries as ActionMenu.
-defineProps<{ items: MenuEntry[] }>()
+defineProps<{ items: MenuEntry[]; disabled?: boolean }>()
 const emit = defineEmits<{ open: [boolean] }>()
 </script>
 
 <template>
   <ContextMenuRoot :modal="false" @update:open="(v) => emit('open', v)">
-    <ContextMenuTrigger as-child>
+    <ContextMenuTrigger as-child :disabled="disabled">
       <slot />
     </ContextMenuTrigger>
     <ContextMenuPortal>

@@ -10,6 +10,10 @@ export interface TreeContext {
   currentId: () => number | null
   isOpen: (id: number) => boolean
   toggle: (id: number, open?: boolean) => void
+  selecting: () => boolean
+  selectionState: (node: TreeNode) => boolean | 'mixed'
+  select: (node: TreeNode, range?: boolean) => void
+  busy: () => boolean
   renaming: Ref<number | null>
   finishRename: (node: TreeNode, title: string | null) => void
   menu: (node: TreeNode) => MenuEntry[]
