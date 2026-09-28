@@ -22,9 +22,15 @@
 }
 .yy-content h1 {
   font-size: 1.75em;
+  padding-bottom: 0.3em;
+  background:
+    linear-gradient(var(--yy-primary), var(--yy-primary)) left bottom / 44px 3px no-repeat,
+    linear-gradient(var(--yy-border), var(--yy-border)) left bottom / 100% 1px no-repeat;
 }
 .yy-content h2 {
   font-size: 1.45em;
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid var(--yy-primary);
 }
 .yy-content h3 {
   font-size: 1.22em;
