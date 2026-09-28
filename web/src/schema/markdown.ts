@@ -12,6 +12,7 @@ import remarkStringify from 'remark-stringify'
 import { codeFromCallout, codeMeta, parseCodeMeta } from './codeBlock'
 import { schemaExtensions } from './extensions'
 import { alignment } from './alignment'
+import { remarkStrong } from './strong'
 
 // Markdown <-> Tiptap JSON using remark, with Obsidian's extensions: callouts, ==highlight==,
 // [[wiki links]], ![[embeds]], image sizes (![alt|300](src)) and single-newline line breaks.
@@ -21,6 +22,9 @@ import { alignment } from './alignment'
 // written as HTML and read back.
 
 export interface ImportContext {
+  // For auditing old imports against their original source. New imports/pastes accept
+  // punctuation next to ** without requiring spaces around Chinese text.
+  strictStrong?: boolean
   // Obsidian treats a single newline inside a paragraph as a line break unless "strict line breaks" is on.
   breaks?: boolean
   resolveImage?: (target: string, kind: 'markdown' | 'wiki' | 'html') => string | null
@@ -40,7 +44,9 @@ function withMark(marks: Mark[], mark: Mark): Mark[] {
 const calloutMarker = /^\[!([\w-]+)\]([+-]?)[ \t]*/
 
 export function markdownToDoc(markdown: string, ctx: ImportContext = {}): JSONContent {
-  const tree = unified().use(remarkParse).use(remarkGfm).use(remarkMath).parse(markdown) as Root
+  const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath)
+  if (!ctx.strictStrong) parser.use(remarkStrong)
+  const tree = parser.parse(markdown) as Root
   const defs = new Map<string, { url: string; title?: string | null }>()
   collectDefinitions(tree, defs)
   const content = new Converter(ctx, defs).blocks(tree.children)

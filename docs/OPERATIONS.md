@@ -77,6 +77,23 @@ npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
 
 每篇改动的文档先保存一个版本再写入，写入时核对 revision；重复运行不会再改动。单篇文档要撤回时，在它的历史里恢复迁移前的版本。2026-09-27 已对正式实例运行，62 篇文档中的 313 个全部转换（结果见 DESIGN.md 第 16 节），以后不需要再运行：Markdown 导入会直接把 `[!code]` 转为代码块。
 
+## 存量加粗修复
+
+`migrate-strong` 修复原始 Markdown 中因标点边界而漏识别或配对错位的加粗。它不重新导入整篇文档，也不在阅读或编辑时扫描星号。必须取得当初导入提交的 Markdown，并按数据库只读查询得到的 `docs.source_path` 对应到文档 ID，放入私有目录，文件名为 `<id>.md`；不要使用修复后从 Yuyan 导出的 Markdown 作为原始来源。正文、预览报告和原始笔记只放 `.local` 或其他不受 Git 跟踪的位置。
+
+```sh
+# 通过受信 SSH 隧道访问实例。生成预览只有 GET 请求，报告必须写到新文件。
+npm --prefix web run migrate-strong -- --server http://127.0.0.1:18199/ \
+  --source-dir "$PWD/.local/strong-source" --preview "$PWD/.local/strong-preview.json"
+# 审阅报告并取得真实数据修改授权后，先创建应用一致性备份，再应用同一份报告。
+npm --prefix web run migrate-strong -- --server http://127.0.0.1:18199/ \
+  --apply "$PWD/.local/strong-preview.json"
+```
+
+预览记录每个段落修改前后的 JSON、文档 revision 和内容哈希。写入前先核对全部文档，任一篇在预览后发生变化就停止，重新生成预览；每篇先保存历史快照，再通过带 `baseRevision` 的正常保存 API 写入。写入途中遇到冲突立即停止，已成功的文档可在历史记录中恢复；重新生成预览不会再次改动已修复的段落。只修改配对星号与 bold，无法仅作这些修改、与现存内容不一致或同文档中转义后无法区分的段落会跳过。
+
+2026-09-28：解析、导出再导入的 30 项针对性检查通过；Chromium/WebKit 的粘贴、保存、重开和桌面/375 px 阅读通过，隔离实例验证历史快照与 revision 冲突保护。正式实例只读 roundtrip：318 篇文档、185 个表格通过。基于原始导入提交的预览为 47 篇、392 段，8 段未满足自动修复条件而跳过；正式正文尚未写入，等待本次批量修复授权。
+
 ## 导出
 
 导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹（Markdown 表达不了的内容写成 HTML，例如设置了列宽行高的表格，见 DESIGN.md 第 18 节）：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。先建立上文的受信 SSH 隧道，再使用回环地址。
