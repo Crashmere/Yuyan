@@ -253,6 +253,14 @@ export function tableControls(): Plugin {
         if (target && root.contains(target)) { clearTimeout(leaving); leaving = undefined; return }
         const next = target?.closest('table')
         if (next instanceof HTMLTableElement && view.dom.contains(next)) { show(next); return }
+        // The rails extend 32 px above/left and end dots extend 11 px past each corner.
+        // Include the gaps between them, with a little room for pointer drift.
+        const box = table && root.getBoundingClientRect()
+        if (box && e.clientX >= box.left - 40 && e.clientX <= box.right + 18 && e.clientY >= box.top - 40 && e.clientY <= box.bottom + 18) {
+          clearTimeout(leaving)
+          leaving = undefined
+          return
+        }
         if (!leaving) leaving = setTimeout(() => { leaving = undefined; hide() }, 120)
       }
       const scrolled = () => { inserting = null; schedule() }

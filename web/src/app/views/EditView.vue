@@ -10,7 +10,7 @@ import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
 import { copyDocLink } from '../actions'
 import { setTitle } from '../router'
-import { editing, loading, loadTree, setNodeTitle, setPage } from '../store'
+import { editing, invalidateTree, loading, loadTree, setNodeTitle, setPage } from '../store'
 import NotFoundState from './NotFoundState.vue'
 import { useModeShortcut } from '../modeShortcut'
 import { useEditingTab } from '../../editor/tabKey'
@@ -73,6 +73,7 @@ function onStatus(s: SaveStatus, text: string) {
 
 function onSaved(title: string) {
   if (!doc.value) return
+  invalidateTree(doc.value.bookId)
   setNodeTitle(doc.value.bookId, id, title)
   setTitle(`编辑：${title}`)
 }
@@ -84,6 +85,7 @@ async function cancel() {
   const ask = p.touched()
   if (ask && !(await confirm({ title: '放弃这次编辑？', message: '这次打开编辑后所做的修改都会丢弃，历史版本里也不会留下记录。', confirmText: '放弃修改', danger: true }))) return
   if (!(await p.discard())) return
+  invalidateTree(doc.value.bookId)
   setNodeTitle(doc.value.bookId, id, doc.value.title)
   await router.push(`/docs/${id}`)
 }

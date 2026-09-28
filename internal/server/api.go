@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"unicode"
 
 	"github.com/Crashmere/Yuyan/internal/doc"
 	"github.com/Crashmere/Yuyan/internal/render"
@@ -193,23 +192,12 @@ func (s *Server) docView(r *http.Request) (any, error) {
 	if d.Kind == "doc" {
 		res := s.rendered(d)
 		v.HTML, v.TOC, v.HasMath, v.HasMermaid = res.HTML, nonNil(res.TOC), res.HasMath, res.HasMermaid
-		v.Chars = countChars(doc.PlainText(d.Content))
+		v.Chars = doc.CountChars(doc.PlainText(d.Content))
 		if v.Images, err = s.imageSizes(r, d.Content); err != nil {
 			return nil, err
 		}
 	}
 	return v, nil
-}
-
-// countChars counts characters other than whitespace, the way Chinese word counts are given.
-func countChars(text string) int {
-	n := 0
-	for _, c := range text {
-		if !unicode.IsSpace(c) {
-			n++
-		}
-	}
-	return n
 }
 
 type versionInfo struct {

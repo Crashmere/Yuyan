@@ -51,6 +51,8 @@ type TreeNode struct {
 	Kind      string      `json:"kind"`
 	Title     string      `json:"title"`
 	UpdatedAt string      `json:"updatedAt"`
+	Chars     int         `json:"chars"`
+	Images    int         `json:"images"`
 	Children  []*TreeNode `json:"children,omitempty"`
 }
 
@@ -370,7 +372,9 @@ INSERT INTO doc_versions(doc_id, revision, title, content, schema_version, reaso
 // Tree returns the live document tree of a knowledge base in display order.
 func (s *Store) Tree(ctx context.Context, bookID int64) ([]*TreeNode, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, parent_id, kind, title, updated_at FROM docs WHERE book_id = ? AND deleted_at IS NULL ORDER BY position, id`, bookID)
+SELECT id, parent_id, kind, title, updated_at, plain_text,
+  (SELECT count(*) FROM json_tree(docs.content) WHERE key = 'type' AND value = 'image')
+FROM docs WHERE book_id = ? AND deleted_at IS NULL ORDER BY position, id`, bookID)
 	if err != nil {
 		return nil, err
 	}
@@ -380,9 +384,11 @@ SELECT id, parent_id, kind, title, updated_at FROM docs WHERE book_id = ? AND de
 	for rows.Next() {
 		n := &TreeNode{}
 		var parent sql.NullInt64
-		if err := rows.Scan(&n.ID, &parent, &n.Kind, &n.Title, &n.UpdatedAt); err != nil {
+		var plainText string
+		if err := rows.Scan(&n.ID, &parent, &n.Kind, &n.Title, &n.UpdatedAt, &plainText, &n.Images); err != nil {
 			return nil, err
 		}
+		n.Chars = doc.CountChars(plainText)
 		if parent.Valid {
 			n.ParentID = &parent.Int64
 		}

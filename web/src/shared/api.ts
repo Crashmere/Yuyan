@@ -19,6 +19,8 @@ export interface TreeNode {
   kind: 'doc' | 'group'
   title: string
   updatedAt: string
+  chars: number
+  images: number
   children?: TreeNode[]
 }
 

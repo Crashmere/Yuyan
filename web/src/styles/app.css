@@ -1456,10 +1456,38 @@ a.yy-crumb:hover {
 a.yy-catalog-title:hover {
   color: var(--yy-primary);
 }
-.yy-catalog-time {
+.yy-catalog-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   flex: none;
   color: var(--yy-text-3);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.yy-catalog-time {
+  min-width: 6em;
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .yy-catalog-row {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 10px 0;
+  }
+  .yy-catalog-title {
+    flex-basis: 100%;
+  }
+  .yy-catalog-meta {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    font-size: 12px;
+  }
+  .yy-catalog-time {
+    min-width: 0;
+    text-align: left;
+  }
 }
 
 /* Document */

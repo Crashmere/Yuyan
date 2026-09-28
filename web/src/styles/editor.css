@@ -144,7 +144,15 @@
 }
 .yy-content .ProseMirror {
   min-height: 60vh;
+  padding-top: 12px;
   outline: none;
+}
+.ProseMirror hr {
+  height: 20px;
+  margin: calc(1.8em - 10px) 0;
+  border: 0;
+  background: linear-gradient(var(--yy-border), var(--yy-border)) center / 100% 1px no-repeat;
+  cursor: pointer;
 }
 .yy-content .ProseMirror :where(h1, h2, h3, h4, h5, h6) {
   scroll-margin-top: calc(var(--yy-topbar) + 44px + 16px);
@@ -210,6 +218,13 @@ body.yy-row-dragging * {
 /* Table rails live outside ProseMirror, so they remain reachable beside a scrolling table. */
 .ProseMirror .yy-table-frame {
   margin-top: 32px;
+}
+.ProseMirror .yy-table-frame.is-scrollable {
+  padding-bottom: 20px;
+}
+.ProseMirror .yy-table-frame.is-scrollable::before,
+.ProseMirror .yy-table-frame.is-scrollable::after {
+  bottom: 20px;
 }
 .yy-table-controls {
   position: fixed;

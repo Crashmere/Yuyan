@@ -14,7 +14,11 @@ defineProps<{ nodes: TreeNode[]; depth?: number }>()
       <div class="yy-catalog-row" :class="n.kind">
         <RouterLink v-if="n.kind === 'doc'" :to="`/docs/${n.id}`" class="yy-catalog-title">{{ n.title }}</RouterLink>
         <span v-else class="yy-catalog-title">{{ n.title }}</span>
-        <span v-if="n.kind === 'doc'" class="yy-catalog-time">{{ fromNow(n.updatedAt) }}</span>
+        <span v-if="n.kind === 'doc'" class="yy-catalog-meta">
+          <span>{{ n.chars.toLocaleString() }} 字</span>
+          <span v-if="n.images">{{ n.images.toLocaleString() }} 张图片</span>
+          <span class="yy-catalog-time">{{ fromNow(n.updatedAt) }}</span>
+        </span>
       </div>
       <CatalogList v-if="n.children?.length" :nodes="n.children" :depth="(depth ?? 0) + 1" />
     </li>

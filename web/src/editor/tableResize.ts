@@ -6,6 +6,26 @@ const hoverDelay = 250
 export const resizeHitWidth = 8
 const activeHitWidth = 14
 
+// Outside the last cell, the event targets the scroll frame or editor instead of a td/th.
+// Resolve that missing half of the hit area geometrically, without covering the scroll bar.
+function resizeCell(view: EditorView, event: MouseEvent): HTMLTableCellElement | null {
+  const target = event.target instanceof Element ? event.target : null
+  if (target?.closest('.yy-table-bar, button, input')) return null
+  const cell = target?.closest('td, th')
+  if (cell instanceof HTMLTableCellElement && view.dom.contains(cell)) return cell
+  for (const table of view.dom.querySelectorAll('table')) {
+    const box = table.getBoundingClientRect()
+    const clip = table.closest('.yy-table-scroll')!.getBoundingClientRect()
+    const { clientX: x, clientY: y } = event
+    const right = box.right <= clip.right + 1 && x >= box.right - 1 && x <= box.right + resizeHitWidth && y >= box.top && y <= box.bottom
+    const bottom = y >= box.bottom - 1 && y <= box.bottom + resizeHitWidth && x >= Math.max(box.left, clip.left) && x <= Math.min(box.right, clip.right)
+    if (!right && !bottom) continue
+    const hit = view.dom.ownerDocument.elementFromPoint(Math.min(x, box.right - 2), Math.min(y, box.bottom - 2))?.closest('td, th')
+    if (hit instanceof HTMLTableCellElement && hit.closest('table') === table) return hit
+  }
+  return null
+}
+
 // Keep a preview mounted while it fades out; ProseMirror removes its decorations immediately.
 function resizeLine(axis: 'row' | 'column') {
   let line: HTMLDivElement | null = null
@@ -39,6 +59,22 @@ export function withResizeDelay(plugin: Plugin): Plugin {
   let ready = false
   const preview = resizeLine('column')
 
+  function activate(view: EditorView, event: MouseEvent) {
+    const cell = resizeCell(view, event)
+    if (cell && event.clientX >= cell.getBoundingClientRect().right) {
+      const $pos = view.state.doc.resolve(view.posAtDOM(cell, 0))
+      for (let d = $pos.depth; d > 0; d--) {
+        if (!['cell', 'header_cell'].includes($pos.node(d).type.spec.tableRole ?? '')) continue
+        const handle = $pos.before(d)
+        if (columnResizingPluginKey.getState(view.state)?.activeHandle !== handle) {
+          view.dispatch(view.state.tr.setMeta(columnResizingPluginKey, { setHandle: handle }))
+        }
+        return
+      }
+    }
+    events.mousemove?.call(plugin, view, event)
+  }
+
   function clear(view: EditorView) {
     clearTimeout(timer)
     edge = latest = null
@@ -60,7 +96,7 @@ export function withResizeDelay(plugin: Plugin): Plugin {
           const activeBox = edge?.table.getBoundingClientRect()
           // Once acquired, a little hand movement should not lose the same border.
           if (ready && edge && activeBox && Math.abs(event.clientX - edge.x) <= activeHitWidth && event.clientY >= activeBox.top && event.clientY <= activeBox.bottom) return false
-          const cell = event.target instanceof Element ? event.target.closest('td, th') : null
+          const cell = resizeCell(view, event)
           const box = cell?.getBoundingClientRect()
           const x = box && (event.clientX - box.left <= resizeHitWidth ? box.left : box.right - event.clientX <= resizeHitWidth ? box.right : null)
           if (x == null || !cell) { clear(view); return false }
@@ -71,12 +107,12 @@ export function withResizeDelay(plugin: Plugin): Plugin {
             timer = setTimeout(() => {
               if (!view.isDestroyed && latest && table.isConnected) {
                 ready = true
-                events.mousemove?.call(plugin, view, latest)
+                activate(view, latest)
               }
             }, hoverDelay)
           }
           latest = event
-          if (ready) events.mousemove?.call(plugin, view, event)
+          if (ready) activate(view, event)
           return false
         },
         mouseleave(view) {
@@ -183,7 +219,7 @@ export function rowResizing(): Plugin {
       handleDOMEvents: {
         mousemove(view, event) {
           if (dragging || !view.editable) return false
-          const cell = event.target instanceof Element ? event.target.closest('td, th') : null
+          const cell = resizeCell(view, event)
           let row = cell?.parentElement
           const box = cell?.getBoundingClientRect()
           const columnBorder = !!box && (event.clientX - box.left <= resizeHitWidth || box.right - event.clientX <= resizeHitWidth)

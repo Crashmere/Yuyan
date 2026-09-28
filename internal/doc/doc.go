@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // SchemaVersion is bumped whenever stored JSON needs a migration.
@@ -163,6 +164,17 @@ func PlainText(n Node) string {
 	}
 	walk(n)
 	return strings.TrimSpace(b.String())
+}
+
+// CountChars excludes whitespace, using the same count in reading pages and catalogs.
+func CountChars(text string) int {
+	n := 0
+	for _, c := range text {
+		if !unicode.IsSpace(c) {
+			n++
+		}
+	}
+	return n
 }
 
 // TextContent returns the concatenated text of a node, used for headings and titles.

@@ -37,11 +37,18 @@ export async function loadBooks(force = false): Promise<Book[]> {
   return state.books
 }
 
+const staleTrees = new Set<number>()
+
+export function invalidateTree(bookId: number) {
+  staleTrees.add(bookId)
+}
+
 export async function loadTree(bookId: number, force = false): Promise<TreeNode[]> {
   const cached = state.trees[bookId]
-  if (cached && !force) return cached
+  if (cached && !force && !staleTrees.has(bookId)) return cached
   const tree = await api<TreeNode[]>(`books/${bookId}/tree`)
   state.trees[bookId] = tree
+  staleTrees.delete(bookId)
   return tree
 }
 
