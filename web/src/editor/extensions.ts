@@ -31,6 +31,7 @@ import CalloutView from './views/CalloutView.vue'
 import ImageView from './views/ImageView.vue'
 import ImageBoardView from './views/ImageBoardView.vue'
 import { ImageBoard } from '../schema/imageBoard'
+import { managedNodeView } from './managedNodeView'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
 
@@ -40,7 +41,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     ...schemaExtensions({
       imageBoard: ImageBoard.extend({
         addOptions() { return { ui } },
-        addNodeView() { return VueNodeViewRenderer(ImageBoardView) },
+        addNodeView() { return props => managedNodeView(VueNodeViewRenderer(ImageBoardView)(props)) },
       }),
       codeBlock: withTitles(CodeBlock)
         .extend({

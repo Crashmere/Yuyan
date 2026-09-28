@@ -2,9 +2,10 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import type { NodeViewRenderer } from '@tiptap/core'
 import { codeEditorIn } from '../code/editor'
 import CodeBlockView from './views/CodeBlockView.vue'
+import { managedNodeView } from './managedNodeView'
 
 export const codeNodeView: NodeViewRenderer = props => {
-  const view = VueNodeViewRenderer(CodeBlockView)(props)
+  const view = managedNodeView(VueNodeViewRenderer(CodeBlockView)(props))
   let focusFrame = 0
   view.setSelection = (anchor, head) => {
     cancelAnimationFrame(focusFrame)

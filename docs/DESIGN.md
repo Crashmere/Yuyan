@@ -781,6 +781,7 @@ flowchart LR
 - 网格排列支持列数和间距，选中部分图片时只排列所选，未选时排列全部；横向/纵向等距分布需至少三张图片。方向键微调 1 px，Shift 为 10 px。解除组合按图层顺序恢复独立图片段落，保留裁切、大小、阴影与链接。
 - 正文新增 `imageBoard` 块，包含一个或多个真实 `image` 节点；`image.placement` 保存相对于画板的矩形。图片计数、资源收集、复制、备份继续递归处理原节点。编辑、阅读按同一相对位置绘制，窄屏同比例缩小整个画板。
 - 几何定义在 `web/src/schema/imageGeometry.ts`，组合格式在 `imageBoard.ts`，事务在 `editor/imageOperations.ts`；节点视图、Go `internal/render/image_geometry.go` 与 Markdown 导入导出对应。裁切图片所在段落和组合导出为带内联样式与参数的 HTML，可在导入后继续编辑；普通图片仍导出 Markdown。格式版本维持 1，无数据库迁移；旧程序不认识组合节点，写入组合后不能直接回退到不支持该节点的程序。
+- 代码块和画板的子内容由组件负责显示，通过 `editor/managedNodeView.ts` 显式返回空的 `contentDOM` 引用，并忽略内部 DOM 变化；外层重新解析时保留文档模型中的内容。弹窗的 `aria-hidden` 等展示属性不应写回正文，也不应让裁切误报文档变化。对真实正文变更的过期位置检查继续保留。
 
 ## 20. 统一选区移除
 
