@@ -16,8 +16,16 @@ export function imageSizes(editor: Editor): ImageSizes {
 export function blockWidth(el: HTMLElement): number {
   const block = el.closest<HTMLElement>('p, li, td, th, .callout-content, .ProseMirror')
   if (!block) return el.getBoundingClientRect().width
-  const style = getComputedStyle(block)
-  return Math.floor(block.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight))
+  // A selected image may live in a collapsed Callout. Use the nearest measurable ancestor,
+  // subtracting the hidden containers' insets, instead of writing a zero-width batch resize.
+  let inset = 0
+  for (let current: HTMLElement | null = block; current; current = current.parentElement) {
+    const style = getComputedStyle(current)
+    inset += parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+    if (current.clientWidth > 0) return Math.max(0, Math.floor(current.clientWidth - inset))
+    inset += (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0)
+  }
+  return 0
 }
 
 export function fileName(src: string): string {

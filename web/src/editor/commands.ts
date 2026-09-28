@@ -7,6 +7,7 @@ import {
   ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow,
 } from 'lucide-vue-next'
 import type { EditorUi } from './context'
+import { clearSelectedTextFormatting, setSelectedTextStyle, textStyleActive, toggleSelectedTextMark } from './textSelection'
 
 // Commands shared by the toolbar, the selection toolbar, the slash menu and the block menu. Every
 // command works on the existing document schema; nothing here adds a new node or attribute.
@@ -23,7 +24,7 @@ export interface TextStyle {
 const headingIcons = [Heading1, Heading2, Heading3, Heading4, Heading5, Heading6]
 
 export const textStyles: TextStyle[] = [
-  { id: 'p', label: '正文', icon: Pilcrow, shortcut: 'Mod-Alt-0', active: (e) => e.isActive('paragraph'), apply: (e) => e.chain().focus().setParagraph().run() },
+  { id: 'p', label: '正文', icon: Pilcrow, shortcut: 'Mod-Alt-0', active: (e) => textStyleActive(e, 0), apply: (e) => { if (!setSelectedTextStyle(e, 0)) e.chain().focus().setParagraph().run() } },
   ...headingIcons.map((icon, i) => {
     const level = (i + 1) as 1 | 2 | 3 | 4 | 5 | 6
     return {
@@ -31,8 +32,8 @@ export const textStyles: TextStyle[] = [
       label: `标题 ${level}`,
       icon,
       shortcut: `Mod-Alt-${level}`,
-      active: (e: Editor) => e.isActive('heading', { level }),
-      apply: (e: Editor) => e.chain().focus().setHeading({ level }).run(),
+      active: (e: Editor) => textStyleActive(e, level),
+      apply: (e: Editor) => { if (!setSelectedTextStyle(e, level)) e.chain().focus().setHeading({ level }).run() },
     }
   }),
 ]
@@ -49,7 +50,7 @@ export interface MarkButton {
   toggle: (e: Editor) => void
 }
 
-export const markButtons: MarkButton[] = [
+const textMarkButtons: MarkButton[] = [
   { name: 'bold', label: '粗体', icon: Bold, shortcut: 'Mod-B', toggle: (e) => e.chain().focus().toggleBold().run() },
   { name: 'italic', label: '斜体', icon: Italic, shortcut: 'Mod-I', toggle: (e) => e.chain().focus().toggleItalic().run() },
   { name: 'strike', label: '删除线', icon: Strikethrough, shortcut: 'Mod-Shift-X', toggle: (e) => e.chain().focus().toggleStrike().run() },
@@ -57,6 +58,7 @@ export const markButtons: MarkButton[] = [
   { name: 'code', label: '行内代码', icon: Code, shortcut: 'Mod-E', toggle: (e) => e.chain().focus().toggleCode().run() },
   { name: 'highlight', label: '高亮', icon: Highlighter, shortcut: 'Mod-Shift-H', toggle: (e) => e.chain().focus().toggleHighlight().run() },
 ]
+export const markButtons = textMarkButtons.map(button => ({ ...button, toggle: (e: Editor) => { if (!toggleSelectedTextMark(e, button.name)) button.toggle(e) } }))
 
 export const listButtons: MarkButton[] = [
   { name: 'bulletList', label: '无序列表', icon: List, shortcut: 'Mod-Shift-8', toggle: (e) => e.chain().focus().toggleBulletList().run() },
@@ -65,7 +67,7 @@ export const listButtons: MarkButton[] = [
 ]
 
 export function clearFormatting(e: Editor) {
-  e.chain().focus().unsetAllMarks().run()
+  if (!clearSelectedTextFormatting(e)) e.chain().focus().unsetAllMarks().run()
 }
 
 export function insertCallout(e: Editor, type = 'note') {

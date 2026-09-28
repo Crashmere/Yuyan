@@ -6,15 +6,16 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { ChevronDown, CopyCheck, Download, ExternalLink, Replace, Square, TextCursorInput } from 'lucide-vue-next'
+import { CopyCheck, Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
 import { imageTypes } from './extensions'
-import { blockWidth, fileName } from './images'
+import { fileName } from './images'
 import { uploadFile } from './uploads'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
 import AlignmentMenu from './AlignmentMenu.vue'
+import ImageFormatControls from './ImageFormatControls.vue'
 
 // Shown while an image is selected: size, replace, download, open, alternative text, delete.
 const { editor, tick } = useEditorContext()
@@ -26,7 +27,6 @@ const positionOptions = {
   onShow: () => { menuVisible.value = true },
   onHide: () => { menuVisible.value = false },
 }
-const sizesOpen = ref(false)
 const altOpen = ref(false)
 const alt = ref('')
 const altInput = ref<HTMLInputElement | null>(null)
@@ -42,7 +42,6 @@ const image = computed(() => {
 watch(
   () => image.value?.pos,
   () => {
-    sizesOpen.value = false
     altOpen.value = false
   },
 )
@@ -81,25 +80,6 @@ function setAttrs(pos: number, attrs: Record<string, unknown>) {
   e.view.dispatch(closeHistory(tr.setSelection(NodeSelection.create(tr.doc, pos))))
 }
 
-const sizes = [
-  { label: '原始尺寸', fraction: 0 },
-  { label: '适应宽度', fraction: 1 },
-  { label: '75%', fraction: 0.75 },
-  { label: '50%', fraction: 0.5 },
-  { label: '25%', fraction: 0.25 },
-]
-
-function resize(fraction: number) {
-  const e = editor.value
-  const img = image.value
-  sizesOpen.value = false
-  if (!e || !img) return
-  if (!fraction) return setAttrs(img.pos, { width: null, height: null })
-  const dom = e.view.nodeDOM(img.pos)
-  if (!(dom instanceof HTMLElement)) return
-  setAttrs(img.pos, { width: Math.round(blockWidth(dom) * fraction), height: null })
-}
-
 function applyToAllImages() {
   const e = editor.value
   const sel = e?.state.selection
@@ -121,7 +101,6 @@ function applyToAllImages() {
   e.view.dispatch(tr)
   // Keep this batch separate from both the source adjustment and the next edit.
   e.view.dispatch(closeHistory(e.state.tr))
-  sizesOpen.value = false
   toast(`已将对齐和大小应用到 ${changed} 张图片`, 'success')
 }
 
@@ -190,18 +169,11 @@ function cancelAlt() {
 <template>
   <BubbleMenu v-if="editor" ref="menu" :editor="editor" plugin-key="imageMenu" :update-delay="0" :resize-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :options="positionOptions" class="yy-bubble yy-image-toolbar">
     <template v-if="!altOpen">
-      <div class="yy-bubble-styles">
-        <button type="button" class="yy-bubble-select" @mousedown.prevent @click="sizesOpen = !sizesOpen">
-          {{ image?.attrs.width ? `${image.attrs.width} px` : '原始尺寸' }}<ChevronDown :size="13" />
-        </button>
-        <div v-if="sizesOpen" class="yy-bubble-list">
-          <button v-for="s in sizes" :key="s.label" type="button" @mousedown.prevent @click="resize(s.fraction)">{{ s.label }}</button>
-        </div>
-      </div>
-      <span class="yy-bubble-sep"></span>
-      <AlignmentMenu />
-      <button type="button" class="yy-bubble-btn" data-tip="应用对齐和大小到全文图片" aria-label="应用对齐和大小到全文图片" @mousedown.prevent @click="applyToAllImages"><CopyCheck :size="16" /></button>
-      <button type="button" class="yy-bubble-btn" :class="{ active: image?.attrs.shadow === true }" :aria-pressed="image?.attrs.shadow === true" :data-tip="image?.attrs.shadow ? '关闭阴影边框' : '显示阴影边框'" aria-label="阴影边框" @mousedown.prevent @click="image && setAttrs(image.pos, { shadow: image.attrs.shadow ? null : true })"><Square :size="16" /></button>
+      <ImageFormatControls>
+        <span class="yy-bubble-sep"></span>
+        <AlignmentMenu />
+        <button type="button" class="yy-bubble-btn" data-tip="应用对齐和大小到全文图片" aria-label="应用对齐和大小到全文图片" @mousedown.prevent @click="applyToAllImages"><CopyCheck :size="16" /></button>
+      </ImageFormatControls>
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :data-tip="replacing === null ? '替换图片' : `上传中 ${replacing}%`" aria-label="替换图片" :disabled="replacing !== null" @mousedown.prevent @click="fileInput?.click()">
         <Replace :size="16" />

@@ -10,6 +10,7 @@ import { useEditorContext } from './context'
 import { keyLabel, withKey } from './keys'
 import AlignmentMenu from './AlignmentMenu.vue'
 import { shiftHeadingLevel } from './headingLevels'
+import { textMarkActive } from './textSelection'
 
 // The formatting toolbar above the document.
 const { editor, tick, ui } = useEditorContext()
@@ -21,7 +22,7 @@ const state = computed(() => {
   if (!e) return null
   return {
     style: currentStyle(e)?.label ?? '正文',
-    marks: Object.fromEntries(markButtons.map((m) => [m.name, e.isActive(m.name)])),
+    marks: Object.fromEntries(markButtons.map((m) => [m.name, textMarkActive(e, m.name)])),
     lists: Object.fromEntries(listButtons.map((m) => [m.name, e.isActive(m.name)])),
     link: e.isActive('link'),
     canUndo: e.can().undo(),

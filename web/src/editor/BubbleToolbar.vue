@@ -9,7 +9,10 @@ import { ChevronDown, Link, RemoveFormatting } from 'lucide-vue-next'
 import { clearFormatting, currentStyle, markButtons, textStyles } from './commands'
 import { useEditorContext } from './context'
 import { withKey } from './keys'
-import { hasTextTools } from './textSelection'
+import { hasTextTools, textMarkActive } from './textSelection'
+import { selectionContent } from './selectionContent'
+import ImageFormatControls from './ImageFormatControls.vue'
+import AlignmentMenu from './AlignmentMenu.vue'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
 import { codeEditorIn } from '../code/editor'
 
@@ -38,7 +41,8 @@ const state = computed(() => {
   void tick.value
   const e = editor.value
   if (!e) return null
-  return { text: hasTextTools(e), style: currentStyle(e)?.label ?? '正文', marks: Object.fromEntries(markButtons.map((m) => [m.name, e.isActive(m.name)])), link: e.isActive('link') }
+  const images = selectionContent(e.state).images.length
+  return { text: hasTextTools(e), images, style: currentStyle(e)?.label ?? (images ? '多种样式' : '正文'), marks: Object.fromEntries(markButtons.map((m) => [m.name, textMarkActive(e, m.name)])), link: textMarkActive(e, 'link') }
 })
 
 function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTMLElement; view: EditorView }) {
@@ -106,8 +110,8 @@ function anchor() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor && state" :editor="editor" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar">
-    <template v-if="state.text">
+  <BubbleMenu v-if="editor && state" :editor="editor" :update-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar" :class="{ 'has-images': state.images, 'is-mixed': state.images && state.text }" role="toolbar" aria-label="选中内容">
+    <div v-if="state.text" class="yy-selection-text-tools" role="group" aria-label="文字格式">
       <div class="yy-bubble-styles">
         <button type="button" class="yy-bubble-select" @mousedown.prevent @click="stylesOpen = !stylesOpen">{{ state.style }}<ChevronDown :size="13" /></button>
         <div v-if="stylesOpen" class="yy-bubble-list">
@@ -133,8 +137,15 @@ function anchor() {
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :class="{ active: state.link }" data-tip="链接" aria-label="链接" @mousedown.prevent @click="ui.openLink()"><Link :size="16" /></button>
       <button type="button" class="yy-bubble-btn" :data-tip="withKey('清除格式', 'Mod-\\')" aria-label="清除格式" @mousedown.prevent @click="clearFormatting(editor)"><RemoveFormatting :size="16" /></button>
-      <span class="yy-bubble-sep"></span>
-    </template>
-    <RemoveSelectionButton />
+    </div>
+    <div class="yy-selection-content-tools">
+      <template v-if="state.images">
+        <span class="yy-selected-image-count">{{ state.images }} 张图片</span>
+        <ImageFormatControls />
+        <span class="yy-bubble-sep"></span>
+        <AlignmentMenu />
+      </template>
+      <RemoveSelectionButton />
+    </div>
   </BubbleMenu>
 </template>

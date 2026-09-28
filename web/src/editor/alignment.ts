@@ -2,8 +2,8 @@ import type { Editor } from '@tiptap/core'
 import type { Node as PMNode, ResolvedPos } from '@tiptap/pm/model'
 import { NodeSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
-import { closeHistory } from '@tiptap/pm/history'
 import { alignment, type Alignment } from '../schema/alignment'
+import { commitSelectionChange, selectionContent } from './selectionContent'
 
 interface Target { pos: number; node: PMNode }
 export interface AlignmentTarget {
@@ -29,14 +29,16 @@ function target(kind: AlignmentTarget['kind'], nodes: Target[]): AlignmentTarget
   return { kind, nodes, current: values.every((a) => a === values[0]) ? values[0] : null }
 }
 
-export function alignmentTargets(e: Editor): { content: AlignmentTarget | null; table: AlignmentTarget | null } {
+export function alignmentTargets(e: Editor): { content: AlignmentTarget | null; images: AlignmentTarget | null; table: AlignmentTarget | null } {
   const sel = e.state.selection
   const selected = sel instanceof NodeSelection ? { pos: sel.from, node: sel.node } : null
   const table = selected?.node.type.name === 'table' ? selected : ancestor(sel.$from, ['table'])
   const sameTable = table && (selected?.node === table.node || ancestor(sel.$to, ['table'])?.pos === table.pos)
   const tableTarget = sameTable ? target('table', [table]) : null
-  if (selected?.node.type.name === 'image') return { content: target('image', [selected]), table: tableTarget }
-  if (selected?.node.type.name === 'table') return { content: null, table: tableTarget }
+  if (selected?.node.type.name === 'image') return { content: target('image', [selected]), images: null, table: tableTarget }
+  if (selected?.node.type.name === 'table') return { content: null, images: null, table: tableTarget }
+  const content = selectionContent(e.state)
+  const images = target('image', content.images)
   const nodes: Target[] = []
   if (tableTarget) {
     if (sel instanceof CellSelection) sel.forEachCell((node, pos) => nodes.push({ node, pos }))
@@ -48,30 +50,36 @@ export function alignmentTargets(e: Editor): { content: AlignmentTarget | null; 
         if (node.type.name === 'tableHeader' || node.type.name === 'tableCell') { nodes.push({ node, pos }); return false }
       })
     }
-    return { content: target('cell', nodes), table: tableTarget }
+    return { content: target('cell', nodes), images, table: tableTarget }
   }
-  e.state.doc.nodesBetween(sel.from, sel.to, (node, pos) => {
-    if (node.type.name === 'paragraph') { nodes.push({ node, pos }); return false }
-    // Table content has its own controls; never change it as a side effect of a body selection.
-    if (node.type.name === 'table') return false
-  })
-  return { content: target('paragraph', nodes), table: null }
-}
-
-export function setAlignment(e: Editor, kind: AlignmentTarget['kind'], value: Alignment) {
-  const targets = alignmentTargets(e)
-  const selected = kind === 'table' ? targets.table : targets.content
-  if (!selected || selected.kind !== kind) return
-  const attr = kind === 'paragraph' ? 'textAlign' : kind === 'cell' ? 'cellAlign' : 'blockAlign'
-  const tr = e.state.tr
-  const selection = e.state.selection.getBookmark()
-  for (const { node, pos } of selected.nodes) {
-    tr.setNodeMarkup(pos, undefined, { ...node.attrs, [attr]: value })
-    // A cell-level action applies to all its paragraphs, including previously aligned ones.
-    if (kind === 'cell') node.descendants((child, at) => {
-      if (child.type.name === 'paragraph' && child.attrs.textAlign) tr.setNodeMarkup(pos + 1 + at, undefined, { ...child.attrs, textAlign: null })
+  const seen = new Set<number>()
+  const textParagraphs = new Set(images ? content.text.filter(range => range.parent.type.name === 'paragraph').map(range => e.state.doc.resolve(range.from).before()) : [])
+  for (const { $from, $to } of sel.ranges) {
+    e.state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+      if (node.type.name === 'paragraph') {
+        if (!seen.has(pos) && (!images || textParagraphs.has(pos))) { nodes.push({ node, pos }); seen.add(pos) }
+        return false
+      }
+      // Table content has its own controls; never change it as a side effect of a body selection.
+      if (node.type.name === 'table') return false
     })
   }
-  e.view.dispatch(closeHistory(tr.setSelection(selection.resolve(tr.doc))))
-  e.commands.focus(undefined, { scrollIntoView: false })
+  return { content: target('paragraph', nodes), images, table: null }
+}
+
+export function setAlignment(e: Editor, kind: AlignmentTarget['kind'] | 'selection', value: Alignment) {
+  const targets = alignmentTargets(e)
+  const selected = (kind === 'selection' ? [targets.content, targets.images] : [targets.content, targets.images, targets.table].filter(t => t?.kind === kind)).filter((t): t is AlignmentTarget => !!t)
+  const tr = e.state.tr
+  for (const t of selected) {
+    const attr = t.kind === 'paragraph' ? 'textAlign' : t.kind === 'cell' ? 'cellAlign' : 'blockAlign'
+    for (const { node, pos } of t.nodes) {
+      if (node.attrs[attr] !== value) tr.setNodeMarkup(pos, undefined, { ...node.attrs, [attr]: value })
+      // A cell-level action applies to all its paragraphs, including previously aligned ones.
+      if (t.kind === 'cell') node.descendants((child, at) => {
+        if (child.type.name === 'paragraph' && child.attrs.textAlign) tr.setNodeMarkup(pos + 1 + at, undefined, { ...child.attrs, textAlign: null })
+      })
+    }
+  }
+  commitSelectionChange(e, tr)
 }

@@ -16,10 +16,15 @@ const choices = [
 ] as const
 const targets = computed(() => {
   void tick.value
-  return editor.value ? alignmentTargets(editor.value) : { content: null, table: null }
+  return editor.value ? alignmentTargets(editor.value) : { content: null, images: null, table: null }
 })
-const current = computed(() => targets.value.content ?? targets.value.table)
-const icon = computed(() => choices.find((c) => c.value === current.value?.current)?.icon ?? TextAlignStart)
+const current = computed(() => targets.value.content ?? targets.value.images ?? targets.value.table)
+const combined = computed(() => {
+  const { images, content } = targets.value
+  if (images && content) return images.current === content.current ? images.current : null
+  return current.value?.current
+})
+const icon = computed(() => choices.find((c) => c.value === combined.value)?.icon ?? TextAlignStart)
 const names = { paragraph: '段落', image: '图片', cell: '单元格内容', table: '表格位置' }
 function itemsFor(t: AlignmentTarget): MenuEntry[] {
   return choices.map((c) => ({
@@ -30,8 +35,14 @@ function itemsFor(t: AlignmentTarget): MenuEntry[] {
   }))
 }
 const items = computed<MenuEntry[]>(() => [
+  ...(targets.value.content && targets.value.images ? [
+    ...choices.map(c => ({ label: `选中内容${c.label}`, icon: c.icon, checked: combined.value === c.value, run: () => { if (editor.value) setAlignment(editor.value, 'selection', c.value) } })),
+    null,
+  ] : []),
   ...(targets.value.content ? itemsFor(targets.value.content) : []),
-  ...(targets.value.content && targets.value.table ? [null] : []),
+  ...(targets.value.content && targets.value.images ? [null] : []),
+  ...(targets.value.images ? itemsFor(targets.value.images) : []),
+  ...((targets.value.content || targets.value.images) && targets.value.table ? [null] : []),
   ...(targets.value.table ? itemsFor(targets.value.table) : []),
 ])
 </script>

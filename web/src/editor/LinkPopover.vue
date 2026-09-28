@@ -3,11 +3,15 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useEditorContext } from './context'
 import { onOutside, place } from './floating'
 import { normalizeHref } from './links'
+import { selectionContent } from './selectionContent'
+import { setSelectedTextMark } from './textSelection'
 
 // Adds or edits a link. With nothing selected it asks for the text as well and inserts a new link.
 const props = defineProps<{ from: number; to: number; href: string; withText: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const { editor } = useEditorContext()
+const selected = editor.value ? selectionContent(editor.value.state) : null
+const mixedSelection = editor.value && selected?.images.length && selected.text.length ? editor.value.state.selection.getBookmark() : null
 
 const text = ref('')
 const url = ref(props.href)
@@ -33,6 +37,9 @@ function apply() {
       const label = text.value.trim() || href
       e.chain().focus().insertContentAt(props.from, { type: 'text', text: label, marks: [{ type: 'link', attrs: { href } }] }).run()
     }
+  } else if (mixedSelection) {
+    e.view.dispatch(e.state.tr.setSelection(mixedSelection.resolve(e.state.doc)))
+    setSelectedTextMark(e, 'link', href ? { href } : null)
   } else if (href) {
     e.chain().focus().setTextSelection({ from: props.from, to: props.to }).extendMarkRange('link').setLink({ href }).run()
   } else {
@@ -42,7 +49,11 @@ function apply() {
 }
 
 function remove() {
-  editor.value?.chain().focus().setTextSelection({ from: props.from, to: props.to }).extendMarkRange('link').unsetLink().run()
+  const e = editor.value
+  if (e && mixedSelection) {
+    e.view.dispatch(e.state.tr.setSelection(mixedSelection.resolve(e.state.doc)))
+    setSelectedTextMark(e, 'link', null)
+  } else e?.chain().focus().setTextSelection({ from: props.from, to: props.to }).extendMarkRange('link').unsetLink().run()
   close(false)
 }
 
