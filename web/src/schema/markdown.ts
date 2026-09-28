@@ -209,7 +209,7 @@ class Converter {
   }
 
   private htmlBlock(n: Html): JSONContent[] {
-    const blocks = /^\s*<(?:table|p)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
+    const blocks = /^\s*<(?:table|p|div|span)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
     if (blocks?.length) return blocks
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
@@ -474,7 +474,7 @@ class Exporter {
     const kids = n.content ?? []
     switch (n.type) {
       case 'paragraph':
-        if (alignment(n.attrs?.textAlign) || kids.some((c) => c.type === 'image' && alignment(c.attrs?.blockAlign))) return [{ type: 'html', value: this.nodeHtml(n) }]
+        if (alignment(n.attrs?.textAlign) || kids.some((c) => c.type === 'image' && (alignment(c.attrs?.blockAlign) || c.attrs?.crop))) return [{ type: 'html', value: this.nodeHtml(n) }]
         return [{ type: 'paragraph', children: this.inline(kids) }]
       case 'heading':
         return [{ type: 'heading', depth: (n.attrs?.level ?? 1) as 1, children: this.inline(kids) }]
@@ -506,6 +506,8 @@ class Exporter {
         return [{ type: 'math', value: String(n.attrs?.latex ?? '') }]
       case 'table':
         return tableNeedsHtml(n) ? [{ type: 'html', value: this.nodeHtml(n) }] : [this.table(n)]
+      case 'imageBoard':
+        return [{ type: 'html', value: this.nodeHtml(n) }]
       case 'callout': {
         const [title, body] = kids
         const fold = String(n.attrs?.fold ?? '')
@@ -609,7 +611,7 @@ class Exporter {
   private image(n: JSONContent): PhrasingContent {
     const a = n.attrs ?? {}
     const src = this.ctx.imageSrc ? this.ctx.imageSrc(String(a.src ?? '')) : String(a.src ?? '')
-    if ((a.height && !a.width) || a.shadow === true || a.blockAlign) {
+    if ((a.height && !a.width) || a.shadow === true || a.blockAlign || a.crop || a.placement || a.sourceWidth || a.sourceHeight) {
       return { type: 'html', value: this.nodeHtml(n) }
     }
     const size = a.width ? `|${a.width}${a.height ? `x${a.height}` : ''}` : ''

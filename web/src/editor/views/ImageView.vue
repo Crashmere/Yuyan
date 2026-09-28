@@ -5,10 +5,12 @@ import { assetURL } from '../../shared/api'
 import { assetId, reservedSize } from '../../shared/images'
 import { blockWidth, imageSizes } from '../images'
 import { alignment } from '../../schema/alignment'
+import ImageSurface from '../ImageSurface.vue'
 
 const props = defineProps(nodeViewProps)
 
 const img = ref<HTMLImageElement | null>(null)
+const content = ref<HTMLElement | null>(null)
 // The width while a corner is being dragged; written to the document on release.
 const live = ref<number | null>(null)
 const src = computed(() => assetURL(String(props.node.attrs.src ?? '')))
@@ -24,7 +26,7 @@ const height = computed(() => (live.value === null ? ((props.node.attrs.height a
 // Dragging a corner sets the width in pixels and drops any height, keeping the proportions; the
 // Markdown export writes it as Obsidian's |width.
 function startResize(e: PointerEvent, direction: 1 | -1) {
-  const el = img.value
+  const el = content.value
   if (!el || e.button !== 0) return
   e.preventDefault()
   e.stopPropagation()
@@ -56,8 +58,10 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
 
 <template>
   <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null, 'is-aligned': !!align, 'ProseMirror-selectednode': selected }" :style="align ? { textAlign: align } : undefined">
-    <span class="yy-image-content">
+    <span ref="content" class="yy-image-content">
+      <ImageSurface v-if="node.attrs.crop" :attrs="{ ...node.attrs, width: live ?? node.attrs.width, height: live === null ? node.attrs.height : null }" />
       <img
+        v-else
         ref="img"
         :src="src"
         :alt="node.attrs.alt ?? ''"

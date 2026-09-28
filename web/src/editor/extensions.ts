@@ -29,6 +29,8 @@ import { UiShortcuts } from './uiShortcuts'
 import { insertImages, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
 import ImageView from './views/ImageView.vue'
+import ImageBoardView from './views/ImageBoardView.vue'
+import { ImageBoard } from '../schema/imageBoard'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
 
@@ -36,6 +38,10 @@ export function editorExtensions(ui: EditorUi): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
+      imageBoard: ImageBoard.extend({
+        addOptions() { return { ui } },
+        addNodeView() { return VueNodeViewRenderer(ImageBoardView) },
+      }),
       codeBlock: withTitles(CodeBlock)
         .extend({
           addNodeView() {

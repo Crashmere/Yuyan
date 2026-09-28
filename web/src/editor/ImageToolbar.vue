@@ -6,7 +6,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { CopyCheck, Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
+import { Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
@@ -56,7 +56,7 @@ function anchor() {
   const e = editor.value
   const sel = e?.state.selection
   const dom = sel instanceof NodeSelection && sel.node.type.name === 'image' ? e?.view.nodeDOM(sel.from) : null
-  const img = dom instanceof HTMLElement ? dom.querySelector('img') : null
+  const img = dom instanceof HTMLElement ? dom.querySelector('[data-image-frame], img') : null
   return img ? { getBoundingClientRect: () => img.getBoundingClientRect(), contextElement: img } : null
 }
 
@@ -80,30 +80,6 @@ function setAttrs(pos: number, attrs: Record<string, unknown>) {
   e.view.dispatch(closeHistory(tr.setSelection(NodeSelection.create(tr.doc, pos))))
 }
 
-function applyToAllImages() {
-  const e = editor.value
-  const sel = e?.state.selection
-  if (!e?.isEditable || !(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return
-  const { blockAlign = null, width = null, height = null } = sel.node.attrs
-  const tr = closeHistory(e.state.tr)
-  let changed = 0
-  e.state.doc.descendants((node, pos) => {
-    if (node.type.name !== 'image') return
-    if ((node.attrs.blockAlign ?? null) === blockAlign && (node.attrs.width ?? null) === width && (node.attrs.height ?? null) === height) return
-    tr.setNodeMarkup(pos, undefined, { ...node.attrs, blockAlign, width, height })
-    changed++
-  })
-  if (!changed) {
-    toast('全文图片的对齐和大小设置已一致', 'info')
-    return
-  }
-  tr.setSelection(NodeSelection.create(tr.doc, sel.from))
-  e.view.dispatch(tr)
-  // Keep this batch separate from both the source adjustment and the next edit.
-  e.view.dispatch(closeHistory(e.state.tr))
-  toast(`已将对齐和大小应用到 ${changed} 张图片`, 'success')
-}
-
 async function replace(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
@@ -124,7 +100,7 @@ async function replace(event: Event) {
         return pos < 0
       })
     }
-    if (pos >= 0) setAttrs(pos, { src: asset.url })
+    if (pos >= 0) setAttrs(pos, { src: asset.url, crop: null, sourceWidth: asset.width ?? null, sourceHeight: asset.height ?? null })
   } catch (err) {
     toast(`替换失败：${err instanceof Error ? err.message : err}`, 'error')
   } finally {
@@ -172,7 +148,6 @@ function cancelAlt() {
       <ImageFormatControls>
         <span class="yy-bubble-sep"></span>
         <AlignmentMenu />
-        <button type="button" class="yy-bubble-btn" data-tip="应用对齐和大小到全文图片" aria-label="应用对齐和大小到全文图片" @mousedown.prevent @click="applyToAllImages"><CopyCheck :size="16" /></button>
       </ImageFormatControls>
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :data-tip="replacing === null ? '替换图片' : `上传中 ${replacing}%`" aria-label="替换图片" :disabled="replacing !== null" @mousedown.prevent @click="fileInput?.click()">

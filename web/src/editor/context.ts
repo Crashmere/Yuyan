@@ -1,5 +1,6 @@
 import { inject, type InjectionKey, type Ref, type ShallowRef } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
+import type { ImageEditMode } from './imageOperations'
 
 // What the editor's toolbars, menus and panels share, provided by EditorPane.
 export interface EditorContext {
@@ -15,6 +16,7 @@ export interface EditorUi {
   openMath: (pos: number, fresh?: boolean) => void
   openFind: () => void
   openTableGrid: (anchor: HTMLElement | DOMRect) => void
+  openImageTools: (mode: ImageEditMode, positions?: number[]) => void
 }
 
 export const editorKey: InjectionKey<EditorContext> = Symbol('editor')

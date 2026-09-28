@@ -5,7 +5,7 @@ import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 
 function needsSpace(node: PMNode): boolean {
-  if (['table', 'horizontalRule', 'codeBlock', 'blockMath', 'callout'].includes(node.type.name)) return true
+  if (['table', 'horizontalRule', 'codeBlock', 'blockMath', 'callout', 'imageBoard'].includes(node.type.name)) return true
   if (!node.isTextblock || !node.childCount) return false
   let image = false, other = false
   node.forEach((child) => {

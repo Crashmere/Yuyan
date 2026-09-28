@@ -761,3 +761,14 @@ pre:hover > .yy-copy,
 .callout[data-callout='example'] > .callout-title:empty::before { content: 'Example'; }
 .callout[data-callout='quote'] > .callout-title:empty::before { content: 'Quote'; }
 .callout[data-callout='code'] > .callout-title:empty::before { content: 'Code'; }
+
+/* A crop is a viewport over the immutable original. Board coordinates scale with its frame. */
+.yy-content [data-image-frame] { cursor: zoom-in; }
+.yy-content [data-image-frame] > img { box-shadow: none !important; outline: none; }
+.yy-content [data-image-frame][data-frame='shadow'] {
+  box-shadow: 0 0 0 1px var(--yy-border-strong), 0 4px 16px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 35%)) !important;
+}
+.yy-content [data-image-board] { margin-top: 0.75em; margin-bottom: 0.75em; }
+.yy-content :is(img, [data-image-frame]):has(+ [data-image-frame]),
+.yy-content [data-image-frame]:has(+ img) { margin-bottom: 0.75em; vertical-align: top; }
+.yy-content [data-board-plane] [data-image-frame] { margin: 0; }

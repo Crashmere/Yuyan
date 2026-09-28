@@ -11,6 +11,8 @@ import { Callout, CalloutContent, CalloutTitle } from './callout'
 import { withTitles } from './codeBlock'
 import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignment'
 import { imageFrame } from './imageStyle'
+import { cropImageStyle, imageFrameStyle, parseRect, rect, rectText, storedCrop } from './imageGeometry'
+import { ImageBoard } from './imageBoard'
 
 // The document schema shared by the editor, the importer and the parity snapshots.
 // Every node and mark here needs a matching case in internal/render/render.go.
@@ -52,11 +54,29 @@ export const YuyanImage = Image.extend<ImageOptions>({
         parseHTML: (el: HTMLElement) => el.getAttribute('data-frame') === 'shadow' ? true : null,
         rendered: false,
       },
+      crop: { default: null, parseHTML: (el: HTMLElement) => storedCrop(parseRect(el.getAttribute('data-crop'), true)), rendered: false },
+      placement: { default: null, parseHTML: (el: HTMLElement) => parseRect(el.getAttribute('data-placement')), rendered: false },
+      sourceWidth: { default: null, parseHTML: (el: HTMLElement) => Number(el.getAttribute('data-source-width')) || null, rendered: false },
+      sourceHeight: { default: null, parseHTML: (el: HTMLElement) => Number(el.getAttribute('data-source-height')) || null, rendered: false },
     }
   },
   renderHTML({ node, HTMLAttributes }) {
     const attrs = { ...HTMLAttributes }
     if (typeof attrs.src === 'string') attrs.src = this.options.resolveSrc(attrs.src)
+    const crop = storedCrop(node.attrs.crop), placement = rect(node.attrs.placement)
+    if (crop || placement) {
+      if (crop) attrs['data-crop'] = rectText(crop)
+      if (placement) attrs['data-placement'] = rectText(placement)
+      if (node.attrs.sourceWidth) attrs['data-source-width'] = node.attrs.sourceWidth
+      if (node.attrs.sourceHeight) attrs['data-source-height'] = node.attrs.sourceHeight
+      if (node.attrs.blockAlign) attrs['data-align'] = node.attrs.blockAlign
+      if (node.attrs.shadow) attrs['data-frame'] = 'shadow'
+      return ['span', mergeAttributes({ 'data-image-frame': '', style: imageFrameStyle(node.attrs) }, placement ? {} : blockAlignment(node.attrs.blockAlign, true), imageFrame(node.attrs.shadow)),
+        ['img', mergeAttributes(this.options.HTMLAttributes, attrs, { style: cropImageStyle(crop) })]]
+    }
+    // Preserve source dimensions after resetting a crop as well, for a lossless HTML roundtrip.
+    if (node.attrs.sourceWidth) attrs['data-source-width'] = node.attrs.sourceWidth
+    if (node.attrs.sourceHeight) attrs['data-source-height'] = node.attrs.sourceHeight
     return ['img', mergeAttributes(this.options.HTMLAttributes, attrs, blockAlignment(node.attrs.blockAlign, true), imageFrame(node.attrs.shadow))]
   },
 })
@@ -98,6 +118,7 @@ export interface SchemaOverrides {
   blockMath?: AnyExtension
   callout?: AnyExtension
   table?: AnyExtension
+  imageBoard?: AnyExtension
 }
 
 export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
@@ -120,6 +141,7 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     Code.extend({ excludes: '' }),
     o.codeBlock ?? withTitles(CodeBlock),
     o.image ?? YuyanImage,
+    o.imageBoard ?? ImageBoard,
     Highlight,
     TaskList,
     TaskItem.configure({ nested: true }),

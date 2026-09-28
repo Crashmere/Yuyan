@@ -1232,3 +1232,62 @@ body.yy-row-dragging * {
   opacity: 0.5;
   pointer-events: none;
 }
+.yy-image.ProseMirror-selectednode [data-image-frame] { outline: 2px solid var(--yy-primary); outline-offset: 1px; }
+.yy-image [data-image-frame] img { outline: none; }
+
+.yy-image-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.yy-image-dialog-options { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.yy-image-dialog-options label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.yy-image-dialog-options .yy-input { width: auto; max-width: 120px; height: 32px; }
+.yy-image-preview { display: flex; justify-content: center; padding: 12px; border-radius: 8px; background: var(--yy-bg-muted); }
+.yy-crop-area { position: relative; max-width: 100%; overflow: hidden; user-select: none; touch-action: none; }
+.yy-crop-area > img { display: block; width: 100%; height: 100%; }
+.yy-crop-box { position: absolute; border: 1px solid #fff; box-shadow: 0 0 0 9999px #0008; cursor: move; touch-action: none; }
+.yy-crop-thirds { position: absolute; inset: 0; background: linear-gradient(to right, transparent 33.2%, #ffffff88 33.3%, #ffffff88 33.5%, transparent 33.6%, transparent 66.4%, #ffffff88 66.5%, #ffffff88 66.7%, transparent 66.8%), linear-gradient(to bottom, transparent 33.2%, #ffffff88 33.3%, #ffffff88 33.5%, transparent 33.6%, transparent 66.4%, #ffffff88 66.5%, #ffffff88 66.7%, transparent 66.8%); pointer-events: none; }
+.yy-crop-handle { position: absolute; width: 12px; height: 12px; border: 2px solid white; background: var(--yy-primary); border-radius: 2px; touch-action: none; }
+.yy-crop-handle.nw { left: 0; top: 0; cursor: nwse-resize; }
+.yy-crop-handle.ne { right: 0; top: 0; cursor: nesw-resize; }
+.yy-crop-handle.sw { left: 0; bottom: 0; cursor: nesw-resize; }
+.yy-crop-handle.se { right: 0; bottom: 0; cursor: nwse-resize; }
+.yy-crop-handle.n { left: calc(50% - 6px); top: 0; cursor: ns-resize; }
+.yy-crop-handle.s { left: calc(50% - 6px); bottom: 0; cursor: ns-resize; }
+.yy-crop-handle.w { top: calc(50% - 6px); left: 0; cursor: ew-resize; }
+.yy-crop-handle.e { top: calc(50% - 6px); right: 0; cursor: ew-resize; }
+.yy-crop-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 14px 0; }
+.yy-crop-values label { color: var(--yy-text-2); font-size: 12px; }
+.yy-crop-values .yy-input { display: block; width: 100%; height: 32px; margin-top: 4px; }
+.yy-split-preview { position: relative; max-width: 100%; overflow: hidden; }
+.yy-split-preview > [data-image-frame] { display: block !important; width: 100% !important; }
+.yy-split-piece { position: absolute; box-shadow: inset 0 0 0 1px #fff; display: grid; place-items: center; }
+.yy-split-piece span { padding: 2px 8px; border-radius: 4px; color: white; background: #0008; }
+.yy-image-source { display: flex; gap: 12px; align-items: center; }
+.yy-image-source .yy-input { flex: 1; min-width: 0; }
+.yy-image-source-preview { display: flex; gap: 14px; align-items: center; margin: 16px 0; font-size: 13px; color: var(--yy-text-2); }
+.yy-image-source-preview img { width: 80px; height: 64px; object-fit: contain; border-radius: 4px; background: var(--yy-bg-muted); }
+.yy-image-options, .yy-image-scopes { margin: 16px 0; padding: 12px; border: 1px solid var(--yy-border); border-radius: 8px; font-size: 13px; }
+.yy-image-options { display: flex; gap: 16px; flex-wrap: wrap; }
+.yy-image-options label, .yy-image-scopes label { display: flex; align-items: center; gap: 8px; }
+.yy-image-scopes { display: grid; gap: 14px; }
+.yy-image-scopes small { color: var(--yy-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yy-image-dialog input[type='checkbox'], .yy-image-dialog input[type='radio'] { accent-color: var(--yy-primary); }
+
+.yy-board-view { position: relative; margin: 0.75em 0; white-space: normal; }
+.yy-board-view.ProseMirror-selectednode { outline: none; }
+.yy-board-frame { position: relative; max-width: 100%; }
+.yy-board-plane { position: relative; width: 100%; overflow: hidden; outline: none; touch-action: none; }
+.yy-board-view.selected .yy-board-plane { box-shadow: 0 0 0 1px var(--yy-primary); background: repeating-conic-gradient(var(--yy-bg-muted) 0% 25%, var(--yy-bg) 0% 50%) 50% / 16px 16px; }
+.yy-board-item { position: absolute; cursor: move; touch-action: none; user-select: none; }
+.yy-board-item > [data-image-frame] { display: block !important; width: 100% !important; height: 100% !important; margin: 0 !important; }
+.yy-board-item.picked { outline: 2px solid var(--yy-primary); outline-offset: -1px; }
+.yy-board-item-handle, .yy-board-resize { position: absolute; width: 12px; height: 12px; right: 0; bottom: 0; border: 2px solid var(--yy-bg); background: var(--yy-primary); border-radius: 2px; cursor: nwse-resize; touch-action: none; z-index: 3; }
+.yy-board-resize { right: -6px; bottom: -6px; width: 14px; height: 14px; }
+.yy-board-toolbar { position: relative; z-index: 4; display: grid; gap: 4px; padding: 8px; margin-bottom: 10px; border: 1px solid var(--yy-border); border-radius: 8px; background: var(--yy-bg-elevated); box-shadow: var(--yy-shadow-popover); font: 12px/1.4 var(--yy-font); color: var(--yy-text); }
+.yy-board-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.yy-board-row strong { margin-right: 8px; font-weight: 600; }
+.yy-board-row label { display: flex; align-items: center; gap: 4px; }
+.yy-board-row input { width: 58px; padding: 3px 5px; min-width: 0; border: 1px solid var(--yy-border); border-radius: 4px; background: var(--yy-bg); color: inherit; font: inherit; }
+.yy-board-row select, .yy-board-row button { display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 3px 7px; border: 1px solid var(--yy-border); border-radius: 4px; background: var(--yy-bg); color: inherit; font: inherit; cursor: pointer; }
+.yy-board-row button:hover { background: var(--yy-bg-hover); }
+.yy-board-row button:disabled { opacity: 0.4; cursor: default; }
+.yy-board-hint { margin-top: 8px; color: var(--yy-text-3); font-size: 11px; user-select: none; }
+.yy-board-marquee { position: absolute; border: 1px solid var(--yy-primary); background: var(--yy-primary-soft); pointer-events: none; z-index: 2; }

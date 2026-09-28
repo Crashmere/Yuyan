@@ -22,6 +22,9 @@ import LinkPopover from './LinkPopover.vue'
 import MathPopover from './MathPopover.vue'
 import TableGrid from './TableGrid.vue'
 import ImageToolbar from './ImageToolbar.vue'
+import ImageToolsDialog from './ImageToolsDialog.vue'
+import type { ImageEditMode } from './imageOperations'
+import { selectionContent } from './selectionContent'
 import { insertImages, pendingUploads } from './uploads'
 import { captureEditingPosition, restoreReadingPosition } from './readingPosition'
 import 'katex/dist/katex.min.css'
@@ -56,8 +59,15 @@ const mathTarget = ref<{ pos: number; fresh: boolean } | null>(null)
 const findOpen = ref(false)
 const find = ref<InstanceType<typeof FindReplace> | null>(null)
 const tableGrid = shallowRef<Anchor | null>(null)
+const imageEdit = ref<{ mode: ImageEditMode; positions: number[] } | null>(null)
 
 const ui: EditorUi = {
+  openImageTools(mode, positions) {
+    const e = editor.value
+    if (!e) return
+    const selected = positions ?? selectionContent(e.state).images.map((t) => t.pos)
+    if (selected.length) imageEdit.value = { mode, positions: selected }
+  },
   pickImage: () => fileInput.value?.click(),
   openLink() {
     const e = editor.value
@@ -425,12 +435,13 @@ onBeforeUnmount(() => {
     </div>
 
     <FindReplace v-if="findOpen" ref="find" @close="findOpen = false" />
-    <BubbleToolbar :hidden="!!linkEdit || !!mathTarget" />
+    <BubbleToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
     <LinkCard :hidden="!!linkEdit || !!mathTarget" />
     <LinkPopover v-if="linkEdit" v-bind="linkEdit" @close="linkEdit = null" />
     <MathPopover v-if="mathTarget" :key="mathTarget.pos" :pos="mathTarget.pos" :fresh="mathTarget.fresh" @close="mathTarget = null" />
     <TableGrid v-if="tableGrid" :anchor="tableGrid" @pick="insertTable" @close="tableGrid = null" />
     <ImageToolbar />
+    <ImageToolsDialog v-if="imageEdit" v-bind="imageEdit" @close="imageEdit = null" />
     <BlockHandle />
 
     <input ref="fileInput" type="file" :accept="imageTypes.join(',')" multiple hidden @change="onFilePicked" />

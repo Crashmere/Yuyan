@@ -133,6 +133,8 @@ func (r *renderer) node(n doc.Node) {
 		r.codeBlock(n)
 	case "image":
 		r.image(n)
+	case "imageBoard":
+		r.imageBoard(n)
 	case "table":
 		style, cols := tableColumns(n)
 		var attrs [][2]string
@@ -336,7 +338,21 @@ func (r *renderer) url(href string) string {
 }
 
 func (r *renderer) image(n doc.Node) {
+	crop, placement := imageRectangle(n.Attrs["crop"], true), imageRectangle(n.Attrs["placement"], false)
+	if crop != nil || placement != nil {
+		r.framedImage(n, crop, placement)
+		return
+	}
 	attrs := [][2]string{{"src", r.url(n.Attr("src"))}}
+	for _, k := range []string{"sourceWidth", "sourceHeight"} {
+		if v := n.Attr(k); v != "" {
+			name := "data-source-width"
+			if k == "sourceHeight" {
+				name = "data-source-height"
+			}
+			attrs = append(attrs, [2]string{name, v})
+		}
+	}
 	var style []string
 	for _, k := range []string{"alt", "title", "width", "height"} {
 		if v := n.Attr(k); v != "" {

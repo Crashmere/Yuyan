@@ -38,6 +38,7 @@ function frameTables(root: HTMLElement) {
 // and makes jumps to headings land in the wrong place; the stored sizes reserve the space.
 function reserveImageSpace(root: HTMLElement, sizes: ImageSizes) {
   for (const img of root.querySelectorAll<HTMLImageElement>('img')) {
+    if (img.closest('[data-image-frame]')) continue
     const id = assetId(img.getAttribute('src') ?? '')
     const r = reservedSize(id ? sizes[id] : undefined, Number(img.getAttribute('width')) || null, Number(img.getAttribute('height')) || null)
     if (r.width) img.setAttribute('width', String(r.width))

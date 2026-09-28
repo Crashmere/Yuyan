@@ -49,7 +49,7 @@ function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTM
   const insideCode = !!document.activeElement?.closest('.ProseMirror .cm-content, .yy-code-dialog .cm-content')
   const focused = view.hasFocus() || insideCode || element.contains(document.activeElement)
   const selection = e.state.selection
-  const image = selection instanceof NodeSelection && selection.node.type.name === 'image'
+  const image = selection instanceof NodeSelection && ['image', 'imageBoard'].includes(selection.node.type.name)
   const show = !props.hidden && focused && e.isEditable && !selection.empty && !image
   if (!show) stylesOpen.value = false
   return show

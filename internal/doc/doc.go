@@ -32,7 +32,7 @@ type Mark struct {
 var nodeTypes = map[string]bool{
 	"doc": true, "paragraph": true, "heading": true, "text": true, "hardBreak": true,
 	"horizontalRule": true, "blockquote": true, "bulletList": true, "orderedList": true,
-	"listItem": true, "taskList": true, "taskItem": true, "codeBlock": true, "image": true,
+	"listItem": true, "taskList": true, "taskItem": true, "codeBlock": true, "image": true, "imageBoard": true,
 	"table": true, "tableRow": true, "tableHeader": true, "tableCell": true,
 	"callout": true, "calloutTitle": true, "calloutContent": true,
 	"inlineMath": true, "blockMath": true,
@@ -71,6 +71,16 @@ func validate(n Node, depth int) error {
 	}
 	if n.Type == "doc" && depth > 0 {
 		return errors.New("nested doc node")
+	}
+	if n.Type == "imageBoard" {
+		if len(n.Content) == 0 {
+			return errors.New("image board must contain at least one image")
+		}
+		for _, child := range n.Content {
+			if child.Type != "image" {
+				return errors.New("image board children must be images")
+			}
+		}
 	}
 	for _, m := range n.Marks {
 		if !markTypes[m.Type] {

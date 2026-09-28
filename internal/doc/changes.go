@@ -113,6 +113,9 @@ func changeBlocks(root Node) []changeBlock {
 			media(n, context)
 		case "image", "inlineMath", "blockMath":
 			add(n, context)
+		case "imageBoard":
+			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
+			media(n, context)
 		default:
 			if n.Type != "doc" {
 				context += encoded(Node{Type: n.Type, Attrs: n.Attrs})
@@ -220,6 +223,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 		switch n.Type {
 		case "image":
 			return "图片"
+		case "imageBoard":
+			return "图片组合"
 		case "table":
 			return "表格"
 		case "heading":
@@ -262,6 +267,12 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 		}
 		switch n.Type {
 		case "image":
+			if attrsChanged("crop") {
+				add("裁切图片", places...)
+			}
+			if attrsChanged("placement") {
+				add("调整组合内图片", places...)
+			}
 			if attrsChanged("width", "height") {
 				add("调整图片大小", places...)
 			}
@@ -273,6 +284,13 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			}
 			if attrsChanged("alt", "title") {
 				add("修改图片说明", places...)
+			}
+		case "imageBoard":
+			if attrsChanged("width", "height") {
+				add("调整画板大小", places...)
+			}
+			if attrsChanged("blockAlign") {
+				add("调整画板对齐", places...)
 			}
 		case "table":
 			if attrsChanged("blockAlign") {
