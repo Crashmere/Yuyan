@@ -254,3 +254,60 @@ func TestTreeEditingAPI(t *testing.T) {
 		t.Fatalf("trash after purge: %d %s", status, body)
 	}
 }
+
+// A history row is the result of its own edit, never the content from the row below it.
+// Current content can be newer than the newest snapshot, or equal despite a different revision.
+func TestHistorySummariesAndCurrentContent(t *testing.T) {
+	ctx := context.Background()
+	st, h := newServer(t)
+	b, _ := st.CreateBook(ctx, "合成历史", "")
+	body := func(text string) doc.Node {
+		return doc.Node{Type: "doc", Content: []doc.Node{{Type: "heading", Attrs: map[string]any{"level": float64(2)}, Content: []doc.Node{{Type: "text", Text: "配置"}}}, {Type: "paragraph", Content: []doc.Node{{Type: "text", Text: text}}}}}
+	}
+	first := body("第一稿")
+	d, _ := st.CreateDoc(ctx, store.CreateDocInput{BookID: b.ID, Title: "说明", Content: &first})
+	rev, _, _ := st.SaveDoc(ctx, d.ID, "说明", body("第二稿"), d.Revision)
+	if err := st.Snapshot(ctx, d.ID); err != nil {
+		t.Fatal(err)
+	}
+	opened, _ := st.GetDoc(ctx, d.ID)
+	current, _, _ := st.SaveDoc(ctx, d.ID, "说明", body("第三稿"), rev)
+	read := func() struct {
+		Versions []versionInfo      `json:"versions"`
+		Pending  *doc.ChangeSummary `json:"pending"`
+	} { status, data := do(t, h, "GET", fmt.Sprintf("/yuyan/api/docs/%d/versions", d.ID), ""); var got struct {
+		Versions []versionInfo      `json:"versions"`
+		Pending  *doc.ChangeSummary `json:"pending"`
+	}; if err := json.Unmarshal([]byte(data), &got); status != 200 || err != nil {
+		t.Fatalf("history: %d %v", status, err)
+	}; if strings.Contains(data, `"content":`) {
+		t.Fatal("history list must not ship full snapshot bodies")
+	}; return got }
+	got := read()
+	if len(got.Versions) != 2 || got.Versions[0].Revision != rev || got.Versions[0].MatchesCurrent || got.Pending == nil {
+		t.Fatalf("pending current: %+v", got)
+	}
+	if fmt.Sprint(got.Versions[0].Summary.Labels) != "[修改正文]" || fmt.Sprint(got.Versions[0].Summary.Sections) != "[配置]" {
+		t.Fatalf("summary: %+v", got.Versions[0])
+	}
+	status, data := do(t, h, "GET", fmt.Sprintf("/yuyan/api/versions/%d/view", got.Versions[0].ID), "")
+	if status != 200 || !strings.Contains(data, "第二稿") || strings.Contains(data, "第三稿") || strings.Contains(data, "第一稿") {
+		t.Fatalf("snapshot content mismatch: %s", data)
+	}
+	if _, err := st.DiscardEdits(ctx, d.ID, opened.Title, opened.Content, opened.UpdatedAt, opened.Revision, current); err != nil {
+		t.Fatal(err)
+	}
+	got = read()
+	if !got.Versions[0].MatchesCurrent || got.Pending != nil {
+		t.Fatalf("same content after discard: %+v", got)
+	}
+	// Restore also records the resulting content, retaining the content it replaced.
+	latest, _ := st.GetDoc(ctx, d.ID)
+	if _, err := st.RestoreVersion(ctx, got.Versions[1].ID, latest.Revision); err != nil {
+		t.Fatal(err)
+	}
+	got = read()
+	if got.Versions[0].Reason != "restore" || !got.Versions[0].MatchesCurrent || got.Pending != nil {
+		t.Fatalf("restored current: %+v", got)
+	}
+}

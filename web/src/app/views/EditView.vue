@@ -90,7 +90,9 @@ async function cancel() {
 
 // Leaving saves first; only content that could not reach the server needs a decision.
 onBeforeRouteLeave(async (to) => {
-  if (pane.value && !(await pane.value.flush())) {
+  if (pane.value && !(await pane.value.finish())) {
+    // A snapshot failure leaves the saved document intact. Stay here so 完成 can retry it.
+    if (status.value === 'saved') return false
     const leave = await confirm({
       title: '还有修改没有保存到服务器',
       message: '内容已暂存在这个浏览器里，下次打开这篇文档时可以恢复。仍要离开吗？',

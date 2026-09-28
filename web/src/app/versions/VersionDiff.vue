@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { h, ref, shallowRef, watch, type FunctionalComponent } from 'vue'
 import { ArrowRight, UnfoldVertical } from 'lucide-vue-next'
-import { api, errorMessage, type Doc, type DocMeta, type Version, type VersionInfo } from '../../shared/api'
+import { api, errorMessage, type Doc, type DocMeta, type Version, type VersionInfo, type VersionMeta } from '../../shared/api'
 import { loading } from '../store'
 import { formatTime } from '../time'
 import type { Comparison } from './compare'
@@ -11,7 +11,7 @@ import type { Part } from './diff'
 // document (what has changed since).
 const props = defineProps<{
   version: VersionInfo
-  previous: VersionInfo | null
+  previous: VersionMeta | null
   doc: DocMeta
   against: 'previous' | 'current'
 }>()
@@ -29,7 +29,7 @@ async function load(against: 'previous' | 'current') {
     version(previous?.id ?? props.version.id),
     previous ? version(props.version.id) : api<Doc>(`docs/${props.doc.id}`),
   ])
-  const [from, to] = previous ? [`上一版本（${formatTime(previous.createdAt)}）`, '此版本'] : ['此版本', '当前版本']
+  const [from, to] = previous ? [`上一条快照 r${previous.revision}（${formatTime(previous.createdAt)}）`, `本条快照 r${props.version.revision}`] : [`本条快照 r${props.version.revision}`, `当前内容 r${after.revision}`]
   return { from, to, ...compareVersions(before, after) }
 }
 

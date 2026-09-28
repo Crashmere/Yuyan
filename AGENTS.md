@@ -14,7 +14,7 @@
 - 首次加载的脚本预算见 DESIGN 12.3。再增加按需加载的 Vue 组件时，Rolldown 会把 Vue 等共用代码拆出主包（首次加载多 2–4 KB）；按需加载的部分尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`。改动后用构建清单核对首次加载的分块。
 - 编辑器扩展（`web/src/schema`）与 Go 渲染器（`internal/render`）必须一一对应；新增或修改节点时同时更新两端，并运行 `make parity` 刷新一致性快照。
 - 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格结构变化后恢复 Markdown 表格的形状，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。编辑器交互以 `web/e2e/editor.spec.ts` 的结果为准：IDE 浏览器工具会给页面元素加标记属性，ProseMirror 会因此重新读取选区（节点选区变成文本选区、正文里的菜单被关闭），这类现象不是产品问题；页面里可以用 `document.querySelector('.ProseMirror').editor` 取得编辑器实例。
-- 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。
+- 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。历史快照记录修改后的完整内容，正常离开编辑页等待正文和快照完成；摘要由 `internal/doc/changes.go` 比较相邻快照生成，展示规则见 DESIGN 13.2，不依赖外部模型或数据库迁移。
 - 当前公网使用 HTTPS 与 ServerPortal 统一设备认证，所有公网页面和 API 均由共享 Nginx 校验。应用写接口继续保留自身来源校验。
 - 修改后运行 `make test`；前端改动还要 `npm --prefix web run build`。测试使用 `.local` 隔离数据，仓库只放合成样例，不提交真实笔记。本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。
 - 导入：`npm --prefix web run import -- --source <笔记仓库> --server <实例地址>/yuyan/ --overrides .local/import-overrides.json --report <报告文件>`，先加 `--dry` 演练；目标必须是空实例，overrides 的内容见 docs/OPERATIONS.md。导入后运行 `npm --prefix web run roundtrip -- --server <实例地址>/yuyan/`，确认每篇文档都能被编辑器原样接受。导出用 `npm --prefix web run export -- --server <实例地址>/yuyan/ --out <文件夹>`（先加 `--dry`）；本地试用界面用 `npm --prefix web run seed` 向空实例写入合成数据。

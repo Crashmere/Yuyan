@@ -10,6 +10,7 @@ import { setTitle } from '../router'
 import { loading, loadTree, setPage } from '../store'
 import { formatTime } from '../time'
 import VersionDiff from '../versions/VersionDiff.vue'
+import VersionSummary from '../versions/VersionSummary.vue'
 import NotFoundState from './NotFoundState.vue'
 import { reasons } from './versions'
 
@@ -19,7 +20,7 @@ const view = ref<VersionView | null>(null)
 const missing = ref(false)
 const failure = ref('')
 
-const isCurrent = computed(() => view.value?.version.revision === view.value?.doc.revision)
+const isCurrent = computed(() => view.value?.version.matchesCurrent ?? false)
 // ?compare=previous or ?compare=current opens a comparison instead of the preview.
 const compare = computed(() => {
   const c = route.query.compare
@@ -67,11 +68,12 @@ async function restore() {
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
   <main v-else-if="view" class="yy-doc-page">
     <article class="yy-article">
-      <p class="yy-banner">这是 {{ formatTime(view.version.createdAt) }} 的版本（{{ reasons[view.version.reason] ?? view.version.reason }}），只能查看。</p>
+      <p class="yy-banner">快照 r{{ view.version.revision }} · {{ formatTime(view.version.createdAt) }} · {{ reasons[view.version.reason] ?? view.version.reason }}。{{ isCurrent ? '与当前内容一致。' : '这是当时保存的完整内容，只读。' }}</p>
+      <VersionSummary :summary="view.version.summary" />
       <nav v-if="view.previous || !isCurrent" class="yy-tabs" aria-label="查看方式">
         <RouterLink :to="{ query: {} }" replace :class="{ active: !compare }" :aria-current="!compare ? 'page' : undefined">预览</RouterLink>
-        <RouterLink v-if="view.previous" :to="{ query: { compare: 'previous' } }" replace :class="{ active: compare === 'previous' }" :aria-current="compare === 'previous' ? 'page' : undefined">与上一版本对比</RouterLink>
-        <RouterLink v-if="!isCurrent" :to="{ query: { compare: 'current' } }" replace :class="{ active: compare === 'current' }" :aria-current="compare === 'current' ? 'page' : undefined">与当前版本对比</RouterLink>
+        <RouterLink v-if="view.previous" :to="{ query: { compare: 'previous' } }" replace :class="{ active: compare === 'previous' }" :aria-current="compare === 'previous' ? 'page' : undefined">本次改动</RouterLink>
+        <RouterLink v-if="!isCurrent" :to="{ query: { compare: 'current' } }" replace :class="{ active: compare === 'current' }" :aria-current="compare === 'current' ? 'page' : undefined">此后改动</RouterLink>
       </nav>
       <h1 class="yy-doc-title">{{ view.version.title }}</h1>
       <VersionDiff v-if="compare" :version="view.version" :previous="view.previous" :doc="view.doc" :against="compare" />

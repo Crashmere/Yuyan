@@ -20,7 +20,7 @@ type Version struct {
 
 func (s *Store) Versions(ctx context.Context, docID int64) ([]Version, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE doc_id = ? ORDER BY id DESC`, docID)
+SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_versions WHERE doc_id = ? ORDER BY id DESC`, docID)
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,12 @@ SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE d
 	var out []Version
 	for rows.Next() {
 		var v Version
-		if err := rows.Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt); err != nil {
+		var content string
+		if err := rows.Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt, &content); err != nil {
+			return nil, err
+		}
+		v.Content, err = doc.Parse([]byte(content))
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -52,15 +57,18 @@ SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_version
 	return v, err
 }
 
-// PreviousVersion is the version of the same document recorded just before v, without its
-// content, or ErrNotFound when v is the oldest.
+// PreviousVersion is the snapshot recorded just before v, or ErrNotFound when v is the oldest.
 func (s *Store) PreviousVersion(ctx context.Context, v Version) (Version, error) {
 	var p Version
+	var content string
 	err := s.DB.QueryRowContext(ctx, `
-SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE doc_id = ? AND id < ? ORDER BY id DESC LIMIT 1`, v.DocID, v.ID).
-		Scan(&p.ID, &p.DocID, &p.Revision, &p.Title, &p.Reason, &p.CreatedAt)
+SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_versions WHERE doc_id = ? AND id < ? ORDER BY id DESC LIMIT 1`, v.DocID, v.ID).
+		Scan(&p.ID, &p.DocID, &p.Revision, &p.Title, &p.Reason, &p.CreatedAt, &content)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
+	}
+	if err == nil {
+		p.Content, err = doc.Parse([]byte(content))
 	}
 	return p, err
 }

@@ -48,7 +48,7 @@
 .yy-heading-tools {
   position: absolute;
   top: 0;
-  left: -36px;
+  left: -42px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -127,6 +127,9 @@
     width: 16px;
     flex-direction: column;
     gap: 3px;
+  }
+  .yy-content > h2 > .yy-heading-tools {
+    left: -19px;
   }
 }
 .yy-content a {

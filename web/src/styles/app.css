@@ -1744,12 +1744,41 @@ a.yy-catalog-title:hover {
   padding: 0;
 }
 .yy-version-list li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 48px;
+  display: grid;
+  gap: 10px;
+  padding: 20px 0;
   border-bottom: 1px solid var(--yy-border);
 }
+.yy-version-meta,
+.yy-version-labels,
+.yy-version-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.yy-version-meta {
+  color: var(--yy-text-3);
+  font-size: 13px;
+}
+.yy-version-labels { gap: 6px; }
+.yy-version-labels .yy-tag { white-space: normal; }
+.yy-version-sections {
+  margin: 8px 0 0;
+  color: var(--yy-text-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.yy-history-current {
+  margin: 20px 0 8px;
+  padding: 16px;
+  border: 1px solid var(--yy-border);
+  border-radius: var(--yy-radius);
+  background: var(--yy-bg-muted);
+}
+.yy-history-current p { margin: 8px 0; color: var(--yy-text-2); font-size: 13px; }
+.yy-history-current > .yy-btn { margin-top: 10px; }
+.yy-article > .yy-version-summary { margin-bottom: 20px; }
 .yy-version-time {
   flex: none;
   color: var(--yy-primary);
@@ -1767,7 +1796,7 @@ a.yy-catalog-title:hover {
   white-space: nowrap;
 }
 .yy-version-current {
-  color: var(--yy-text-3);
+  color: var(--yy-primary);
   font-size: 13px;
 }
 

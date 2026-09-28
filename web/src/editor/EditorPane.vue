@@ -242,7 +242,24 @@ function capturePosition() {
   return captureEditingPosition(e, discarded ? { doc: e.schema.nodeFromJSON(props.doc.content), mapping: positionMapping.invert() } : undefined)
 }
 
-defineExpose({ flush, setTitle, touched, discard, capturePosition })
+// Normal navigation must finish recording the snapshot before the history page loads.
+// pagehide still uses a beacon as a best-effort fallback when the browser closes.
+async function finish(): Promise<boolean> {
+  if (!(await flush())) return false
+  if (!savedThisSession) return true
+  try {
+    const savedRevision = revision.value
+    await api(`docs/${props.doc.id}/snapshot`, { method: 'POST' })
+    if (revision.value !== savedRevision || status.value !== 'saved') return finish()
+    savedThisSession = false
+    return true
+  } catch (e) {
+    toast(`正文已保存，历史快照未完成：${errorMessage(e)}。请重试。`, 'error')
+    return false
+  }
+}
+
+defineExpose({ flush, finish, setTitle, touched, discard, capturePosition })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {

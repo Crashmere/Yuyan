@@ -61,7 +61,12 @@ export interface DocView {
   images: ImageSizes
 }
 
-export interface VersionInfo {
+export interface ChangeSummary {
+  labels: string[]
+  sections: string[]
+}
+
+export interface VersionMeta {
   id: number
   docId: number
   revision: number
@@ -70,14 +75,19 @@ export interface VersionInfo {
   createdAt: string
 }
 
-export interface Version extends VersionInfo {
+export interface VersionInfo extends VersionMeta {
+  summary: ChangeSummary
+  matchesCurrent: boolean
+}
+
+export interface Version extends VersionMeta {
   content: JSONContent
 }
 
 export interface VersionView {
   version: VersionInfo
   // The version recorded just before this one; null for the oldest.
-  previous: VersionInfo | null
+  previous: VersionMeta | null
   doc: DocMeta
   html: string
   hasMath: boolean

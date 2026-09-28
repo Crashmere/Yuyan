@@ -213,16 +213,29 @@ func countChars(text string) int {
 }
 
 type versionInfo struct {
-	ID        int64  `json:"id"`
-	DocID     int64  `json:"docId"`
-	Revision  int64  `json:"revision"`
-	Title     string `json:"title"`
-	Reason    string `json:"reason"`
-	CreatedAt string `json:"createdAt"`
+	ID             int64             `json:"id"`
+	DocID          int64             `json:"docId"`
+	Revision       int64             `json:"revision"`
+	Title          string            `json:"title"`
+	Reason         string            `json:"reason"`
+	CreatedAt      string            `json:"createdAt"`
+	Summary        doc.ChangeSummary `json:"summary"`
+	MatchesCurrent bool              `json:"matchesCurrent"`
 }
 
 func infoOf(v store.Version) versionInfo {
 	return versionInfo{ID: v.ID, DocID: v.DocID, Revision: v.Revision, Title: v.Title, Reason: v.Reason, CreatedAt: v.CreatedAt}
+}
+
+func summarizeVersion(v store.Version, previous *store.Version, current store.Doc) versionInfo {
+	info := infoOf(v)
+	info.MatchesCurrent = v.Title == current.Title && doc.SameContent(v.Content, current.Content)
+	if previous == nil {
+		info.Summary = doc.ChangeSummary{Labels: []string{"初始内容"}, Sections: []string{}}
+	} else {
+		info.Summary = doc.SummarizeChanges(previous.Title, previous.Content, v.Title, v.Content)
+	}
+	return info
 }
 
 func (s *Server) versions(r *http.Request) (any, error) {
@@ -236,9 +249,18 @@ func (s *Server) versions(r *http.Request) (any, error) {
 	}
 	out := make([]versionInfo, len(list))
 	for i, v := range list {
-		out[i] = infoOf(v)
+		var previous *store.Version
+		if i+1 < len(list) {
+			previous = &list[i+1]
+		}
+		out[i] = summarizeVersion(v, previous, d)
 	}
-	return map[string]any{"doc": d.Meta(), "versions": out}, nil
+	var pending *doc.ChangeSummary
+	if len(list) > 0 && !out[0].MatchesCurrent {
+		summary := doc.SummarizeChanges(list[0].Title, list[0].Content, d.Title, d.Content)
+		pending = &summary
+	}
+	return map[string]any{"doc": d.Meta(), "versions": out, "pending": pending}, nil
 }
 
 func (s *Server) versionView(r *http.Request) (any, error) {
@@ -258,9 +280,11 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 		return nil, store.ErrNotFound
 	}
 	var previous *versionInfo
+	var previousVersion *store.Version
 	if p, err := s.store.PreviousVersion(r.Context(), v); err == nil {
 		info := infoOf(p)
 		previous = &info
+		previousVersion = &p
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return nil, err
 	}
@@ -269,7 +293,7 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"version": infoOf(v), "previous": previous, "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid, "images": images}, nil
+	return map[string]any{"version": summarizeVersion(v, previousVersion, d), "previous": previous, "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid, "images": images}, nil
 }
 
 func (s *Server) trash(r *http.Request) (any, error) {
