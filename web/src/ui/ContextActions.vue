@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui'
+import { ContextMenuContent, ContextMenuPortal, ContextMenuRoot, ContextMenuTrigger } from 'reka-ui'
+import ContextMenuItems from './ContextMenuItems.vue'
 import { vHalfRow } from './halfRow'
 import type { MenuEntry } from './menu'
 
@@ -15,15 +16,7 @@ const emit = defineEmits<{ open: [boolean] }>()
     </ContextMenuTrigger>
     <ContextMenuPortal>
       <ContextMenuContent v-half-row class="yy-menu">
-        <template v-for="(item, i) in items" :key="i">
-          <ContextMenuSeparator v-if="!item" class="yy-menu-sep" />
-          <ContextMenuItem v-else class="yy-menu-item" :class="{ danger: item.danger }" :disabled="item.disabled" @select="item.run?.()">
-            <component :is="item.icon" v-if="item.icon" :size="16" />
-            <span>{{ item.label }}</span>
-            <kbd v-if="item.hint">{{ item.hint }}</kbd>
-            <span v-if="item.description" class="yy-menu-description">{{ item.description }}</span>
-          </ContextMenuItem>
-        </template>
+        <ContextMenuItems :items="items" />
       </ContextMenuContent>
     </ContextMenuPortal>
   </ContextMenuRoot>

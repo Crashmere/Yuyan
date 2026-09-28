@@ -158,7 +158,7 @@ export function editBookDescription(book: Book) {
 
 export function deleteBook(book: Book) {
   return attempt(async () => {
-    const ok = await confirm({ title: `删除知识库“${book.name}”？`, message: '整个知识库会移到回收站，可以在回收站恢复。', confirmText: '删除', danger: true })
+    const ok = await confirm({ title: `删除知识库“${book.name}”？`, message: '知识库及其中的全部文档会移到回收站，可在回收站整体恢复。', confirmText: '移到回收站', danger: true })
     if (!ok) return
     await store.deleteBook(book.id)
     toast('已移到回收站', 'success')
@@ -166,14 +166,22 @@ export function deleteBook(book: Book) {
   }, '删除失败')
 }
 
+export function copyBookLink(id: number) {
+  return attempt(async () => {
+    const ok = await copyText(new URL(`${base}books/${id}`, location.origin).href)
+    toast(ok ? '链接已复制' : '复制失败，请手动复制地址栏中的链接', ok ? 'success' : 'error')
+  }, '复制失败')
+}
+
 export function bookMenu(book: Book): MenuEntry[] {
   return [
     { label: '新建文档', icon: FilePlus, run: () => newDoc(book.id, null) },
-    { label: '新建分组', icon: FolderPlus, run: () => newGroup(book.id, null) },
+    { label: '新建目录分组', icon: FolderPlus, run: () => newGroup(book.id, null) },
     null,
     { label: '重命名', icon: PencilLine, run: () => renameBook(book) },
     { label: '编辑简介', icon: SquarePen, run: () => editBookDescription(book) },
     { label: '移至知识库分组', icon: FolderInput, children: bookGroupChoices(book.id) },
+    { label: '复制链接', icon: ClipboardCopy, run: () => copyBookLink(book.id) },
     { label: '导出知识库', icon: Download, run: () => exportBook(book) },
     null,
     { label: '删除知识库', icon: Trash2, danger: true, run: () => deleteBook(book) },

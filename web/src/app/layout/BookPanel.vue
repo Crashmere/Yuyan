@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { BookOpen, ChevronsUpDown, Ellipsis, Folder, Plus } from 'lucide-vue-next'
 import ActionMenu from '../../ui/ActionMenu.vue'
+import ContextActions from '../../ui/ContextActions.vue'
 import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
@@ -32,9 +33,11 @@ onMounted(() => {
 <template>
   <div class="yy-sidebar-body">
     <div v-if="book" class="yy-book-head">
-      <RouterLink :to="`/books/${book.id}`" class="yy-book-name" :class="{ active: route.name === 'book' }" :title="book.name">
-        <span>{{ book.name }}</span>
-      </RouterLink>
+      <ContextActions :items="bookMenu(book)">
+        <RouterLink :to="`/books/${book.id}`" class="yy-book-name" :class="{ active: route.name === 'book' }" :title="book.name">
+          <span>{{ book.name }}</span>
+        </RouterLink>
+      </ContextActions>
       <ActionMenu :items="switcher" align="start">
         <IconButton small label="切换知识库"><ChevronsUpDown :size="14" /></IconButton>
       </ActionMenu>

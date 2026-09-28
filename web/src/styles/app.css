@@ -1265,6 +1265,26 @@ a.yy-crumb:hover {
   border-color: var(--yy-primary);
   box-shadow: none;
 }
+.yy-book-drop-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 108px;
+  padding: 16px;
+  border: 1px dashed var(--yy-border-strong);
+  border-radius: var(--yy-radius-xl);
+  color: var(--yy-text-3);
+  font-size: 13px;
+  transition: border-color 140ms, background 140ms, color 140ms;
+}
+.yy-book-drop-end.active {
+  border-color: var(--yy-primary);
+  background: var(--yy-primary-soft);
+  color: var(--yy-primary);
+}
+.yy-book-drop-end.yy-book-list-leave-active { display: none; transition: none; }
 .yy-book-icon {
   display: inline-flex;
   align-items: center;
@@ -1351,6 +1371,20 @@ a.yy-crumb:hover {
 }
 .yy-book-group + .yy-book-group { margin-top: 24px; }
 .yy-book-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.yy-book-group-content {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 180ms ease-out, opacity 120ms ease-out;
+}
+.yy-book-group-content.collapsed { grid-template-rows: 0fr; opacity: 0; }
+.yy-book-group-clip {
+  min-height: 0;
+  overflow: hidden;
+  /* Leave room for card shadows while allowing the content's layout height to reach zero. */
+  margin: -8px;
+  padding: 8px;
+}
 .yy-book-group-head[draggable="true"] { cursor: grab; }
 .yy-book-group-head[draggable="true"]:active { cursor: grabbing; }
 .yy-book-group-grip { flex: none; color: var(--yy-text-3); }
@@ -1362,7 +1396,7 @@ a.yy-crumb:hover {
 .yy-group-count { color: var(--yy-text-3); font-size: 12px; font-weight: 400; }
 .yy-book-group-empty { margin: 0; padding: 24px 16px; grid-column: 1 / -1; border: 1px dashed var(--yy-border); border-radius: var(--yy-radius); color: var(--yy-text-3); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) {
-  .yy-book-card, .yy-book-group, .yy-book-group::before { transition: none; }
+  .yy-book-card, .yy-book-drop-end, .yy-book-group, .yy-book-group::before, .yy-book-group-content { transition: none; }
   .yy-book-card.over, .yy-book-list-enter-from, .yy-book-group::before { transform: none; }
   .yy-book-group-drop-hint { animation: none; }
 }
