@@ -13,6 +13,7 @@ import { CalloutKeys } from './calloutKeys'
 import { openCollapsedCode } from './codeBlocks'
 import type { EditorUi } from './context'
 import { ImageSizeStore } from './images'
+import { ImageKeys } from './imageKeys'
 import { MarkdownShortcuts } from './inputRules'
 import { codeNodeView } from './codeNodeView'
 import { MarkdownPaste } from './markdownPaste'
@@ -79,6 +80,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     }),
     UploadPlaceholders,
     ImageSizeStore,
+    ImageKeys,
     SlashCommand.configure({ ui }),
     MarkdownShortcuts.configure({ editMath: (_editor, pos) => ui.openMath(pos, true) }),
     MarkdownPaste,

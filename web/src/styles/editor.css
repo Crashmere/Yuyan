@@ -979,7 +979,14 @@ body.yy-row-dragging * {
   cursor: default;
 }
 .yy-image.is-aligned {
-  width: fit-content;
+  /* Keep the inline node on one full line. display:block would put ProseMirror's caret
+     separators on two additional lines inside the same paragraph. */
+  width: 100%;
+}
+.yy-image-content {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
 }
 .ProseMirror .yy-image.ProseMirror-selectednode {
   outline: none;

@@ -42,6 +42,13 @@ function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTM
   return focused && e.isEditable && sel instanceof NodeSelection && sel.node.type.name === 'image'
 }
 
+function anchor() {
+  const pos = image.value?.pos
+  const dom = pos === undefined ? null : editor.value?.view.nodeDOM(pos)
+  const img = dom instanceof HTMLElement ? dom.querySelector('img') : null
+  return img ? { getBoundingClientRect: () => img.getBoundingClientRect(), contextElement: img } : null
+}
+
 function setAttrs(pos: number, attrs: Record<string, unknown>) {
   const e = editor.value
   const node = e?.state.doc.nodeAt(pos)
@@ -132,7 +139,7 @@ function cancelAlt() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor" :editor="editor" plugin-key="imageMenu" :should-show="shouldShow" :options="{ placement: 'top', offset: 8 }" class="yy-bubble yy-image-toolbar">
+  <BubbleMenu v-if="editor" :editor="editor" plugin-key="imageMenu" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :options="{ placement: 'top', offset: 8 }" class="yy-bubble yy-image-toolbar">
     <template v-if="!altOpen">
       <div class="yy-bubble-styles">
         <button type="button" class="yy-bubble-select" @mousedown.prevent @click="sizesOpen = !sizesOpen">
