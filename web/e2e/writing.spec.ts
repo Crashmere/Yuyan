@@ -1,7 +1,7 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import type { JSONContent } from '@tiptap/core'
 import { markdownToDoc } from '../src/schema/markdown'
-import { openSidebar } from './sidebar'
+import { closeDrawer, openSidebar } from './sidebar'
 
 async function createDoc(request: APIRequestContext, content: string | JSONContent) {
   const books = await (await request.get('api/books')).json()
@@ -22,6 +22,95 @@ const levels = (page: Page) => page.locator('.ProseMirror').evaluate((el: any) =
   const result: number[] = []
   el.editor.state.doc.descendants((n: any) => { if (n.type.name === 'heading') result.push(n.attrs.level) })
   return result
+})
+
+async function tabStays(page: Page, target: Locator) {
+  await target.focus()
+  for (const key of ['Tab', 'Shift+Tab']) {
+    await page.keyboard.press(key)
+    await expect(target).toBeFocused()
+  }
+}
+
+test('Tab stays out of control navigation while editing and returns to normal in reading mode', async ({ page, request }) => {
+  const id = await createDoc(request, '普通正文')
+  await openEditor(page, id)
+  const editor = page.locator('.ProseMirror')
+  const before = await editor.evaluate((el: any) => ({ doc: el.editor.getJSON(), selection: el.editor.state.selection.toJSON() }))
+  await tabStays(page, editor)
+  expect(await editor.evaluate((el: any) => ({ doc: el.editor.getJSON(), selection: el.editor.state.selection.toJSON() }))).toEqual(before)
+  await tabStays(page, page.locator('.yy-title-input'))
+  await tabStays(page, page.locator('.yy-toolbar').getByRole('button', { name: /^粗体/ }))
+  await openSidebar(page)
+  await tabStays(page, page.getByRole('button', { name: /^外观/ }))
+  await closeDrawer(page)
+  await editor.click()
+  await page.keyboard.press('ControlOrMeta+f')
+  await tabStays(page, page.getByRole('textbox', { name: '查找', exact: true }))
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('ControlOrMeta+/')
+  const close = help(page).getByRole('button', { name: '关闭快捷键' })
+  await tabStays(page, close)
+  await tabStays(page, help(page).getByRole('tab', { name: '常用' }))
+  // Arrow navigation in tabs is still available.
+  await page.keyboard.press('ArrowRight')
+  await expect(help(page).getByRole('tab', { name: '文字' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: '完成', exact: true }).click()
+  const edit = page.getByRole('link', { name: '编辑', exact: true })
+  await edit.focus()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: '更多操作', exact: true })).toBeFocused()
+})
+
+test('Tab retains list indentation, table navigation and code indentation including expanded code', async ({ page, request }) => {
+  const id = await createDoc(request, '正文\n\n- 第一项\n- 第二项\n\n| 甲 | 乙 |\n| --- | --- |\n| 丙 | 丁 |\n\n```js\nconst answer = 42\n```')
+  await openEditor(page, id)
+  const editor = page.locator('.ProseMirror')
+  const item = editor.locator('li > p', { hasText: '第二项' })
+  await item.click()
+  await expect.poll(() => editor.evaluate((el: any) => el.editor.state.selection.$from.parent.textContent)).toBe('第二项')
+  await page.keyboard.press('Tab')
+  await expect(editor.locator('ul ul li')).toHaveText('第二项')
+  await page.keyboard.press('Shift+Tab')
+  await expect(editor.locator('ul ul')).toHaveCount(0)
+  await expect(editor).toBeFocused()
+  await editor.locator('li > p', { hasText: '第一项' }).click()
+  await expect.poll(() => editor.evaluate((el: any) => el.editor.state.selection.$from.parent.textContent)).toBe('第一项')
+  await page.keyboard.press('Tab')
+  await expect(editor).toBeFocused()
+  const selectedCell = () => editor.evaluate((el: any) => {
+    const { $from } = el.editor.state.selection
+    for (let depth = $from.depth; depth > 0; depth--) if (['tableCell', 'tableHeader'].includes($from.node(depth).type.name)) return $from.node(depth).textContent
+    return null
+  })
+  await editor.locator('th').first().click()
+  await expect.poll(selectedCell).toBe('甲')
+  await page.keyboard.press('Shift+Tab')
+  expect(await selectedCell()).toBe('甲')
+  await expect(editor).toBeFocused()
+  await page.keyboard.press('Tab')
+  expect(await selectedCell()).toBe('乙')
+  await page.keyboard.press('Shift+Tab')
+  expect(await selectedCell()).toBe('甲')
+  await editor.locator('td').last().click()
+  await expect.poll(selectedCell).toBe('丁')
+  await page.keyboard.press('Tab')
+  await expect(editor.locator('tr')).toHaveCount(3)
+  await expect(editor).toBeFocused()
+  for (const expanded of [false, true]) {
+    if (expanded) await page.getByRole('button', { name: '放大代码块' }).click()
+    const code = page.locator('.cm-content')
+    await code.click()
+    await page.keyboard.press('Home')
+    await page.keyboard.press('Tab')
+    await expect(code).toBeFocused()
+    await expect.poll(() => code.textContent()).toBe('    const answer = 42')
+    await page.keyboard.press('Shift+Tab')
+    await expect.poll(() => code.textContent()).toBe('const answer = 42')
+    await expect(code).toBeFocused()
+    if (expanded) await page.keyboard.press('Escape')
+  }
 })
 
 test('Escape twice saves the latest title and body before returning to reading; hints and interrupted sequences stay safe', async ({ page, request }) => {

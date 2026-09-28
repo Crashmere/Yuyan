@@ -13,6 +13,7 @@ import { setTitle } from '../router'
 import { editing, loading, loadTree, setNodeTitle, setPage } from '../store'
 import NotFoundState from './NotFoundState.vue'
 import { useModeShortcut } from '../modeShortcut'
+import { useEditingTab } from '../../editor/tabKey'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,6 +26,8 @@ const failure = ref('')
 const status = ref<SaveStatus>('loading')
 const statusText = ref('')
 const words = ref(0)
+
+useEditingTab()
 
 useModeShortcut('Escape', '连按两次 Esc 键保存并回到阅读模式', () => !!pane.value && status.value !== 'loading', () => {
   // Use the same route guard as 完成: wait for uploads and saves, then restore the reading position.
