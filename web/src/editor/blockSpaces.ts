@@ -10,7 +10,7 @@ function needsSpace(node: PMNode): boolean {
   let image = false, other = false
   node.forEach((child) => {
     if (child.type.name === 'image') image = true
-    else if (child.type.name !== 'hardBreak' && !(child.isText && !/\S/.test(child.text!))) other = true
+    else if (child.type.name !== 'hardBreak') other = true
   })
   return image && !other
 }
@@ -53,7 +53,7 @@ export const BlockSpaces = Extension.create({
               const box = dom.getBoundingClientRect()
               const parentBox = dom.parentElement!.getBoundingClientRect()
               if (x < parentBox.left || x > parentBox.right) return
-              // Visual rows inside one paragraph are handled by the image insertion guide.
+              // Visual rows inside one paragraph are handled by the image break guide.
               // Clicking their automatic spacing must never silently split the paragraph.
               const $pos = view.state.doc.resolve(pos)
               const parent = $pos.parent

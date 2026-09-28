@@ -3,7 +3,6 @@ import type { ImageSizes } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
 import { codeIcon } from '../../shared/codeIcons'
 import { assetId, reservedSize } from '../../shared/images'
-import { enhanceImageFlow } from '../../shared/imageFlow'
 import { needsDisplay } from '../../shared/latex'
 import { mermaidError, renderMermaid } from '../../shared/mermaid'
 import { frameTable } from '../../shared/tableFrame'
@@ -19,7 +18,6 @@ export function cleanupCode(root: HTMLElement) { cleanups.get(root)?.forEach(cle
 export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
   cleanupCode(root)
   if (options.images) reserveImageSpace(root, options.images)
-  enhanceImageFlow(root)
   const codeReady = enhanceCode(root)
   frameTables(root)
   await Promise.all([codeReady, options.math && renderMath(root), options.mermaid && renderDiagrams(root)])

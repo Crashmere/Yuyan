@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
-import { closeHistory } from '@tiptap/pm/history'
-import { NodeSelection } from '@tiptap/pm/state'
 import { assetURL } from '../../shared/api'
 import { assetId, reservedSize } from '../../shared/images'
 import { blockWidth, imageSizes } from '../images'
@@ -48,18 +46,7 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
     handle.removeEventListener('pointercancel', end)
     const w = live.value
     live.value = null
-    if (w !== null && w !== Math.round(start)) {
-      const pos = props.getPos()
-      if (typeof pos !== 'number') return
-      const { state, view } = props.editor
-      const node = state.doc.nodeAt(pos)
-      if (node?.type.name !== 'image') return
-      const tr = closeHistory(state.tr).setNodeMarkup(pos, undefined, { ...node.attrs, width: w, height: null })
-      // Replacing an inline leaf maps its node selection to a text cursor unless restored.
-      // Keep the image selected and its toolbar attached throughout the resize commit.
-      if (state.selection instanceof NodeSelection && state.selection.from === pos) tr.setSelection(NodeSelection.create(tr.doc, pos))
-      view.dispatch(tr)
-    }
+    if (w !== null && w !== Math.round(start)) props.updateAttributes({ width: w, height: null })
   }
   handle.addEventListener('pointermove', move)
   handle.addEventListener('pointerup', end)
