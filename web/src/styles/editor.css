@@ -1036,6 +1036,9 @@ body.yy-row-dragging * {
 .ProseMirror .yy-image + .ProseMirror-separator + .yy-image {
   vertical-align: top;
 }
+.ProseMirror .yy-image:not(.is-aligned):has(+ .yy-image:not(.is-aligned), + .ProseMirror-separator + .yy-image:not(.is-aligned)) {
+  margin-inline-end: 0.5em;
+}
 .yy-image-content {
   position: relative;
   display: inline-block;
