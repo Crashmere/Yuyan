@@ -1,10 +1,4 @@
-.PHONY: test web build linux dev parity e2e
-
-test:
-	npm --prefix web test
-	npm --prefix web run typecheck
-	go test ./...
-	go vet ./...
+.PHONY:  web build linux dev
 
 web:
 	npm --prefix web run build
@@ -19,9 +13,15 @@ dev: build
 	@test -f .local/data/yuyan.db || bin/yuyan init --data .local/data
 	bin/yuyan serve --data .local/data --with-prefix
 
-parity:
-	npm --prefix web run parity
 
-# Browser smoke tests; needs `npx --prefix web playwright install chromium` once.
-e2e: build
-	npm --prefix web run e2e
+.PHONY: release deploy portal rollback releases
+release:
+	bash deploy/release.sh build
+deploy:
+	bash deploy/release.sh deploy
+portal:
+	bash deploy/release.sh portal
+rollback:
+	bash deploy/release.sh rollback $(COMMIT)
+releases:
+	bash deploy/release.sh list

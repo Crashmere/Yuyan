@@ -6,9 +6,6 @@
   "scripts": {
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
-    "test": "vitest run",
-    "e2e": "playwright test",
-    "parity": "tsx tools/parity/render.ts",
     "import": "tsx tools/import/import.ts",
     "export": "tsx tools/export/export.ts",
     "seed": "tsx tools/demo/seed.ts",
@@ -62,7 +59,6 @@
     "vue-router": "5.3.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
     "@types/mdast": "4.0.4",
     "@types/node": "24.3.0",
     "@vitejs/plugin-vue": "6.0.9",
@@ -70,7 +66,6 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vite": "8.3.1",
-    "vitest": "5.0.2",
     "vue-tsc": "3.3.11"
   }
 }

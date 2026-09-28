@@ -1,0 +1,11 @@
+{
+  "app": "yuyan",
+  "build": [
+    "make",
+    "linux"
+  ],
+  "binary": "bin/yuyan-linux-amd64",
+  "portal": true,
+  "restricted": true,
+  "gzip": true
+}

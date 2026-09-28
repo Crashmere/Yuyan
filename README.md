@@ -13,3 +13,7 @@ make dev   # 构建前端与程序，首次运行时在 .local/data 建库，然
 ```
 
 打开 <http://127.0.0.1:18084/yuyan/>。设计与决策见 [docs/DESIGN.md](docs/DESIGN.md)。
+
+日常发布与验证按 [本机发布说明](docs/DEPLOYMENT.md) 执行；GitHub 只作源码备份。
+
+本地开发前运行 `npm --prefix web ci` 安装锁定依赖；正式发布的 `make release` 会在隔离快照中自动安装依赖并构建。

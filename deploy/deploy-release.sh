@@ -44,8 +44,7 @@ finish() {
 trap finish EXIT
 trap 'exit 130' INT
 trap 'exit 143' HUP TERM
-# The program arrives gzip-compressed with a generous time limit, because uploads from GitHub's
-# runners to this server sometimes drop to tens of KB/s.
+# Receive the local release as gzip; verify the uncompressed program below.
 timeout 600 head -c 67108865 > "$release/yuyan.gz"
 size=$(stat -c %s "$release/yuyan.gz")
 if ((size==0||size>67108864)); then echo 'Compressed upload must be 1 byte to 64 MiB.' >&2; exit 65; fi
