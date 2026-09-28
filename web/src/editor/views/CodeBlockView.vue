@@ -6,7 +6,7 @@ import { closeHistory } from '@tiptap/pm/history'
 import { ChevronDown } from 'lucide-vue-next'
 import { copyText } from '../../shared/clipboard'
 import { codeIcons } from '../../shared/codeIcons'
-import { renderMermaid } from '../../shared/mermaid'
+import { mermaidError, renderMermaid } from '../../shared/mermaid'
 import { setCollapsed } from '../codeBlocks'
 import LanguagePicker from './LanguagePicker.vue'
 import { CodeEditor } from '../../code/editor'
@@ -185,7 +185,9 @@ const error = ref('')
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(
   () => [isMermaid.value, props.node.textContent] as const,
-  ([mermaid, source]) => {
+  ([mermaid, source], _previous, onCleanup) => {
+    let active = true
+    onCleanup(() => { active = false; clearTimeout(timer) })
     clearTimeout(timer)
     if (!mermaid) return
     timer = setTimeout(async () => {
@@ -195,10 +197,12 @@ watch(
         return
       }
       try {
-        preview.value = await renderMermaid(source)
+        const svg = await renderMermaid(source)
+        if (!active) return
+        preview.value = svg
         error.value = ''
       } catch (e) {
-        error.value = e instanceof Error ? e.message : String(e)
+        if (active) error.value = mermaidError(e)
       }
     }, 400)
   },
@@ -251,7 +255,7 @@ async function copy() {
       <div v-if="isMermaid" class="yy-mermaid-preview" contenteditable="false">
         <div v-if="preview" class="yy-mermaid-svg" :class="{ stale: !!error }" v-html="preview"></div>
         <p v-else-if="!error" class="yy-mermaid-empty">输入 Mermaid 代码后在这里预览</p>
-        <p v-if="error" class="yy-mermaid-error">语法有误：{{ error }}<template v-if="preview">。上面是上一次成功的预览。</template></p>
+        <p v-if="error" class="yy-mermaid-error">{{ error }}<template v-if="preview"> 上面是上一次成功的预览。</template></p>
       </div>
     </div>
   </node-view-wrapper>

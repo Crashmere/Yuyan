@@ -14,6 +14,8 @@ Nginx location 对 HTML、JSON、JS、CSS 开启 gzip：服务器下行只有约
 
 当前公网使用 HTTPS 与统一设备认证，授权设备可以查看和修改内容；版本历史、回收站和每日备份用于恢复。
 
+发布后旧标签页的动态模块 404 排查见共享 [发布后旧标签页的动态模块加载失败](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#发布后旧标签页的动态模块加载失败)。本应用的构建清单位于 `/static/manifest.json`，页面外壳使用 `no-cache`，带哈希的脚本长期缓存。界面提供全局刷新入口；编辑时先保存，保存冲突或失败不会刷新。浏览器回归通过实际拦截 Mermaid 核心分块、图表类型分块和编辑页分块的 404，核对桌面与 375 px 提示、源码和预览保留、保存期间继续输入以及冲突草稿。
+
 ## 首次安装
 
 先核对端口、身份、目录与现有全部服务健康。服务器不需要新的系统软件。

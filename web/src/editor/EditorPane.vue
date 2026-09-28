@@ -138,6 +138,7 @@ function readDraft(): Draft | null {
 
 function changed() {
   if (!loaded || discarded) return
+  if (inFlight) again = true
   if (status.value !== 'conflict') status.value = 'dirty'
   clearTimeout(saveTimer)
   saveTimer = setTimeout(save, 1200)

@@ -4,7 +4,7 @@ import { copyText } from '../../shared/clipboard'
 import { codeIcon } from '../../shared/codeIcons'
 import { assetId, reservedSize } from '../../shared/images'
 import { needsDisplay } from '../../shared/latex'
-import { renderMermaid } from '../../shared/mermaid'
+import { mermaidError, renderMermaid } from '../../shared/mermaid'
 import { frameTable } from '../../shared/tableFrame'
 import { codeActions, type CodeAction } from '../../code/actions'
 import { codeKey, readCodePreferences, saveCodePreferences } from '../../code/preferences'
@@ -242,7 +242,10 @@ async function renderDiagrams(root: HTMLElement) {
       box.innerHTML = await renderMermaid(code.textContent ?? '')
       pre.replaceWith(box)
     } catch (e) {
-      pre.insertAdjacentHTML('afterend', '<p class="yy-mermaid-error">图表渲染失败，显示原始代码。</p>')
+      const notice = document.createElement('p')
+      notice.className = 'yy-mermaid-error'
+      notice.textContent = `${mermaidError(e)} 已保留原始代码。`
+      pre.after(notice)
       console.warn('mermaid', e)
     }
   }

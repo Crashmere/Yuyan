@@ -703,8 +703,9 @@ test('Mermaid previews beside its source and keeps the last diagram on errors', 
   await block.locator('.cm-content').click()
   await caretAtEnd(block.locator('.cm-content'))
   await page.keyboard.type('\n  B --> {{{')
-  await expect(block.locator('.yy-mermaid-error')).toBeVisible()
+  await expect(block.locator('.yy-mermaid-error')).toContainText('语法有误')
   await expect(block.locator('.yy-mermaid-svg.stale svg')).toBeVisible()
+  await expect(page.locator('.yy-module-notice')).toHaveCount(0)
 })
 
 test('reading pages: image viewer, folded long code and line numbers', async ({ page }) => {

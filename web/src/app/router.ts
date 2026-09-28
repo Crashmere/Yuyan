@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { base } from '../shared/api'
+import { isModuleLoadError, moduleLoadFailed, moduleReloadURL } from '../shared/moduleLoad'
 import { state } from './store'
 import HomeView from './views/HomeView.vue'
 import BookView from './views/BookView.vue'
@@ -44,15 +45,17 @@ router.beforeEach((to, from) => {
     to.meta.readingPosition = captureReadingPosition()
   }
 })
-router.afterEach(() => {
+router.afterEach((_to, _from, failure) => {
   state.navigating = false
+  if (!failure) moduleReloadURL.value = null
 })
 
-// After a new release the old tab's chunks are gone from the server; load the page afresh.
+// A failed route import uses the same explicit, save-aware refresh as other lazy features.
 router.onError((error: Error, to) => {
   state.navigating = false
-  if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(error.message)) {
-    location.assign(router.resolve(to).href)
+  if (isModuleLoadError(error)) {
+    moduleReloadURL.value = router.resolve(to).href
+    moduleLoadFailed.value = true
   }
 })
 

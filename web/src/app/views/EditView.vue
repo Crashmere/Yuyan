@@ -14,6 +14,7 @@ import { editing, loading, loadTree, setNodeTitle, setPage } from '../store'
 import NotFoundState from './NotFoundState.vue'
 import { useModeShortcut } from '../modeShortcut'
 import { useEditingTab } from '../../editor/tabKey'
+import { moduleReloadGuard } from '../../shared/moduleLoad'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +27,9 @@ const failure = ref('')
 const status = ref<SaveStatus>('loading')
 const statusText = ref('')
 const words = ref(0)
+
+const saveBeforeReload = async () => !doc.value || (!!pane.value && status.value !== 'loading' && await pane.value.flush())
+moduleReloadGuard.value = saveBeforeReload
 
 useEditingTab()
 
@@ -58,6 +62,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (moduleReloadGuard.value === saveBeforeReload) moduleReloadGuard.value = null
   if (editing.value?.docId === id) editing.value = null
 })
 

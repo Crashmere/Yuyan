@@ -7,6 +7,7 @@ import { state } from '../store'
 import { openShortcuts, shortcutsLoaded, shortcutsOpen } from '../shortcuts/panel'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
+import ModuleLoadNotice from './ModuleLoadNotice.vue'
 
 const SearchPanel = defineAsyncComponent(() => import('../search/SearchPanel.vue'))
 const ShortcutsDialog = defineAsyncComponent(() => import('../shortcuts/ShortcutsDialog.vue'))
@@ -65,6 +66,7 @@ function resize(e: PointerEvent) {
     <div class="yy-drawer-mask" @click="drawer = false"></div>
     <div class="yy-main">
       <TopBar @open-drawer="drawer = true" />
+      <ModuleLoadNotice />
       <div v-if="state.loading > 0 || state.navigating" class="yy-progress"></div>
       <RouterView v-slot="{ Component, route: r }">
         <component :is="Component" :key="r.path" />

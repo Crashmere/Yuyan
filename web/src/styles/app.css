@@ -1148,6 +1148,21 @@ a.yy-crumb:hover {
 .yy-banner.danger {
   background: var(--yy-danger-soft);
 }
+.yy-module-notice {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  width: 480px;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  border: 1px solid var(--yy-border);
+  box-shadow: var(--yy-shadow-popover);
+  font-size: 13px;
+}
+.yy-module-notice .yy-btn {
+  margin-left: auto;
+}
 
 .yy-empty-state {
   display: flex;
