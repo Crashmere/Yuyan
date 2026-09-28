@@ -511,11 +511,6 @@ pre:hover > .yy-copy,
 .yy-content img + img {
   vertical-align: top;
 }
-/* Inline photos keep flowing across rows. Put the gap after the preceding photo so a
-   wrapped row starts flush with the paragraph rather than inheriting a leading margin. */
-.yy-content img:not([data-align]):has(+ img:not([data-align])) {
-  margin-inline-end: 0.5em;
-}
 /* Match the editor's preservation of typed spaces in paragraphs of inline images. */
 .yy-content p:has(img):not(:has(img[data-align], .yy-image.is-aligned)) {
   white-space: break-spaces;
