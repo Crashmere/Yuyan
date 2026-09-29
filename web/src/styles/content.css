@@ -681,6 +681,12 @@ pre:hover > .yy-copy,
   text-align: center;
   overflow-x: auto;
 }
+/* Mermaid measures HTML labels outside the document. Keep their intrinsic widths after insertion:
+   inherited overflow-wrap:anywhere shrinks long labels inside the already-sized SVG boxes. */
+.yy-mermaid,
+.yy-mermaid-svg {
+  overflow-wrap: normal;
+}
 .yy-mermaid-error {
   color: var(--yy-danger);
   font-size: 13px;
