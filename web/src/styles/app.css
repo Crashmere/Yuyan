@@ -500,9 +500,25 @@ kbd {
 .yy-batch-actions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; }
 .yy-batch-actions .yy-icon-btn { justify-self: center; width: 100%; max-width: 40px; }
 .yy-batch-actions .yy-batch-trash:not(:disabled) { color: var(--yy-danger); }
-.yy-tree-row.group .yy-tree-title {
+.yy-directory-title {
+  position: relative;
+  padding: 1px 8px 1px 10px;
+  border-radius: 3px;
   color: var(--yy-text-2);
   font-weight: 600;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--yy-primary) 6%, transparent), transparent min(180px, 100%));
+}
+.yy-directory-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--yy-primary) 36%, var(--yy-text-3));
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 .yy-tree-row.dragging {
   opacity: 0.45;
@@ -1623,10 +1639,6 @@ a.yy-crumb:hover {
   gap: 16px;
   min-height: 40px;
   border-bottom: 1px solid var(--yy-border);
-}
-.yy-catalog-row.group .yy-catalog-title {
-  color: var(--yy-text-2);
-  font-weight: 600;
 }
 .yy-catalog-title {
   flex: 1;

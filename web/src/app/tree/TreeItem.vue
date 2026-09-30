@@ -84,7 +84,7 @@ function onTitleClick(e: MouseEvent) {
           @blur="tree.finishRename(node, draft)"
         />
         <a v-else-if="node.kind === 'doc' && !selecting" class="yy-tree-title" :href="href" draggable="false" :title="node.title" @click="onTitleClick">{{ node.title }}</a>
-        <span v-else class="yy-tree-title" :title="node.title">{{ node.title }}</span>
+        <span v-else class="yy-tree-title" :class="{ 'yy-directory-title': node.kind === 'group' }" :title="node.title">{{ node.title }}</span>
         <span v-if="!renaming && !selecting" class="yy-tree-actions" @click.stop>
           <ActionMenu v-model:open="menuOpen" :items="items">
             <IconButton small label="更多操作" :tooltip="false"><Ellipsis :size="15" /></IconButton>
