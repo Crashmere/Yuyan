@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
 import { DragHandle } from '@tiptap/extension-drag-handle-vue-3'
+import type { NestedOptions } from '@tiptap/extension-drag-handle'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { ArrowDown, ArrowUp, CopyPlus, GripVertical, Plus, Replace, Trash2 } from 'lucide-vue-next'
 import ActionMenu from '../ui/ActionMenu.vue'
@@ -13,6 +14,15 @@ import { useEditorContext } from './context'
 const { editor } = useEditorContext()
 const current = shallowRef<{ node: PMNode; pos: number } | null>(null)
 const menuOpen = ref(false)
+// Containers expose their body blocks; structural titles, table cells and board images stay
+// with their owning block. Near the outer edge the handle still targets the whole container.
+const nested: NestedOptions = {
+  defaultRules: false,
+  rules: [{
+    id: 'containerBodyBlocks',
+    evaluate: ({ node, parent }) => node.isBlock && ['doc', 'highlightBlock', 'foldContent'].includes(parent?.type.name ?? '') ? 0 : 1000,
+  }],
+}
 // As in Feishu, the grip of a heading shows its level.
 const level = computed(() => (current.value?.node.type.name === 'heading' ? (current.value.node.attrs.level as number) : 0))
 
@@ -62,7 +72,7 @@ function insertBelow() {
 </script>
 
 <template>
-  <DragHandle v-if="editor" :editor="editor" :on-node-change="onNodeChange" class="yy-block-handle">
+  <DragHandle v-if="editor" :editor="editor" :nested="nested" :on-node-change="onNodeChange" class="yy-block-handle">
     <button type="button" class="yy-handle-btn" data-tip="在下方插入" aria-label="在下方插入" @mousedown.prevent @click="insertBelow"><Plus :size="16" /></button>
     <ActionMenu v-model:open="menuOpen" :items="menu" align="start" :restore-focus="false">
       <button type="button" class="yy-handle-btn grip" :class="{ 'is-heading': level }" data-tip="拖动调整位置，点击打开菜单" aria-label="拖动调整位置，点击打开菜单">

@@ -66,18 +66,27 @@ export function insertContainer(editor: Editor, type: 'foldBlock' | 'highlightBl
   return true
 }
 
+function enterFoldContent(editor: Editor): boolean {
+  const { state } = editor, { $from, $to } = state.selection
+  if ($from.parent.type.name !== 'foldTitle' || !$from.sameParent($to) || editor.view.composing) return false
+  const pos = $from.before($from.depth - 1), block = state.doc.nodeAt(pos)!
+  const tr = state.tr
+  if (block.attrs.collapsed) tr.setNodeMarkup(pos, undefined, { ...block.attrs, collapsed: false })
+  tr.setSelection(TextSelection.near(tr.doc.resolve($from.after() + 1))).scrollIntoView()
+  editor.view.dispatch(tr)
+  return true
+}
+
 export const BlockContainers = Extension.create({
   name: 'blockContainers',
   addKeyboardShortcuts() {
     return {
+      Tab: ({ editor }) => enterFoldContent(editor),
       Enter: ({ editor }) => {
         const { state } = editor, { $from, empty } = state.selection
         if (!empty) return false
         if ($from.parent.type.name === 'foldTitle') {
-          const pos = $from.before($from.depth - 1), block = state.doc.nodeAt(pos)!
-          const tr = state.tr.setNodeMarkup(pos, undefined, { ...block.attrs, collapsed: false })
-          tr.setSelection(TextSelection.near(tr.doc.resolve($from.after() + 2)))
-          editor.view.dispatch(tr); return true
+          return enterFoldContent(editor)
         }
         const depth = $from.depth, parent = depth > 1 ? $from.node(depth - 1) : null
         if ($from.parent.type.name !== 'paragraph' || $from.parent.content.size || !parent || !['foldContent', 'highlightBlock'].includes(parent.type.name) || $from.index(depth - 1) !== parent.childCount - 1) return false
