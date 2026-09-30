@@ -35,7 +35,7 @@ export const AlignmentAttributes = Extension.create({
         attributes: {
           blockAlign: {
             default: null,
-            parseHTML: (el: HTMLElement) => alignment(el.getAttribute('data-align')),
+            parseHTML: (el: HTMLElement) => alignment(el.getAttribute('data-align') || (el.matches('[data-image-caption]') ? el.querySelector('img')?.getAttribute('data-align') : null)),
             // The two nodes render this themselves (images also need display:block).
             rendered: false,
           },

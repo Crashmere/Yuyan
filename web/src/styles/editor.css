@@ -172,7 +172,16 @@
   outline-offset: 2px;
 }
 .ProseMirror .selectedCell {
-  background: var(--yy-primary-soft);
+  isolation: isolate;
+}
+.ProseMirror .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--yy-primary) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yy-primary) 55%, transparent);
+  pointer-events: none;
 }
 /* Column and row borders drag to resize (prosemirror-tables and tables.ts). */
 .ProseMirror :is(td, th) {
@@ -1051,6 +1060,11 @@ body.yy-row-dragging * {
   display: inline-block;
   max-width: 100%;
 }
+.yy-image-figure { display: inline-block; max-width: 100%; vertical-align: top; }
+.ProseMirror .yy-image-caption[contenteditable='false'] { white-space: pre-wrap; }
+.yy-image-caption-form { width: min(340px, calc(100vw - 48px)); padding: 4px; }
+.yy-image-caption-form textarea.yy-input { width: 100%; height: auto; min-height: 76px; resize: vertical; }
+.yy-image-caption-form > div { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
 .ProseMirror .yy-image.ProseMirror-selectednode {
   outline: none;
 }
@@ -1295,3 +1309,19 @@ body.yy-row-dragging * {
 .yy-board-row button:disabled { opacity: 0.4; cursor: default; }
 .yy-board-hint { margin-top: 8px; color: var(--yy-text-3); font-size: 11px; user-select: none; }
 .yy-board-marquee { position: absolute; border: 1px solid var(--yy-primary); background: var(--yy-primary-soft); pointer-events: none; z-index: 2; }
+
+/* Shared text and cell colour palette. Selected swatches are a formatting state. */
+.yy-color-picker { width: 224px; padding: 12px; z-index: 60; }
+.yy-color-heading { color: var(--yy-text-2); font-size: 12px; margin-bottom: 8px; }
+.yy-color-reset { display: block; width: 100%; padding: 5px 8px; margin-bottom: 8px; border: 1px solid var(--yy-border); border-radius: 4px; background: var(--yy-bg); color: var(--yy-text); font: inherit; text-align: left; cursor: pointer; }
+.yy-color-reset:hover { background: var(--yy-bg-hover); }
+.yy-color-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.yy-color-swatch { position: relative; height: 32px; border: 1px solid var(--yy-border); border-radius: 4px; background: var(--yy-bg); font-size: 20px; font-weight: 600; cursor: pointer; }
+.yy-color-swatch:hover { border-color: var(--yy-text-3); }
+.yy-color-swatch[aria-pressed='true'] { border-color: var(--yy-primary); }
+.yy-color-check { position: absolute; right: 1px; bottom: 1px; color: var(--yy-primary); }
+.yy-color-custom { display: flex; gap: 6px; margin-top: 10px; }
+.yy-color-custom .yy-input { width: 0; flex: 1; min-width: 0; height: 30px; font-family: var(--yy-mono); font-size: 12px; }
+.yy-color-custom .yy-btn { height: 30px; }
+.yy-table-header-option { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--yy-text-2); }
+.yy-table-header-option input { accent-color: var(--yy-primary); }

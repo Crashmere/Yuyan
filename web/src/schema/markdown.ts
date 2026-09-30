@@ -209,7 +209,7 @@ class Converter {
   }
 
   private htmlBlock(n: Html): JSONContent[] {
-    const blocks = /^\s*<(?:table|p|div|span)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
+    const blocks = /^\s*<(?:table|p|div|span|h[1-6]|ul|ol|blockquote|figure)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
     if (blocks?.length) return blocks
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
@@ -472,6 +472,9 @@ class Exporter {
 
   private block(n: JSONContent): Nodes[] {
     const kids = n.content ?? []
+    // Keep rich content inside its whole container: Markdown list/quote prefixes can otherwise
+    // become literal HTML text or change multiline image captions during a roundtrip.
+    if (needsRichInline(n) || containsRichTable(n)) return [{ type: 'html', value: this.nodeHtml(n) }]
     switch (n.type) {
       case 'paragraph':
         if (alignment(n.attrs?.textAlign) || kids.some((c) => c.type === 'image' && (alignment(c.attrs?.blockAlign) || c.attrs?.crop))) return [{ type: 'html', value: this.nodeHtml(n) }]
@@ -611,7 +614,7 @@ class Exporter {
   private image(n: JSONContent): PhrasingContent {
     const a = n.attrs ?? {}
     const src = this.ctx.imageSrc ? this.ctx.imageSrc(String(a.src ?? '')) : String(a.src ?? '')
-    if ((a.height && !a.width) || a.shadow === true || a.blockAlign || a.crop || a.placement || a.sourceWidth || a.sourceHeight) {
+    if ((a.height && !a.width) || a.caption || a.shadow === true || a.blockAlign || a.crop || a.placement || a.sourceWidth || a.sourceHeight) {
       return { type: 'html', value: this.nodeHtml(n) }
     }
     const size = a.width ? `|${a.width}${a.height ? `x${a.height}` : ''}` : ''
@@ -627,14 +630,22 @@ function textOf(n: JSONContent): string {
 // Tables Markdown cannot hold, which docToMarkdown writes as HTML: column widths, row heights,
 // merged cells, or cells holding more than paragraphs. Anything else Markdown cannot express that
 // the editor gains later is exported as HTML too, so nothing is lost.
+function needsRichInline(n: JSONContent): boolean {
+  return !!n.marks?.some(m => m.type === 'textColor') || (n.type === 'image' && !!n.attrs?.caption) || !!n.content?.some(needsRichInline)
+}
+
+function containsRichTable(n: JSONContent): boolean {
+  return (n.type === 'table' && tableNeedsHtml(n)) || !!n.content?.some(containsRichTable)
+}
+
 function tableNeedsHtml(n: JSONContent): boolean {
-  if (alignment(n.attrs?.blockAlign)) return true
+  if (alignment(n.attrs?.blockAlign) || needsRichInline(n)) return true
   return (n.content ?? []).some(
-    (row) =>
+    (row, index) =>
       !!row.attrs?.height ||
       (row.content ?? []).some((cell) => {
         const a = cell.attrs ?? {}
-        return !!alignment(a.cellAlign) || (a.colspan ?? 1) > 1 || (a.rowspan ?? 1) > 1 || !!(a.colwidth as number[] | null)?.some(Boolean) || (cell.content ?? []).some((b) => b.type !== 'paragraph' || !!alignment(b.attrs?.textAlign) || b.content?.some((c) => !!alignment(c.attrs?.blockAlign)))
+        return cell.type !== (index === 0 ? 'tableHeader' : 'tableCell') || !!a.backgroundColor || !!alignment(a.cellAlign) || (a.colspan ?? 1) > 1 || (a.rowspan ?? 1) > 1 || !!(a.colwidth as number[] | null)?.some(Boolean) || (cell.content ?? []).some((b) => b.type !== 'paragraph' || !!alignment(b.attrs?.textAlign) || b.content?.some((c) => !!alignment(c.attrs?.blockAlign)))
       }),
   )
 }

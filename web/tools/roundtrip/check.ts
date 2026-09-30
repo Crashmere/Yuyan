@@ -138,7 +138,7 @@ async function main() {
         const diff = firstDifference(normalize(content), normalize(node.toJSON() as JSONContent))
         if (diff) failures.push(`${book.name} / ${d.title}（#${d.id}）：${diff}`)
         const reshaped = tablesToReshape(node)
-        if (reshaped) failures.push(`${book.name} / ${d.title}（#${d.id}）：${reshaped} 个表格在编辑时会被调整表头或列对齐`)
+        if (reshaped) failures.push(`${book.name} / ${d.title}（#${d.id}）：${reshaped} 个表格在编辑时会被调整列宽或列对齐`)
         tables += countTables(node)
         if (node.lastChild?.type.name !== 'paragraph') trailing++
       } catch (e) {

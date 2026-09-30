@@ -56,6 +56,19 @@ func imageRectangle(value any, crop bool) *imageRect {
 func imageRectText(c *imageRect) string {
 	return strings.Join([]string{imageNum(c.x), imageNum(c.y), imageNum(c.width), imageNum(c.height)}, ",")
 }
+
+const captionTextStyle = "display: block; width: 0; min-width: 100%; padding-top: 6px; font-size: 12px; line-height: 1.5; font-weight: normal; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; color: light-dark(#8a8f8d, #85888c)"
+
+func captionBoxStyle(n doc.Node) string {
+	base := "display: inline-block; max-width: 100%; vertical-align: top; line-height: 0"
+	if p := imageRectangle(n.Attrs["placement"], false); p != nil {
+		return base + fmt.Sprintf("; position: absolute; left: %s%%; top: %s%%; width: %s%%; height: %s%%", imageNum(p.x*100), imageNum(p.y*100), imageNum(p.width*100), imageNum(p.height*100))
+	}
+	if a := alignment(n.Attr("blockAlign")); a != "" {
+		return base + "; display: block; width: fit-content; " + alignmentMargins(a)
+	}
+	return base
+}
 func (r *renderer) imageBoard(n doc.Node) {
 	w, h := imageNumber(n.Attrs["width"], 800), imageNumber(n.Attrs["height"], 500)
 	attrs := [][2]string{{"data-image-board", ""}, {"data-width", imageNum(w)}, {"data-height", imageNum(h)}}
@@ -84,12 +97,16 @@ func (r *renderer) framedImage(n doc.Node, crop, placement *imageRect) {
 	h := imageNumber(n.Attrs["height"], w/ratio)
 	style := "display: inline-block; overflow: hidden; vertical-align: middle; border-radius: 4px; line-height: 0; "
 	if placement != nil {
-		style += fmt.Sprintf("position: absolute; left: %s%%; top: %s%%; width: %s%%; height: %s%%", imageNum(placement.x*100), imageNum(placement.y*100), imageNum(placement.width*100), imageNum(placement.height*100))
+		visual := placement
+		if n.Attr("caption") != "" {
+			visual = &imageRect{0, 0, 1, 1}
+		}
+		style += fmt.Sprintf("position: absolute; left: %s%%; top: %s%%; width: %s%%; height: %s%%", imageNum(visual.x*100), imageNum(visual.y*100), imageNum(visual.width*100), imageNum(visual.height*100))
 	} else {
 		style += fmt.Sprintf("position: relative; width: %spx; aspect-ratio: %s / %s; max-width: 100%%", imageNum(w), imageNum(w), imageNum(h))
 	}
 	wrapper := [][2]string{{"data-image-frame", ""}}
-	if placement == nil {
+	if placement == nil && n.Attr("caption") == "" {
 		if a := alignment(n.Attr("blockAlign")); a != "" {
 			wrapper = append(wrapper, [2]string{"data-align", a})
 			style += "; display: block; " + alignmentMargins(a)

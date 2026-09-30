@@ -14,12 +14,13 @@ GitHub 只备份源码和配置，推送不触发测试或部署。本机入口�
 - 对齐的格式定义在 `web/src/schema/alignment.ts`（DESIGN 第 19 节），只支持图片、段落和表格。单元格 `cellAlign` 是列对齐 `align` 的独立覆盖；整表位置是 `blockAlign`，宽表格的定位仍由 `web/src/shared/tableFrame.ts` 处理。导出对齐时用 HTML 保留，两端渲染与导入同时更新。
 - 图片阴影边框为可选 `image.shadow`，定义在 `web/src/schema/imageStyle.ts`；节点视图、Go 静态渲染、HTML 导入导出及历史摘要保持对应。知识库分组用现有 `meta.book_groups` 保存，GET/PUT `/api/book-groups` 带 revision 冲突检查；分组显示共用 `bookSections`，彻底删除知识库时同步清理归属。
 - 图片裁切、互补切分、四种范围的批量参数与组合画板见 DESIGN 19.2–19.3；几何定义在 `schema/imageGeometry.ts`，`imageBoard` 包含真实图片节点，原图保持不可变。编辑节点、Go 渲染、HTML 导入导出与历史摘要同步维护；画板改尺寸与整体缩放是两个独立操作。新格式无数据库迁移，使用组合后不要直接回退到不支持它的程序。
+- Markdown 之外的格式第一批见 DESIGN 第 23 节：`schema/colors.ts` 与 `internal/doc/colors.go` 共用纯色规则与浅深色板，`textColor` 为文字标记、`backgroundColor` 为单元格属性；图片说明用 `image.caption` 与 `schema/imageCaption.ts`，独立于 alt/title。表格保留实际表头和跨行跨列结构，不再强制首行表头。含这些格式的容器整体导出 HTML 并读回；修改时同步阅读渲染、导入导出、搜索与历史摘要，正式实例只读 roundtrip。分栏、附件、通用画板属于后续批次。
 - 自行渲染子内容的代码块和图片画板节点视图必须经过 `editor/managedNodeView.ts`，向 ProseMirror 返回 `contentDOM=null`；Vue 渲染器默认给非叶节点创建脱离页面的内容容器，弹窗的无障碍属性变化触发祖先重解析时会把该容器读成空。此类视图只通过事务写正文；带代码块与画板的合成文档应覆盖弹窗打开、取消、应用和保存重开。
 - 阅读页在 Go 渲染的正文上由前端补充的行为集中在 `web/src/app/content`：`enhance.ts`（代码、表格、公式、图表、图片占位；宽表格的框在 `web/src/shared/tableFrame.ts`，编辑器也用）、`folds.ts`（按标题折叠，展开用 `reveal()`）、`matches.ts`（搜索高亮）。滚动到正文中某处之前先调用 `reveal()`，否则目标可能在折叠的节里。
 - 搜索面板的拼音由服务端 `internal/server/pinyin.go` 用 go-pinyin 词典生成（随 `/api/titles`、`/api/books` 返回，含多音字），前端 `web/src/app/search/match.ts` 只负责匹配；不要在前端再引入拼音字典或用排序规则推算。
 - 按钮的提示写在 `data-tip` 上，由 `web/src/ui/tooltip.ts` 统一显示；不要用 `title` 或组件库的 Tooltip 做按钮提示。阅读页和编辑页的大纲共用 `web/src/app/content/OutlinePanel.vue`（外观、固定与折叠）和 `outline.ts`（当前节的判定）。
 - 首次加载的脚本预算见 DESIGN 12.3。再增加按需加载的 Vue 组件时，Rolldown 会把 Vue 等共用代码拆出主包（首次加载多 2–4 KB）；按需加载的部分尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`。改动后用构建清单核对首次加载的分块。
-- 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格结构变化后恢复 Markdown 表格的形状，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。
+- 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格变化后统一列宽和列默认对齐，保留表头与合并结构，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。
 - 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。历史快照记录修改后的完整内容，正常离开编辑页等待正文和快照完成；摘要由 `internal/doc/changes.go` 比较相邻快照生成，展示规则见 DESIGN 13.2，不依赖外部模型或数据库迁移。
 - 当前公网使用 HTTPS 与 ServerPortal 统一设备认证，所有公网页面和 API 均由共享 Nginx 校验。应用写接口继续保留自身来源校验。
 - 测试使用 `.local` 隔离数据，仓库只放合成样例，不提交真实笔记。本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。

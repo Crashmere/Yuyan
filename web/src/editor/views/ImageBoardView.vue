@@ -3,10 +3,11 @@ import { computed, onBeforeUnmount, reactive, ref, toRaw, watch } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { NodeSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
-import { AlignHorizontalSpaceAround, AlignVerticalSpaceAround, CopyCheck, Crop, Grid2X2, Scissors, Trash2, Ungroup } from 'lucide-vue-next'
+import { AlignHorizontalSpaceAround, AlignVerticalSpaceAround, Captions, CopyCheck, Crop, Grid2X2, Scissors, Trash2, Ungroup } from 'lucide-vue-next'
 import { clamp, imageDimensions, positive, rect, round, type ImageRect } from '../../schema/imageGeometry'
 import { gridLayout, type ImageEditMode } from '../imageOperations'
 import ImageSurface from '../ImageSurface.vue'
+import ImageCaptionForm from '../ImageCaptionForm.vue'
 import type { EditorUi } from '../context'
 const props = defineProps(nodeViewProps)
 const ui = props.extension.options.ui as EditorUi
@@ -19,6 +20,8 @@ const attrs = computed<Record<string, any>[]>(() => props.node.content.content.m
 const size = computed(() => liveSize.value ?? { width: positive(props.node.attrs.width, 800), height: positive(props.node.attrs.height, 500) })
 const items = computed(() => live.value ?? attrs.value)
 const selected = computed(() => [...picked].sort((a, b) => a - b))
+const captionIndex = ref<number | null>(null)
+watch(() => selected.value.join(','), () => { captionIndex.value = null })
 const marquee = ref<ImageRect | null>(null)
 const marqueeStyle = computed(() => marquee.value ? cssRect(marquee.value) : {})
 let stopDrag: (() => void) | undefined
@@ -50,6 +53,12 @@ function edit(mode: ImageEditMode) {
   const positions: number[] = []
   props.node.forEach((n, _, index) => { if (picked.has(index)) positions.push(offset); offset += n.nodeSize })
   ui.openImageTools(mode, positions)
+}
+function saveCaption(value: string | null) {
+  const index = captionIndex.value
+  captionIndex.value = null
+  if (index !== null) commit(attrs.value.map((a, i) => i === index ? { ...a, caption: value } : a))
+  plane.value?.focus()
 }
 function track(e: PointerEvent, move: (event: PointerEvent) => void, finish: (cancel: boolean) => void) {
   stopDrag?.(); const handle = e.currentTarget as HTMLElement
@@ -173,7 +182,7 @@ function ungroup() {
   const tr = closeHistory(e.state.tr.replaceWith(pos, pos + current.nodeSize, nodes)); tr.setSelection(NodeSelection.create(tr.doc, pos + 1)); e.view.dispatch(tr); e.view.dispatch(closeHistory(e.state.tr))
 }
 function keyboard(e: KeyboardEvent) {
-  if (e.isComposing || (e.target instanceof Element && e.target.closest('input, select, button'))) return
+  if (e.isComposing || (e.target instanceof Element && e.target.closest('input, textarea, select, button'))) return
   const handled = () => { e.preventDefault(); e.stopPropagation() }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') { handled(); attrs.value.forEach((_, i) => picked.add(i)); return }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { handled(); e.shiftKey ? props.editor.commands.redo() : props.editor.commands.undo(); return }
@@ -202,6 +211,7 @@ function keyboard(e: KeyboardEvent) {
         <button type="button" :disabled="!picked.size" @click="layer(true)">置顶</button><button type="button" :disabled="!picked.size" @click="layer(false)">置底</button>
         <button type="button" :disabled="!picked.size" data-tip="裁切所选图片" aria-label="裁切组合内图片" @click="edit('crop')"><Crop :size="15" /></button>
         <button type="button" :disabled="picked.size !== 1" data-tip="切分所选图片" aria-label="切分组合内图片" @click="edit('split')"><Scissors :size="15" /></button>
+        <button type="button" :disabled="picked.size !== 1" data-tip="图片说明" aria-label="组合内图片说明" @click="captionIndex = selected[0]"><Captions :size="15" /></button>
         <button type="button" :disabled="!picked.size" data-tip="批量应用图片参数" aria-label="批量应用组合内图片参数" @click="edit('apply')"><CopyCheck :size="15" /></button>
         <span class="yy-bubble-sep"></span><label>列 <input v-model.number="columns" type="number" min="1" :max="items.length" aria-label="排列列数" /></label><label>间距 <input v-model.number="gap" type="number" min="0" max="100" aria-label="排列间距" /></label>
         <button type="button" data-tip="按网格均匀排列所选图片，未选时排列全部" aria-label="网格排列" @click="grid"><Grid2X2 :size="15" /></button>
@@ -209,11 +219,13 @@ function keyboard(e: KeyboardEvent) {
         <button type="button" :disabled="picked.size < 3" data-tip="垂直等距分布" aria-label="垂直等距分布" @click="distribute('y')"><AlignVerticalSpaceAround :size="15" /></button>
         <button type="button" :disabled="!picked.size" data-tip="移除所选图片" aria-label="移除组合内图片" @click="remove"><Trash2 :size="15" /></button>
       </div>
+      <ImageCaptionForm v-if="captionIndex !== null" :value="attrs[captionIndex]?.caption" @save="saveCaption" @cancel="captionIndex = null; plane?.focus()" />
     </div>
     <div class="yy-board-frame" :style="{ width: `${size.width}px`, marginLeft: node.attrs.blockAlign === 'center' || node.attrs.blockAlign === 'right' ? 'auto' : '0', marginRight: node.attrs.blockAlign === 'right' ? '0' : 'auto' }">
       <div ref="plane" data-board-plane class="yy-board-plane" tabindex="0" aria-label="图片画板，点击选择图片，Shift 多选，拖动空白框选" :style="{ aspectRatio: `${size.width} / ${size.height}` }" @pointerdown.self="beginMarquee" @dragstart.prevent>
         <div v-for="(a, i) in items" :key="i" class="yy-board-item" :class="{ picked: picked.has(i) && props.selected }" :style="cssRect(placement(i))" :data-board-index="i" @pointerdown="drag($event, i)">
           <ImageSurface :attrs="{ ...a, placement: null, width: placement(i).width * size.width, height: placement(i).height * size.height }" />
+          <span v-if="a.caption" class="yy-image-caption">{{ a.caption }}</span>
           <span v-if="picked.has(i) && props.selected" class="yy-board-item-handle" @pointerdown.stop="drag($event, i, true)"></span>
         </div>
         <span v-if="marquee" class="yy-board-marquee" :style="marqueeStyle"></span>

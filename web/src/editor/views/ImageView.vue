@@ -76,6 +76,7 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
 
 <template>
   <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null, 'is-aligned': !!align, 'ProseMirror-selectednode': selected }" :style="align ? { textAlign: align } : undefined" @mousedown="pick" @click="pickSingle">
+    <span class="yy-image-figure">
     <span ref="content" class="yy-image-content">
       <ImageSurface v-if="node.attrs.crop" :attrs="{ ...node.attrs, width: live ?? node.attrs.width, height: live === null ? node.attrs.height : null }" />
       <img
@@ -96,6 +97,8 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
         <span class="yy-image-handle right" data-tip="拖动调整宽度" @pointerdown="startResize($event, 1)"></span>
       </template>
       <span v-if="live !== null" class="yy-image-size">{{ live }} px</span>
+    </span>
+    <span v-if="node.attrs.caption" class="yy-image-caption" contenteditable="false">{{ node.attrs.caption }}</span>
     </span>
   </node-view-wrapper>
 </template>

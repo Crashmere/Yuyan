@@ -40,7 +40,7 @@ var nodeTypes = map[string]bool{
 
 var markTypes = map[string]bool{
 	"bold": true, "italic": true, "strike": true, "code": true, "underline": true,
-	"highlight": true, "link": true,
+	"highlight": true, "link": true, "textColor": true,
 }
 
 func Empty() Node {
@@ -86,6 +86,12 @@ func validate(n Node, depth int) error {
 		if !markTypes[m.Type] {
 			return fmt.Errorf("unknown mark type %q", m.Type)
 		}
+		if m.Type == "textColor" && NormalizeColor(m.Attr("color")) == "" {
+			return errors.New("invalid text colour")
+		}
+	}
+	if value := n.Attr("backgroundColor"); value != "" && NormalizeColor(value) == "" {
+		return errors.New("invalid cell background colour")
 	}
 	for _, c := range n.Content {
 		if err := validate(c, depth+1); err != nil {
@@ -160,6 +166,9 @@ func PlainText(n Node) string {
 			b.WriteString(n.Attr("latex"))
 		case "image":
 			b.WriteString(n.Attr("alt"))
+			if caption := n.Attr("caption"); caption != "" {
+				b.WriteString("\n" + caption + "\n")
+			}
 		case "codeBlock":
 			if title := n.Attr("title"); title != "" {
 				b.WriteString(title + "\n")

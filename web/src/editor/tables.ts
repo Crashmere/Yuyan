@@ -19,16 +19,12 @@ function cellAt(table: PMNode, rel: number): PMNode | null {
   return role === 'cell' || role === 'header_cell' ? node : null
 }
 
-// Markdown tables have exactly one header row and one alignment per column. Structural edits
-// (inserting a row above the header, deleting the header row, Tab adding a row at the end) would
-// leave other shapes, so the table under the cursor is put back into that shape after each change:
-// the first row holds header cells, the other rows plain cells, and every cell takes its column's
-// alignment. Tables from Markdown already have this shape, so loading a document changes nothing.
+// Keep column alignment and widths consistent, while preserving explicit header cells and spans.
+// Both ordinary Markdown tables and richer HTML tables retain their chosen structure.
 // Once columns have widths (from dragging a border), a column without one, such as a new column,
 // gets their average, so the table keeps a width for every column.
 function normalize(tr: Transaction, table: PMNode, start: number): boolean {
   const map = TableMap.get(table)
-  const { tableHeader, tableCell } = table.type.schema.nodes
   const aligns: Align[] = []
   const widths: (number | null)[] = []
   for (let col = 0; col < map.width; col++) {
@@ -54,11 +50,10 @@ function normalize(tr: Transaction, table: PMNode, start: number): boolean {
       seen.add(rel)
       const node = cellAt(table, rel)
       if (!node) continue
-      const type = row === 0 ? tableHeader : tableCell
       const rect = map.findCell(rel)
       const colwidth = fill ? widths.slice(rect.left, rect.right).map((w) => w ?? fill) : node.attrs.colwidth
-      if (node.type === type && node.attrs.align === aligns[col] && JSON.stringify(node.attrs.colwidth) === JSON.stringify(colwidth)) continue
-      tr.setNodeMarkup(start + rel, type, { ...node.attrs, align: aligns[col], colwidth })
+      if (node.attrs.align === aligns[col] && JSON.stringify(node.attrs.colwidth) === JSON.stringify(colwidth)) continue
+      tr.setNodeMarkup(start + rel, undefined, { ...node.attrs, align: aligns[col], colwidth })
       changed = true
     }
   }

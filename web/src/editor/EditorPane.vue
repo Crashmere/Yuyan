@@ -98,9 +98,9 @@ const ui: EditorUi = {
 
 provide(editorKey, { editor, tick, ui })
 
-function insertTable(rows: number, cols: number) {
+function insertTable(rows: number, cols: number, withHeaderRow = true) {
   tableGrid.value = null
-  editor.value?.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+  editor.value?.chain().focus().insertTable({ rows, cols, withHeaderRow }).run()
 }
 
 const draftKey = `yuyan:draft:${props.doc.id}`

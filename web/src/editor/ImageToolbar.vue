@@ -6,7 +6,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
+import { Captions, Download, ExternalLink, Replace, TextCursorInput } from 'lucide-vue-next'
 import { assetURL } from '../shared/api'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
@@ -16,6 +16,7 @@ import { uploadFile } from './uploads'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
 import AlignmentMenu from './AlignmentMenu.vue'
 import ImageFormatControls from './ImageFormatControls.vue'
+import ImageCaptionForm from './ImageCaptionForm.vue'
 
 // Shown while an image is selected: size, replace, download, open, alternative text, delete.
 const { editor, tick } = useEditorContext()
@@ -28,6 +29,7 @@ const positionOptions = {
   onHide: () => { menuVisible.value = false },
 }
 const altOpen = ref(false)
+const captionOpen = ref(false)
 const alt = ref('')
 const altInput = ref<HTMLInputElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -43,6 +45,7 @@ watch(
   () => image.value?.pos,
   () => {
     altOpen.value = false
+    captionOpen.value = false
   },
 )
 
@@ -78,6 +81,7 @@ function setAttrs(pos: number, attrs: Record<string, unknown>) {
   if (!e || node?.type.name !== 'image') return
   const tr = e.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs })
   e.view.dispatch(closeHistory(tr.setSelection(NodeSelection.create(tr.doc, pos))))
+  e.view.dispatch(closeHistory(e.state.tr))
 }
 
 async function replace(event: Event) {
@@ -140,11 +144,17 @@ function cancelAlt() {
   altOpen.value = false
   editor.value?.commands.focus()
 }
+function saveCaption(value: string | null) {
+  const img = image.value
+  captionOpen.value = false
+  if (img) setAttrs(img.pos, { caption: value })
+  editor.value?.commands.focus()
+}
 </script>
 
 <template>
   <BubbleMenu v-if="editor" ref="menu" :editor="editor" plugin-key="imageMenu" :update-delay="0" :resize-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :options="positionOptions" class="yy-bubble yy-image-toolbar">
-    <template v-if="!altOpen">
+    <template v-if="!altOpen && !captionOpen">
       <ImageFormatControls>
         <span class="yy-bubble-sep"></span>
         <AlignmentMenu />
@@ -156,10 +166,12 @@ function cancelAlt() {
       <button type="button" class="yy-bubble-btn" data-tip="下载" aria-label="下载" @mousedown.prevent @click="download"><Download :size="16" /></button>
       <button type="button" class="yy-bubble-btn" data-tip="查看原图" aria-label="查看原图" @mousedown.prevent @click="open"><ExternalLink :size="16" /></button>
       <button type="button" class="yy-bubble-btn" data-tip="替代文字" aria-label="替代文字" @mousedown.prevent @click="editAlt"><TextCursorInput :size="16" /></button>
+      <button type="button" class="yy-bubble-btn" data-tip="图片说明" aria-label="图片说明" @mousedown.prevent @click="captionOpen = true"><Captions :size="16" /></button>
       <span v-if="replacing !== null" class="yy-bubble-note">上传中 {{ replacing }}%</span>
       <span class="yy-bubble-sep"></span>
       <RemoveSelectionButton />
     </template>
+    <ImageCaptionForm v-else-if="captionOpen" :value="image?.attrs.caption" @save="saveCaption" @cancel="captionOpen = false; editor.commands.focus()" />
     <form v-else class="yy-image-alt" @submit.prevent="saveAlt">
       <input ref="altInput" v-model="alt" class="yy-input" placeholder="图片无法显示时显示的文字" aria-label="替代文字" @keydown.esc.prevent="cancelAlt" />
       <button type="submit" class="yy-btn small primary">确定</button>

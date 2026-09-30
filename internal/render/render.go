@@ -178,8 +178,16 @@ func (r *renderer) node(n doc.Node) {
 			attrs = append(attrs, [2]string{"data-cell-align", cell}, [2]string{"data-column-align", a})
 			a = cell
 		}
+		var styles []string
 		if a != "" {
-			attrs = append(attrs, [2]string{"style", "text-align: " + a})
+			styles = append(styles, "text-align: "+a)
+		}
+		if color := doc.NormalizeColor(n.Attr("backgroundColor")); color != "" {
+			attrs = append(attrs, [2]string{"data-cell-background", color})
+			styles = append(styles, doc.ColorStyle(color, true))
+		}
+		if len(styles) > 0 {
+			attrs = append(attrs, [2]string{"style", strings.Join(styles, "; ")})
 		}
 		r.wrap(tag, attrs, n)
 	case "callout":
@@ -304,6 +312,11 @@ func (r *renderer) text(n doc.Node) {
 		case "highlight":
 			r.b.WriteString("<mark>")
 			closers = append(closers, "</mark>")
+		case "textColor":
+			if color := doc.NormalizeColor(m.Attr("color")); color != "" {
+				r.open("span", [][2]string{{"data-text-color", color}, {"style", doc.ColorStyle(color, false)}})
+				closers = append(closers, "</span>")
+			}
 		case "link":
 			href := m.Attr("href")
 			attrs := [][2]string{{"href", r.url(href)}}
@@ -338,6 +351,18 @@ func (r *renderer) url(href string) string {
 }
 
 func (r *renderer) image(n doc.Node) {
+	if caption := n.Attr("caption"); caption != "" {
+		r.open("span", [][2]string{{"data-image-caption", ""}, {"data-caption", caption}, {"style", captionBoxStyle(n)}})
+		defer func() {
+			style := captionTextStyle
+			if imageRectangle(n.Attrs["placement"], false) != nil {
+				style += "; position: absolute; left: 0; top: 100%"
+			}
+			r.open("span", [][2]string{{"data-caption-text", ""}, {"style", style}})
+			r.b.WriteString(html.EscapeString(caption))
+			r.b.WriteString("</span></span>")
+		}()
+	}
 	crop, placement := imageRectangle(n.Attrs["crop"], true), imageRectangle(n.Attrs["placement"], false)
 	if crop != nil || placement != nil {
 		r.framedImage(n, crop, placement)
@@ -361,7 +386,9 @@ func (r *renderer) image(n doc.Node) {
 	}
 	if a := alignment(n.Attr("blockAlign")); a != "" {
 		attrs = append(attrs, [2]string{"data-align", a})
-		style = append(style, "display: block; "+alignmentMargins(a))
+		if n.Attr("caption") == "" {
+			style = append(style, "display: block; "+alignmentMargins(a))
+		}
 	}
 	if n.AttrBool("shadow") {
 		attrs = append(attrs, [2]string{"data-frame", "shadow"})

@@ -11,6 +11,8 @@ import { keyLabel, withKey } from './keys'
 import AlignmentMenu from './AlignmentMenu.vue'
 import { shiftHeadingLevel } from './headingLevels'
 import { textMarkActive } from './textSelection'
+import TextColorMenu from './TextColorMenu.vue'
+import TableTools from './TableTools.vue'
 
 // The formatting toolbar above the document.
 const { editor, tick, ui } = useEditorContext()
@@ -97,8 +99,10 @@ const insertMenu = computed<MenuEntry[]>(() => {
         <component :is="m.icon" :size="17" />
       </IconButton>
       <IconButton label="链接" :active="state.link" :disabled="state.inCode" @mousedown.prevent @click="ui.openLink()"><Link :size="17" /></IconButton>
+      <TextColorMenu />
       <span class="yy-toolbar-sep"></span>
       <AlignmentMenu />
+      <TableTools />
       <IconButton
         v-for="m in listButtons"
         :key="m.name"

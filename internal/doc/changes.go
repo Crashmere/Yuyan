@@ -282,8 +282,11 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			if attrsChanged("shadow") {
 				add("调整图片边框", places...)
 			}
-			if attrsChanged("alt", "title") {
+			if attrsChanged("caption") {
 				add("修改图片说明", places...)
+			}
+			if attrsChanged("alt", "title") {
+				add("修改图片替代文字或标题", places...)
 			}
 		case "imageBoard":
 			if attrsChanged("width", "height") {
@@ -304,6 +307,9 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			}
 			if tablePart(old, "shape") != tablePart(n, "shape") {
 				add("调整表格结构", places...)
+			}
+			if tablePart(old, "background") != tablePart(n, "background") {
+				add("调整单元格底色", places...)
 			}
 			if tablePart(old, "content") != tablePart(n, "content") {
 				add("修改表格内容", places...)
@@ -380,6 +386,10 @@ func tablePart(n Node, part string) string {
 		case "shape":
 			if v.Type == "tableRow" || v.Type == "tableCell" || v.Type == "tableHeader" {
 				out = append(out, v.Type+encoded(v.Attrs["colspan"])+encoded(v.Attrs["rowspan"]))
+			}
+		case "background":
+			if color := v.Attr("backgroundColor"); color != "" {
+				out = append(out, path+color)
 			}
 		case "content":
 			if v.Type == "tableCell" || v.Type == "tableHeader" {

@@ -2,10 +2,10 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { onOutside, place, type Anchor } from './floating'
 
-// Picks the size of a new table by hovering over a grid. The first row is the header row, which
-// Markdown tables always have.
+// Picks the size and optional first header row of a new table.
 const props = defineProps<{ anchor: Anchor }>()
-const emit = defineEmits<{ pick: [rows: number, cols: number]; close: [] }>()
+const emit = defineEmits<{ pick: [rows: number, cols: number, header: boolean]; close: [] }>()
+const header = ref(true)
 
 const rows = 8
 const cols = 10
@@ -42,10 +42,11 @@ onBeforeUnmount(() => {
           :aria-label="`${r} 行 ${c} 列`"
           @mouseenter="hover = { r, c }"
           @mousedown.prevent
-          @click="emit('pick', r, c)"
+          @click="emit('pick', r, c, header)"
         ></button>
       </template>
     </div>
-    <div class="yy-table-grid-label">{{ hover.r ? `${hover.r} 行 × ${hover.c} 列（第一行为表头）` : '选择表格大小' }}</div>
+    <div class="yy-table-grid-label">{{ hover.r ? `${hover.r} 行 × ${hover.c} 列` : '选择表格大小' }}</div>
+    <label class="yy-table-header-option"><input v-model="header" type="checkbox" />第一行为表头</label>
   </div>
 </template>

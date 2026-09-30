@@ -16,6 +16,8 @@ import ImageFormatControls from './ImageFormatControls.vue'
 import AlignmentMenu from './AlignmentMenu.vue'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
 import { codeEditorIn } from '../code/editor'
+import TextColorMenu from './TextColorMenu.vue'
+import TableTools from './TableTools.vue'
 
 // The toolbar over selected content. Its style list lives inside the bubble, since a menu in a
 // separate layer would take focus away from the editor and hide the bubble.
@@ -142,9 +144,11 @@ function anchor() {
       </button>
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :class="{ active: state.link }" data-tip="链接" aria-label="链接" @mousedown.prevent @click="ui.openLink()"><Link :size="16" /></button>
+      <TextColorMenu compact />
       <button type="button" class="yy-bubble-btn" :data-tip="withKey('清除格式', 'Mod-\\')" aria-label="清除格式" @mousedown.prevent @click="clearFormatting(editor)"><RemoveFormatting :size="16" /></button>
     </div>
     <div class="yy-selection-content-tools">
+      <TableTools compact />
       <template v-if="state.images">
         <span class="yy-selected-image-count">{{ state.images }} 张图片</span>
         <ImageFormatControls />
