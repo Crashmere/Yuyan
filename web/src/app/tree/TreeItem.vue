@@ -7,7 +7,7 @@ import ActionMenu from '../../ui/ActionMenu.vue'
 import ContextActions from '../../ui/ContextActions.vue'
 import IconButton from '../../ui/IconButton.vue'
 import { newDoc } from '../actions'
-import { treeKey } from './context'
+import { dropsIntoNode, treeKey } from './context'
 
 defineOptions({ name: 'TreeItem' })
 const props = defineProps<{ node: TreeNode; depth: number }>()
@@ -22,6 +22,7 @@ const selected = computed(() => tree.selectionState(props.node))
 const renaming = computed(() => tree.renaming.value === props.node.id)
 const items = computed(() => tree.menu(props.node))
 const drop = computed(() => (tree.drag.overId === props.node.id && tree.drag.position ? `drop-${tree.drag.position}` : ''))
+const dropDepth = computed(() => props.depth + (dropsIntoNode(props.node, tree.drag.position, open.value) ? 1 : 0))
 const href = computed(() => router.resolve(`/docs/${props.node.id}`).href)
 const menuOpen = ref(false)
 const contextOpen = ref(false)
@@ -56,7 +57,7 @@ function onTitleClick(e: MouseEvent) {
       <div
         class="yy-tree-row"
         :class="[node.kind, drop, { current, selecting, checked: selecting && selected === true, active: menuOpen || contextOpen, dragging: tree.drag.id === node.id }]"
-        :style="{ '--depth': depth }"
+        :style="{ '--depth': depth, '--drop-depth': dropDepth }"
         :data-tree-id="node.id"
         :draggable="!renaming && !selecting"
         @click="activate"

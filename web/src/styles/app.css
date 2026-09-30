@@ -410,6 +410,8 @@ kbd {
 
 /* Tree ------------------------------------------------------------------------------------ */
 
+.yy-tree { --tree-indent: 16px; }
+
 .yy-tree,
 .yy-tree-children {
   list-style: none;
@@ -422,7 +424,7 @@ kbd {
   display: flex;
   align-items: center;
   height: 32px;
-  padding: 0 4px 0 calc(4px + var(--depth, 0) * 16px);
+  padding: 0 4px 0 calc(4px + var(--depth, 0) * var(--tree-indent));
   border-radius: var(--yy-radius);
   color: var(--yy-text);
   cursor: pointer;
@@ -503,7 +505,8 @@ kbd {
 .yy-tree-row.drop-after::after {
   content: '';
   position: absolute;
-  left: calc(20px + var(--depth, 0) * 16px);
+  /* Align with the destination title, after the row padding and disclosure caret. */
+  left: calc(26px + var(--drop-depth, var(--depth, 0)) * var(--tree-indent));
   right: 4px;
   height: 2px;
   border-radius: 1px;

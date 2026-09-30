@@ -4,6 +4,11 @@ import type { MenuEntry } from '../../ui/menu'
 
 export type DropPosition = 'before' | 'after' | 'inside'
 
+// The destination and its visual indentation must agree when dropping below an open branch.
+export function dropsIntoNode(node: TreeNode, position: DropPosition | null, open: boolean): boolean {
+  return position === 'inside' || (position === 'after' && !!node.children?.length && open)
+}
+
 // What every row of a knowledge base tree shares, provided by BookTree.
 export interface TreeContext {
   bookId: number

@@ -6,7 +6,7 @@ import { nodeMenu } from '../actions'
 import { loadExpanded, saveExpanded } from '../prefs'
 import * as store from '../store'
 import TreeItem from './TreeItem.vue'
-import { treeKey, type DropPosition } from './context'
+import { dropsIntoNode, treeKey, type DropPosition } from './context'
 import { useTreeSelection } from './selection'
 
 const props = defineProps<{ bookId: number; nodes: TreeNode[]; currentId: number | null; busy?: boolean }>()
@@ -105,7 +105,7 @@ function reset() {
 // target works out where a drop puts the dragged node; the index counts siblings without it.
 function target(node: TreeNode, position: DropPosition, dragId: number): { parentId: number | null; index: number } {
   // Below an expanded node with children the drop line sits above its first child.
-  if (position === 'inside' || (position === 'after' && node.children?.length && expanded.has(node.id))) {
+  if (dropsIntoNode(node, position, expanded.has(node.id))) {
     const kids = (node.children ?? []).filter((c) => c.id !== dragId)
     return { parentId: node.id, index: position === 'inside' ? kids.length : 0 }
   }
