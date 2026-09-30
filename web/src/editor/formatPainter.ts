@@ -89,6 +89,11 @@ export function applyFormatPainter(e: Editor): boolean {
 
 export const FormatPainter = Extension.create({
   name: 'formatPainter',
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Shift-s': () => { toggleFormatPainter(this.editor); return true },
+    }
+  },
   addProseMirrorPlugins() {
     const editor = this.editor
     return [new Plugin<PainterState | null>({

@@ -1,4 +1,4 @@
-// Pinyin matching for the search panel. The server spells each title as units separated by spaces:
+// Pinyin matching shared by the search panel and insert menu. Spellings use units separated by spaces:
 // one per Chinese character with its readings separated by "/", and one per run of letters and
 // digits, e.g. "01 zui/cuo duan lu/luo" for 01 最短路. Each character can be typed in full
 // (zuiduanlu), by its initial (zdl) or partly (zuidl), starting at any character.

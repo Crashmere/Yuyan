@@ -4,6 +4,7 @@ import Suggestion, { type SuggestionProps } from '@tiptap/suggestion'
 import { VueRenderer } from '@tiptap/vue-3'
 import { computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { insertItems, type InsertItem } from './commands'
+import { searchInsertItems } from './insertSearch'
 import type { EditorUi } from './context'
 import SlashMenu from './SlashMenu.vue'
 
@@ -29,8 +30,8 @@ function remember(id: string) {
   }
 }
 
-// With no query the menu starts with the recently used items; a query matches the name, pinyin
-// initials or English keywords.
+// With no query the menu starts with recent items; searching uses the shared text/pinyin matcher
+// and the insert commands' Markdown aliases.
 function filter(query: string): SlashEntry[] {
   const q = query.trim().toLowerCase()
   if (!q) {
@@ -40,7 +41,7 @@ function filter(query: string): SlashEntry[] {
       .map((i) => ({ ...i, recent: true }))
     return [...recent, ...insertItems]
   }
-  return insertItems.filter((i) => i.label.toLowerCase().includes(q) || i.keywords.includes(q))
+  return searchInsertItems(q)
 }
 
 function place(el: HTMLElement, rect: (() => DOMRect | null) | null | undefined) {
@@ -68,6 +69,7 @@ export const SlashCommand = Extension.create<{ ui: EditorUi | null }>({
         editor: this.editor,
         pluginKey: new PluginKey(`slashCommand${i}`),
         char,
+        allowSpaces: true,
         allow: ({ state, range }) => !state.doc.resolve(range.from).parent.type.spec.code,
         items: ({ query }) => filter(query),
         command: ({ editor, range, props }: { editor: Editor; range: Range; props: SlashEntry }) => {

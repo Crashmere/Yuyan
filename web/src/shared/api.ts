@@ -20,7 +20,7 @@ export interface Book {
   position: number
   docCount: number
   updatedAt: string
-  // The name's pinyin for the search panel (see search/match.ts); only in the list of books.
+  // The name's pinyin for the search panel (see searchMatch.ts); only in the list of books.
   pinyin?: string
 }
 

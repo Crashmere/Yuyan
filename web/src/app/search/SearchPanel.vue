@@ -7,7 +7,7 @@ import { api, errorMessage, type Book, type DocSummary, type SearchHit, type Tit
 import { recentlyViewed } from '../prefs'
 import { loadBooks } from '../store'
 import { parts } from './highlight'
-import { score, units, type Units } from './match'
+import { score, units, type Units } from '../../shared/searchMatch'
 import { searchOpen } from './panel'
 
 // Opened with Cmd/Ctrl+K or the sidebar's search button. Before typing it lists recent documents;
