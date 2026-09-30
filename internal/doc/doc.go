@@ -89,6 +89,14 @@ func validate(n Node, depth int) error {
 		if m.Type == "textColor" && NormalizeColor(m.Attr("color")) == "" {
 			return errors.New("invalid text colour")
 		}
+		if m.Type == "textColor" && m.Attr("gradient") != "" {
+			if from, _ := TextGradient(m.Attr("gradient")); from == "" {
+				return errors.New("invalid text gradient")
+			}
+		}
+		if m.Type == "highlight" && m.Attr("color") != "" && NormalizeColor(m.Attr("color")) == "" {
+			return errors.New("invalid highlight colour")
+		}
 	}
 	if value := n.Attr("backgroundColor"); value != "" && NormalizeColor(value) == "" {
 		return errors.New("invalid cell background colour")

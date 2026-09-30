@@ -3,7 +3,6 @@ import StarterKit from '@tiptap/starter-kit'
 import Code from '@tiptap/extension-code'
 import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
-import Highlight from '@tiptap/extension-highlight'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { createColGroup, Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
@@ -13,7 +12,7 @@ import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignm
 import { imageFrame } from './imageStyle'
 import { cropImageStyle, imageFrameStyle, parseRect, rect, rectText, storedCrop } from './imageGeometry'
 import { ImageBoard } from './imageBoard'
-import { CellBackground, TextColor } from './colors'
+import { CellBackground, TextColor, TextHighlight } from './colors'
 import { imageElement, withImageCaption } from './imageCaption'
 
 // The document schema shared by the editor, the importer and the parity snapshots.
@@ -156,7 +155,7 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     o.codeBlock ?? withTitles(CodeBlock),
     o.image ?? YuyanImage,
     o.imageBoard ?? ImageBoard,
-    Highlight,
+    TextHighlight,
     TaskList,
     TaskItem.configure({ nested: true }),
     o.table ?? YuyanTable.configure({ resizable: false }),

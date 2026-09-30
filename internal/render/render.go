@@ -291,8 +291,20 @@ func colwidth(n doc.Node) string {
 // so the last mark in the list is the outermost element.
 func (r *renderer) text(n doc.Node) {
 	var closers []string
-	for i := len(n.Marks) - 1; i >= 0; i-- {
-		m := n.Marks[i]
+	// Like the editor, keep colour inside highlights and links, regardless of stored mark order.
+	marks := make([]doc.Mark, 0, len(n.Marks))
+	for _, m := range n.Marks {
+		if m.Type == "textColor" {
+			marks = append(marks, m)
+		}
+	}
+	for _, m := range n.Marks {
+		if m.Type != "textColor" {
+			marks = append(marks, m)
+		}
+	}
+	for i := len(marks) - 1; i >= 0; i-- {
+		m := marks[i]
 		switch m.Type {
 		case "bold":
 			r.b.WriteString("<strong>")
@@ -310,11 +322,20 @@ func (r *renderer) text(n doc.Node) {
 			r.b.WriteString("<u>")
 			closers = append(closers, "</u>")
 		case "highlight":
-			r.b.WriteString("<mark>")
+			var attrs [][2]string
+			if color := doc.NormalizeColor(m.Attr("color")); color != "" {
+				attrs = append(attrs, [2]string{"data-highlight-color", color}, [2]string{"style", doc.ColorStyle(color, true)})
+			}
+			r.open("mark", attrs)
 			closers = append(closers, "</mark>")
 		case "textColor":
 			if color := doc.NormalizeColor(m.Attr("color")); color != "" {
-				r.open("span", [][2]string{{"data-text-color", color}, {"style", doc.ColorStyle(color, false)}})
+				attrs := [][2]string{{"data-text-color", color}, {"style", doc.ColorStyle(color, false)}}
+				if style := doc.TextGradientStyle(m.Attr("gradient")); style != "" {
+					attrs[1][1] = style
+					attrs = append(attrs, [2]string{"data-text-gradient", m.Attr("gradient")})
+				}
+				r.open("span", attrs)
 				closers = append(closers, "</span>")
 			}
 		case "link":

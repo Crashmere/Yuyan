@@ -1,5 +1,5 @@
 import { getSchema, type Extensions, type JSONContent } from '@tiptap/core'
-import { DOMParser as SchemaParser, type Schema } from '@tiptap/pm/model'
+import { DOMParser as SchemaParser, Fragment, Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { renderToHTMLString } from '@tiptap/static-renderer/pm/html-string'
 import type {
   Blockquote, Code, Html, List, ListItem, Nodes, Paragraph, PhrasingContent, Root, RootContent, Table,
@@ -531,8 +531,15 @@ class Exporter {
   // Written with the schema's rendering, rows on lines of their own; a blank line, which would end
   // the HTML block in Markdown, is written as &#10;.
   private nodeHtml(n: JSONContent): string {
-    const node = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href)
-    return renderToHTMLString({ extensions: documentSchema().extensions, content: { type: 'doc', content: [node] } })
+    const mapped = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href)
+    // The static renderer wraps marks in reverse order to ProseMirror's DOM serializer.
+    // Keep text colour innermost in both, so highlight backgrounds never cover gradient ink.
+    const orderMarks = (n: PMNode): PMNode => {
+      const node = n.isLeaf ? n : n.copy(Fragment.fromArray(n.content.content.map(orderMarks)))
+      return node.mark([...node.marks].sort((a, b) => Number(b.type.name === 'textColor') - Number(a.type.name === 'textColor')))
+    }
+    const node = orderMarks(PMNode.fromJSON(documentSchema().schema, { type: 'doc', content: [mapped] }))
+    return renderToHTMLString({ extensions: documentSchema().extensions, content: node })
       .replace('<tbody>', '<tbody>\n')
       .replace(/<\/tr>/g, '</tr>\n')
       .replace(/\n(?=\n)/g, '&#10;')
@@ -631,7 +638,7 @@ function textOf(n: JSONContent): string {
 // merged cells, or cells holding more than paragraphs. Anything else Markdown cannot express that
 // the editor gains later is exported as HTML too, so nothing is lost.
 function needsRichInline(n: JSONContent): boolean {
-  return !!n.marks?.some(m => m.type === 'textColor') || (n.type === 'image' && !!n.attrs?.caption) || !!n.content?.some(needsRichInline)
+  return !!n.marks?.some(m => m.type === 'textColor' || (m.type === 'highlight' && m.attrs?.color)) || (n.type === 'image' && !!n.attrs?.caption) || !!n.content?.some(needsRichInline)
 }
 
 function containsRichTable(n: JSONContent): boolean {

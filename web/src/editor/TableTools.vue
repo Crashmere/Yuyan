@@ -26,7 +26,8 @@ const state = computed(() => {
   else selected.push(e.getAttributes(e.isActive('tableHeader') ? 'tableHeader' : 'tableCell').backgroundColor ?? null)
   const headers: boolean[] = []
   table?.firstChild?.forEach(n => headers.push(n.type.name === 'tableHeader'))
-  return { merge: e.can().mergeCells(), split: e.can().splitCell(), header: headers.length > 0 && headers.every(Boolean), background: selected.every(c => c === selected[0]) ? selected[0] : null }
+  const backgroundMixed = !selected.every(c => c === selected[0])
+  return { merge: e.can().mergeCells(), split: e.can().splitCell(), header: headers.length > 0 && headers.every(Boolean), background: backgroundMixed ? null : selected[0], backgroundMixed }
 })
 const items = computed(() => {
   const e = editor.value
@@ -39,7 +40,7 @@ const items = computed(() => {
     <span :class="compact ? 'yy-bubble-sep' : 'yy-toolbar-sep'"></span>
     <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="合并单元格" data-tip="合并单元格" :disabled="!state.merge" @mousedown.prevent @click="apply(chain => chain.mergeCells())"><Merge :size="17" /></button>
     <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="拆分单元格" data-tip="拆分单元格" :disabled="!state.split" @mousedown.prevent @click="apply(chain => chain.splitCell())"><Columns2 :size="17" /></button>
-    <ColorPicker kind="background" :compact="compact" :value="state.background" @pick="color => apply(chain => chain.setCellAttribute('backgroundColor', color))" />
+    <ColorPicker kind="cell" :compact="compact" :value="state.background" :mixed="state.backgroundMixed" @pick="color => apply(chain => chain.setCellAttribute('backgroundColor', color))" />
     <ActionMenu :items="items" :restore-focus="false">
       <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="表格设置" data-tip="表格设置" @mousedown.prevent><TableProperties :size="17" /></button>
     </ActionMenu>

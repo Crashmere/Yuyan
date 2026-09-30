@@ -88,7 +88,7 @@ const insertMenu = computed<MenuEntry[]>(() => {
       <IconButton label="降低标题等级" :disabled="!state.canDemote" @mousedown.prevent @click="editor.chain().focus().command(shiftHeadingLevel(1)).run()"><ArrowDown :size="17" /></IconButton>
       <span class="yy-toolbar-sep"></span>
       <IconButton
-        v-for="m in markButtons"
+        v-for="m in markButtons.filter(m => m.name !== 'highlight')"
         :key="m.name"
         :label="withKey(m.label, m.shortcut)"
         :active="state.marks[m.name]"

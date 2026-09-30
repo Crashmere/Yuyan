@@ -130,7 +130,7 @@ function anchor() {
       </div>
       <span class="yy-bubble-sep"></span>
       <button
-        v-for="m in markButtons"
+        v-for="m in markButtons.filter(m => m.name !== 'highlight')"
         :key="m.name"
         type="button"
         class="yy-bubble-btn"
