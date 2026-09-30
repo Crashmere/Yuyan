@@ -646,7 +646,7 @@ function containsRichTable(n: JSONContent): boolean {
 }
 
 function containsBlockContainer(n: JSONContent): boolean {
-  return n.type === 'foldBlock' || n.type === 'highlightBlock' || !!n.content?.some(containsBlockContainer)
+  return n.type === 'foldBlock' || n.type === 'highlightBlock' || n.type === 'columns' || !!n.content?.some(containsBlockContainer)
 }
 
 function tableNeedsHtml(n: JSONContent): boolean {

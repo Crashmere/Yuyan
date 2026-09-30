@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 
-const containers = new Set(['codeBlock', 'tableCell', 'tableHeader', 'callout', 'foldBlock', 'highlightBlock'])
+const containers = new Set(['codeBlock', 'tableCell', 'tableHeader', 'callout', 'foldBlock', 'highlightBlock', 'columns', 'column'])
 
 // Mod-A selects the content of the code block, table cell or callout holding the cursor; pressed
 // again, the one around it, and then the whole document.

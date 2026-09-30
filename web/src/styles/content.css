@@ -11,8 +11,18 @@
 .yy-content .ProseMirror > :first-child {
   margin-top: 0;
 }
-.yy-content :where(p, ul, ol, blockquote, pre, table, .callout, .code-block, .yy-fold-block, .yy-highlight-block, hr) {
+.yy-content :where(p, ul, ol, blockquote, pre, table, .callout, .code-block, .yy-fold-block, .yy-highlight-block, .yy-columns, hr) {
   margin: 0.75em 0;
+}
+
+/* Columns have no reading chrome. Constrain their children, including wide tables and code. */
+.yy-columns { min-width: 0; }
+.yy-columns-grid { display: grid; gap: 24px; }
+.yy-column { min-width: 0; container: yy-column / inline-size; }
+.yy-column > :first-child { margin-top: 0; }
+.yy-column > :last-child { margin-bottom: 0; }
+@media (max-width: 720px) {
+  .yy-columns, .yy-columns-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 /* Neutral folding cards and soft highlight blocks, shared by the reader and editor. */
@@ -453,6 +463,19 @@ pre:hover > .yy-copy {
   line-height: 1.5;
   cursor: pointer;
   user-select: none;
+}
+.code-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@container yy-column (max-width: 480px) {
+  .code-block .code-title {
+    display: grid; grid-template-columns: 15px minmax(0, 1fr) 28px 28px;
+    gap: 4px; padding: 8px 12px;
+  }
+  .code-title::before { grid-area: 1 / 1; }
+  .code-title-text { grid-area: 1 / 2 / 2 / -1; margin-right: 56px; }
+  .code-title > .code-lang { grid-area: 2 / 1 / 3 / 3; margin-left: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .code-title > .yy-code-wrap-btn { grid-area: 2 / 3; padding: 0; justify-content: center; }
+  .code-title > .yy-copy { grid-area: 2 / 4; padding: 0; justify-content: center; }
+  .code-title > :is(.yy-code-wrap-btn, .yy-copy) > span { display: none; }
 }
 /* The editor's arrow (lucide ChevronDown), drawn as a mask so it stays sharp at any pixel density. */
 .code-title::before {

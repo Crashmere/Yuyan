@@ -116,6 +116,11 @@ func changeBlocks(root Node) []changeBlock {
 		case "imageBoard":
 			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
 			media(n, context)
+		case "columns":
+			add(Node{Type: n.Type, Attrs: map[string]any{"widths": n.Attrs["widths"], "count": len(n.Content)}}, context)
+			for _, child := range n.Content {
+				walk(child, context+n.Type)
+			}
 		case "foldBlock", "highlightBlock":
 			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
 			for _, child := range n.Content {
@@ -249,6 +254,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			return "折叠块标题"
 		case "highlightBlock":
 			return "高亮块"
+		case "columns":
+			return "分栏"
 		default:
 			return "正文"
 		}
@@ -277,6 +284,10 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			return false
 		}
 		switch n.Type {
+		case "columns":
+			if attrsChanged("widths", "count") {
+				add("调整分栏布局", places...)
+			}
 		case "foldBlock":
 			if attrsChanged("collapsed") {
 				add("调整折叠块状态", places...)

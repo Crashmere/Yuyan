@@ -12,6 +12,7 @@ import { withTitles } from './codeBlock'
 import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignment'
 import { imageFrame } from './imageStyle'
 import { cropImageStyle, imageFrameStyle, parseRect, rect, rectText, storedCrop } from './imageGeometry'
+import { Columns, Column } from './columns'
 import { ImageBoard } from './imageBoard'
 import { CellBackground, TextColor, TextHighlight } from './colors'
 import { imageElement, withImageCaption } from './imageCaption'
@@ -132,6 +133,7 @@ export interface SchemaOverrides {
   table?: AnyExtension
   imageBoard?: AnyExtension
   foldBlock?: AnyExtension
+  columns?: AnyExtension
 }
 
 export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
@@ -171,6 +173,8 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     FoldTitle,
     FoldContent,
     HighlightBlock,
+    o.columns ?? Columns,
+    Column,
     o.inlineMath ?? InlineMath,
     o.blockMath ?? BlockMath,
   ]

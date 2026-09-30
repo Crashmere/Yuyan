@@ -36,6 +36,11 @@ const collapsed = computed(() => titled.value && !!props.node.attrs.collapsed)
 // document.
 const titleText = ref(String(props.node.attrs.title ?? ''))
 const titleInput = ref<HTMLInputElement | null>(null)
+const titleBar = ref<HTMLElement | null>(null)
+const titleHeight = ref(40)
+const titleObserver = new ResizeObserver(entries => { titleHeight.value = entries[0]?.borderBoxSize[0]?.blockSize ?? titleBar.value?.offsetHeight ?? 40 })
+watch(titleBar, el => { titleObserver.disconnect(); if (el) titleObserver.observe(el) })
+onBeforeUnmount(() => titleObserver.disconnect())
 watch(
   () => props.node.attrs.title,
   (t) => {
@@ -166,7 +171,7 @@ onMounted(() => {
         const state = props.editor.state, { $from, from, to } = state.selection
         let selection: Selection = new AllSelection(state.doc)
         for (let d = $from.depth; d > 0; d--) {
-          if (!['codeBlock', 'callout', 'tableCell', 'tableHeader'].includes($from.node(d).type.name)) continue
+          if (!['codeBlock', 'callout', 'tableCell', 'tableHeader', 'foldBlock', 'highlightBlock', 'column', 'columns'].includes($from.node(d).type.name)) continue
           if ($from.start(d) < from || $from.end(d) > to) { selection = TextSelection.between(state.doc.resolve($from.start(d)), state.doc.resolve($from.end(d))); break }
         }
         props.editor.view.dispatch(state.tr.setSelection(selection)); props.editor.view.focus(); return true
@@ -237,8 +242,8 @@ async function copy() {
 </script>
 
 <template>
-  <node-view-wrapper class="yy-codeblock" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed, 'is-wrapped': wrapped }">
-    <div v-if="titled" class="yy-codeblock-title" contenteditable="false">
+  <node-view-wrapper class="yy-codeblock" :style="{ '--code-title-height': `${titleHeight}px` }" :class="{ 'is-mermaid': isMermaid, 'has-title': titled, 'is-collapsed': collapsed, 'is-wrapped': wrapped }">
+    <div v-if="titled" ref="titleBar" class="yy-codeblock-title" contenteditable="false">
       <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :data-tip="collapsed ? '展开代码' : '收起代码'" @click="toggle">
         <ChevronDown :size="15" />
       </button>

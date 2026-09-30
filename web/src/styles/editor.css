@@ -908,7 +908,7 @@ body.yy-row-dragging * {
   top: 0;
 }
 .yy-codeblock.has-title > .code-tab {
-  top: 40px;
+  top: var(--code-title-height, 40px);
 }
 
 /* The title bar of a titled block (schema/codeBlock.ts), as in Yuque. */
@@ -971,7 +971,6 @@ body.yy-row-dragging * {
   .yy-codeblock-title { flex-wrap: wrap; height: 72px; gap: 0 6px; padding-top: 4px; padding-bottom: 4px; }
   .yy-codeblock-name { flex-basis: calc(100% - 32px); }
   .yy-codeblock-title .yy-codeblock-btn > span { display: none; }
-  .yy-codeblock.has-title > .code-tab { top: 72px; }
 }
 .yy-lang-panel {
   z-index: 70;
@@ -1437,3 +1436,30 @@ body.yy-row-dragging * {
 @media (prefers-reduced-motion: reduce) { .yy-color-arrow svg, .yy-color-more > svg { transition: none; } }
 .yy-table-header-option { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--yy-text-2); }
 .yy-table-header-option input { accent-color: var(--yy-primary); }
+
+.yy-columns-editor { position: relative; }
+.yy-column-handles { position: absolute; inset: 0; pointer-events: none; }
+.yy-column-resize {
+  position: absolute; top: 0; bottom: 0; width: 16px; margin-left: -8px;
+  border: 0; padding: 0; background: transparent; cursor: col-resize;
+  pointer-events: auto; touch-action: none;
+}
+.yy-column-resize::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 7px; width: 1px;
+  background: var(--yy-border); opacity: 0; transition: opacity .15s;
+}
+.yy-columns-editor:hover > .yy-column-handles > .yy-column-resize::after { opacity: 1; }
+.yy-column-resize:hover::after, .is-resizing > .yy-column-handles > .yy-column-resize::after { background: var(--yy-primary); opacity: 1; }
+.ProseMirror .yy-column > p:has(> .ProseMirror-trailingBreak:only-child):only-child::before {
+  content: '在此输入内容'; float: left; height: 0; color: var(--yy-text-3); pointer-events: none;
+}
+@media (max-width: 720px) { .yy-column-handles { display: none; } }
+@media (prefers-reduced-motion: reduce) { .yy-column-resize::after { transition: none; } }
+@container yy-column (max-width: 480px) {
+  .yy-codeblock-title { flex-wrap: wrap; height: auto; min-height: 72px; gap: 0 4px; padding-top: 4px; padding-bottom: 4px; }
+  .yy-codeblock-name { flex-basis: calc(100% - 32px); }
+  .yy-codeblock-title .yy-codeblock-btn > span { display: none; }
+  .yy-codeblock-bar { overflow-x: auto; }
+  .yy-codeblock-bar > * { flex-shrink: 0; }
+  .yy-codeblock-title .yy-lang-trigger { max-width: 100%; }
+}

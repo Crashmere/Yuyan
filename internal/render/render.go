@@ -215,6 +215,24 @@ func (r *renderer) node(n doc.Node) {
 		r.wrap("summary", [][2]string{{"class", "yy-fold-title"}}, n)
 	case "foldContent":
 		r.wrap("div", [][2]string{{"class", "yy-fold-content"}, {"data-fold-content", ""}}, n)
+	case "columns":
+		widths := doc.ColumnWidths(n)
+		tracks, values := []string{}, []string{}
+		for i := range n.Content {
+			weight := 1
+			if widths != nil {
+				weight = widths[i]
+			}
+			tracks = append(tracks, "minmax(0, "+strconv.Itoa(weight)+"fr)")
+			values = append(values, strconv.Itoa(weight))
+		}
+		attrs := [][2]string{{"class", "yy-columns"}, {"data-columns", ""}, {"style", "display: grid; grid-template-columns: " + strings.Join(tracks, " ") + "; gap: 24px"}}
+		if widths != nil {
+			attrs = append(attrs, [2]string{"data-column-widths", strings.Join(values, ",")})
+		}
+		r.wrap("div", attrs, n)
+	case "column":
+		r.wrap("div", [][2]string{{"class", "yy-column"}, {"data-column", ""}, {"style", "min-width: 0"}}, n)
 	case "highlightBlock":
 		color, dark := doc.HighlightBlockColor(n.Attr("backgroundColor"))
 		r.wrap("div", [][2]string{{"class", "yy-highlight-block"}, {"data-highlight-block", color}, {"style", "background-color: " + color + "; background-color: light-dark(" + color + ", " + dark + ")"}}, n)

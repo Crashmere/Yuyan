@@ -13,6 +13,7 @@ import { shiftHeadingLevel } from './headingLevels'
 import { textMarkActive } from './textSelection'
 import TextColorMenu from './TextColorMenu.vue'
 import TableTools from './TableTools.vue'
+import ColumnTools from './ColumnTools.vue'
 import FormatPainterButton from './FormatPainterButton.vue'
 import FormatIcon from './FormatIcon.vue'
 
@@ -110,6 +111,7 @@ const insertMenu = computed<MenuEntry[]>(() => {
       <span class="yy-toolbar-sep"></span>
       <AlignmentMenu />
       <TableTools />
+      <ColumnTools />
       <IconButton
         v-for="m in listButtons"
         :key="m.name"

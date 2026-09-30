@@ -36,7 +36,7 @@ var nodeTypes = map[string]bool{
 	"table": true, "tableRow": true, "tableHeader": true, "tableCell": true,
 	"callout": true, "calloutTitle": true, "calloutContent": true,
 	"foldBlock": true, "foldTitle": true, "foldContent": true, "highlightBlock": true,
-	"inlineMath": true, "blockMath": true,
+	"inlineMath": true, "blockMath": true, "columns": true, "column": true,
 }
 
 var markTypes = map[string]bool{
@@ -86,8 +86,33 @@ func validate(n Node, depth int) error {
 	if n.Type == "foldBlock" && (len(n.Content) != 2 || n.Content[0].Type != "foldTitle" || n.Content[1].Type != "foldContent") {
 		return errors.New("fold block must contain a title and content")
 	}
-	if (n.Type == "foldContent" || n.Type == "highlightBlock") && len(n.Content) == 0 {
+	if (n.Type == "foldContent" || n.Type == "highlightBlock" || n.Type == "column") && len(n.Content) == 0 {
 		return errors.New("block container must contain at least one block")
+	}
+	if n.Type == "columns" {
+		if len(n.Content) < 2 || len(n.Content) > 4 {
+			return errors.New("columns must contain 2 to 4 columns")
+		}
+		if n.Attrs["widths"] != nil && ColumnWidths(n) == nil {
+			return errors.New("invalid column widths")
+		}
+		for _, child := range n.Content {
+			if child.Type != "column" {
+				return errors.New("columns children must be columns")
+			}
+		}
+	}
+	for _, child := range n.Content {
+		if child.Type == "column" && n.Type != "columns" {
+			return errors.New("column must belong to columns")
+		}
+		if n.Type == "column" {
+			switch child.Type {
+			case "paragraph", "heading", "horizontalRule", "blockquote", "bulletList", "orderedList", "taskList", "codeBlock", "imageBoard", "table", "callout", "foldBlock", "highlightBlock", "blockMath", "columns":
+			default:
+				return errors.New("column children must be blocks")
+			}
+		}
 	}
 	for _, m := range n.Marks {
 		if !markTypes[m.Type] {

@@ -20,7 +20,7 @@ const nested: NestedOptions = {
   defaultRules: false,
   rules: [{
     id: 'containerBodyBlocks',
-    evaluate: ({ node, parent }) => node.isBlock && ['doc', 'highlightBlock', 'foldContent'].includes(parent?.type.name ?? '') ? 0 : 1000,
+    evaluate: ({ node, parent }) => node.isBlock && ['doc', 'highlightBlock', 'foldContent', 'column'].includes(parent?.type.name ?? '') ? 0 : 1000,
   }],
 }
 // As in Feishu, the grip of a heading shows its level.

@@ -104,6 +104,9 @@ function addTitleBar(pre: HTMLElement, language: string | undefined, text: strin
   // Exported HTML also hides the saved title without this site's stylesheet. Once enhanced,
   // no-title owns visibility so the reading-page tab can show the preserved text again.
   bar.removeAttribute('hidden')
+  const titleText = Object.assign(document.createElement('span'), { className: 'code-title-text' })
+  titleText.append(...bar.childNodes)
+  bar.append(titleText)
   const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
   label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language ?? ''))?.label ?? language ?? '纯文本'
   bar.appendChild(label)
