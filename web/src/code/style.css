@@ -3,8 +3,8 @@
 .yy-code-editor-host .cm-scroller { overflow-x: auto; font-family: inherit; }
 .yy-code-editor-host .cm-content { padding: 12px 0; caret-color: #abb2bf; }
 .yy-code-editor-host .cm-line { padding: 0 16px 0 6px; }
-.yy-code-editor-host .cm-gutters { border: 0; background: var(--yy-codeblock-bg); color: var(--yy-codeblock-muted); user-select: none; }
-.yy-code-editor-host .cm-lineNumbers .cm-gutterElement { min-width: 2.7em; padding: 0 6px 0 10px; cursor: default; }
+.yy-code-editor-host .cm-gutters { border: 0; border-right: 1px solid var(--yy-codeblock-line); background: var(--yy-codeblock-bg); color: var(--yy-codeblock-muted); user-select: none; }
+.yy-code-editor-host .cm-lineNumbers .cm-gutterElement { min-width: 2.4em; padding: 0 6px; cursor: default; }
 .yy-code-editor-host .cm-foldGutter .cm-gutterElement { padding: 0 4px; width: 18px; }
 .yy-code-editor-host .cm-activeLine, .yy-code-editor-host .cm-activeLineGutter { background: #ffffff05; }
 .yy-code-editor-host .cm-focused { outline: none; }

@@ -236,6 +236,7 @@
 /* On reading pages (enhance.ts) the code scrolls inside the block, so the copy button in the
    corner stays put instead of scrolling away with long lines. */
 .yy-content pre[data-enhanced] {
+  padding-left: 8px;
   overflow-x: visible;
 }
 .yy-content pre[data-enhanced] > code {
@@ -262,13 +263,15 @@
   left: 0;
   z-index: 1;
   flex: none;
-  width: 4em;
+  width: 3.5em;
+  margin-right: 6px;
+  border-right: 1px solid var(--yy-codeblock-line);
   background: var(--yy-codeblock-bg);
   user-select: none;
 }
 .yy-code-gutter::before {
   position: absolute;
-  left: 12px;
+  left: 0;
   width: 2.2em;
   color: var(--yy-codeblock-muted);
   text-align: right;
@@ -384,8 +387,8 @@ pre:hover > .yy-copy {
 .code-block.no-title:hover > .yy-code-actions { opacity: 1; }
 .code-block.no-title > pre > .yy-copy { right: 67px; }
 .yy-code-region-fold, .yy-code-line-select { position: absolute; top: 0; height: 1.65em; padding: 0; border: 0; color: var(--yy-codeblock-muted); background: none; font: inherit; cursor: pointer; user-select: none; }
-.yy-code-region-fold { left: 0; width: 14px; }
-.yy-code-line-select { left: 14px; width: 2.2em; cursor: default; }
+.yy-code-region-fold { right: 2px; width: 14px; }
+.yy-code-line-select { left: 0; width: 2.2em; cursor: default; }
 .yy-code-region-fold:hover { color: var(--yy-codeblock-title); }
 .yy-code-region-placeholder { margin: 0 6px; padding: 0 5px; border: 1px solid #ffffff20; border-radius: 3px; background: #ffffff0b; color: var(--yy-codeblock-muted); font: 11px/1.5 var(--yy-font); cursor: pointer; user-select: none; }
 .yy-code-line-hidden { display: none !important; }
