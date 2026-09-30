@@ -460,11 +460,16 @@ func alignmentMargins(align string) string {
 func (r *renderer) codeBlock(n doc.Node) {
 	if title, ok := n.Attrs["title"].(string); ok {
 		class := "code-block"
-		if collapsed, _ := n.Attrs["collapsed"].(bool); collapsed {
+		var titleAttrs = [][2]string{{"class", "code-title"}}
+		if n.AttrBool("titleHidden") {
+			class += " no-title"
+			titleAttrs = append(titleAttrs, [2]string{"hidden", ""})
+		} else if n.AttrBool("collapsed") {
 			class += " is-collapsed"
 		}
 		r.open("div", [][2]string{{"class", class}})
-		r.b.WriteString(`<div class="code-title">` + html.EscapeString(title) + "</div>")
+		r.open("div", titleAttrs)
+		r.b.WriteString(html.EscapeString(title) + "</div>")
 		r.code(n)
 		r.b.WriteString("</div>")
 		return

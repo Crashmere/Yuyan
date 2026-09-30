@@ -82,7 +82,7 @@ const groups: { id: string; title: string; description: string; items: [string, 
     id: 'code',
     title: '代码块',
     description: 'JetBrains 默认方案 · 在编辑模式的代码区内生效。',
-    items: codeShortcutRows(),
+    items: [['标题进入代码区', 'Tab'], ...codeShortcutRows()],
   },
   { id: 'markdown', title: 'Markdown', description: '在行首或文字两侧输入符号；标有空格或回车的项目需再按对应按键。', items: [] },
 ]

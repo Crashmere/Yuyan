@@ -967,6 +967,12 @@ body.yy-row-dragging * {
   background: none;
   color: var(--yy-codeblock-muted);
 }
+@media (max-width: 640px) {
+  .yy-codeblock-title { flex-wrap: wrap; height: 72px; gap: 0 6px; padding-top: 4px; padding-bottom: 4px; }
+  .yy-codeblock-name { flex-basis: calc(100% - 32px); }
+  .yy-codeblock-title .yy-codeblock-btn > span { display: none; }
+  .yy-codeblock.has-title > .code-tab { top: 72px; }
+}
 .yy-lang-panel {
   z-index: 70;
   width: 250px;

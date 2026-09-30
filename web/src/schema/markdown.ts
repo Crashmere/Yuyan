@@ -185,8 +185,8 @@ class Converter {
 
   private code(n: Code): JSONContent {
     const language = normalizeLanguage(n.lang ?? '')
-    const { title, collapsed } = parseCodeMeta(n.meta)
-    const node: JSONContent = { type: 'codeBlock', attrs: { language: language || null, ...(title !== null ? { title, collapsed } : {}) } }
+    const { title, collapsed, titleHidden } = parseCodeMeta(n.meta)
+    const node: JSONContent = { type: 'codeBlock', attrs: { language: language || null, ...(title !== null ? { title, collapsed, titleHidden } : {}) } }
     if (n.value) node.content = [{ type: 'text', text: n.value }]
     return node
   }
@@ -502,7 +502,7 @@ class Exporter {
         }]
       case 'codeBlock': {
         // A fence needs a language before the title; "text" reads back as no language.
-        const meta = codeMeta(n.attrs?.title, n.attrs?.collapsed)
+        const meta = codeMeta(n.attrs?.title, n.attrs?.collapsed, n.attrs?.titleHidden)
         return [{ type: 'code', lang: (n.attrs?.language as string) || (meta ? 'text' : null), meta, value: textOf(n) }]
       }
       case 'blockMath':

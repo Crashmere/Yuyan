@@ -6,7 +6,8 @@ export function installTabPolicy() {
   window.addEventListener('keydown', event => {
     if (!isTab(event)) return
     const target = event.target
-    if (target instanceof HTMLElement && target.isContentEditable && target.closest('.ProseMirror, .cm-content')) return
+    if (target instanceof HTMLElement && target.closest('.ProseMirror, .cm-content') &&
+      (target.isContentEditable || target.hasAttribute('data-editor-tab'))) return
     event.preventDefault()
     event.stopImmediatePropagation()
   }, true)

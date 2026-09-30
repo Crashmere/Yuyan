@@ -30,7 +30,7 @@ function refocus() {
 }
 
 // The title bar, as in Yuque (schema/codeBlock.ts): a title, and an arrow that collapses the code.
-const titled = computed(() => typeof props.node.attrs.title === 'string')
+const titled = computed(() => typeof props.node.attrs.title === 'string' && !props.node.attrs.titleHidden)
 const collapsed = computed(() => titled.value && !!props.node.attrs.collapsed)
 // v-model waits for the end of Chinese input composition, so partial pinyin never reaches the
 // document.
@@ -43,17 +43,25 @@ watch(
   },
 )
 watch(titleText, (t) => {
-  if (titled.value && t !== props.node.attrs.title) props.updateAttributes({ title: t })
+  if (typeof props.node.attrs.title === 'string' && t !== props.node.attrs.title) props.updateAttributes({ title: t })
 })
 
+function setTitleHidden(titleHidden: boolean) {
+  const pos = props.getPos()
+  if (typeof pos !== 'number') return
+  const tr = props.editor.state.tr.setNodeMarkup(pos, undefined, { ...props.node.attrs, title: titleText.value, titleHidden, collapsed: false })
+  props.editor.view.dispatch(closeHistory(tr))
+  props.editor.view.dispatch(closeHistory(props.editor.state.tr))
+}
+
 async function showTitle() {
-  props.updateAttributes({ title: '' })
+  setTitleHidden(false)
   await nextTick()
   titleInput.value?.focus()
 }
 
 function hideTitle() {
-  props.updateAttributes({ title: null, collapsed: false })
+  setTitleHidden(true)
 }
 
 function toggle() {
@@ -65,6 +73,17 @@ function toggle() {
 function titleEntered() {
   if (collapsed.value) titleInput.value?.blur()
   else refocus()
+}
+
+async function titleKey(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return
+  if (event.key !== 'Tab' && event.key !== 'Enter') return
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.key === 'Enter') { titleEntered(); return }
+  if (collapsed.value) props.updateAttributes({ collapsed: false })
+  await nextTick()
+  code.value?.setSelection(0, 0, true)
 }
 
 const codeHost = ref<HTMLElement | null>(null)
@@ -223,7 +242,7 @@ async function copy() {
       <button type="button" class="yy-codeblock-toggle" :aria-label="collapsed ? '展开代码' : '收起代码'" :aria-expanded="!collapsed" :data-tip="collapsed ? '展开代码' : '收起代码'" @click="toggle">
         <ChevronDown :size="15" />
       </button>
-      <input ref="titleInput" v-model="titleText" class="yy-codeblock-name" placeholder="代码块标题" aria-label="代码块标题" @keydown.enter.prevent="titleEntered" />
+      <input ref="titleInput" v-model="titleText" class="yy-codeblock-name" data-editor-tab placeholder="代码块标题" aria-label="代码块标题" @keydown="titleKey" />
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
       <button type="button" class="yy-codeblock-btn yy-code-wrap-btn" aria-label="自动换行" :aria-pressed="wrapped" :data-tip="wrapped ? '关闭自动换行' : '开启自动换行'" @mousedown.prevent @click="toggleWrap">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="codeIcons.wrap" /></svg><span>自动换行</span>

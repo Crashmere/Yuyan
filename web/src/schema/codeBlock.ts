@@ -1,9 +1,8 @@
 import type { JSONContent, Node } from '@tiptap/core'
 
 // Code blocks as in Yuque: an optional title bar with a title, and whether the block starts
-// collapsed. title null means no title bar; '' shows the bar without a title. A collapsed block
-// needs its bar to open again, so collapsed implies a title. Blocks without a bar keep their old
-// HTML; titled ones are wrapped as
+// collapsed. title null means no title; '' is an empty title. titleHidden hides the bar while
+// keeping its text. A collapsed block needs a visible bar to open again. Titled blocks wrap as
 //   <div class="code-block[ is-collapsed]"><div class="code-title">…</div><pre>…</pre></div>
 // which internal/render writes the same way.
 export function withTitles<T extends Node>(base: T) {
@@ -15,6 +14,11 @@ export function withTitles<T extends Node>(base: T) {
           default: null,
           rendered: false,
           parseHTML: (el: HTMLElement) => (el.matches('div.code-block') ? (el.querySelector(':scope > .code-title')?.textContent ?? '') : null),
+        },
+        titleHidden: {
+          default: false,
+          rendered: false,
+          parseHTML: (el: HTMLElement) => el.matches('div.code-block.no-title'),
         },
         collapsed: {
           default: false,
@@ -36,9 +40,10 @@ export function withTitles<T extends Node>(base: T) {
     },
     renderHTML(props) {
       const pre = this.parent!(props)
-      const { title, collapsed } = props.node.attrs
+      const { title, collapsed, titleHidden } = props.node.attrs
       if (typeof title !== 'string') return pre
-      return ['div', { class: collapsed ? 'code-block is-collapsed' : 'code-block' }, ['div', { class: 'code-title' }, title], pre]
+      const className = titleHidden ? 'code-block no-title' : collapsed ? 'code-block is-collapsed' : 'code-block'
+      return ['div', { class: className }, ['div', { class: 'code-title', ...(titleHidden ? { hidden: '' } : {}) }, title], pre]
     },
   })
 }
@@ -61,7 +66,7 @@ export function codeFromCallout(callout: JSONContent): JSONContent | null {
 // escapes and entities in this line (remark writes the backslashes that need it), so a title keeps
 // its quotes by choosing the other kind, or &quot; when it has both, and protects an & that would
 // read as an entity.
-export function codeMeta(title: unknown, collapsed: unknown): string | null {
+export function codeMeta(title: unknown, collapsed: unknown, titleHidden: unknown = false): string | null {
   if (typeof title !== 'string') return null
   let text = title.replace(/&(?=#?\w+;)/g, '&amp;')
   let quote = '"'
@@ -69,14 +74,15 @@ export function codeMeta(title: unknown, collapsed: unknown): string | null {
     if (text.includes("'")) text = text.replace(/"/g, '&quot;')
     else quote = "'"
   }
-  return `title=${quote}${text}${quote}${collapsed ? ' collapsed' : ''}`
+  return `title=${quote}${text}${quote}${collapsed ? ' collapsed' : ''}${titleHidden ? ' title-hidden' : ''}`
 }
 
 // Reads codeMeta's form, as Markdown hands it over decoded, and a title among other settings.
-export function parseCodeMeta(meta: string | null | undefined): { title: string | null; collapsed: boolean } {
-  const exact = /^title=(["'])(.*)\1( collapsed)?$/.exec(meta ?? '')
-  if (exact) return { title: exact[2], collapsed: !!exact[3] }
+export function parseCodeMeta(meta: string | null | undefined): { title: string | null; collapsed: boolean; titleHidden: boolean } {
+  const flags = (text: string) => ({ collapsed: /(?:^|\s)collapsed(?:\s|$)/.test(text), titleHidden: /(?:^|\s)title-hidden(?:\s|$)/.test(text) })
+  const exact = /^title=(["'])(.*)\1((?: (?:collapsed|title-hidden))*)$/.exec(meta ?? '')
+  if (exact) return { title: exact[2], ...flags(exact[3]) }
   const m = /(?:^|\s)title=(["'])(.*?)\1/.exec(meta ?? '')
-  if (!m) return { title: null, collapsed: false }
-  return { title: m[2], collapsed: /(?:^|\s)collapsed(?:\s|$)/.test((meta ?? '').replace(m[0], ' ')) }
+  if (!m) return { title: null, collapsed: false, titleHidden: false }
+  return { title: m[2], ...flags((meta ?? '').replace(m[0], ' ')) }
 }

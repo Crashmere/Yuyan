@@ -119,7 +119,7 @@ export const insertItems: InsertItem[] = [
   { id: 'code', label: '代码块', description: '带语法高亮的代码', icon: SquareCode, group: '插入', markdown: '```', syntax: ['~~~'], pinyin: 'dai ma kuai', keywords: 'dmk code', run: (e) => e.chain().focus().toggleCodeBlock().run() },
   {
     id: 'titledCode', label: '带标题的代码块', description: '有标题栏，可以收起', icon: SquareCode, group: '插入', syntax: ['```', '~~~', '``` title=', '~~~ title='], pinyin: 'dai biao ti de dai ma kuai', keywords: 'dbtddmk btdmk code title',
-    run: (e) => e.chain().focus().toggleCodeBlock().updateAttributes('codeBlock', { title: '' }).run(),
+    run: (e) => e.chain().focus().toggleCodeBlock().updateAttributes('codeBlock', { title: '', titleHidden: false }).run(),
   },
   {
     id: 'mermaid', label: 'Mermaid 图表', description: '用文字画流程图、时序图', icon: Workflow, group: '插入', markdown: '```mermaid', syntax: ['~~~mermaid'], pinyin: 'mermaid tu biao', keywords: 'mermaid tb chart diagram lct',
