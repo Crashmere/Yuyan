@@ -4,7 +4,9 @@ import { isNavigationFailure, NavigationFailureType, RouterView, useRoute, useRo
 import { prefs } from '../prefs'
 import { pageShortcutAllowed } from '../pageShortcut'
 import { openSearch, searchLoaded } from '../search/panel'
-import { state } from '../store'
+import { locate, state } from '../store'
+import { newDoc } from '../actions'
+import { altLetter } from '../../shared/keyboard'
 import { openShortcuts, shortcutsLoaded, shortcutsOpen } from '../shortcuts/panel'
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
@@ -15,10 +17,22 @@ const ShortcutsDialog = defineAsyncComponent(() => import('../shortcuts/Shortcut
 
 const route = useRoute()
 const router = useRouter()
+let creatingDoc = false
 
 // Cmd/Ctrl+K opens the search panel everywhere, including in the editor.
 function onKey(e: KeyboardEvent) {
   if (e.defaultPrevented || e.repeat || e.isComposing) return
+  if (altLetter(e, 'n') && (route.name === 'doc' || route.name === 'book') && pageShortcutAllowed(e)) {
+    if (state.bookId === null || state.navigating || state.loading || Number(route.params.id) !== (route.name === 'doc' ? state.docId : state.bookId)) return
+    const current = route.name === 'doc' ? locate(state.bookId, state.docId)?.node : undefined
+    if (route.name === 'doc' && !current) return
+    e.preventDefault()
+    if (!creatingDoc) {
+      creatingDoc = true
+      void newDoc(state.bookId, current?.kind === 'group' ? current.id : current?.parentId ?? null).finally(() => { creatingDoc = false })
+    }
+    return
+  }
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key === '/') {
     // CodeMirror owns Mod-/ for line comments; every other page and input opens help.
     if (e.target instanceof Element && e.target.closest('.cm-editor')) return

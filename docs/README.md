@@ -8,6 +8,8 @@
 
 日常发布与验证按 [本机发布说明](DEPLOYMENT.md) 执行；GitHub 只作源码备份。
 
+新建与选区快捷键见 DESIGN.md 第 22 节：阅读时 Option/Alt+N 在当前目录新建文档；编辑时 Option/Alt+L 逐层扩大选区，Option/Alt+Shift+L 逐层缩回，覆盖正文、嵌套内容与代码语法层级。
+
 图片裁切、互补切分、可选参数及四种范围的批量应用、图片组合画板见 DESIGN.md 19.2–19.3；格式兼容与验证见 OPERATIONS.md。
 
 Markdown 之外的格式扩展第一批见 DESIGN.md 第 23 节：文字颜色、图片说明、合并/拆分单元格、单元格底色与可选表头。分栏见 DESIGN.md 23.7；附件与通用画板分到后续批次。

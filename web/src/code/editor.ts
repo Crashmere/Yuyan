@@ -11,6 +11,8 @@ import { codeHash, readCodePreferences, saveCodePreferences, type CodePreference
 import { codeSearchPanel, openCodeSearch } from './search'
 import { formatLanguage } from './formatLanguage'
 import { codeKeys } from './keymap'
+import { codeSelectionHistory, resizeCodeSelection } from './expandSelection'
+import { altLetter } from '../shared/keyboard'
 import './style.css'
 
 const externalMatches = StateEffect.define<{ from: number; to: number; current: boolean }[]>()
@@ -31,6 +33,7 @@ export interface CodeEditorOptions {
   readOnly?: boolean
   onUpdate?: (update: ViewUpdate) => void
   keys?: KeyBinding[]
+  onResizeSelection?: (shrink: boolean) => void
   onPreferences?: (preferences: CodePreferences) => void
 }
 
@@ -74,7 +77,13 @@ export class CodeEditor {
       window.addEventListener('mousemove', move); window.addEventListener('mouseup', stop); window.addEventListener('blur', stop)
       return true
     }
+    const resizeSelection = (view: EditorView, shrink: boolean) => {
+      if (options.onResizeSelection) options.onResizeSelection(shrink)
+      else resizeCodeSelection(view, shrink)
+      return true
+    }
     const commands: Record<string, (view: EditorView) => boolean> = {
+      expand: view => resizeSelection(view, false), shrink: view => resizeSelection(view, true),
       find: openCodeSearch,
       replace: view => { openCodeSearch(view); view.dom.querySelector<HTMLInputElement>('[aria-label="代码替换为"]')?.focus(); return true },
       format: () => { void this.format(); return true }, indent: indentMore, unindent: indentLess,
@@ -110,8 +119,12 @@ export class CodeEditor {
       this.language.of([]), this.wrapping.of(this.preferences.wrapped ? EditorView.lineWrapping : []),
       indentUnit.of('    '), EditorState.tabSize.of(4), indentOnInput(), bracketMatching(), closeBrackets(),
       autocompletion(), rectangularSelection(), drawSelection(), highlightActiveLine(), oneDark, syntaxHighlighting(classHighlighter),
-      search({ top: true, createPanel: codeSearchPanel }), externalHighlights,
+      search({ top: true, createPanel: codeSearchPanel }), externalHighlights, codeSelectionHistory,
       EditorState.phrases.of({ 'Fold line': '折叠代码区域', 'Unfold line': '展开代码区域' }),
+      Prec.highest(EditorView.domEventHandlers({ keydown: (event, view) => {
+        if (view.composing || !altLetter(event, 'l', event.shiftKey)) return false
+        return resizeSelection(view, event.shiftKey)
+      } })),
       Prec.highest(keymap.of(keys)),
       EditorView.updateListener.of(update => {
         if (update.docChanged) this.version++

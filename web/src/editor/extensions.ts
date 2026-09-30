@@ -23,6 +23,7 @@ import { MarkdownPaste } from './markdownPaste'
 import { Search } from './search'
 import { SlashCommand } from './slash'
 import { SelectWithin } from './selectWithin'
+import { ExpandSelection } from './expandSelection'
 import { fixColumnWidths, followColumnBorder, FramedTableView, TableShape } from './tables'
 import { resizeHitWidth, rowResizing, withResizeDelay } from './tableResize'
 import { tableControls } from './tableControls'
@@ -109,6 +110,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     Search,
     TableShape,
     SelectWithin,
+    ExpandSelection,
     FormatPainter,
     UiShortcuts.configure({ openFind: ui.openFind }),
   ]
