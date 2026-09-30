@@ -13,7 +13,6 @@ import { setTitle } from '../router'
 import { editing, invalidateTree, loading, loadTree, setNodeTitle, setPage } from '../store'
 import NotFoundState from './NotFoundState.vue'
 import { useModeShortcut } from '../modeShortcut'
-import { useEditingTab } from '../../editor/tabKey'
 import { moduleReloadGuard } from '../../shared/moduleLoad'
 
 const route = useRoute()
@@ -30,8 +29,6 @@ const words = ref(0)
 
 const saveBeforeReload = async () => !doc.value || (!!pane.value && status.value !== 'loading' && await pane.value.flush())
 moduleReloadGuard.value = saveBeforeReload
-
-useEditingTab()
 
 useModeShortcut('Escape', '连按两次 Esc 键保存并回到阅读模式', () => !!pane.value && status.value !== 'loading', () => {
   // Use the same route guard as 完成: wait for uploads and saves, then restore the reading position.

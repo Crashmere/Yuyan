@@ -7,7 +7,9 @@ import { applyPrefs } from './prefs'
 import { router } from './router'
 import { installTooltips } from '../ui/tooltip'
 import { installModuleLoadRecovery } from '../shared/moduleLoad'
+import { installTabPolicy } from '../shared/tabKey'
 
+installTabPolicy()
 installModuleLoadRecovery()
 applyPrefs()
 installTooltips()

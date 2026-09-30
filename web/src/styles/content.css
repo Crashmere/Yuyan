@@ -93,7 +93,6 @@
   transform: rotate(-45deg);
 }
 .yy-content > :hover > .yy-heading-tools,
-.yy-fold:focus-visible,
 .is-folded > .yy-fold {
   opacity: 1;
 }
@@ -142,7 +141,7 @@
 .yy-code-action:hover { background: var(--yy-codeblock-hover); color: var(--yy-codeblock-title); }
 .yy-code-menu { position: fixed; z-index: 90; display: grid; min-width: 190px; padding: 5px; border: 1px solid var(--yy-border); border-radius: 7px; background: var(--yy-bg-elevated); box-shadow: var(--yy-shadow-popover); font: 13px/1.5 var(--yy-font); }
 .yy-code-menu button { padding: 7px 9px; border: 0; border-radius: 4px; text-align: left; color: var(--yy-text); background: none; cursor: pointer; }
-.yy-code-menu button:hover, .yy-code-menu button:focus-visible { background: var(--yy-bg-hover); }
+.yy-code-menu button:hover { background: var(--yy-bg-hover); }
 .yy-code-menu { overflow: auto; overscroll-behavior: contain; }
 .yy-code-menu button:disabled { color: var(--yy-text-3); cursor: default; background: none; }
 .yy-code-dialog { position: fixed; inset: 24px; width: calc(100% - 48px); height: calc(100% - 48px); max-width: none; max-height: none; padding: 0; border: 1px solid #ffffff25; border-radius: 9px; background: var(--yy-codeblock-bg); color: var(--yy-codeblock-text); overflow: hidden; }
@@ -365,8 +364,7 @@ pre > .yy-copy > span {
 .yy-copy:hover {
   color: var(--yy-codeblock-title);
 }
-pre:hover > .yy-copy,
-.yy-copy:focus-visible {
+pre:hover > .yy-copy {
   opacity: 1;
 }
 
@@ -383,7 +381,7 @@ pre:hover > .yy-copy,
 .code-block > .yy-code-actions { position: absolute; top: 7px; right: 7px; z-index: 2; }
 .code-block .code-title { padding-right: 65px; }
 .code-block.no-title > .yy-code-actions { opacity: 0; transition: opacity .15s; }
-.code-block.no-title:hover > .yy-code-actions, .code-block > .yy-code-actions:focus-within { opacity: 1; }
+.code-block.no-title:hover > .yy-code-actions { opacity: 1; }
 .code-block.no-title > pre > .yy-copy { right: 67px; }
 .yy-code-region-fold, .yy-code-line-select { position: absolute; top: 0; height: 1.65em; padding: 0; border: 0; color: var(--yy-codeblock-muted); background: none; font: inherit; cursor: pointer; user-select: none; }
 .yy-code-region-fold { left: 0; width: 14px; }
@@ -473,8 +471,7 @@ pre:hover > .yy-copy,
 .code-tab:hover {
   background: #4b5263;
 }
-:is(.code-block, .yy-codeblock):hover .code-tab,
-.code-tab:focus-visible {
+:is(.code-block, .yy-codeblock):hover .code-tab {
   opacity: 1;
 }
 .code-lang {

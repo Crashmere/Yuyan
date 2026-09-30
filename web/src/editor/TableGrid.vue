@@ -41,7 +41,6 @@ onBeforeUnmount(() => {
           :class="{ on: r <= hover.r && c <= hover.c }"
           :aria-label="`${r} 行 ${c} 列`"
           @mouseenter="hover = { r, c }"
-          @focus="hover = { r, c }"
           @mousedown.prevent
           @click="emit('pick', r, c)"
         ></button>

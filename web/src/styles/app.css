@@ -29,9 +29,8 @@ button {
   color: inherit;
 }
 
-:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--yy-primary) 60%, transparent);
-  outline-offset: 1px;
+:focus {
+  outline: none;
 }
 
 ::selection {
@@ -159,10 +158,6 @@ button {
   font: inherit;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
-}
-.yy-input:focus {
-  border-color: var(--yy-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yy-primary) 18%, transparent);
 }
 .yy-textarea {
   height: auto;
@@ -719,7 +714,7 @@ a.yy-crumb:hover {
 .yy-menu-item .lucide {
   color: var(--yy-text-2);
 }
-.yy-menu-item[data-highlighted] {
+.yy-menu-item:hover:not([data-disabled]) {
   background: var(--yy-bg-hover);
 }
 .yy-menu-item[data-disabled] {
@@ -1410,7 +1405,6 @@ a.yy-crumb:hover {
   font-size: 12px;
 }
 .yy-book-card-link { position: absolute; inset: 0; border-radius: inherit; }
-.yy-book-card-link:focus-visible { outline: 2px solid var(--yy-primary); outline-offset: 2px; }
 .yy-book-card-menu { position: absolute; top: 12px; right: 10px; z-index: 1; }
 .yy-section-actions { display: flex; gap: 8px; }
 .yy-book-group { position: relative; isolation: isolate; transition: opacity 150ms; }
@@ -1857,8 +1851,7 @@ a.yy-catalog-title:hover {
     visibility: hidden;
     transition: opacity 0.15s 0.2s, visibility 0s 0.35s;
   }
-  .yy-toc.is-peek:hover .yy-toc-panel,
-  .yy-toc.is-peek:has(:focus-visible) .yy-toc-panel {
+  .yy-toc.is-peek:hover .yy-toc-panel {
     opacity: 1;
     visibility: visible;
     transition: opacity 0.15s 0.15s, visibility 0s 0.15s;
@@ -1956,8 +1949,7 @@ a.yy-catalog-title:hover {
   transform: rotate(-45deg);
 }
 .yy-toc:hover .yy-toc-caret,
-.yy-toc-caret.folded,
-.yy-toc-caret:focus-visible {
+.yy-toc-caret.folded {
   opacity: 1;
 }
 .yy-toc-caret:hover {
@@ -2172,10 +2164,6 @@ a.yy-catalog-title:hover {
   border-radius: var(--yy-radius-lg);
   background: var(--yy-bg);
   color: var(--yy-text-3);
-}
-.yy-search-box:focus-within {
-  border-color: var(--yy-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--yy-primary) 18%, transparent);
 }
 .yy-search-box input {
   flex: 1;

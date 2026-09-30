@@ -109,8 +109,6 @@ export function tableControls(): Plugin {
         if (insert) {
           b.addEventListener('pointerenter', () => { inserting = { axis, index }; schedule() })
           b.addEventListener('pointerleave', () => { inserting = null; schedule() })
-          b.addEventListener('focus', () => { inserting = { axis, index }; schedule() })
-          b.addEventListener('blur', () => { inserting = null; schedule() })
         }
         root.appendChild(b)
         buttons.push(b)
