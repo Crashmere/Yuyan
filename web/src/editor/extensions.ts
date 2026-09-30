@@ -34,6 +34,8 @@ import ImageBoardView from './views/ImageBoardView.vue'
 import { ImageBoard } from '../schema/imageBoard'
 import { managedNodeView } from './managedNodeView'
 import { FormatPainter } from './formatPainter'
+import { FoldBlock } from '../schema/blockContainers'
+import { BlockContainers, foldBlockView } from './blockContainers'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
 
@@ -41,6 +43,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
+      foldBlock: FoldBlock.extend({ addNodeView() { return foldBlockView } }),
       imageBoard: ImageBoard.extend({
         addOptions() { return { ui } },
         addNodeView() { return props => managedNodeView(VueNodeViewRenderer(ImageBoardView)(props)) },
@@ -99,6 +102,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     MarkdownShortcuts.configure({ editMath: (_editor, pos) => ui.openMath(pos, true) }),
     MarkdownPaste,
     CalloutKeys,
+    BlockContainers,
     Search,
     TableShape,
     SelectWithin,

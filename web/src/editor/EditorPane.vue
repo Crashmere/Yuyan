@@ -22,6 +22,7 @@ import LinkPopover from './LinkPopover.vue'
 import MathPopover from './MathPopover.vue'
 import TableGrid from './TableGrid.vue'
 import ImageToolbar from './ImageToolbar.vue'
+import HighlightBlockToolbar from './HighlightBlockToolbar.vue'
 import ImageToolsDialog from './ImageToolsDialog.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
@@ -441,6 +442,7 @@ onBeforeUnmount(() => {
     <MathPopover v-if="mathTarget" :key="mathTarget.pos" :pos="mathTarget.pos" :fresh="mathTarget.fresh" @close="mathTarget = null" />
     <TableGrid v-if="tableGrid" :anchor="tableGrid" @pick="insertTable" @close="tableGrid = null" />
     <ImageToolbar />
+    <HighlightBlockToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit || !!tableGrid || findOpen" />
     <ImageToolsDialog v-if="imageEdit" v-bind="imageEdit" @close="imageEdit = null" />
     <BlockHandle />
 

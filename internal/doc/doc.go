@@ -35,6 +35,7 @@ var nodeTypes = map[string]bool{
 	"listItem": true, "taskList": true, "taskItem": true, "codeBlock": true, "image": true, "imageBoard": true,
 	"table": true, "tableRow": true, "tableHeader": true, "tableCell": true,
 	"callout": true, "calloutTitle": true, "calloutContent": true,
+	"foldBlock": true, "foldTitle": true, "foldContent": true, "highlightBlock": true,
 	"inlineMath": true, "blockMath": true,
 }
 
@@ -81,6 +82,12 @@ func validate(n Node, depth int) error {
 				return errors.New("image board children must be images")
 			}
 		}
+	}
+	if n.Type == "foldBlock" && (len(n.Content) != 2 || n.Content[0].Type != "foldTitle" || n.Content[1].Type != "foldContent") {
+		return errors.New("fold block must contain a title and content")
+	}
+	if (n.Type == "foldContent" || n.Type == "highlightBlock") && len(n.Content) == 0 {
+		return errors.New("block container must contain at least one block")
 	}
 	for _, m := range n.Marks {
 		if !markTypes[m.Type] {
@@ -157,7 +164,7 @@ func (m Mark) Attr(key string) string {
 
 var blockTypes = map[string]bool{
 	"paragraph": true, "heading": true, "codeBlock": true, "blockMath": true,
-	"horizontalRule": true, "calloutTitle": true, "tableCell": true, "tableHeader": true,
+	"horizontalRule": true, "calloutTitle": true, "foldTitle": true, "tableCell": true, "tableHeader": true,
 }
 
 // PlainText flattens a document for search: one line per text block.

@@ -704,6 +704,66 @@ body.yy-row-dragging * {
   vertical-align: -2px;
 }
 
+/* Fold/highlight blocks ----------------------------------------------------------------------- */
+.yy-fold-editor .yy-fold-title { cursor: text; }
+.yy-fold-editor[data-collapsed='true'] > .yy-fold-inner > .yy-fold-content { display: none; }
+.yy-fold-toggle {
+  position: absolute;
+  top: 14px;
+  left: 7px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--yy-text-3);
+  cursor: pointer;
+}
+.yy-fold-toggle::after {
+  content: '';
+  border: 4px solid transparent;
+  border-left: 5px solid currentColor;
+  transform-origin: 2px 4px;
+  transition: transform 120ms;
+}
+.yy-fold-toggle[aria-expanded='true']::after { transform: rotate(90deg); }
+.ProseMirror .yy-fold-title:has(> .ProseMirror-trailingBreak:only-child)::before,
+.ProseMirror .yy-fold-content > p:has(> .ProseMirror-trailingBreak:only-child):only-child::before,
+.ProseMirror .yy-highlight-block > p:has(> .ProseMirror-trailingBreak:only-child):only-child::before {
+  content: '在此输入内容';
+  float: left;
+  height: 0;
+  color: var(--yy-text-3);
+  opacity: 0.65;
+  pointer-events: none;
+}
+.ProseMirror .yy-fold-title:has(> .ProseMirror-trailingBreak:only-child)::before { content: '请输入折叠块标题'; }
+.yy-highlight-block.yy-highlight-selected { box-shadow: 0 0 0 1px #7db2ff; }
+.ProseMirror .yy-highlight-block.ProseMirror-selectednode { outline: none; }
+.yy-block-palette {
+  display: flex;
+  gap: 7px;
+  padding: 8px 10px;
+  max-width: calc(100vw - 16px);
+}
+.yy-block-palette button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #273442;
+  cursor: pointer;
+}
+.yy-block-palette button:hover { border-color: #899298; }
+@media (max-width: 400px) { .yy-block-palette { gap: 5px; padding: 8px; } }
+@media (prefers-reduced-motion: reduce) { .yy-fold-toggle::after { transition: none; } }
+
 /* Slash menu ---------------------------------------------------------------------------------- */
 
 .yy-slash {

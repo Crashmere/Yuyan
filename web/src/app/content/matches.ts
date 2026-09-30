@@ -7,7 +7,7 @@ import { reveal } from './folds'
 
 const name = 'yy-search'
 // Matches do not run from one of these into the next, as the server's plain text breaks there too.
-const blocks = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .code-title, .yy-line, pre'
+const blocks = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .yy-fold-title, .code-title, .yy-line, pre'
 // Formulas and diagrams are redrawn from their source; buttons and language labels are not part of
 // the text.
 const skipped = '[data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang'

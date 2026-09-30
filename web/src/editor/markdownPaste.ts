@@ -2,7 +2,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { markdownToDoc } from '../schema/markdown'
 
-const blockSyntax = /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```|~~~|\|.*\||\s*[-*]\s\[[ xX]\]\s|\$\$)/m
+const blockSyntax = /^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s|```|~~~|\|.*\||\s*[-*]\s\[[ xX]\]\s|\$\$|<(?:details|div)\b[^>]*data-(?:fold|highlight)-block)/m
 const inlineSyntax = /\*\*[^*\n]+\*\*|\[[^\]\n]+\]\([^)\n]+\)|`[^`\n]+`|==[^=\n]+==|!\[\[[^\]\n]+\]\]/
 
 // Pasting plain text that looks like Markdown inserts formatted content instead of raw symbols.

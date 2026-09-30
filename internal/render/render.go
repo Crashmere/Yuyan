@@ -205,6 +205,19 @@ func (r *renderer) node(n doc.Node) {
 		r.wrap("div", [][2]string{{"class", "callout-title"}}, n)
 	case "calloutContent":
 		r.wrap("div", [][2]string{{"class", "callout-content"}}, n)
+	case "foldBlock":
+		attrs := [][2]string{{"class", "yy-fold-block"}, {"data-fold-block", ""}}
+		if !n.AttrBool("collapsed") {
+			attrs = append(attrs, [2]string{"open", ""})
+		}
+		r.wrap("details", attrs, n)
+	case "foldTitle":
+		r.wrap("summary", [][2]string{{"class", "yy-fold-title"}}, n)
+	case "foldContent":
+		r.wrap("div", [][2]string{{"class", "yy-fold-content"}, {"data-fold-content", ""}}, n)
+	case "highlightBlock":
+		color, dark := doc.HighlightBlockColor(n.Attr("backgroundColor"))
+		r.wrap("div", [][2]string{{"class", "yy-highlight-block"}, {"data-highlight-block", color}, {"style", "background-color: " + color + "; background-color: light-dark(" + color + ", " + dark + ")"}}, n)
 	case "inlineMath":
 		r.res.HasMath = true
 		r.open("span", [][2]string{{"data-latex", n.Attr("latex")}, {"data-type", "inline-math"}})

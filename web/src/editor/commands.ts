@@ -4,10 +4,11 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
 import {
   Bold, Code, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
-  ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow,
+  ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow, PanelTopClose, Square,
 } from 'lucide-vue-next'
 import type { EditorUi } from './context'
 import { clearSelectedTextFormatting, setSelectedTextStyle, textStyleActive, toggleSelectedTextMark } from './textSelection'
+import { insertContainer } from './blockContainers'
 
 // Commands shared by the toolbar, the selection toolbar, the slash menu and the block menu. Every
 // command works on the existing document schema; nothing here adds a new node or attribute.
@@ -113,6 +114,8 @@ export const insertItems: InsertItem[] = [
   { id: 'ordered', label: '有序列表', description: '带编号的列表', icon: ListOrdered, group: '列表', markdown: '1.', syntax: ['1)'], pinyin: 'you xu lie biao', keywords: 'yxlb ordered list ol', run: (e) => e.chain().focus().toggleOrderedList().run() },
   { id: 'task', label: '任务列表', description: '可勾选的待办', icon: ListTodo, group: '列表', markdown: '[ ]', syntax: ['- [ ]', '[x]', '- [x]'], pinyin: 'ren wu lie biao', keywords: 'rwlb todo task', run: (e) => e.chain().focus().toggleTaskList().run() },
   { id: 'quote', label: '引用', description: '引用一段话', icon: Quote, group: '插入', markdown: '>', pinyin: 'yin yong', keywords: 'yy quote blockquote', run: (e) => e.chain().focus().toggleBlockquote().run() },
+  { id: 'foldBlock', label: '折叠块', description: '带标题、可以展开或收起的内容', icon: PanelTopClose, group: '插入', syntax: ['<details>'], pinyin: 'zhe die kuai', keywords: 'fold collapse toggle details', run: e => { insertContainer(e, 'foldBlock') } },
+  { id: 'highlightBlock', label: '高亮块', description: '用柔和底色突出一段内容', icon: Square, group: '插入', pinyin: 'gao liang kuai', keywords: 'highlight background color', run: e => { insertContainer(e, 'highlightBlock') } },
   { id: 'code', label: '代码块', description: '带语法高亮的代码', icon: SquareCode, group: '插入', markdown: '```', syntax: ['~~~'], pinyin: 'dai ma kuai', keywords: 'dmk code', run: (e) => e.chain().focus().toggleCodeBlock().run() },
   {
     id: 'titledCode', label: '带标题的代码块', description: '有标题栏，可以收起', icon: SquareCode, group: '插入', syntax: ['```', '~~~', '``` title=', '~~~ title='], pinyin: 'dai biao ti de dai ma kuai', keywords: 'dbtddmk btdmk code title',

@@ -7,6 +7,7 @@ import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { createColGroup, Table, TableCell, TableHeader, TableRow } from '@tiptap/extension-table'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
 import { Callout, CalloutContent, CalloutTitle } from './callout'
+import { FoldBlock, FoldTitle, FoldContent, HighlightBlock } from './blockContainers'
 import { withTitles } from './codeBlock'
 import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignment'
 import { imageFrame } from './imageStyle'
@@ -130,6 +131,7 @@ export interface SchemaOverrides {
   callout?: AnyExtension
   table?: AnyExtension
   imageBoard?: AnyExtension
+  foldBlock?: AnyExtension
 }
 
 export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
@@ -165,6 +167,10 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     o.callout ?? Callout,
     CalloutTitle,
     CalloutContent,
+    o.foldBlock ?? FoldBlock,
+    FoldTitle,
+    FoldContent,
+    HighlightBlock,
     o.inlineMath ?? InlineMath,
     o.blockMath ?? BlockMath,
   ]

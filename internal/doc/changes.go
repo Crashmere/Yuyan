@@ -105,7 +105,7 @@ func changeBlocks(root Node) []changeBlock {
 			levels, headings = append(levels, level), append(headings, title)
 			add(stripMedia(n), context)
 			media(n, context)
-		case "paragraph", "calloutTitle", "table", "codeBlock", "horizontalRule":
+		case "paragraph", "calloutTitle", "foldTitle", "table", "codeBlock", "horizontalRule":
 			clean := stripMedia(n)
 			if n.Type != "paragraph" || len(clean.Content) > 0 {
 				add(clean, context)
@@ -116,6 +116,11 @@ func changeBlocks(root Node) []changeBlock {
 		case "imageBoard":
 			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
 			media(n, context)
+		case "foldBlock", "highlightBlock":
+			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
+			for _, child := range n.Content {
+				walk(child, context+n.Type)
+			}
 		default:
 			if n.Type != "doc" {
 				context += encoded(Node{Type: n.Type, Attrs: n.Attrs})
@@ -238,6 +243,12 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			return "公式"
 		case "horizontalRule":
 			return "分隔线"
+		case "foldBlock":
+			return "折叠块"
+		case "foldTitle":
+			return "折叠块标题"
+		case "highlightBlock":
+			return "高亮块"
 		default:
 			return "正文"
 		}
@@ -266,6 +277,20 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			return false
 		}
 		switch n.Type {
+		case "foldBlock":
+			if attrsChanged("collapsed") {
+				add("调整折叠块状态", places...)
+			}
+		case "highlightBlock":
+			if attrsChanged("backgroundColor") {
+				add("调整高亮块底色", places...)
+			}
+		case "foldTitle":
+			if TextContent(old) != TextContent(n) {
+				add("修改折叠块标题", places...)
+			} else {
+				add("调整折叠块标题格式", places...)
+			}
 		case "image":
 			if attrsChanged("crop") {
 				add("裁切图片", places...)

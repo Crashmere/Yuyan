@@ -209,7 +209,7 @@ class Converter {
   }
 
   private htmlBlock(n: Html): JSONContent[] {
-    const blocks = /^\s*<(?:table|p|div|span|h[1-6]|ul|ol|blockquote|figure)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
+    const blocks = /^\s*<(?:table|p|div|span|h[1-6]|ul|ol|blockquote|figure|details)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
     if (blocks?.length) return blocks
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
@@ -474,7 +474,7 @@ class Exporter {
     const kids = n.content ?? []
     // Keep rich content inside its whole container: Markdown list/quote prefixes can otherwise
     // become literal HTML text or change multiline image captions during a roundtrip.
-    if (needsRichInline(n) || containsRichTable(n)) return [{ type: 'html', value: this.nodeHtml(n) }]
+    if (needsRichInline(n) || containsRichTable(n) || containsBlockContainer(n)) return [{ type: 'html', value: this.nodeHtml(n) }]
     switch (n.type) {
       case 'paragraph':
         if (alignment(n.attrs?.textAlign) || kids.some((c) => c.type === 'image' && (alignment(c.attrs?.blockAlign) || c.attrs?.crop))) return [{ type: 'html', value: this.nodeHtml(n) }]
@@ -643,6 +643,10 @@ function needsRichInline(n: JSONContent): boolean {
 
 function containsRichTable(n: JSONContent): boolean {
   return (n.type === 'table' && tableNeedsHtml(n)) || !!n.content?.some(containsRichTable)
+}
+
+function containsBlockContainer(n: JSONContent): boolean {
+  return n.type === 'foldBlock' || n.type === 'highlightBlock' || !!n.content?.some(containsBlockContainer)
 }
 
 function tableNeedsHtml(n: JSONContent): boolean {

@@ -82,6 +82,9 @@ export function setupFolds(root: HTMLElement, key?: string) {
 
 // Unfolds the sections hiding el, before scrolling to a heading or a search match inside them.
 export function reveal(el: Element) {
+  for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+    if (parent.matches('details[data-fold-block]')) (parent as HTMLDetailsElement).open = true
+  }
   const root = el.closest<HTMLElement>('.yy-content')
   if (!root) return
   let block: Element = el
