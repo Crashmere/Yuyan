@@ -1327,9 +1327,9 @@ body.yy-row-dragging * {
 .yy-color-arrow svg, .yy-color-more > svg { transition: transform 150ms ease; }
 .yy-color-arrow svg.open, .yy-color-more > svg.open { transform: rotate(180deg); }
 .yy-color-apply:disabled, .yy-color-arrow:disabled { opacity: .35; cursor: default; }
-.yy-color-letter { font: 21px/1 var(--yy-font); }
+.yy-color-letter { font: 500 17px/1 var(--yy-font); }
 .yy-color-indicator { position: absolute; bottom: 3px; left: 6px; right: 6px; height: 2px; border-radius: 1px; }
-.yy-color-combined-sample { display: inline-flex; align-items: center; justify-content: center; width: 23px; height: 24px; border-radius: 3px; font: 21px/1 var(--yy-font); }
+.yy-color-combined-sample { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 3px; font: 500 17px/1 var(--yy-font); }
 /* Reka positions the outer wrapper; the content must participate in its size measurement. */
 .yy-color-picker { position: relative; width: 320px; max-width: calc(100vw - 16px); max-height: min(var(--reka-popover-content-available-height, 560px), calc(100dvh - 80px)); padding: 14px; overflow: auto; overscroll-behavior: contain; z-index: 60; }
 .yy-color-picker.is-quick { width: 292px; }
