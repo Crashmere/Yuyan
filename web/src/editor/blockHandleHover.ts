@@ -3,19 +3,18 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 
 type Target = { node: PMNode; pos: number } | null
 
-// Nested targeting prefers the parent within 12px of a child's edge. Keep the current
-// child while crossing that edge to its tools. Observe mouse movement only: an overlay
-// would steal text clicks/selections, and locking the drag plugin would disable dragging.
+// Keep a heading targeted while crossing its edge to the level-labelled grip.
+// Observe mouse movement only: an overlay would steal text clicks/selections,
+// and locking the drag plugin would disable dragging.
 export function keepBlockHandleReachable(editor: Editor, target: () => Target, element: () => HTMLElement | null, menuOpen: () => boolean) {
   const surface = editor.view.dom, root = surface.ownerDocument
-  let crossing = false
   let hideFrame = 0
 
   function region(event: MouseEvent) {
     const current = target(), handle = element()
     if (!current || !handle || editor.isDestroyed || !editor.isEditable || event.buttons || menuOpen() || handle.dataset.dragging === 'true' || handle.style.visibility === 'hidden') return null
     if (current.pos < 0 || current.pos > editor.state.doc.content.size || editor.state.doc.nodeAt(current.pos) !== current.node) return null
-    if (!['column', 'highlightBlock', 'foldContent'].includes(editor.state.doc.resolve(current.pos).parent.type.name)) return null
+    if (current.node.type.name !== 'heading') return null
     const node = editor.view.nodeDOM(current.pos)
     if (!(node instanceof HTMLElement) || !node.getClientRects().length) return null
     const tools = handle.getBoundingClientRect(), block = node.getBoundingClientRect()
@@ -35,29 +34,27 @@ export function keepBlockHandleReachable(editor: Editor, target: () => Target, e
     const area = region(event)
     const handle = element(), hit = event.target as globalThis.Node | null
     if (!area?.bridge && hit && !surface.contains(hit) && !handle?.contains(hit) && target() && !menuOpen() && !event.buttons && handle?.dataset.dragging !== 'true') {
-      crossing = false
       // The upstream picker resolves targets in RAF. Hide after an already queued pick,
-      // otherwise a rapid exit can bring a stale ancestor handle back onto the page.
+      // otherwise a rapid exit can bring a stale heading handle back onto the page.
       hideFrame = requestAnimationFrame(() => {
         hideFrame = 0
         if (!editor.isDestroyed && !menuOpen()) editor.view.dispatch(editor.state.tr.setMeta('hideDragHandle', true))
       })
       return
     }
-    if (!area) { crossing = false; return }
+    if (!area) return
     if (area.bridge) {
-      crossing = true
-      // Run before ProseMirror's mousemove listener can schedule a new ancestor target.
+      // Run before ProseMirror's mousemove listener can schedule a new target.
       // No preventDefault: native text selection and click placement keep working.
       event.stopPropagation()
-    } else if (crossing) {
-      crossing = false
-      if (!area.inBlock) editor.view.dispatch(editor.state.tr.setMeta('hideDragHandle', true))
+    } else if (!area.inBlock) {
+      // The picker keeps its previous target when no eligible node is found. Clear it
+      // when moving onto ordinary content so a heading's grip cannot linger there.
+      editor.view.dispatch(editor.state.tr.setMeta('hideDragHandle', true))
     }
   }
   function leave(event: MouseEvent) {
     if (event.target === surface && region(event)?.bridge) {
-      crossing = true
       event.stopImmediatePropagation()
     }
   }

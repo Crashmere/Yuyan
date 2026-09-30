@@ -664,6 +664,10 @@ body.yy-row-dragging * {
   gap: 0;
   padding-right: 6px;
 }
+.yy-block-handle:not(.has-heading) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 .yy-handle-btn {
   display: inline-flex;
   align-items: center;
