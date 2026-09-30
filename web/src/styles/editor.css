@@ -40,6 +40,8 @@
   background: var(--yy-primary-soft);
   color: var(--yy-primary);
 }
+.ProseMirror.yy-format-painting { cursor: copy; }
+.yy-format-painting :is(p, h1, h2, h3, h4, h5, h6, li, td, th) { cursor: copy; }
 .yy-toolbar-sep {
   flex: none;
   width: 1px;

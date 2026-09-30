@@ -5,7 +5,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { NodeSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { ChevronDown, Link, RemoveFormatting } from 'lucide-vue-next'
+import { ChevronDown, Link } from 'lucide-vue-next'
 import { clearFormatting, currentStyle, markButtons, textStyles } from './commands'
 import { useEditorContext } from './context'
 import { withKey } from './keys'
@@ -18,6 +18,8 @@ import RemoveSelectionButton from './RemoveSelectionButton.vue'
 import { codeEditorIn } from '../code/editor'
 import TextColorMenu from './TextColorMenu.vue'
 import TableTools from './TableTools.vue'
+import FormatIcon from './FormatIcon.vue'
+import { formatPainterState } from './formatPainter'
 
 // The toolbar over selected content. Its style list lives inside the bubble, since a menu in a
 // separate layer would take focus away from the editor and hide the bubble.
@@ -53,7 +55,7 @@ function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTM
   const focused = view.hasFocus() || insideCode || element.contains(document.activeElement)
   const selection = e.state.selection
   const image = selection instanceof NodeSelection && ['image', 'imageBoard'].includes(selection.node.type.name)
-  const show = !props.hidden && focused && e.isEditable && !selection.empty && !image
+  const show = !props.hidden && !formatPainterState(e.state) && focused && e.isEditable && !selection.empty && !image
   if (!show) stylesOpen.value = false
   return show
 }
@@ -145,7 +147,7 @@ function anchor() {
       <span class="yy-bubble-sep"></span>
       <button type="button" class="yy-bubble-btn" :class="{ active: state.link }" data-tip="链接" aria-label="链接" @mousedown.prevent @click="ui.openLink()"><Link :size="16" /></button>
       <TextColorMenu compact />
-      <button type="button" class="yy-bubble-btn" :data-tip="withKey('清除格式', 'Mod-\\')" aria-label="清除格式" @mousedown.prevent @click="clearFormatting(editor)"><RemoveFormatting :size="16" /></button>
+      <button type="button" class="yy-bubble-btn" :data-tip="withKey('清除格式', 'Mod-\\')" aria-label="清除格式" @mousedown.prevent @click="clearFormatting(editor)"><FormatIcon kind="clear" :size="16" /></button>
     </div>
     <div class="yy-selection-content-tools">
       <TableTools compact />

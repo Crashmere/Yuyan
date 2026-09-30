@@ -33,6 +33,7 @@ import ImageView from './views/ImageView.vue'
 import ImageBoardView from './views/ImageBoardView.vue'
 import { ImageBoard } from '../schema/imageBoard'
 import { managedNodeView } from './managedNodeView'
+import { FormatPainter } from './formatPainter'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
 
@@ -101,6 +102,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     Search,
     TableShape,
     SelectWithin,
+    FormatPainter,
     UiShortcuts.configure({ openFind: ui.openFind }),
   ]
 }

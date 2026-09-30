@@ -21,6 +21,7 @@ GitHub 只备份源码和配置，推送不触发测试或部署。本机入口�
 - 按钮的提示写在 `data-tip` 上，由 `web/src/ui/tooltip.ts` 统一显示；不要用 `title` 或组件库的 Tooltip 做按钮提示。阅读页和编辑页的大纲共用 `web/src/app/content/OutlinePanel.vue`（外观、固定与折叠）和 `outline.ts`（当前节的判定）。
 - 首次加载的脚本预算见 DESIGN 12.3。再增加按需加载的 Vue 组件时，Rolldown 会把 Vue 等共用代码拆出主包（首次加载多 2–4 KB）；按需加载的部分尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`。改动后用构建清单核对首次加载的分块。
 - 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格变化后统一列宽和列默认对齐，保留表头与合并结构，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。
+- 格式刷由 `editor/formatPainter.ts` 管理临时采样和单次/连续模式，使用 `selectionContent.ts` 的真实选区范围；只复制文字视觉标记和段落样式，保留目标链接、图片与代码内容，每次应用单独撤销。顶部格式刷和清除格式共用 `FormatIcon.vue` 的滚筒/橡皮擦图标，交互见 DESIGN 23.5。
 - 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。历史快照记录修改后的完整内容，正常离开编辑页等待正文和快照完成；摘要由 `internal/doc/changes.go` 比较相邻快照生成，展示规则见 DESIGN 13.2，不依赖外部模型或数据库迁移。
 - 当前公网使用 HTTPS 与 ServerPortal 统一设备认证，所有公网页面和 API 均由共享 Nginx 校验。应用写接口继续保留自身来源校验。
 - 测试使用 `.local` 隔离数据，仓库只放合成样例，不提交真实笔记。本机 zsh 对 goenv 做了延迟加载，`make` 找不到 `go` 时在命令前加 `PATH="$HOME/.goenv/shims:$PATH"`。
