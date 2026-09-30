@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
+import { NodeSelection } from '@tiptap/pm/state'
 import { assetURL } from '../../shared/api'
 import { assetId, reservedSize } from '../../shared/images'
 import { blockWidth, imageSizes } from '../images'
 import { alignment } from '../../schema/alignment'
+import { selectImage } from '../imageSelection'
 import ImageSurface from '../ImageSurface.vue'
 
 const props = defineProps(nodeViewProps)
@@ -22,6 +24,22 @@ const reserved = computed(() => {
 })
 const width = computed(() => live.value ?? (props.node.attrs.width as number | null) ?? reserved.value.width)
 const height = computed(() => (live.value === null ? ((props.node.attrs.height as number | null) ?? undefined) : undefined))
+
+function pick(e: MouseEvent) {
+  const pos = props.getPos()
+  if (typeof pos === 'number') selectImage(props.editor.view, pos, e)
+}
+
+function pickSingle(e: MouseEvent) {
+  if (!props.editor.isEditable || e.button !== 0 || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || (e.target instanceof Element && e.target.closest('.yy-image-handle'))) return
+  const pos = props.getPos()
+  if (typeof pos !== 'number') return
+  // Finish a plain click as one image even after rapid modifier-clicks. Leave mousedown alone
+  // so dragging the image still uses ProseMirror's normal drag handling.
+  const view = props.editor.view
+  view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, pos)))
+  view.focus()
+}
 
 // Dragging a corner sets the width in pixels and drops any height, keeping the proportions; the
 // Markdown export writes it as Obsidian's |width.
@@ -57,7 +75,7 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
 </script>
 
 <template>
-  <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null, 'is-aligned': !!align, 'ProseMirror-selectednode': selected }" :style="align ? { textAlign: align } : undefined">
+  <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null, 'is-aligned': !!align, 'ProseMirror-selectednode': selected }" :style="align ? { textAlign: align } : undefined" @mousedown="pick" @click="pickSingle">
     <span ref="content" class="yy-image-content">
       <ImageSurface v-if="node.attrs.crop" :attrs="{ ...node.attrs, width: live ?? node.attrs.width, height: live === null ? node.attrs.height : null }" />
       <img

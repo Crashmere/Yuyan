@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { BookOpen, Ellipsis, FilePlus } from 'lucide-vue-next'
+import { BookOpen, ChevronDown, Ellipsis, Plus } from 'lucide-vue-next'
 import { api, ApiError, errorMessage, type Book, type TreeNode } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
-import { bookMenu, editBookDescription, newDoc } from '../actions'
+import { bookCreateMenu, bookMenu, editBookDescription, newDoc } from '../actions'
 import { bookColor } from '../bookColor'
 import { setTitle } from '../router'
 import { bookOf, loadBooks, loading, loadTree, setPage, state } from '../store'
@@ -52,7 +52,9 @@ onMounted(async () => {
 <template>
   <Teleport defer to="#yy-topbar-actions">
     <template v-if="book && !missing">
-      <button type="button" class="yy-btn primary" @click="newDoc(id, null)"><FilePlus :size="15" />新建文档</button>
+      <ActionMenu :items="bookCreateMenu(id)">
+        <button type="button" class="yy-btn primary"><Plus :size="15" />新建<ChevronDown :size="14" /></button>
+      </ActionMenu>
       <ActionMenu :items="bookMenu(book)"><IconButton label="知识库操作"><Ellipsis :size="18" /></IconButton></ActionMenu>
     </template>
   </Teleport>

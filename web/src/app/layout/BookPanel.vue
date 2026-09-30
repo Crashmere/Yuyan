@@ -9,7 +9,7 @@ import ContextActions from '../../ui/ContextActions.vue'
 import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
-import { bookMenu, newDoc } from '../actions'
+import { bookCreateMenu, bookMenu } from '../actions'
 import { bookOf, bookSections, loadBooks, loadTree, state } from '../store'
 import BookTree from '../tree/BookTree.vue'
 import { runBatch, type BatchAction } from '../tree/batch'
@@ -78,7 +78,9 @@ onMounted(() => {
         <ActionMenu :items="bookMenu(book)">
           <IconButton small label="知识库操作"><Ellipsis :size="15" /></IconButton>
         </ActionMenu>
-        <IconButton small label="新建文档" @click="newDoc(book.id, null)"><Plus :size="15" /></IconButton>
+        <ActionMenu :items="bookCreateMenu(book.id)">
+          <IconButton small label="新建"><Plus :size="15" /></IconButton>
+        </ActionMenu>
       </template>
     </div>
     <div class="yy-tree-scroll">

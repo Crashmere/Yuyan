@@ -1059,7 +1059,8 @@ body.yy-row-dragging * {
 .ProseMirror .yy-image.ProseMirror-selectednode {
   outline: none;
 }
-.yy-image.ProseMirror-selectednode img {
+.yy-image.ProseMirror-selectednode img,
+.yy-image.yy-image-multiselected img {
   outline: 2px solid var(--yy-primary);
   outline-offset: 1px;
 }
@@ -1077,6 +1078,7 @@ body.yy-row-dragging * {
   left: -5px;
   cursor: nesw-resize;
 }
+.yy-image-multiselected .yy-image-handle { display: none; }
 .yy-image-handle.right {
   right: -5px;
   cursor: nwse-resize;
@@ -1232,7 +1234,8 @@ body.yy-row-dragging * {
   opacity: 0.5;
   pointer-events: none;
 }
-.yy-image.ProseMirror-selectednode [data-image-frame] { outline: 2px solid var(--yy-primary); outline-offset: 1px; }
+.yy-image.ProseMirror-selectednode [data-image-frame],
+.yy-image.yy-image-multiselected [data-image-frame] { outline: 2px solid var(--yy-primary); outline-offset: 1px; }
 .yy-image [data-image-frame] img { outline: none; }
 
 .yy-image-dialog { top: 50%; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; transform: translate(-50%, -50%); animation: yy-fade 0.15s ease-out; }

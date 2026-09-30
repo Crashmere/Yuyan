@@ -6,6 +6,7 @@ import { api, ApiError, errorMessage, type DocView } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
 import { useModeShortcut } from '../modeShortcut'
+import { pageShortcutAllowed } from '../pageShortcut'
 import { newDoc, nodeMenu } from '../actions'
 import DocContent from '../content/DocContent.vue'
 import Toc from '../content/Toc.vue'
@@ -50,6 +51,15 @@ const title = computed(() => node.value?.title ?? view.value?.doc.title ?? '')
 const empty = computed(() => !!view.value && view.value.chars === 0 && !/<(img|table|pre|hr|div)\b/.test(view.value.html))
 // Titles shown on this page follow the tree, which stays current after renames elsewhere.
 const titleOf = (n: { id: number; title: string }) => locate(state.bookId, n.id)?.node.title ?? n.title
+
+function changeDoc(e: KeyboardEvent) {
+  if (!view.value || state.navigating || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !['ArrowUp', 'ArrowDown'].includes(e.key) || !pageShortcutAllowed(e)) return
+  e.preventDefault()
+  const target = e.key === 'ArrowUp' ? view.value.prev : view.value.next
+  if (target) void router.push(`/docs/${target.id}`)
+}
+onMounted(() => window.addEventListener('keydown', changeDoc))
+onBeforeUnmount(() => window.removeEventListener('keydown', changeDoc))
 
 onMounted(async () => {
   try {

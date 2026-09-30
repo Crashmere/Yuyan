@@ -2,6 +2,7 @@
 import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isNavigationFailure, NavigationFailureType, RouterView, useRoute, useRouter } from 'vue-router'
 import { prefs } from '../prefs'
+import { pageShortcutAllowed } from '../pageShortcut'
 import { openSearch, searchLoaded } from '../search/panel'
 import { state } from '../store'
 import { openShortcuts, shortcutsLoaded, shortcutsOpen } from '../shortcuts/panel'
@@ -28,6 +29,12 @@ function onKey(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k' && !e.isComposing) {
     e.preventDefault()
     openSearch()
+    return
+  }
+  if (route.name !== 'edit' && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b' && pageShortcutAllowed(e)) {
+    e.preventDefault()
+    if (matchMedia('(max-width: 1700px)').matches) drawer.value = !drawer.value
+    else prefs.sidebarCollapsed = !prefs.sidebarCollapsed
   }
 }
 onMounted(() => window.addEventListener('keydown', onKey))

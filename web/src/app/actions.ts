@@ -33,6 +33,13 @@ export function newGroup(bookId: number, parentId: number | null) {
   }, '新建分组失败')
 }
 
+export function bookCreateMenu(bookId: number): MenuEntry[] {
+  return [
+    { label: '新建文档', icon: FilePlus, run: () => newDoc(bookId, null) },
+    { label: '新建分组', icon: FolderPlus, run: () => newGroup(bookId, null) },
+  ]
+}
+
 export function renameDoc(bookId: number, node: { id: number; title: string; kind: string }) {
   return attempt(async () => {
     const title = await prompt({ title: node.kind === 'group' ? '重命名分组' : '重命名文档', value: node.title, confirmText: '保存' })

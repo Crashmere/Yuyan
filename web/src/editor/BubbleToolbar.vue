@@ -11,6 +11,7 @@ import { useEditorContext } from './context'
 import { withKey } from './keys'
 import { hasTextTools, textMarkActive } from './textSelection'
 import { selectionContent } from './selectionContent'
+import { ImageSelection } from './imageSelection'
 import ImageFormatControls from './ImageFormatControls.vue'
 import AlignmentMenu from './AlignmentMenu.vue'
 import RemoveSelectionButton from './RemoveSelectionButton.vue'
@@ -70,6 +71,11 @@ function anchor() {
   const e = editor.value
   const selection = e?.state.selection
   if (!e || !selection) return null
+  if (selection instanceof ImageSelection) {
+    const dom = e.view.nodeDOM(selection.head)
+    const image = dom instanceof Element ? dom.querySelector('[data-image-frame], img') : null
+    if (image) return { contextElement: image, getBoundingClientRect: () => image.getBoundingClientRect() }
+  }
   if (selection.$from.parent.type.name === 'codeBlock' && selection.$from.sameParent(selection.$to)) {
     const dom = e.view.nodeDOM(selection.$from.before())
     const code = dom instanceof Element ? codeEditorIn(dom) : undefined

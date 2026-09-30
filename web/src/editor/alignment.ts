@@ -4,6 +4,7 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
 import { alignment, type Alignment } from '../schema/alignment'
 import { commitSelectionChange, selectionContent } from './selectionContent'
+import { ImageSelection } from './imageSelection'
 
 interface Target { pos: number; node: PMNode }
 export interface AlignmentTarget {
@@ -31,6 +32,7 @@ function target(kind: AlignmentTarget['kind'], nodes: Target[]): AlignmentTarget
 
 export function alignmentTargets(e: Editor): { content: AlignmentTarget | null; images: AlignmentTarget | null; table: AlignmentTarget | null } {
   const sel = e.state.selection
+  if (sel instanceof ImageSelection) return { content: null, images: target('image', selectionContent(e.state).images), table: null }
   const selected = sel instanceof NodeSelection ? { pos: sel.from, node: sel.node } : null
   const table = selected?.node.type.name === 'table' ? selected : ancestor(sel.$from, ['table'])
   const sameTable = table && (selected?.node === table.node || ancestor(sel.$to, ['table'])?.pos === table.pos)
