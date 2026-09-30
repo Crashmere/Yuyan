@@ -1850,11 +1850,21 @@ a.yy-catalog-title:hover {
 .yy-toc-head {
   position: sticky;
   top: 0;
+  /* Heading rows and their z-index: 1 carets scroll beneath the pinned controls. */
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 8px;
   background: var(--yy-bg);
+}
+.yy-toc-head::before {
+  /* Cover the scroll container's top padding (12px in peek panels, 20px in drawers). */
+  position: absolute;
+  inset: -20px 0 0;
+  z-index: -1;
+  background: inherit;
+  content: '';
 }
 .yy-toc-title {
   color: var(--yy-text-3);
