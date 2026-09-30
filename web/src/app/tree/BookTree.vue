@@ -17,6 +17,7 @@ const selection = useTreeSelection(() => props.nodes, (id) => expanded.has(id))
 const { active: selecting, selectedNodes, roots: selectedRoots, allState: selectionState } = selection
 const renaming = ref<number | null>(null)
 const drag = reactive({ id: null as number | null, overId: null as number | null, position: null as DropPosition | null })
+const dropAtEnd = ref(false)
 let expandTimer: ReturnType<typeof setTimeout> | undefined
 
 function toggle(id: number, open = !expanded.has(id)) {
@@ -96,10 +97,20 @@ function positionOf(e: DragEvent): DropPosition {
   return y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'inside'
 }
 
-function reset() {
+function clearDrop() {
   clearTimeout(expandTimer)
-  drag.id = drag.overId = null
+  drag.overId = null
   drag.position = null
+  dropAtEnd.value = false
+}
+
+function reset() {
+  clearDrop()
+  drag.id = null
+}
+
+function leaveTree(e: DragEvent) {
+  if (!(e.relatedTarget instanceof Node) || !(e.currentTarget as HTMLElement).contains(e.relatedTarget)) clearDrop()
 }
 
 // target works out where a drop puts the dragged node; the index counts siblings without it.
@@ -113,6 +124,34 @@ function target(node: TreeNode, position: DropPosition, dragId: number): { paren
   const siblings = found.siblings.filter((s) => s.id !== dragId)
   const i = siblings.findIndex((s) => s.id === node.id)
   return { parentId: found.parent?.id ?? null, index: position === 'before' ? i : i + 1 }
+}
+
+async function move(d: TreeNode, to: { parentId: number | null; index: number }) {
+  const from = store.locate(props.bookId, d.id)!
+  if ((from.parent?.id ?? null) === to.parentId && from.siblings.indexOf(d) === to.index) return
+  try {
+    await store.moveDoc(d.id, props.bookId, { bookId: props.bookId, ...to })
+    if (to.parentId != null) toggle(to.parentId, true)
+  } catch (err) {
+    toast(`移动失败：${errorMessage(err)}`, 'error')
+  }
+}
+
+function overEnd(e: DragEvent) {
+  if (!dragged() || selecting.value) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+  clearDrop()
+  dropAtEnd.value = true
+}
+
+async function dropEnd(e: DragEvent) {
+  const d = dragged()
+  const atEnd = dropAtEnd.value
+  reset()
+  if (!d || !atEnd) return
+  e.preventDefault()
+  await move(d, { parentId: null, index: props.nodes.filter((n) => n.id !== d.id).length })
 }
 
 provide(treeKey, {
@@ -130,6 +169,7 @@ provide(treeKey, {
   drag,
   onDragStart(node, e) {
     if (selecting.value) { e.preventDefault(); return }
+    reset()
     drag.id = node.id
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
@@ -138,14 +178,14 @@ provide(treeKey, {
   },
   onDragOver(node, e) {
     const d = dragged()
-    if (!d || store.contains(d, node.id)) return
+    if (!d || store.contains(d, node.id)) { clearDrop(); return }
     e.preventDefault()
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
     const position = positionOf(e)
     if (drag.overId === node.id && drag.position === position) return
+    clearDrop()
     drag.overId = node.id
     drag.position = position
-    clearTimeout(expandTimer)
     if (position === 'inside' && node.children?.length && !expanded.has(node.id)) expandTimer = setTimeout(() => toggle(node.id, true), 700)
   },
   async onDrop(node, e) {
@@ -154,23 +194,19 @@ provide(treeKey, {
     const position = drag.position
     reset()
     if (!d || !position || store.contains(d, node.id)) return
-    const to = target(node, position, d.id)
-    const from = store.locate(props.bookId, d.id)!
-    if ((from.parent?.id ?? null) === to.parentId && from.siblings.indexOf(d) === to.index) return
-    try {
-      await store.moveDoc(d.id, props.bookId, { bookId: props.bookId, ...to })
-      if (to.parentId != null) toggle(to.parentId, true)
-    } catch (err) {
-      toast(`移动失败：${errorMessage(err)}`, 'error')
-    }
+    await move(d, target(node, position, d.id))
   },
   onDragEnd: reset,
 })
 </script>
 
 <template>
-  <ul v-if="nodes.length" ref="root" class="yy-tree" role="tree" :aria-multiselectable="selecting || undefined" @dragleave.self="drag.overId = null">
+  <ul v-if="nodes.length" ref="root" class="yy-tree" role="tree" :aria-multiselectable="selecting || undefined" @dragleave="leaveTree">
     <TreeItem v-for="n in nodes" :key="n.id" :node="n" :depth="0" />
   </ul>
   <p v-else class="yy-tree-empty">还没有文档</p>
+  <div v-if="nodes.length && !selecting" class="yy-tree-end" :class="{ 'drop-end': dropAtEnd }" aria-hidden="true"
+    @dragover="overEnd" @drop="dropEnd" @dragleave="clearDrop">
+    <span v-if="drag.id !== null">放到最顶层末尾</span>
+  </div>
 </template>

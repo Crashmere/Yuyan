@@ -386,6 +386,9 @@ kbd {
 }
 
 .yy-tree-scroll {
+  --tree-indent: 16px;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -397,6 +400,7 @@ kbd {
   top: 0;
   z-index: 1;
   display: flex;
+  flex: none;
   align-items: center;
   gap: 2px;
   padding: 0 2px 2px 10px;
@@ -410,7 +414,18 @@ kbd {
 
 /* Tree ------------------------------------------------------------------------------------ */
 
-.yy-tree { --tree-indent: 16px; }
+.yy-tree { flex: none; }
+
+.yy-tree-end {
+  position: relative;
+  flex: 1 0 32px;
+  padding: 8px 4px 0 26px;
+  color: var(--yy-text-3);
+  font-size: 12px;
+  user-select: none;
+}
+.yy-tree-end > span { pointer-events: none; }
+.yy-tree-end.drop-end { color: var(--yy-primary); }
 
 .yy-tree,
 .yy-tree-children {
@@ -502,7 +517,8 @@ kbd {
   box-shadow: inset 0 0 0 1px var(--yy-primary);
 }
 .yy-tree-row.drop-before::before,
-.yy-tree-row.drop-after::after {
+.yy-tree-row.drop-after::after,
+.yy-tree-end.drop-end::before {
   content: '';
   position: absolute;
   /* Align with the destination title, after the row padding and disclosure caret. */
@@ -512,7 +528,8 @@ kbd {
   border-radius: 1px;
   background: var(--yy-primary);
 }
-.yy-tree-row.drop-before::before {
+.yy-tree-row.drop-before::before,
+.yy-tree-end.drop-end::before {
   top: -1px;
 }
 .yy-tree-row.drop-after::after {
