@@ -31,6 +31,9 @@
   width: 30px;
   height: 30px;
 }
+.yy-toolbar-insert { margin-right: 6px; }
+.yy-toolbar-insert-symbol { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: var(--yy-primary); color: #fff; }
+.yy-toolbar-insert:hover .yy-toolbar-insert-symbol, .yy-toolbar-insert[data-state='open'] .yy-toolbar-insert-symbol { background: var(--yy-primary-hover); }
 .yy-toolbar .yy-icon-btn:disabled {
   opacity: 0.35;
   cursor: default;

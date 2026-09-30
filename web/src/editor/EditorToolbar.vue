@@ -78,6 +78,9 @@ const insertMenu = computed<MenuEntry[]>(() => {
 <template>
   <div v-if="editor && state" class="yy-toolbar" role="toolbar" aria-label="格式">
     <div class="yy-toolbar-inner">
+      <ActionMenu :items="insertMenu" align="start" :restore-focus="false">
+        <button ref="insertButton" type="button" class="yy-icon-btn yy-toolbar-insert" aria-label="插入" data-tip="插入" @mousedown.prevent><span class="yy-toolbar-insert-symbol"><Plus :size="16" :stroke-width="2.4" /></span></button>
+      </ActionMenu>
       <IconButton :label="withKey('撤销', 'Mod-Z')" :disabled="!state.canUndo" @mousedown.prevent @click="editor.chain().focus().undo().run()"><Undo2 :size="17" /></IconButton>
       <IconButton :label="withKey('重做', 'Mod-Shift-Z')" :disabled="!state.canRedo" @mousedown.prevent @click="editor.chain().focus().redo().run()"><Redo2 :size="17" /></IconButton>
       <FormatPainterButton />
@@ -117,10 +120,6 @@ const insertMenu = computed<MenuEntry[]>(() => {
       >
         <component :is="m.icon" :size="17" />
       </IconButton>
-      <span class="yy-toolbar-sep"></span>
-      <ActionMenu :items="insertMenu" align="start" :restore-focus="false">
-        <button ref="insertButton" type="button" class="yy-toolbar-select" @mousedown.prevent><Plus :size="16" /><span>插入</span><ChevronDown :size="14" /></button>
-      </ActionMenu>
       <span class="yy-spacer"></span>
       <IconButton :label="withKey('查找替换', 'Mod-F')" @mousedown.prevent @click="ui.openFind()"><Search :size="17" /></IconButton>
       <IconButton :label="prefs.focusMode ? '退出专注模式' : '专注模式（隐藏侧栏）'" :active="prefs.focusMode" @mousedown.prevent @click="prefs.focusMode = !prefs.focusMode">
