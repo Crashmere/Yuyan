@@ -27,11 +27,12 @@ const groups: { id: string; title: string; description: string; items: [string, 
   {
     id: 'common',
     title: '常用',
-    description: 'E 和 Esc 需在 0.4 秒内连按两次；其余组合同时按下。代码块内的 Cmd/Ctrl + / 保留为行注释。',
+    description: '连按两次 E 或 Esc 切换模式，间隔需小于 0.4 秒。编辑时单按 Esc 先取消选区，无选区时显示保存提示。代码块内的 Cmd/Ctrl + / 保留为行注释。',
     items: [
       ['进入编辑模式（阅读时）', 'E → E'],
       ['新建文档（阅读时）', 'Alt-N'],
       ['保存并回到阅读模式（编辑时）', 'Esc → Esc'],
+      ['取消选区并回到选区开头（编辑时）', 'Esc'],
       ['开关左侧栏（非编辑时）', 'Mod-B'],
       ['上一篇文档（阅读时）', 'ArrowUp'],
       ['下一篇文档（阅读时）', 'ArrowDown'],

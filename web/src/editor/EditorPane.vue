@@ -27,6 +27,7 @@ import HighlightBlockToolbar from './HighlightBlockToolbar.vue'
 import ImageToolsDialog from './ImageToolsDialog.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
+import { cancelSelection } from './cancelSelection'
 import { insertImages, pendingUploads } from './uploads'
 import { clearUnusedBlockSpaces } from './blockSpaces'
 import { openTemplates, saveEditorTemplate } from './templates'
@@ -278,7 +279,7 @@ async function finish(): Promise<boolean> {
   }
 }
 
-defineExpose({ flush, finish, setTitle, touched, discard, capturePosition, saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
+defineExpose({ flush, finish, setTitle, touched, discard, capturePosition, cancelSelection: (event: KeyboardEvent) => !!editor.value && cancelSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {

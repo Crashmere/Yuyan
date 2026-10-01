@@ -33,7 +33,7 @@ moduleReloadGuard.value = saveBeforeReload
 useModeShortcut('Escape', '连按两次 Esc 键保存并回到阅读模式', () => !!pane.value && status.value !== 'loading', () => {
   // Use the same route guard as 完成: wait for uploads and saves, then restore the reading position.
   void router.push(`/docs/${id}`)
-})
+}, event => pane.value?.cancelSelection(event) ?? false)
 
 const menu: MenuEntry[] = [
   { label: '保存为文档模板', icon: PanelsTopLeft, run: () => pane.value?.saveTemplate() },
