@@ -296,6 +296,16 @@
       "method": "GET",
       "path": "/attachments/{id}",
       "description": "经设备认证下载附件，支持 HEAD、Range 和指定下载文件名"
+    },
+    {
+      "method": "GET",
+      "path": "/api/attachments/{id}/preview",
+      "description": "读取附件预览类型、文本或压缩包目录，不解压写入磁盘"
+    },
+    {
+      "method": "GET",
+      "path": "/attachments/{id}/content",
+      "description": "经设备认证读取可预览的图片、PDF、音视频，支持 HEAD 和 Range；拒绝其他类型直读"
     }
   ]
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { base, type ImageSizes } from '../../shared/api'
 import { stopLoading } from '../../shared/images'
@@ -11,6 +11,10 @@ import { clearMatches, showMatches } from './matches'
 import { restoreReadingPosition, type ReadingPosition } from './readingPosition'
 import { parseRect } from '../../schema/imageGeometry'
 import { setupLinkPreviews } from '../../shared/linkPreview'
+import { prepareAttachmentCards, type PreviewAttachment } from './attachmentPreview'
+
+const AttachmentPreviewDialog = defineAsyncComponent(() => import('./AttachmentPreviewDialog.vue'))
+const attachment = ref<PreviewAttachment | null>(null)
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app. highlight is
 // the text searched for when the page was opened from search results; foldKey names the document
@@ -29,6 +33,7 @@ async function run() {
   initialPosition = undefined // Only on entry, not a later theme change or content redraw.
   await nextTick()
   if (!root.value) return
+  prepareAttachmentCards(root.value)
   previewCleanup()
   previewCleanup = setupLinkPreviews(root.value)
   drawn = enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images }).catch((e: unknown) => console.warn('enhance', e))
@@ -57,7 +62,7 @@ async function mark() {
 }
 
 onMounted(run)
-watch(() => props.html, run)
+watch(() => props.html, () => { attachment.value = null; void run() })
 watch(() => props.highlight, mark)
 onBeforeUnmount(() => {
   previewCleanup()
@@ -79,6 +84,13 @@ const shown = ref<number | null>(null)
 
 function onClick(e: MouseEvent) {
   const target = e.target as HTMLElement
+  const file = target.closest<HTMLElement>('.yy-attachment-open')?.closest<HTMLElement>('[data-attachment]')
+  if (file) {
+    e.preventDefault()
+    const download = file.querySelector<HTMLAnchorElement>('a[download]')!
+    attachment.value = { src: file.dataset.src!, name: file.dataset.name!, download: download.href, size: file.querySelector('.yy-attachment-size')?.textContent ?? '' }
+    return
+  }
   const title = target.closest('.callout[data-callout-fold] > .callout-title, .code-block > .code-title')
   if (title && !target.closest('.yy-copy, .yy-code-wrap-btn, .yy-code-actions')) {
     title.parentElement?.classList.toggle('is-collapsed')
@@ -112,4 +124,5 @@ function onClick(e: MouseEvent) {
 <template>
   <div :key="generation" ref="root" class="yy-content" @click="onClick" v-html="html"></div>
   <Lightbox v-model:index="shown" :images="images" />
+  <AttachmentPreviewDialog v-if="attachment" :attachment="attachment" @close="attachment = null" />
 </template>

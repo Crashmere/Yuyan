@@ -883,6 +883,10 @@ pre:hover > .yy-copy {
   font: 14px/1.5 var(--yy-font); transition: background .15s, border-color .15s;
 }
 .yy-content a.yy-attachment-card:hover { background: var(--yy-bg-muted); border-color: var(--yy-border-strong); color: var(--yy-text); text-decoration: none; }
+.yy-content .yy-attachment-readable { padding: 0 12px 0 0; gap: 4px; }
+.yy-content .yy-attachment-readable:hover { border-color: var(--yy-border-strong); background: var(--yy-bg-muted); }
+.yy-attachment-open { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 12px 14px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.yy-content .yy-attachment-readable .yy-attachment-action { font-size: 24px; }
 .yy-attachment-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 40px; height: 44px; border: 1px solid var(--yy-border); border-radius: 4px 10px 4px 4px; background: var(--yy-bg-muted); color: var(--yy-text-2); font: 600 10px/1 var(--yy-font); letter-spacing: .2px; }
 .yy-attachment-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 .yy-attachment-name { overflow-wrap: anywhere; white-space: normal; }

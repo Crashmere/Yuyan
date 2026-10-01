@@ -126,6 +126,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 
 	mux.HandleFunc("GET /assets/{file}", s.assetFile)
 	mux.HandleFunc("GET /attachments/{id}", s.attachmentFile)
+	mux.HandleFunc("GET /attachments/{id}/content", s.attachmentContent)
 	mux.HandleFunc("GET /static/chroma.css", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -171,6 +172,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("POST /api/versions/{id}/restore", s.write(s.apiRestoreVersion))
 	mux.Handle("POST /api/assets", s.write(s.apiUploadAsset))
 	mux.Handle("POST /api/attachments", http.NewCrossOriginProtection().Handler(s.write(s.apiUploadAttachment)))
+	mux.Handle("GET /api/attachments/{id}/preview", s.get(s.attachmentPreview))
 	mux.Handle("GET /api/search", s.read(s.apiSearch))
 	mux.Handle("GET /api/trash", s.get(s.trash))
 	mux.Handle("DELETE /api/trash", s.write(s.apiEmptyTrash))
