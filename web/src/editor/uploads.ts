@@ -68,14 +68,15 @@ export function pendingUploads(editor: Editor): number {
 export function insertImages(editor: Editor, files: File[], pos?: number) { insertFiles(editor, files, pos, 'image') }
 export function insertAttachments(editor: Editor, files: File[], pos?: number) { insertFiles(editor, files, pos, 'attachment') }
 export function insertFiles(editor: Editor, files: File[], pos?: number, mode?: 'image' | 'attachment') {
+  const attachments = files.map(file => mode === 'attachment' || (mode !== 'image' && !['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'].includes(file.type)))
   let at = pos
   if (at === undefined) {
     // Adding files preserves an existing selection, including when upload fails or is cancelled.
-    // Explicit image insertion retains its established replace-selection behavior.
-    if (!editor.state.selection.empty && mode === 'image') editor.commands.deleteSelection()
+    // Image-only insertion retains its established replace-selection behavior.
+    if (!editor.state.selection.empty && !attachments.some(Boolean)) editor.commands.deleteSelection()
     at = editor.state.selection.to
   }
-  const queued = files.map(file => start(editor, file, at!, mode === 'attachment' || (mode !== 'image' && !['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'].includes(file.type))))
+  const queued = files.map((file, index) => start(editor, file, at!, attachments[index]!))
   void (async () => { for (const up of queued) { if (!editor.isDestroyed && uploads(editor).has(up.id)) await send(editor, up) } })()
 }
 
