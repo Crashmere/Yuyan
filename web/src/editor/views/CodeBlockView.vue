@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
-import { AllSelection, Selection, TextSelection } from '@tiptap/pm/state'
+import { Selection, TextSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import { ChevronDown } from 'lucide-vue-next'
 import { copyText } from '../../shared/clipboard'
@@ -177,13 +177,8 @@ onMounted(() => {
       { key: 'Backspace', run: view => { if (view.state.doc.length) return false; const done = props.editor.commands.clearNodes(); if (done) props.editor.view.focus(); return done } },
       { key: 'Mod-a', run: view => {
         if (view.state.selection.main.from !== 0 || view.state.selection.main.to !== view.state.doc.length) return false
-        const state = props.editor.state, { $from, from, to } = state.selection
-        let selection: Selection = new AllSelection(state.doc)
-        for (let d = $from.depth; d > 0; d--) {
-          if (!['codeBlock', 'callout', 'tableCell', 'tableHeader', 'foldBlock', 'highlightBlock', 'column', 'columns'].includes($from.node(d).type.name)) continue
-          if ($from.start(d) < from || $from.end(d) > to) { selection = TextSelection.between(state.doc.resolve($from.start(d)), state.doc.resolve($from.end(d))); break }
-        }
-        props.editor.view.dispatch(state.tr.setSelection(selection)); props.editor.view.focus(); return true
+        closeExpanded?.()
+        props.editor.commands.selectAll(); props.editor.view.focus(); return true
       } },
     ],
   })

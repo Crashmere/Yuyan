@@ -23,7 +23,6 @@ import { MarkdownPaste } from './markdownPaste'
 import { Search } from './search'
 import { SlashCommand } from './slash'
 import { DocumentLinks } from './documentLinks'
-import { SelectWithin } from './selectWithin'
 import { ExpandSelection } from './expandSelection'
 import { HeadingFolds } from './headingFolds'
 import { fixColumnWidths, followColumnBorder, FramedTableView, TableShape } from './tables'
@@ -112,7 +111,6 @@ export function editorExtensions(ui: EditorUi, foldKey?: string): Extensions {
     BlockContainers,
     Search,
     TableShape,
-    SelectWithin,
     ExpandSelection,
     HeadingFolds.configure({ key: foldKey }),
     FormatPainter,

@@ -145,9 +145,15 @@ export async function moveDoc(id: number, fromBookId: number, to: { bookId: numb
 
 export async function deleteDoc(bookId: number, id: number) {
   const found = locate(bookId, id)
+  const ids = found ? collectIds(found.node) : [id]
   await api(`docs/${id}`, { method: 'DELETE' })
-  if (found) forgetViewed(collectIds(found.node))
-  await refresh(bookId)
+  forgetViewed(ids)
+  const removed = locate(bookId, id)
+  if (removed) removed.siblings.splice(removed.siblings.indexOf(removed.node), 1)
+  invalidateTree(bookId)
+  // A failed list refresh must not strand the user on a successfully deleted document.
+  try { await refresh(bookId); return true }
+  catch { return false }
 }
 
 function collectIds(n: TreeNode): number[] {

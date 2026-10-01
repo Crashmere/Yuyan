@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Ellipsis, FileText, Folder, PencilLine, TableOfC
 import { api, ApiError, errorMessage, type DocView } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
+import { toast } from '../../ui/toast'
 import { useModeShortcut } from '../modeShortcut'
 import { pageShortcutAllowed } from '../pageShortcut'
 import { newDoc, nodeMenu } from '../actions'
@@ -25,6 +26,8 @@ const view = ref<DocView | null>(null)
 const missing = ref(false)
 const failure = ref('')
 const tocOpen = ref(false)
+let disposed = false
+onBeforeUnmount(() => { disposed = true })
 // Up to this width (the breakpoint in app.css) the outline is a drawer opened from the top bar;
 // wider, it sits beside the text (Toc.vue).
 const drawerQuery = matchMedia('(max-width: 1180px)')
@@ -65,12 +68,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', changeDoc))
 onMounted(async () => {
   try {
     const v = await loading(api<DocView>(`docs/${id}/view`))
+    if (disposed) return
     view.value = v
     setPage(v.doc.bookId, v.doc.id)
     setTitle(v.doc.title)
-    void loadTree(v.doc.bookId)
+    void loadTree(v.doc.bookId).catch(() => toast('目录更新失败，请刷新页面重试', 'error', { key: 'tree-refresh' }))
     if (v.doc.kind === 'doc') recordView({ id: v.doc.id, title: v.doc.title, bookId: v.doc.bookId, bookName: v.doc.bookName })
   } catch (e) {
+    if (disposed) return
     if (e instanceof ApiError && e.status === 404) {
       missing.value = true
       setPage(null)

@@ -78,9 +78,19 @@ export function deleteDoc(bookId: number, node: TreeNode) {
     if (!ok) return
     const current = store.state.docId
     const inside = current != null && store.contains(node, current)
-    await store.deleteDoc(bookId, node.id)
-    toast('已移到回收站', 'success')
-    if (inside) await router.replace(`/books/${bookId}`)
+    const parent = store.locate(bookId, node.id)?.parent
+    const destination = parent ? `/docs/${parent.id}` : `/books/${bookId}`
+    // Finish and unmount the affected editor before deleting its document. Otherwise its
+    // route guard would try to save/snapshot a document that has already been trashed.
+    const editor = store.editing.value
+    if (editor && store.contains(node, editor.docId)) {
+      if (!await editor.flush()) throw new Error('当前文档尚未保存，请处理保存问题后重试')
+      if (await router.replace(`/docs/${editor.docId}`)) return
+    }
+    const route = router.currentRoute.value
+    const refreshed = await store.deleteDoc(bookId, node.id)
+    toast(`已移到回收站${refreshed ? '' : '，请刷新页面以更新目录'}`, 'success')
+    if (inside && router.currentRoute.value === route && route.path !== destination) await router.replace(destination)
   }, '删除失败')
 }
 

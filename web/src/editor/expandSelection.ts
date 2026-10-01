@@ -63,23 +63,27 @@ function nextSelection(view: EditorView, selection: Selection): Selection | unde
   }
   for (let depth = $from.sharedDepth(current.to); depth > 0; depth--) {
     const parent = $from.node(depth)
+    const pos = $from.before(depth), role = parent.type.spec.tableRole
+    // Cell -> table, with no intervening row or cross-cell text selection.
+    if (role === 'row') continue
+    // Selecting all cell text and selecting the table are different operations, even for
+    // a single cell. Always offer the table plugin's canonical whole-table selection.
+    if (role === 'table') {
+      const map = TableMap.get(parent), start = pos + 1
+      add(CellSelection.create(doc, start + map.map[0], start + map.map.at(-1)!))
+      continue
+    }
     const content = TextSelection.between(doc.resolve($from.start(depth)), doc.resolve($from.end(depth)))
     add(content)
+    if (role === 'cell' || role === 'header_cell') {
+      add(CellSelection.create(doc, pos))
+      continue
+    }
     // TextSelection.between skips edge atoms. Select the enclosing node when that would leave
     // part of the original image/block selection out; ordinary text avoids redundant steps.
     if ((content.from > current.from || content.to < current.to || !usable(content))
       && NodeSelection.isSelectable(parent)) {
-      const pos = $from.before(depth), role = parent.type.spec.tableRole
-      // Use the table plugin's canonical selection immediately. Its later normalization of a
-      // NodeSelection would otherwise repeatedly select the same table.
-      if (role === 'table') {
-        const map = TableMap.get(parent), start = pos + 1
-        add(CellSelection.create(doc, start + map.map[0], start + map.map.at(-1)!))
-      } else if (role === 'row') {
-        const cell = doc.resolve(pos + 1)
-        add(CellSelection.rowSelection(cell, cell))
-      } else if (role === 'cell' || role === 'header_cell') add(CellSelection.create(doc, pos))
-      else add(NodeSelection.create(doc, pos))
+      add(NodeSelection.create(doc, pos))
     }
   }
   for (const section of headingSections(doc)) {

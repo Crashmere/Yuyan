@@ -184,7 +184,7 @@ function ungroup() {
 function keyboard(e: KeyboardEvent) {
   if (e.isComposing || (e.target instanceof Element && e.target.closest('input, textarea, select, button'))) return
   const handled = () => { e.preventDefault(); e.stopPropagation() }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') { handled(); attrs.value.forEach((_, i) => picked.add(i)); return }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') { handled(); props.editor.commands.selectAll(); props.editor.view.focus(); return }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { handled(); e.shiftKey ? props.editor.commands.redo() : props.editor.commands.undo(); return }
   if (e.key === 'Escape' && picked.size) { handled(); picked.clear(); return }
   if ((e.key === 'Backspace' || e.key === 'Delete') && picked.size) { handled(); remove(); return }
