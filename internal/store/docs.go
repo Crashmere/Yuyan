@@ -92,6 +92,9 @@ func (s *Store) CreateDoc(ctx context.Context, in CreateDocInput) (Doc, error) {
 	if err := checkBookAlive(ctx, tx, in.BookID); err != nil {
 		return Doc{}, err
 	}
+	if err := retainContentAssets(ctx, tx, content); err != nil {
+		return Doc{}, err
+	}
 	if in.ParentID != nil {
 		var book int64
 		err := tx.QueryRowContext(ctx, `SELECT book_id FROM docs WHERE id = ? AND deleted_at IS NULL`, *in.ParentID).Scan(&book)
@@ -187,6 +190,9 @@ func (s *Store) SaveDoc(ctx context.Context, id int64, title string, content doc
 	if current != baseRevision {
 		return current, "", ErrConflict
 	}
+	if err := retainContentAssets(ctx, tx, content); err != nil {
+		return current, "", err
+	}
 	now := s.stamp()
 	next := current + 1
 	if _, err := tx.ExecContext(ctx, `
@@ -239,6 +245,9 @@ func (s *Store) DiscardEdits(ctx context.Context, id int64, title string, conten
 	}
 	if current != base {
 		return current, ErrConflict
+	}
+	if err := retainContentAssets(ctx, tx, content); err != nil {
+		return current, err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM doc_versions WHERE doc_id = ? AND revision > ?`, id, since); err != nil {
 		return 0, err

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,7 +29,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("usage: yuyan init|check|serve|backup|daily|restore [flags]")
+		return errors.New("usage: yuyan init|check|serve|backup|daily|restore|gc [flags]")
 	}
 	cmd := os.Args[1]
 	flags := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -38,11 +39,28 @@ func run() error {
 	withPrefix := flags.Bool("with-prefix", false, "also accept the public prefix directly (local testing without Nginx)")
 	out := flags.String("out", "", "backup: new backup directory; daily: directory holding daily backups")
 	from := flags.String("from", "", "restore: backup directory to restore from")
+	dryRun := flags.Bool("dry-run", false, "gc: report unused media without changing data")
 	if err := flags.Parse(os.Args[2:]); err != nil {
 		return err
 	}
 	ctx := context.Background()
 	switch cmd {
+	case "gc":
+		s, err := store.Open(*dir)
+		if err != nil {
+			return err
+		}
+		defer s.Close()
+		var result store.AssetGCResult
+		if *dryRun {
+			result, err = s.InspectAssets(ctx)
+		} else {
+			result, err = s.CollectAssets(ctx)
+		}
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
 	case "backup", "daily":
 		if *out == "" {
 			return errors.New("--out required")
@@ -119,6 +137,15 @@ func serve(dir, listen, base string, withPrefix bool) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	gcDone := make(chan struct{})
+	go func() {
+		defer close(gcDone)
+		s.RunAssetGC(ctx)
+	}()
+	defer func() {
+		stop()
+		<-gcDone
+	}()
 	errc := make(chan error, 1)
 	go func() { errc <- httpServer.ListenAndServe() }()
 	slog.Info("listening", "addr", listen, "base", base, "withPrefix", withPrefix)

@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
@@ -70,6 +71,9 @@ func (s *Store) PutAttachment(ctx context.Context, source io.Reader, originalNam
 	}
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
+	if err := syscall.Flock(int(tmp.Fd()), syscall.LOCK_EX); err != nil {
+		return Asset{}, err
+	}
 	hash := sha256.New()
 	size, err := io.Copy(io.MultiWriter(tmp, hash), assetReader{ctx, source})
 	if err != nil {
@@ -90,11 +94,6 @@ func (s *Store) PutAttachment(ctx context.Context, source io.Reader, originalNam
 	}
 	full := hex.EncodeToString(hash.Sum(nil))
 	id := full[:32]
-	if a, err := s.GetAsset(ctx, id); err == nil {
-		return a, nil
-	} else if !errors.Is(err, ErrNotFound) {
-		return Asset{}, err
-	}
 	var width, height int
 	if ok {
 		metadataBytes := size
@@ -108,22 +107,44 @@ func (s *Store) PutAttachment(ctx context.Context, source io.Reader, originalNam
 	if err := tmp.Sync(); err != nil {
 		return Asset{}, err
 	}
-	if err := tmp.Close(); err != nil {
+	if err := ctx.Err(); err != nil {
 		return Asset{}, err
 	}
-	if err := ctx.Err(); err != nil {
+	lock, err := s.lockAssets(ctx, false)
+	if err != nil {
+		return Asset{}, err
+	}
+	defer lock.Close()
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Asset{}, err
+	}
+	defer tx.Rollback()
+	if a, err := getAsset(ctx, tx, id); err == nil {
+		if err := writeAssetGCState(ctx, tx, a.ID+"."+a.Ext, assetGCState{UnreferencedAt: s.now().UTC()}); err != nil {
+			return Asset{}, err
+		}
+		return a, tx.Commit()
+	} else if !errors.Is(err, ErrNotFound) {
 		return Asset{}, err
 	}
 	if err := publishAsset(tmp.Name(), s.AssetPath(id, ext), full); err != nil {
 		return Asset{}, err
 	}
-	_, err = s.DB.ExecContext(ctx, `
+	_, err = tx.ExecContext(ctx, `
 INSERT OR IGNORE INTO assets(id, sha256, ext, mime, size, width, height, original_name, created_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, full, ext, mime, size, nullInt(width), nullInt(height), originalName, s.stamp())
 	if err != nil {
 		return Asset{}, err
 	}
-	return s.GetAsset(ctx, id)
+	if err := writeAssetGCState(ctx, tx, id+"."+ext, assetGCState{UnreferencedAt: s.now().UTC()}); err != nil {
+		return Asset{}, err
+	}
+	a, err := getAsset(ctx, tx, id)
+	if err != nil {
+		return Asset{}, err
+	}
+	return a, tx.Commit()
 }
 
 type assetReader struct {
@@ -224,9 +245,15 @@ func (s *Store) AssetSizes(ctx context.Context, ids []string) (map[string][2]int
 }
 
 func (s *Store) GetAsset(ctx context.Context, id string) (Asset, error) {
+	return getAsset(ctx, s.DB, id)
+}
+
+func getAsset(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, id string) (Asset, error) {
 	var a Asset
 	var w, h sql.NullInt64
-	err := s.DB.QueryRowContext(ctx, `SELECT id, ext, mime, size, width, height, original_name FROM assets WHERE id = ?`, id).
+	err := q.QueryRowContext(ctx, `SELECT id, ext, mime, size, width, height, original_name FROM assets WHERE id = ?`, id).
 		Scan(&a.ID, &a.Ext, &a.Mime, &a.Size, &w, &h, &a.OriginalName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return a, ErrNotFound

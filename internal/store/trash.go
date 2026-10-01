@@ -9,7 +9,8 @@ import (
 
 // PurgeDoc permanently deletes a document in the trash together with everything deleted with it.
 // Children that were trashed separately stay in the trash and move to the top level of their
-// knowledge base, as if restored without a parent. Image files are kept.
+// knowledge base, as if restored without a parent. Unreferenced media is collected
+// separately after its one-hour grace period.
 func (s *Store) PurgeDoc(ctx context.Context, id int64) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {

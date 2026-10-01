@@ -81,8 +81,18 @@ func (s *Store) CreateTemplate(ctx context.Context, name, kind string, content d
 	if err != nil {
 		return t, err
 	}
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO meta(key, value) VALUES (?, ?)`, "template:"+t.ID, string(data))
-	return t, err
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return t, err
+	}
+	defer tx.Rollback()
+	if err := retainContentAssets(ctx, tx, content); err != nil {
+		return t, err
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO meta(key, value) VALUES (?, ?)`, "template:"+t.ID, string(data)); err != nil {
+		return t, err
+	}
+	return t, tx.Commit()
 }
 
 // Compare the stored revision in the same statement as the write, including deletion.

@@ -30,6 +30,11 @@ type BackupManifest struct {
 // Backup writes a consistent snapshot of the database and hard links to every recorded asset into
 // out, which must not exist yet. Hard links require data and backups on the same mount point.
 func (s *Store) Backup(ctx context.Context, out string) error {
+	lock, err := s.lockAssets(ctx, false)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
 	if err := os.Mkdir(out, 0o700); err != nil {
 		return err
 	}
