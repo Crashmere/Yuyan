@@ -2,7 +2,7 @@ import { languages } from '../../editor/languages'
 import type { ImageSizes } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
 import { codeIcon } from '../../shared/codeIcons'
-import { assetId, reservedSize } from '../../shared/images'
+import { reserveImageSpace } from '../../shared/images'
 import { needsDisplay } from '../../shared/latex'
 import { mermaidError, renderMermaid } from '../../shared/mermaid'
 import { frameTable } from '../../shared/tableFrame'
@@ -31,18 +31,6 @@ function frameTables(root: HTMLElement) {
     table.replaceWith(frame)
     scroller.append(table)
     frameTable(frame, scroller)
-  }
-}
-
-// Lazily loaded images take no space until they arrive, which pushes the text below them down
-// and makes jumps to headings land in the wrong place; the stored sizes reserve the space.
-function reserveImageSpace(root: HTMLElement, sizes: ImageSizes) {
-  for (const img of root.querySelectorAll<HTMLImageElement>('img')) {
-    if (img.closest('[data-image-frame]')) continue
-    const id = assetId(img.getAttribute('src') ?? '')
-    const r = reservedSize(id ? sizes[id] : undefined, Number(img.getAttribute('width')) || null, Number(img.getAttribute('height')) || null)
-    if (r.width) img.setAttribute('width', String(r.width))
-    if (r.aspectRatio) img.style.aspectRatio = r.aspectRatio
   }
 }
 

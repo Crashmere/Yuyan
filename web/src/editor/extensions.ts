@@ -22,6 +22,7 @@ import { codeNodeView } from './codeNodeView'
 import { MarkdownPaste } from './markdownPaste'
 import { Search } from './search'
 import { SlashCommand } from './slash'
+import { DocumentLinks } from './documentLinks'
 import { SelectWithin } from './selectWithin'
 import { ExpandSelection } from './expandSelection'
 import { HeadingFolds } from './headingFolds'
@@ -104,6 +105,7 @@ export function editorExtensions(ui: EditorUi, foldKey?: string): Extensions {
     ImageBreaks,
     BlockSpaces,
     SlashCommand.configure({ ui }),
+    DocumentLinks,
     MarkdownShortcuts.configure({ editMath: (_editor, pos) => ui.openMath(pos, true) }),
     MarkdownPaste,
     CalloutKeys,

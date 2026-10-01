@@ -6,6 +6,8 @@ GitHub 只备份源码和配置，推送不触发测试或部署。本机入口�
 
 先读 [docs/README.md](docs/README.md)，再按任务读取设计与验证文档。
 
+文档/章节链接、悬停预览、文末反向链接及模板/片段见 DESIGN 第 24 节。链接复用 `/docs/<id>#<slug>` 与阅读渲染的锚点；`internal/server/links.go` 从存活正文推导关系。模板存于 `meta` 的 `template:<id>`，独立 revision 和现有 JSON 格式；`editor/templates.ts` 闭合选区结构并通过单次事务插入。原生备份覆盖模板和图片，不从源文档删除动作回收模板引用的资源。
+
 - Yuyan（语燕）是用户一人使用的网页知识库，功能参照语雀网页版中适合单人使用的部分：知识库与文档树、所见即所得编辑、阅读页。
 - Go 内嵌 Vue + Tiptap 前端 + SQLite。正文以 Tiptap 文档 JSON 保存并记录格式版本号；Markdown 只用于导入和导出。启动缺库必须报错，只有 `init` 会建库。
 - 前端是单页应用：Go 对所有页面地址返回 `internal/server/templates/shell.html`，由 `internal/server/app.go` 预加载首屏数据，预加载的键必须与前端请求的 API 路径完全一致；正文 HTML 仍由 Go 渲染。前端代码在 `web/src/app`（路由、布局、目录、页面）、`web/src/ui`（通用组件）、`web/src/editor`（编辑器，按需加载）。

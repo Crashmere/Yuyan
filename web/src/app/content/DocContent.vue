@@ -10,6 +10,7 @@ import Lightbox, { type LightboxImage } from './Lightbox.vue'
 import { clearMatches, showMatches } from './matches'
 import { restoreReadingPosition, type ReadingPosition } from './readingPosition'
 import { parseRect } from '../../schema/imageGeometry'
+import { setupLinkPreviews } from '../../shared/linkPreview'
 
 // Shows HTML rendered by the Go renderer. Links inside the site open within the app. highlight is
 // the text searched for when the page was opened from search results; foldKey names the document
@@ -21,12 +22,15 @@ const root = ref<HTMLElement | null>(null)
 const generation = ref(0)
 let drawn: Promise<unknown> = Promise.resolve()
 let initialPosition = props.readingPosition
+let previewCleanup = () => {}
 
 async function run() {
   const position = initialPosition
   initialPosition = undefined // Only on entry, not a later theme change or content redraw.
   await nextTick()
   if (!root.value) return
+  previewCleanup()
+  previewCleanup = setupLinkPreviews(root.value)
   drawn = enhance(root.value, { math: !!props.math, mermaid: !!props.mermaid, images: props.images }).catch((e: unknown) => console.warn('enhance', e))
   setupFolds(root.value, props.foldKey)
   if (location.hash) scrollTo(decodeURIComponent(location.hash.slice(1)))
@@ -56,9 +60,11 @@ onMounted(run)
 watch(() => props.html, run)
 watch(() => props.highlight, mark)
 onBeforeUnmount(() => {
+  previewCleanup()
   clearMatches()
   if (root.value) { cleanupCode(root.value); stopLoading(root.value) }
 })
+watch(() => router.currentRoute.value.hash, hash => { if (hash) scrollTo(decodeURIComponent(hash.slice(1)), true) })
 watch(
   () => prefs.theme,
   () => {

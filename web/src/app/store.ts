@@ -1,6 +1,7 @@
 import { computed, reactive, shallowRef } from 'vue'
 import { api, ApiError, type Book, type BookGroup, type BookGroups, type Doc, type TreeNode } from '../shared/api'
 import { forgetViewed } from './prefs'
+import type { JSONContent } from '@tiptap/core'
 
 // Shared client state: the knowledge base list, the trees seen so far, and what the current page
 // is about (for the sidebar and the breadcrumb). Writes go to the server first and then refresh
@@ -117,8 +118,8 @@ export function setNodeTitle(bookId: number, id: number, title: string) {
   if (found) found.node.title = title
 }
 
-export async function createDoc(bookId: number, parentId: number | null, kind: 'doc' | 'group' = 'doc', title?: string): Promise<Doc> {
-  const doc = await api<Doc>('docs', { method: 'POST', json: { bookId, parentId, kind, title: title ?? (kind === 'doc' ? '无标题文档' : '新分组') } })
+export async function createDoc(bookId: number, parentId: number | null, kind: 'doc' | 'group' = 'doc', title?: string, content?: JSONContent): Promise<Doc> {
+  const doc = await api<Doc>('docs', { method: 'POST', json: { bookId, parentId, kind, title: title ?? (kind === 'doc' ? '无标题文档' : '新分组'), content } })
   await refresh(bookId)
   return doc
 }

@@ -5,7 +5,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { NodeSelection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
-import { ChevronDown, Link } from 'lucide-vue-next'
+import { ChevronDown, Link, Layers } from 'lucide-vue-next'
 import { clearFormatting, currentStyle, markButtons, textStyles } from './commands'
 import { useEditorContext } from './context'
 import { withKey } from './keys'
@@ -158,6 +158,7 @@ function anchor() {
         <AlignmentMenu />
       </template>
       <RemoveSelectionButton />
+      <button type="button" class="yy-bubble-btn" data-tip="保存为内容片段" aria-label="保存为内容片段" @mousedown.prevent @click="ui.saveSnippet()"><Layers :size="16" /></button>
     </div>
   </BubbleMenu>
 </template>

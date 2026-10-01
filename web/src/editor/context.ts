@@ -13,6 +13,8 @@ export interface EditorContext {
 export interface EditorUi {
   pickImage: () => void
   openLink: () => void
+  openTemplates: () => void
+  saveSnippet: () => void
   openMath: (pos: number, fresh?: boolean) => void
   openFind: () => void
   openTableGrid: (anchor: HTMLElement | DOMRect) => void

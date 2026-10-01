@@ -9,6 +9,7 @@ import { useModeShortcut } from '../modeShortcut'
 import { pageShortcutAllowed } from '../pageShortcut'
 import { newDoc, nodeMenu } from '../actions'
 import DocContent from '../content/DocContent.vue'
+import Backlinks from '../content/Backlinks.vue'
 import Toc from '../content/Toc.vue'
 import { prefs, recordView } from '../prefs'
 import { setTitle } from '../router'
@@ -118,6 +119,7 @@ onMounted(async () => {
         这篇文档还是空的。<RouterLink :to="`/docs/${id}/edit`" class="yy-link-btn">开始写作</RouterLink>
       </div>
       <DocContent v-else :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" :highlight="highlight" :fold-key="String(view.doc.id)" :reading-position="readingPosition" />
+      <Backlinks v-if="view.doc.kind === 'doc'" :doc-id="id" />
       <nav v-if="view.prev || view.next" class="yy-pager">
         <RouterLink v-if="view.prev" :to="`/docs/${view.prev.id}`" class="prev">
           <span class="yy-pager-label"><ArrowLeft :size="14" />上一篇</span><span class="yy-pager-title">{{ titleOf(view.prev) }}</span>

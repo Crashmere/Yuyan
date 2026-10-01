@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
+import { templateRequest } from '../shared/templates'
 import AppLayout from './layout/AppLayout.vue'
 import MoveDialog from './tree/MoveDialog.vue'
 import DialogHost from '../ui/DialogHost.vue'
 import ToastHost from '../ui/ToastHost.vue'
+import '../styles/library.css'
+const TemplateDialog = defineAsyncComponent(() => import('./templates/TemplateDialog.vue'))
 </script>
 
 <template>
@@ -10,4 +14,5 @@ import ToastHost from '../ui/ToastHost.vue'
   <MoveDialog />
   <DialogHost />
   <ToastHost />
+  <TemplateDialog v-if="templateRequest" />
 </template>

@@ -6,6 +6,10 @@
 
 ## 布局
 
+文档模板与内容片段存放于既有 `meta` 表的 `template:<id>`，包含独立 revision、正文 JSON 和格式版本，无数据库迁移。备份仍为整个 SQLite 快照和全部登记图片，源文档删除不回收图片，模板可独立复用；恢复模板库需走原生备份恢复，知识库 Markdown 导出不包含模板库。链接选择、预览与文末反向链接从存活正文推导，不新增索引文件或数据目录。接口及交互见 DESIGN 第 24 节，门户 API 声明同步维护。
+
+2026-10-01 在合成隔离实例验证模板冲突检测、非法结构拒绝、源文档彻底删除，以及原生备份/恢复后的模板内容和登记图片；反向链接随文档删除、恢复和知识库回收站状态变化。正式实例只读 roundtrip 检查 320 篇文档、212 个表格无差异；本次没有迁移或批量修改正式正文。
+
 `/opt/yuyan/bin/yuyan` 为内嵌前端的 Linux amd64 程序。config 放本项目的 unit 与 Nginx location，data 放 `yuyan.db` 与 `assets/`（按内容寻址的图片），backups 放快照，docs 与 AGENTS.md 是受控文档副本，releases 留发布历史，current-commit 为程序来源。知识库分组保存在数据库现有 `meta` 表的 `book_groups` JSON 中，随一致性备份保留；旧库无需迁移，未配置时所有知识库均未分组。分组 API 与门户声明保持同步，分组不新增数据目录。
 
 运行身份 yuyan，发布身份 yuyan-deploy；data/backups 为 0700，程序与配置由 root 管理。服务监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问，不增加公网端口。systemd 只允许写 data，内存上限 384 MiB（`GOMEMLIMIT=320MiB`），CPU 100%。图片由程序返回并带一年 `immutable` 缓存，Nginx 不直接读取 data，因此 data 保持 0700。

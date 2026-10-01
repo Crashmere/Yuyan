@@ -17,6 +17,8 @@ type Options struct {
 	// Parity disables page-only additions (heading ids, highlighting, lazy images, read-only
 	// checkboxes) so the output can be compared with Tiptap's static renderer.
 	Parity bool
+	// Embedded previews must not duplicate the containing page's heading identifiers.
+	NoHeadingIDs bool
 }
 
 type Heading struct {
@@ -30,6 +32,29 @@ type Result struct {
 	TOC        []Heading
 	HasMath    bool
 	HasMermaid bool
+}
+
+// Headings uses the reading renderer's identifiers without rendering code or media.
+// Include every level (and empty headings) so duplicate suffixes remain identical.
+func Headings(n doc.Node) []Heading {
+	r := &renderer{ids: map[string]int{}}
+	out := []Heading{}
+	var walk func(doc.Node)
+	walk = func(n doc.Node) {
+		if n.Type == "heading" {
+			text := strings.TrimSpace(doc.TextContent(n))
+			level := n.AttrInt("level", 1)
+			if level < 1 || level > 6 {
+				level = 1
+			}
+			out = append(out, Heading{Level: level, Text: text, ID: r.slug(text)})
+		}
+		for _, c := range n.Content {
+			walk(c)
+		}
+	}
+	walk(n)
+	return out
 }
 
 type renderer struct {
@@ -87,7 +112,9 @@ func (r *renderer) node(n doc.Node) {
 		if !r.opt.Parity {
 			text := strings.TrimSpace(doc.TextContent(n))
 			id := r.slug(text)
-			attrs = append(attrs, [2]string{"id", id})
+			if !r.opt.NoHeadingIDs {
+				attrs = append(attrs, [2]string{"id", id})
+			}
 			if level <= 4 && text != "" {
 				r.res.TOC = append(r.res.TOC, Heading{Level: level, Text: text, ID: id})
 			}

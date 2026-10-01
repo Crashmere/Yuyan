@@ -29,6 +29,8 @@ import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
 import { insertImages, pendingUploads } from './uploads'
 import { clearUnusedBlockSpaces } from './blockSpaces'
+import { openTemplates, saveEditorTemplate } from './templates'
+import { setupLinkPreviews } from '../shared/linkPreview'
 import { captureEditingPosition, restoreReadingPosition } from './readingPosition'
 import 'katex/dist/katex.min.css'
 import '../styles/editor.css'
@@ -66,6 +68,8 @@ const tableGrid = shallowRef<Anchor | null>(null)
 const imageEdit = ref<{ mode: ImageEditMode; positions: number[] } | null>(null)
 
 const ui: EditorUi = {
+  openTemplates: () => { if (editor.value) void openTemplates(editor.value) },
+  saveSnippet: () => { if (editor.value) void saveEditorTemplate(editor.value, 'snippet') },
   openImageTools(mode, positions) {
     const e = editor.value
     if (!e) return
@@ -274,7 +278,7 @@ async function finish(): Promise<boolean> {
   }
 }
 
-defineExpose({ flush, finish, setTitle, touched, discard, capturePosition })
+defineExpose({ flush, finish, setTitle, touched, discard, capturePosition, saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {
@@ -353,6 +357,7 @@ watch(title, () => {
   void nextTick(autosizeTitle)
 })
 
+let previewCleanup = () => {}
 onMounted(async () => {
   const d = props.doc
   const e = new Editor({
@@ -373,6 +378,7 @@ onMounted(async () => {
     },
   })
   editor.value = e
+  previewCleanup = setupLinkPreviews(e.view.dom)
   emit('words', e.storage.characterCount.characters())
   const draft = readDraft()
   if (draft && (draft.title !== d.title || JSON.stringify(draft.content) !== JSON.stringify(d.content))) draftOffer.value = draft
@@ -399,6 +405,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  previewCleanup()
   window.removeEventListener('beforeunload', beforeUnload)
   window.removeEventListener('pagehide', snapshot)
   window.removeEventListener('online', save)

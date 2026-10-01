@@ -7,6 +7,11 @@ import { insertItems, type InsertItem } from './commands'
 import { searchInsertItems } from './insertSearch'
 import type { EditorUi } from './context'
 import SlashMenu from './SlashMenu.vue'
+import { PanelsTopLeft } from 'lucide-vue-next'
+import { api } from '../shared/api'
+import type { TemplateEntry } from '../shared/templates'
+import { score, units } from '../shared/searchMatch'
+import { insertSavedTemplate } from './templates'
 
 export interface SlashEntry extends InsertItem {
   recent?: boolean
@@ -64,6 +69,7 @@ export const SlashCommand = Extension.create<{ ui: EditorUi | null }>({
 
   addProseMirrorPlugins() {
     const ui = this.options.ui
+    let library: Promise<TemplateEntry[]> | null = null
     return ['/', '、'].map((char, i) =>
       Suggestion<SlashEntry, SlashEntry>({
         editor: this.editor,
@@ -71,7 +77,16 @@ export const SlashCommand = Extension.create<{ ui: EditorUi | null }>({
         char,
         allowSpaces: true,
         allow: ({ state, range }) => !state.doc.resolve(range.from).parent.type.spec.code,
-        items: ({ query }) => filter(query),
+        items: async ({ query }) => {
+          library ??= api<TemplateEntry[]>('templates').catch(() => [])
+          const templates = await library
+          const matched = templates.map(item => ({ item, rank: query.trim() ? score(item.name, units(item.pinyin), query) : 1 }))
+            .filter(row => row.rank > 0).sort((a, b) => b.rank - a.rank).slice(0, 20)
+          const entries: SlashEntry[] = matched.map(({ item }) => ({ id: `template:${item.id}`, label: item.name,
+            description: item.kind === 'document' ? '文档模板' : '内容片段', icon: PanelsTopLeft, group: '模板与片段',
+            pinyin: item.pinyin, keywords: '', run: e => { void insertSavedTemplate(e, item.id) } }))
+          return [...filter(query), ...entries]
+        },
         command: ({ editor, range, props }: { editor: Editor; range: Range; props: SlashEntry }) => {
           editor.chain().focus().deleteRange(range).run()
           remember(props.id)
@@ -98,6 +113,7 @@ export const SlashCommand = Extension.create<{ ui: EditorUi | null }>({
               return (component?.ref as { onKeyDown?: (e: KeyboardEvent) => boolean } | null)?.onKeyDown?.(event) ?? false
             },
             onExit: () => {
+              library = null
               component?.element?.remove()
               component?.destroy()
               component = null

@@ -20,7 +20,7 @@
       "id": "data",
       "name": "业务数据",
       "path": "/opt/yuyan/data",
-      "purpose": "数据库、图片与历史迁移材料；临时文件不属于恢复数据。",
+      "purpose": "数据库（文档、历史、模板与内容片段）、图片与历史迁移材料；临时文件不属于恢复数据。",
       "kind": "data",
       "browse": true,
       "cleanup": false
@@ -246,6 +246,46 @@
       "method": "DELETE",
       "path": "/api/trash/books/{id}",
       "description": "以项目 API 路由和 DESIGN.md 为准"
+    },
+    {
+      "method": "GET",
+      "path": "/api/link-targets",
+      "description": "存活文档与章节的拼音选择索引"
+    },
+    {
+      "method": "GET",
+      "path": "/api/docs/{id}/preview",
+      "description": "文档或章节的文字摘要"
+    },
+    {
+      "method": "GET",
+      "path": "/api/docs/{id}/backlinks",
+      "description": "指向当前文档的来源列表"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates",
+      "description": "模板与内容片段摘要列表"
+    },
+    {
+      "method": "POST",
+      "path": "/api/templates",
+      "description": "保存独立模板或内容片段"
+    },
+    {
+      "method": "GET",
+      "path": "/api/templates/{id}",
+      "description": "模板内容、预览与图片尺寸"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/templates/{id}",
+      "description": "重命名模板，检测版本冲突"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/templates/{id}",
+      "description": "删除模板，检测版本冲突"
     }
   ]
 }

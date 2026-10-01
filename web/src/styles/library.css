@@ -1,0 +1,58 @@
+/* Internal links and the content library share the app's quiet list and panel treatment. */
+.yy-link-preview {
+  position: fixed; z-index: 500; pointer-events: none; width: 320px; max-width: calc(100vw - 20px);
+  padding: 14px 16px; border: 1px solid var(--yy-border); border-radius: 9px;
+  background: var(--yy-bg); box-shadow: var(--yy-shadow-popover); font-size: 13px; line-height: 1.6;
+}
+.yy-link-preview strong, .yy-link-preview small { display: block; overflow-wrap: anywhere; }
+.yy-link-preview small { margin-top: 3px; color: var(--yy-text-3); }
+.yy-link-preview p { margin: 9px 0 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.yy-doc-link-picker { overflow-y: auto; overscroll-behavior: contain; max-height: min(360px, 48vh); min-width: 0; }
+.yy-doc-link-suggestion { position: fixed; z-index: 160; width: 360px; max-width: calc(100vw - 16px); background: var(--yy-bg); border: 1px solid var(--yy-border); border-radius: 8px; padding: 5px; box-shadow: var(--yy-shadow-popover); }
+.yy-picker-hint { padding: 7px 9px; color: var(--yy-text-3); font-size: 12px; }
+.yy-picker-empty { padding: 18px 12px; margin: 0; color: var(--yy-text-3); font-size: 13px; }
+.yy-doc-link-row, .yy-template-row { display: flex; align-items: center; border-radius: 5px; }
+.yy-doc-link-row.active, .yy-template-row.active { background: var(--yy-bg-hover); }
+.yy-doc-link-row > button, .yy-template-row > button:first-child { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 9px; background: none; border: 0; text-align: left; cursor: pointer; }
+.yy-doc-link-row > button > span, .yy-template-row > button > span { min-width: 0; flex: 1; }
+.yy-doc-link-row strong, .yy-template-row strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 500; }
+.yy-doc-link-row small, .yy-template-row small { display: block; color: var(--yy-text-3); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yy-doc-link-row > .yy-link-chapters { flex: none; padding: 10px 8px; }
+.yy-link-chapters svg, .yy-backlinks-toggle > svg:first-child { transition: transform 0.15s; }
+.yy-link-chapters svg.expanded { transform: rotate(180deg); }
+.yy-link-tabs { display: flex; gap: 18px; margin: 0 0 10px; border-bottom: 1px solid var(--yy-border); }
+.yy-link-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 9px 0; font-size: 13px; color: var(--yy-text-3); cursor: pointer; }
+.yy-link-tabs button.active { color: var(--yy-primary); border-bottom-color: var(--yy-primary); }
+.yy-link-panel .yy-doc-link-picker { margin-top: 6px; }
+.yy-backlinks { margin-top: 48px; border-top: 1px solid var(--yy-border); padding-top: 14px; }
+.yy-backlinks-toggle { border: 0; background: none; display: flex; align-items: center; gap: 7px; padding: 4px 0; color: var(--yy-text-3); cursor: pointer; font-size: 13px; }
+.yy-backlinks-toggle:hover { color: var(--yy-primary); }
+.yy-backlinks-toggle .expanded { transform: rotate(90deg); }
+.yy-backlinks-toggle span { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--yy-bg-hover); }
+.yy-backlinks-body { padding: 8px 0; font-size: 13px; }
+.yy-backlinks-body > p { color: var(--yy-text-3); }
+.yy-backlinks-body > a { display: block; padding: 10px 12px; border-radius: 5px; }
+.yy-backlinks-body > a:hover { background: var(--yy-bg-hover); }
+.yy-backlinks-body strong { font-weight: 500; }
+.yy-backlinks-body small { margin-left: 10px; color: var(--yy-text-3); }
+.yy-backlinks-body p { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--yy-text-3); }
+.yy-template-dialog { top: 50%; transform: translate(-50%, -50%); animation: yy-fade 0.15s ease-out; width: 880px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.yy-template-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.yy-template-heading .yy-dialog-title { margin: 0; }
+.yy-template-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); min-height: 0; height: min(420px, 53dvh); }
+.yy-template-list { overflow: auto; padding-right: 12px; border-right: 1px solid var(--yy-border); }
+.yy-template-row { padding-right: 3px; }
+.yy-template-menu { z-index: 100; }
+.yy-template-preview { overflow: auto; padding: 0 0 12px 20px; min-width: 0; }
+.yy-template-preview h3 { margin: 4px 0 16px; font-size: 18px; overflow-wrap: anywhere; }
+.yy-template-preview .yy-content { font-size: 13px; }
+.yy-template-preview .yy-content table { max-width: 100%; }
+.yy-template-preview .yy-content img { max-width: 100%; }
+.yy-template-preview .yy-content { pointer-events: none; }
+@media (max-width: 600px) {
+  .yy-template-dialog { padding: 16px; }
+  .yy-template-body { grid-template-columns: 1fr; grid-template-rows: minmax(100px, 1fr) minmax(100px, 1.1fr); height: min(460px, 56dvh); }
+  .yy-template-list { border-right: 0; border-bottom: 1px solid var(--yy-border); padding: 0 0 8px; }
+  .yy-template-preview { padding: 12px 0; }
+  .yy-backlinks-body small { display: block; margin-left: 0; }
+}

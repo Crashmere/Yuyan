@@ -6,7 +6,7 @@ import MenuItems from './MenuItems.vue'
 
 // A dropdown menu opened from the element in the default slot. Menus used inside the editor set
 // restoreFocus to false, so closing them leaves focus with the editor instead of the trigger.
-const props = withDefaults(defineProps<{ items: MenuEntry[]; align?: 'start' | 'center' | 'end'; restoreFocus?: boolean }>(), {
+const props = withDefaults(defineProps<{ items: MenuEntry[]; align?: 'start' | 'center' | 'end'; restoreFocus?: boolean; contentClass?: string }>(), {
   align: 'end',
   restoreFocus: true,
 })
@@ -23,7 +23,7 @@ function onCloseAutoFocus(e: Event) {
       <slot />
     </DropdownMenuTrigger>
     <DropdownMenuPortal>
-      <DropdownMenuContent v-half-row class="yy-menu" :align="align" :side-offset="4" @click.stop @close-auto-focus="onCloseAutoFocus">
+      <DropdownMenuContent v-half-row class="yy-menu" :class="contentClass" :align="align" :side-offset="4" @click.stop @close-auto-focus="onCloseAutoFocus">
         <MenuItems :items="items" />
       </DropdownMenuContent>
     </DropdownMenuPortal>

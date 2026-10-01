@@ -5,6 +5,8 @@ import { onOutside, place } from './floating'
 import { normalizeHref } from './links'
 import { selectionContent } from './selectionContent'
 import { setSelectedTextMark } from './textSelection'
+import DocLinkPicker from './DocLinkPicker.vue'
+import type { LinkChoice } from '../shared/internalLinks'
 
 // Adds or edits a link. With nothing selected it asks for the text as well and inserts a new link.
 const props = defineProps<{ from: number; to: number; href: string; withText: boolean }>()
@@ -15,6 +17,15 @@ const mixedSelection = editor.value && selected?.images.length && selected.text.
 
 const text = ref('')
 const url = ref(props.href)
+const internal = ref(false)
+const query = ref('')
+const picker = ref<InstanceType<typeof DocLinkPicker> | null>(null)
+
+function chooseLink(choice: LinkChoice) {
+  url.value = choice.href
+  if (!text.value) text.value = choice.label
+  apply()
+}
 const panel = ref<HTMLElement | null>(null)
 const first = ref<HTMLInputElement | null>(null)
 let unplace = () => {}
@@ -59,6 +70,7 @@ function remove() {
 
 function onKeydown(e: KeyboardEvent) {
   if (e.isComposing) return
+  if (internal.value && picker.value?.onKeyDown(e)) { e.preventDefault(); e.stopPropagation(); return }
   if (e.key === 'Enter') {
     e.preventDefault()
     apply()
@@ -92,6 +104,15 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="panel" class="yy-float yy-link-panel" role="dialog" aria-label="链接" @keydown="onKeydown">
+    <div class="yy-link-tabs">
+      <button type="button" :class="{ active: !internal }" @click="internal = false">网址</button>
+      <button type="button" :class="{ active: internal }" @click="internal = true">文档与章节</button>
+    </div>
+    <template v-if="internal">
+      <input v-model="query" class="yy-input" placeholder="搜索文档或章节" aria-label="搜索文档或章节" />
+      <DocLinkPicker ref="picker" :query="query" :command="chooseLink" />
+    </template>
+    <template v-else>
     <label v-if="withText" class="yy-float-field">
       <span>文字</span>
       <input ref="first" v-model="text" class="yy-input" placeholder="显示的文字" />
@@ -106,5 +127,6 @@ onBeforeUnmount(() => {
       <button type="button" class="yy-btn small" @mousedown.prevent @click="close()">取消</button>
       <button type="button" class="yy-btn small primary" @mousedown.prevent @click="apply">确定</button>
     </div>
+    </template>
   </div>
 </template>

@@ -45,7 +45,7 @@ function unlink() {
 
 <template>
   <BubbleMenu v-if="editor" :editor="editor" plugin-key="linkCard" :should-show="shouldShow" :options="{ placement: 'bottom-start', offset: 8 }" class="yy-link-card">
-    <button type="button" class="yy-link-card-url" :title="href" @mousedown.prevent @click="openHref(href)">
+    <button type="button" class="yy-link-card-url" :data-tip="href" @mousedown.prevent @click="openHref(href)">
       <ExternalLink :size="14" /><span>{{ href }}</span>
     </button>
     <button type="button" class="yy-bubble-btn" data-tip="编辑链接" aria-label="编辑链接" @mousedown.prevent @click="ui.openLink()"><PencilLine :size="15" /></button>

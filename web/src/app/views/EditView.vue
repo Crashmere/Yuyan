@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { Check, CircleAlert, ClipboardCopy, CloudCheck, Ellipsis, History, LoaderCircle } from 'lucide-vue-next'
+import { Check, CircleAlert, ClipboardCopy, CloudCheck, Ellipsis, History, LoaderCircle, PanelsTopLeft, Layers } from 'lucide-vue-next'
 import { api, ApiError, errorMessage, type Doc } from '../../shared/api'
 import EditorPane, { type SaveStatus } from '../../editor/EditorPane.vue'
 import ActionMenu from '../../ui/ActionMenu.vue'
@@ -36,6 +36,8 @@ useModeShortcut('Escape', '连按两次 Esc 键保存并回到阅读模式', () 
 })
 
 const menu: MenuEntry[] = [
+  { label: '保存为文档模板', icon: PanelsTopLeft, run: () => pane.value?.saveTemplate() },
+  { label: '选区保存为片段', icon: Layers, run: () => pane.value?.saveSnippet() },
   { label: '历史版本', icon: History, run: () => void router.push(`/docs/${id}/history`) },
   { label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(id) },
 ]

@@ -1,3 +1,5 @@
+import type { ImageSizes } from './api'
+
 // The asset id in an image address such as /yuyan/assets/<id>.png.
 export function assetId(src: string): string | null {
   return /\/assets\/([0-9a-f]{32})\./.exec(src)?.[1] ?? null
@@ -11,6 +13,16 @@ export function reservedSize(natural: [number, number] | undefined, width: numbe
   const [w, h] = natural
   if (!w || !h) return {}
   return { width: width || height ? undefined : w, aspectRatio: `${w} / ${h}` }
+}
+
+export function reserveImageSpace(root: HTMLElement, sizes: ImageSizes) {
+  for (const img of root.querySelectorAll<HTMLImageElement>('img')) {
+    if (img.closest('[data-image-frame]')) continue
+    const id = assetId(img.getAttribute('src') ?? '')
+    const r = reservedSize(id ? sizes[id] : undefined, Number(img.getAttribute('width')) || null, Number(img.getAttribute('height')) || null)
+    if (r.width) img.setAttribute('width', String(r.width))
+    if (r.aspectRatio) img.style.aspectRatio = r.aspectRatio
+  }
 }
 
 // Cancels the downloads of images still loading in a page that is being left. They would go on in

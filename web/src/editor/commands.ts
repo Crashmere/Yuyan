@@ -2,7 +2,7 @@ import type { Component } from 'vue'
 import type { Editor } from '@tiptap/core'
 import {
   Bold, Code, Columns2, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
-  ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow, PanelTopClose, Square,
+  ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow, PanelTopClose, Square, PanelsTopLeft,
 } from 'lucide-vue-next'
 import type { EditorUi } from './context'
 import { clearSelectedTextFormatting, setSelectedTextStyle, textStyleActive, toggleSelectedTextMark } from './textSelection'
@@ -95,7 +95,7 @@ export interface InsertItem {
   label: string
   description: string
   icon: Component
-  group: '基础' | '列表' | '插入' | '提示块'
+  group: '基础' | '列表' | '插入' | '提示块' | '模板与片段'
   markdown?: string
   // Fixed menu labels use explicit syllables, in the same format as the server's title index.
   pinyin: string
@@ -105,6 +105,7 @@ export interface InsertItem {
 }
 
 export const insertItems: InsertItem[] = [
+  { id: 'template', label: '模板与片段', description: '插入保存的文档模板或内容片段', icon: PanelsTopLeft, group: '插入', pinyin: 'mu/mo ban yu pian duan', keywords: 'mb pd template snippet', run: (_e, ui) => ui.openTemplates() },
   { id: 'p', label: '正文', description: '普通段落', icon: Pilcrow, group: '基础', pinyin: 'zheng wen', keywords: 'zw text paragraph', run: (e) => e.chain().focus().setParagraph().run() },
   { id: 'h1', label: '标题 1', description: '大标题', icon: Heading1, group: '基础', markdown: '#', pinyin: 'biao ti 1', keywords: 'bt1 h1 heading', run: (e) => e.chain().focus().setHeading({ level: 1 }).run() },
   { id: 'h2', label: '标题 2', description: '中标题', icon: Heading2, group: '基础', markdown: '##', pinyin: 'biao ti 2', keywords: 'bt2 h2 heading', run: (e) => e.chain().focus().setHeading({ level: 2 }).run() },

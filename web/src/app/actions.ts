@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue'
-import { ArrowDown, ArrowUp, ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2 } from 'lucide-vue-next'
-import { base, errorMessage, type Book, type BookGroup, type TreeNode } from '../shared/api'
+import { ArrowDown, ArrowUp, ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2, PanelsTopLeft } from 'lucide-vue-next'
+import { api, base, errorMessage, type Book, type BookGroup, type TreeNode, type Doc } from '../shared/api'
+import { chooseTemplate, saveTemplate } from '../shared/templates'
 import { copyText } from '../shared/clipboard'
 import { confirm, prompt } from '../ui/dialog'
 import type { MenuEntry } from '../ui/menu'
@@ -33,9 +34,27 @@ export function newGroup(bookId: number, parentId: number | null) {
   }, '新建分组失败')
 }
 
+export function newFromTemplate(bookId: number, parentId: number | null) {
+  return attempt(async () => {
+    const template = await chooseTemplate('create')
+    if (!template) return
+    const doc = await store.createDoc(bookId, parentId, 'doc', template.name, template.content)
+    await router.push(`/docs/${doc.id}/edit`)
+  }, '从模板新建失败')
+}
+
+export function saveDocTemplate(id: number) {
+  return attempt(async () => {
+    if (store.editing.value?.docId === id && !await store.editing.value.flush()) return
+    const doc = await api<Doc>(`docs/${id}`)
+    await saveTemplate(doc.content, 'document', doc.title)
+  }, '保存模板失败')
+}
+
 export function bookCreateMenu(bookId: number): MenuEntry[] {
   return [
     { label: '新建文档', icon: FilePlus, run: () => newDoc(bookId, null) },
+    { label: '从模板新建', icon: PanelsTopLeft, run: () => newFromTemplate(bookId, null) },
     { label: '新建分组', icon: FolderPlus, run: () => newGroup(bookId, null) },
   ]
 }
@@ -130,12 +149,14 @@ export async function exportBook(book: Book) {
 export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () => void; history?: boolean } = {}): MenuEntry[] {
   return [
     { label: '新建子文档', icon: FilePlus, run: () => newDoc(bookId, node.id) },
+    { label: '从模板新建子文档', icon: PanelsTopLeft, run: () => newFromTemplate(bookId, node.id) },
     { label: '新建子分组', icon: FolderPlus, run: () => newGroup(bookId, node.id) },
     null,
     ...(node.kind === 'doc' ? [{ label: '编辑', icon: SquarePen, run: () => void router.push(`/docs/${node.id}/edit`) }] : []),
     { label: '重命名', icon: PencilLine, run: options.rename ?? (() => renameDoc(bookId, node)) },
     { label: '移动到…', icon: FolderInput, run: () => moveDocTo(bookId, node) },
     ...(node.kind === 'doc' ? [{ label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(node.id) }] : []),
+    ...(node.kind === 'doc' ? [{ label: '保存为文档模板', icon: PanelsTopLeft, run: () => saveDocTemplate(node.id) }] : []),
     ...(options.history && node.kind === 'doc' ? [{ label: '历史版本', icon: History, run: () => void router.push(`/docs/${node.id}/history`) }] : []),
     { label: '导出', icon: Download, description: node.children?.length ? '含子文档' : undefined, run: () => exportDoc(bookId, node) },
     null,
@@ -186,6 +207,7 @@ export function copyBookLink(id: number) {
 export function bookMenu(book: Book): MenuEntry[] {
   return [
     { label: '新建文档', icon: FilePlus, run: () => newDoc(book.id, null) },
+    { label: '从模板新建', icon: PanelsTopLeft, run: () => newFromTemplate(book.id, null) },
     { label: '新建目录分组', icon: FolderPlus, run: () => newGroup(book.id, null) },
     null,
     { label: '重命名', icon: PencilLine, run: () => renameBook(book) },
