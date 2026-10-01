@@ -3,12 +3,13 @@ import { nextTick, onBeforeUnmount, onMounted, provide, ref, shallowRef, watch }
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import { getMarkRange, type JSONContent } from '@tiptap/core'
 import { Mapping } from '@tiptap/pm/transform'
+import { TableOfContents, X } from 'lucide-vue-next'
+import IconButton from '../ui/IconButton.vue'
 import { api, ApiError, base, errorMessage, type Doc } from '../shared/api'
 import { stopLoading } from '../shared/images'
 import { toast } from '../ui/toast'
 import { prefs } from '../app/prefs'
 import type { ReadingPosition } from '../app/content/readingPosition'
-import BlockHandle from './BlockHandle.vue'
 import BubbleToolbar from './BubbleToolbar.vue'
 import { editorKey, type EditorUi } from './context'
 import EditorOutline from './EditorOutline.vue'
@@ -53,6 +54,7 @@ const failure = ref('')
 const draftOffer = ref<Draft | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const titleInput = ref<HTMLTextAreaElement | null>(null)
+const outlineOpen = ref(false)
 
 // Panels over the editor.
 const linkEdit = ref<{ from: number; to: number; href: string; withText: boolean } | null>(null)
@@ -333,6 +335,9 @@ function snapshot() {
 
 // Find also opens from the title field, where the editor's keymap is not active.
 function pageKeys(e: KeyboardEvent) {
+  if (outlineOpen.value && e.key === 'Escape' && !e.isComposing) {
+    e.preventDefault(); outlineOpen.value = false; return
+  }
   if (e.defaultPrevented || (e.target as Element)?.closest('.cm-editor, .yy-code-dialog')) return
   if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return
   if (e.key === 'f' || e.key === 'F') {
@@ -349,7 +354,7 @@ watch(title, () => {
 onMounted(async () => {
   const d = props.doc
   const e = new Editor({
-    extensions: editorExtensions(ui),
+    extensions: editorExtensions(ui, String(d.id)),
     content: d.content,
     onUpdate: ({ editor: ed }) => {
       emit('words', ed.storage.characterCount.characters())
@@ -430,10 +435,15 @@ onBeforeUnmount(() => {
         ></textarea>
         <editor-content v-if="editor" :editor="editor" class="yy-content" />
       </div>
-      <aside v-if="editor" class="yy-doc-aside yy-editor-outline" :class="{ 'is-peek': !prefs.editorOutline }">
-        <EditorOutline />
+      <aside v-if="editor" class="yy-doc-aside yy-editor-outline" :class="{ 'is-peek': !prefs.editorOutline, 'outline-open': outlineOpen }" :role="outlineOpen ? 'dialog' : undefined" :aria-modal="outlineOpen || undefined" :aria-label="outlineOpen ? '大纲' : undefined">
+        <IconButton class="yy-editor-outline-close" label="关闭大纲" @click="outlineOpen = false"><X :size="18" /></IconButton>
+        <EditorOutline @navigate="outlineOpen = false" />
       </aside>
     </div>
+    <button v-if="outlineOpen" type="button" class="yy-editor-outline-mask" aria-label="关闭大纲" @click="outlineOpen = false"></button>
+    <Teleport defer to="#yy-topbar-actions">
+      <IconButton class="yy-editor-outline-open" label="大纲" :active="outlineOpen" @click="outlineOpen = !outlineOpen"><TableOfContents :size="18" /></IconButton>
+    </Teleport>
 
     <FindReplace v-if="findOpen" ref="find" @close="findOpen = false" />
     <BubbleToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
@@ -444,7 +454,6 @@ onBeforeUnmount(() => {
     <ImageToolbar />
     <HighlightBlockToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit || !!tableGrid || findOpen" />
     <ImageToolsDialog v-if="imageEdit" v-bind="imageEdit" @close="imageEdit = null" />
-    <BlockHandle />
 
     <input ref="fileInput" type="file" :accept="imageTypes.join(',')" multiple hidden @change="onFilePicked" />
   </div>

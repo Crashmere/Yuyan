@@ -1,7 +1,7 @@
-import { EditorSelection, StateField, type EditorState } from '@codemirror/state'
+import { EditorSelection, type EditorState } from '@codemirror/state'
 import { syntaxTree } from '@codemirror/language'
 import type { EditorView } from '@codemirror/view'
-import { smallestRange, smallerRange, textRanges, type SelectionRange } from '../shared/selectionRange'
+import { smallestRange, textRanges, type SelectionRange } from '../shared/selectionRange'
 
 export function codeSelectionRanges(state: EditorState, current: SelectionRange): SelectionRange[] {
   const { doc } = state
@@ -21,27 +21,13 @@ export function codeSelectionRanges(state: EditorState, current: SelectionRange)
   return ranges
 }
 
-// Standalone reading/expanded code views have no ProseMirror history. Embedded editors route
-// both shortcuts to the document so shrinking can cross back into code after expanding out.
-export const codeSelectionHistory = StateField.define<readonly EditorSelection[]>({
-  create: () => [],
-  update(history, tr) {
-    if (tr.docChanged) return []
-    if (tr.isUserEvent('select.expand')) return [...history, tr.startState.selection]
-    if (tr.isUserEvent('select.shrink')) return history.slice(0, -1)
-    return tr.selection && !tr.newSelection.eq(tr.startState.selection) ? [] : history
-  },
-})
-
-export function resizeCodeSelection(view: EditorView, shrink = false): boolean {
+export function expandCodeSelection(view: EditorView): boolean {
   const { state } = view, { selection } = state
   const current = { from: Math.min(...selection.ranges.map(r => r.from)), to: Math.max(...selection.ranges.map(r => r.to)) }
-  const nextRange = (range: SelectionRange) => smallestRange(codeSelectionRanges(state, range), range)
-  const previous = shrink ? state.field(codeSelectionHistory).at(-1) : undefined
-  const next = shrink ? smallerRange(current, { from: current.from, to: current.from }, nextRange) : nextRange(current)
+  const next = smallestRange(codeSelectionRanges(state, current), current)
   if (!next) return true
   const backward = selection.main.anchor > selection.main.head
-  const selected = previous ?? EditorSelection.single(backward ? next.to : next.from, backward ? next.from : next.to)
-  if (!selected.eq(selection)) view.dispatch({ selection: selected, scrollIntoView: true, userEvent: shrink ? 'select.shrink' : 'select.expand' })
+  const selected = EditorSelection.single(backward ? next.to : next.from, backward ? next.from : next.to)
+  if (!selected.eq(selection)) view.dispatch({ selection: selected, scrollIntoView: true, userEvent: 'select' })
   return true
 }

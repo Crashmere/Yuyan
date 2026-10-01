@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
-import { Eye, EyeOff } from 'lucide-vue-next'
+import { Eye, EyeOff, GripVertical } from 'lucide-vue-next'
 import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
 
@@ -14,7 +14,7 @@ export interface OutlineEntry {
   href?: string
 }
 
-const props = defineProps<{ items: OutlineEntry[]; active: number; pinned: boolean; emptyText?: string }>()
+const props = defineProps<{ items: OutlineEntry[]; active: number; pinned: boolean; emptyText?: string; reorderable?: boolean }>()
 const emit = defineEmits<{ go: [index: number]; pin: [pinned: boolean] }>()
 
 const folded = reactive(new Set<string>())
@@ -47,7 +47,7 @@ function toggleAll() {
 </script>
 
 <template>
-  <nav class="yy-toc" :class="{ 'is-peek': !pinned }" aria-label="大纲">
+  <nav class="yy-toc" :class="{ 'is-peek': !pinned, 'can-reorder': reorderable }" aria-label="大纲">
     <div v-if="!pinned && items.length" class="yy-toc-lines" tabindex="0" aria-label="大纲">
       <span v-for="(h, i) in items" :key="h.key" :class="{ active: i === active }" :style="{ '--level': h.level - minLevel }"></span>
     </div>
@@ -63,7 +63,7 @@ function toggleAll() {
       </div>
       <ul v-if="items.length">
         <template v-for="(h, i) in items" :key="h.key">
-          <li v-if="shownBy[i] === i" :style="{ '--level': h.level - minLevel }">
+          <li v-if="shownBy[i] === i" :style="{ '--level': h.level - minLevel }" :data-outline-key="h.key">
             <button
               v-if="parents[i]"
               type="button"
@@ -73,7 +73,8 @@ function toggleAll() {
               :aria-expanded="!folded.has(h.key)"
               @click="toggle(h.key)"
             ></button>
-            <a :href="h.href ?? '#'" :class="{ active: i === highlighted }" :title="h.text" @click.prevent="emit('go', i)">{{ h.text }}</a>
+            <a :href="h.href ?? '#'" :draggable="false" :class="{ active: i === highlighted }" :title="h.text" @click.prevent="emit('go', i)">{{ h.text }}</a>
+            <button v-if="reorderable" type="button" class="yy-toc-drag" aria-label="拖动这一节" data-tip="拖动标题及其下全部内容" @click.prevent><GripVertical :size="14" /></button>
           </li>
         </template>
       </ul>

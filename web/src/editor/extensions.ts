@@ -24,6 +24,7 @@ import { Search } from './search'
 import { SlashCommand } from './slash'
 import { SelectWithin } from './selectWithin'
 import { ExpandSelection } from './expandSelection'
+import { HeadingFolds } from './headingFolds'
 import { fixColumnWidths, followColumnBorder, FramedTableView, TableShape } from './tables'
 import { resizeHitWidth, rowResizing, withResizeDelay } from './tableResize'
 import { tableControls } from './tableControls'
@@ -42,7 +43,7 @@ import { BlockContainers, foldBlockView } from './blockContainers'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
 
-export function editorExtensions(ui: EditorUi): Extensions {
+export function editorExtensions(ui: EditorUi, foldKey?: string): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
@@ -111,6 +112,7 @@ export function editorExtensions(ui: EditorUi): Extensions {
     TableShape,
     SelectWithin,
     ExpandSelection,
+    HeadingFolds.configure({ key: foldKey }),
     FormatPainter,
     UiShortcuts.configure({ openFind: ui.openFind }),
   ]

@@ -8,7 +8,7 @@
 
 日常发布与验证按 [本机发布说明](DEPLOYMENT.md) 执行；GitHub 只作源码备份。
 
-新建与选区快捷键见 DESIGN.md 第 22 节：阅读时 Option/Alt+N 在当前目录新建文档；编辑时 Option/Alt+L 逐层扩大选区，Option/Alt+Shift+L 逐层缩回，覆盖正文、嵌套内容与代码语法层级。
+新建与选区快捷键见 DESIGN.md 第 22 节：阅读时 Option/Alt+N 在当前目录新建文档；编辑时 Option/Alt+L 从文字与内容块逐层扩到所属章节、上级章节和全文；标题左侧统一显示层级与折叠按钮，整节移动通过编辑大纲拖动完成。
 
 图片裁切、互补切分、可选参数及四种范围的批量应用、图片组合画板见 DESIGN.md 19.2–19.3；格式兼容与验证见 OPERATIONS.md。
 

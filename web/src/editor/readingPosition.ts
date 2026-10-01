@@ -4,6 +4,7 @@ import type { Node } from '@tiptap/pm/model'
 import type { Mapping } from '@tiptap/pm/transform'
 import { captureBlockPosition, type ReadingPosition } from '../app/content/readingPosition'
 import { codeEditorIn } from '../code/editor'
+import { revealHeadingAt } from './headingFolds'
 
 export function captureEditingPosition(editor: Editor, original?: { doc: Node; mapping: Mapping }): ReadingPosition | undefined {
   const blocks: (Element | null)[] = []
@@ -30,6 +31,7 @@ export function restoreReadingPosition(editor: Editor, position: ReadingPosition
     if (index === position.block) pos = offset
   })
   if (pos === undefined) return false
+  revealHeadingAt(editor.view, pos)
   const block = editor.view.nodeDOM(pos)
   if (!(block instanceof HTMLElement) || !block.isConnected) return false
 

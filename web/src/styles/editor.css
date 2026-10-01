@@ -117,6 +117,7 @@
   color: var(--yy-text-3);
   font-size: 13px;
 }
+.yy-editor-outline-open, .yy-editor-outline-close, .yy-editor-outline-mask { display: none; }
 @media (max-width: 1180px) {
   .yy-toolbar { grid-template-columns: minmax(0, 1fr); padding: 0 40px; }
   .yy-toolbar-inner { grid-column: auto; width: 100%; max-width: var(--yy-content-width); margin: 0 auto; }
@@ -130,6 +131,18 @@
   .yy-editor-outline {
     display: none;
   }
+  .yy-editor-outline-open {
+    display: inline-flex;
+  }
+  .yy-editor-outline.outline-open {
+    display: block; position: fixed; top: var(--yy-topbar); right: 0; bottom: 0; z-index: 56;
+    width: min(320px, 85vw); max-height: none; padding: 20px; background: var(--yy-bg-elevated);
+    border-left: 1px solid var(--yy-border);
+  }
+  .yy-editor-outline-close { display: inline-flex; float: right; position: relative; z-index: 3; margin-top: -6px; }
+  .yy-editor-outline-mask { display: block; position: fixed; inset: var(--yy-topbar) 0 0; z-index: 55; border: 0; background: rgb(0 0 0 / .12); touch-action: none; }
+  .yy-editor-outline .yy-toc-head { background: var(--yy-bg-elevated); }
+  .yy-editor-outline .yy-toc-eye { display: none; }
 }
 /* app.css loads first, so its rule for phones would lose to the ones above. */
 @media (max-width: 640px) {
@@ -654,58 +667,6 @@ body.yy-row-dragging * {
 }
 .yy-link-card-url:hover {
   background: var(--yy-bg-hover);
-}
-
-/* Block handle -------------------------------------------------------------------------------- */
-
-.yy-block-handle {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding-right: 6px;
-}
-.yy-block-handle:not(.has-heading) {
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-.yy-handle-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--yy-radius-sm);
-  background: none;
-  color: var(--yy-text-4);
-  cursor: pointer;
-}
-.yy-handle-btn:hover,
-.yy-handle-btn[data-state='open'] {
-  background: var(--yy-bg-hover);
-  color: var(--yy-text-2);
-}
-.yy-handle-btn.grip {
-  cursor: grab;
-}
-.yy-handle-btn.grip.is-heading {
-  flex: none;
-  gap: 1px;
-  width: auto;
-  white-space: nowrap;
-  padding: 0 2px 0 5px;
-  border: 1px solid var(--yy-border);
-  border-radius: var(--yy-radius);
-  background: var(--yy-bg);
-}
-.yy-handle-level {
-  color: var(--yy-primary);
-  font: 600 12px/1 var(--yy-font);
-}
-.yy-handle-level sub {
-  font-size: 9px;
-  vertical-align: -2px;
 }
 
 /* Fold/highlight blocks ----------------------------------------------------------------------- */

@@ -1,14 +1,14 @@
 import { Extension } from '@tiptap/core'
 import type { ResolvedPos } from '@tiptap/pm/model'
-import { AllSelection, NodeSelection, Plugin, PluginKey, Selection, TextSelection } from '@tiptap/pm/state'
+import { AllSelection, NodeSelection, Plugin, type Selection, TextSelection } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { CellSelection, TableMap } from '@tiptap/pm/tables'
 import { altLetter } from '../shared/keyboard'
-import { growsRange, smallerRange, textRanges } from '../shared/selectionRange'
+import { growsRange, textRanges } from '../shared/selectionRange'
 import { codeEditorIn } from '../code/editor'
 import { codeSelectionRanges } from '../code/expandSelection'
-
-const selectionHistory = new PluginKey<readonly Selection[]>('selectionExpansion')
+import { headingSections } from './sections'
+import { SectionSelection } from './sectionSelection'
 
 function bounds(selection: Selection) {
   // Cell/image selections can have several disjoint ranges; expansion must contain them all.
@@ -71,7 +71,7 @@ function nextSelection(view: EditorView, selection: Selection): Selection | unde
       && NodeSelection.isSelectable(parent)) {
       const pos = $from.before(depth), role = parent.type.spec.tableRole
       // Use the table plugin's canonical selection immediately. Its later normalization of a
-      // NodeSelection would otherwise clear our history or repeatedly select the same table.
+      // NodeSelection would otherwise repeatedly select the same table.
       if (role === 'table') {
         const map = TableMap.get(parent), start = pos + 1
         add(CellSelection.create(doc, start + map.map[0], start + map.map.at(-1)!))
@@ -82,6 +82,14 @@ function nextSelection(view: EditorView, selection: Selection): Selection | unde
       else add(NodeSelection.create(doc, pos))
     }
   }
+  for (const section of headingSections(doc)) {
+    // Body first; when the selection already includes the heading, keep that heading too.
+    const from = current.from < section.body ? section.pos : section.body
+    if (from >= section.end || from > current.from || section.end < current.to) continue
+    const text = TextSelection.between(doc.resolve(from), doc.resolve(section.end))
+    if (selection instanceof TextSelection && text.from === current.from && text.to === current.to) continue
+    add(SectionSelection.create(doc, from, section.end))
+  }
   candidates.push(new AllSelection(doc))
   return candidates.sort((a, b) => {
     const left = bounds(a), right = bounds(b)
@@ -89,23 +97,13 @@ function nextSelection(view: EditorView, selection: Selection): Selection | unde
   })[0]
 }
 
-export function resizeSelection(view: EditorView, shrink = false): boolean {
-  const { state } = view, { doc, selection } = state
-  let next: Selection | undefined
-  if (shrink) {
-    next = selectionHistory.getState(state)?.at(-1)
-    if (!next && !selection.empty) {
-      const current = bounds(selection)
-      let start = Selection.near(doc.resolve(current.from), 1)
-      const hidden = hiddenAncestor(start.$from)
-      if (hidden !== undefined) start = NodeSelection.create(doc, start.$from.before(hidden))
-      next = smallerRange(current, start, range => nextSelection(view, range), bounds)
-    }
-  } else next = nextSelection(view, selection)
+export function expandSelection(view: EditorView): boolean {
+  const { state } = view, { selection } = state
+  const next = nextSelection(view, selection)
   if (next) {
-    const directed = !shrink && next instanceof TextSelection && selection.anchor > selection.head
-      ? TextSelection.create(doc, next.to, next.from) : next
-    if (!directed.eq(selection)) view.dispatch(state.tr.setSelection(directed).setMeta(selectionHistory, shrink ? 'shrink' : 'expand').scrollIntoView())
+    const directed = next instanceof TextSelection && selection.anchor > selection.head
+      ? TextSelection.create(state.doc, next.to, next.from) : next
+    if (!directed.eq(selection)) view.dispatch(state.tr.setSelection(directed).scrollIntoView())
   }
   return true
 }
@@ -114,21 +112,15 @@ export const ExpandSelection = Extension.create({
   name: 'expandSelection',
   priority: 1000,
   addProseMirrorPlugins() {
-    return [new Plugin<readonly Selection[]>({
-      key: selectionHistory,
-      state: {
-        init: () => [],
-        apply(tr, history, oldState) {
-          if (tr.docChanged) return []
-          if (tr.getMeta(selectionHistory) === 'expand') return [...history, oldState.selection]
-          if (tr.getMeta(selectionHistory) === 'shrink') return history.slice(0, -1)
-          return tr.selectionSet && !tr.selection.eq(oldState.selection) ? [] : history
-        },
-      },
+    return [new Plugin({
       props: {
+        createSelectionBetween(view, anchor, head) {
+          const current = view.state.selection
+          return current instanceof SectionSelection && current.anchor === anchor.pos && current.head === head.pos ? current : null
+        },
         handleKeyDown(view, event) {
-          if (!view.editable || view.composing || !altLetter(event, 'l', event.shiftKey)) return false
-          return resizeSelection(view, event.shiftKey)
+          if (!view.editable || view.composing || !altLetter(event, 'l')) return false
+          return expandSelection(view)
         },
       },
     })]

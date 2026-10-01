@@ -1863,7 +1863,8 @@ a.yy-catalog-title:hover {
     visibility: hidden;
     transition: opacity 0.15s 0.2s, visibility 0s 0.35s;
   }
-  .yy-toc.is-peek:hover .yy-toc-panel {
+  .yy-toc.is-peek:hover .yy-toc-panel,
+  .yy-toc.is-peek.is-reordering .yy-toc-panel {
     opacity: 1;
     visibility: visible;
     transition: opacity 0.15s 0.15s, visibility 0s 0.15s;
@@ -1967,6 +1968,22 @@ a.yy-catalog-title:hover {
 .yy-toc-caret:hover {
   color: var(--yy-text);
 }
+.yy-toc.can-reorder a { padding-right: 22px; cursor: grab; }
+.yy-toc-drag {
+  position: absolute; top: 0; right: 0; display: grid; place-items: center;
+  width: 22px; height: 27px; padding: 0; border: 0; background: none;
+  color: var(--yy-text-3); opacity: 0; cursor: grab; touch-action: none;
+}
+.yy-toc li:hover > .yy-toc-drag, .yy-toc.is-reordering .yy-toc-drag { opacity: 1; }
+.yy-toc.is-reordering a, .yy-toc.is-reordering .yy-toc-drag { cursor: grabbing; }
+.yy-toc li.is-dragging { opacity: .45; }
+.yy-toc li.drop-before::after, .yy-toc li.drop-after::after {
+  content: ''; position: absolute; z-index: 3; left: calc(12px + var(--level, 0) * 12px); right: 0;
+  height: 2px; background: var(--yy-primary); pointer-events: none;
+}
+.yy-toc li.drop-before::after { top: -1px; }
+.yy-toc li.drop-after::after { bottom: -1px; }
+@media (hover: none) { .yy-toc-drag { opacity: .65; } }
 .yy-aside-mask {
   display: none;
 }

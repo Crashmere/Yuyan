@@ -6,7 +6,6 @@ export const codeKeys = [
   { action: 'replace', label: '块内替换', key: 'Mod-r' },
   { action: 'format', label: '格式化代码', key: 'Mod-Alt-l' },
   { action: 'expand', label: '逐层扩大选区', key: 'Alt-l' },
-  { action: 'shrink', label: '逐层缩小选区', key: 'Alt-Shift-l' },
   { action: 'indent', label: '缩进（4 个空格）', key: 'Tab' },
   { action: 'unindent', label: '取消缩进', key: 'Shift-Tab' },
   { action: 'comment', label: '切换行注释', key: 'Mod-/' },

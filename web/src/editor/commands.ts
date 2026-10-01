@@ -1,7 +1,5 @@
 import type { Component } from 'vue'
 import type { Editor } from '@tiptap/core'
-import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
-import { TextSelection } from '@tiptap/pm/state'
 import {
   Bold, Code, Columns2, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
   ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow, PanelTopClose, Square,
@@ -11,7 +9,7 @@ import { clearSelectedTextFormatting, setSelectedTextStyle, textStyleActive, tog
 import { insertColumns } from './columns'
 import { insertContainer } from './blockContainers'
 
-// Commands shared by the toolbar, the selection toolbar, the slash menu and the block menu. Every
+// Commands shared by the toolbar, the selection toolbar, the slash menu. Every
 // command works on the existing document schema; nothing here adds a new node or attribute.
 
 export interface TextStyle {
@@ -141,118 +139,4 @@ export const insertItems: InsertItem[] = [
 export function coordsRect(e: Editor): DOMRect {
   const c = e.view.coordsAtPos(e.state.selection.from)
   return new DOMRect(c.left, c.top, 1, c.bottom - c.top)
-}
-
-// ---------------------------------------------------------------------------------------------
-// Blocks under the drag handle. pos is the position before the block.
-
-export interface BlockTarget {
-  id: string
-  label: string
-  icon: Component
-}
-
-export const blockTargets: BlockTarget[] = [
-  { id: 'p', label: '正文', icon: Pilcrow },
-  { id: 'h1', label: '标题 1', icon: Heading1 },
-  { id: 'h2', label: '标题 2', icon: Heading2 },
-  { id: 'h3', label: '标题 3', icon: Heading3 },
-  { id: 'bullet', label: '无序列表', icon: List },
-  { id: 'ordered', label: '有序列表', icon: ListOrdered },
-  { id: 'task', label: '任务列表', icon: ListTodo },
-  { id: 'quote', label: '引用', icon: Quote },
-  { id: 'code', label: '代码块', icon: SquareCode },
-  { id: 'callout', label: 'Callout', icon: MessageSquareText },
-]
-
-function selectBlock(e: Editor, pos: number, node: PMNode) {
-  const tr = e.state.tr
-  const $from = tr.doc.resolve(pos + 1)
-  const $to = tr.doc.resolve(pos + node.nodeSize - 1)
-  e.view.dispatch(tr.setSelection(TextSelection.between($from, $to)))
-}
-
-export function turnInto(e: Editor, pos: number, target: string) {
-  let node = e.state.doc.nodeAt(pos)
-  if (!node) return
-  // A callout is unwrapped first; converting to Callout keeps a callout as it is.
-  if (node.type.name === 'callout') {
-    if (target === 'callout') return
-    const body = node.child(1).content
-    e.view.dispatch(e.state.tr.replaceWith(pos, pos + node.nodeSize, body))
-    node = e.state.doc.nodeAt(pos)
-    if (!node) return
-    if (body.childCount > 1) {
-      const end = pos + body.size
-      e.view.dispatch(e.state.tr.setSelection(TextSelection.between(e.state.doc.resolve(pos + 1), e.state.doc.resolve(end - 1))))
-    } else selectBlock(e, pos, node)
-  } else if (target === 'callout') {
-    const s = e.state.schema.nodes
-    const callout = s.callout.create({ type: 'note', fold: '' }, [s.calloutTitle.create(), s.calloutContent.create(null, node)])
-    const tr = e.state.tr.replaceWith(pos, pos + node.nodeSize, callout)
-    e.view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(pos + 2))))
-    e.commands.focus()
-    return
-  } else {
-    selectBlock(e, pos, node)
-  }
-  const chain = e.chain().focus().clearNodes()
-  const done = {
-    p: () => chain.run(),
-    h1: () => chain.setHeading({ level: 1 }).run(),
-    h2: () => chain.setHeading({ level: 2 }).run(),
-    h3: () => chain.setHeading({ level: 3 }).run(),
-    bullet: () => chain.toggleBulletList().run(),
-    ordered: () => chain.toggleOrderedList().run(),
-    task: () => chain.toggleTaskList().run(),
-    quote: () => chain.toggleBlockquote().run(),
-    code: () => chain.setCodeBlock().run(),
-  }[target]
-  done?.()
-}
-
-export function duplicateBlock(e: Editor, pos: number) {
-  const node = e.state.doc.nodeAt(pos)
-  if (!node) return
-  const at = pos + node.nodeSize
-  const tr = e.state.tr.insert(at, node)
-  e.view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(at + 1))).scrollIntoView())
-  e.commands.focus()
-}
-
-export function deleteBlock(e: Editor, pos: number) {
-  const node = e.state.doc.nodeAt(pos)
-  if (!node) return
-  const tr = e.state.tr
-  if (e.state.doc.childCount === 1) tr.replaceWith(pos, pos + node.nodeSize, e.state.schema.nodes.paragraph.create())
-  else tr.delete(pos, pos + node.nodeSize)
-  e.view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(pos, tr.doc.content.size)))).scrollIntoView())
-  e.commands.focus()
-}
-
-export function moveBlock(e: Editor, pos: number, dir: -1 | 1) {
-  const $pos = e.state.doc.resolve(pos)
-  const index = $pos.index()
-  const parent = $pos.parent
-  const target = index + dir
-  if (target < 0 || target >= parent.childCount) return
-  const node = parent.child(index)
-  const sibling = parent.child(target)
-  const tr = e.state.tr
-  let at: number
-  if (dir < 0) {
-    at = pos - sibling.nodeSize
-    tr.replaceWith(at, pos + node.nodeSize, Fragment.from([node, sibling]))
-  } else {
-    at = pos + sibling.nodeSize
-    tr.replaceWith(pos, pos + node.nodeSize + sibling.nodeSize, Fragment.from([sibling, node]))
-  }
-  e.view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(at + 1))).scrollIntoView())
-  e.commands.focus()
-}
-
-export function canMove(e: Editor, pos: number, dir: -1 | 1): boolean {
-  const $pos = e.state.doc.resolve(pos)
-  const target = $pos.index() + dir
-  return target >= 0 && target < $pos.parent.childCount
 }

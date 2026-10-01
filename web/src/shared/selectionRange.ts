@@ -9,17 +9,6 @@ export function smallestRange(ranges: SelectionRange[], current: SelectionRange)
   return ranges.filter(range => growsRange(range, current)).sort((a, b) => (a.to - a.from) - (b.to - b.from))[0]
 }
 
-// For a manual selection, rebuild the expansion path from its first position. Keep the last
-// strictly smaller range fully inside it; an arbitrary drag must never grow while shrinking.
-export function smallerRange<T extends SelectionRange>(current: SelectionRange, start: T, next: (range: T) => T | undefined, rangeOf: (value: T) => SelectionRange = value => value): T {
-  let result = start
-  for (;;) {
-    const candidate = next(result)
-    if (!candidate || !growsRange(current, rangeOf(candidate)) || !growsRange(rangeOf(candidate), rangeOf(result))) return result
-    result = candidate
-  }
-}
-
 // Native segmentation understands Chinese words as well as Latin words and emoji, without
 // shipping a dictionary. All indices stay in UTF-16, as in ProseMirror and CodeMirror.
 const words = new Intl.Segmenter('zh', { granularity: 'word' })

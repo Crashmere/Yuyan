@@ -14,7 +14,7 @@ import { codeActions, expandCode, type CodeAction } from '../../code/actions'
 import { codeKey } from '../../code/preferences'
 import { searchState } from '../search'
 import { formatLanguage } from '../../code/formatLanguage'
-import { resizeSelection } from '../expandSelection'
+import { expandSelection } from '../expandSelection'
 
 const props = defineProps(nodeViewProps)
 
@@ -141,8 +141,8 @@ onMounted(() => {
   code.value = new CodeEditor(codeHost.value, {
     doc: props.node.textContent, language: language.value, key: codeKey(index),
     onPreferences: preferences => { wrapped.value = preferences.wrapped },
-    onResizeSelection: shrink => {
-      resizeSelection(props.editor.view, shrink)
+    onExpandSelection: () => {
+      expandSelection(props.editor.view)
       const pos = props.getPos(), selection = props.editor.state.selection
       if (typeof pos === 'number' && (selection.from <= pos || selection.to >= pos + props.node.nodeSize)) {
         closeExpanded?.()
