@@ -32,7 +32,7 @@ type Mark struct {
 var nodeTypes = map[string]bool{
 	"doc": true, "paragraph": true, "heading": true, "text": true, "hardBreak": true,
 	"horizontalRule": true, "blockquote": true, "bulletList": true, "orderedList": true,
-	"listItem": true, "taskList": true, "taskItem": true, "codeBlock": true, "image": true, "imageBoard": true,
+	"listItem": true, "taskList": true, "taskItem": true, "codeBlock": true, "image": true, "attachment": true, "imageBoard": true,
 	"table": true, "tableRow": true, "tableHeader": true, "tableCell": true,
 	"callout": true, "calloutTitle": true, "calloutContent": true,
 	"foldBlock": true, "foldTitle": true, "foldContent": true, "highlightBlock": true,
@@ -73,6 +73,11 @@ func validate(n Node, depth int) error {
 	if n.Type == "doc" && depth > 0 {
 		return errors.New("nested doc node")
 	}
+	if n.Type == "attachment" {
+		if !validAttachment(n) {
+			return errors.New("invalid attachment")
+		}
+	}
 	if n.Type == "imageBoard" {
 		if len(n.Content) == 0 {
 			return errors.New("image board must contain at least one image")
@@ -108,7 +113,7 @@ func validate(n Node, depth int) error {
 		}
 		if n.Type == "column" {
 			switch child.Type {
-			case "paragraph", "heading", "horizontalRule", "blockquote", "bulletList", "orderedList", "taskList", "codeBlock", "imageBoard", "table", "callout", "foldBlock", "highlightBlock", "blockMath", "columns":
+			case "attachment", "paragraph", "heading", "horizontalRule", "blockquote", "bulletList", "orderedList", "taskList", "codeBlock", "imageBoard", "table", "callout", "foldBlock", "highlightBlock", "blockMath", "columns":
 			default:
 				return errors.New("column children must be blocks")
 			}
@@ -204,6 +209,8 @@ func PlainText(n Node) string {
 			b.WriteByte('\n')
 		case "inlineMath", "blockMath":
 			b.WriteString(n.Attr("latex"))
+		case "attachment":
+			b.WriteString(n.Attr("name") + "\n")
 		case "image":
 			b.WriteString(n.Attr("alt"))
 			if caption := n.Attr("caption"); caption != "" {

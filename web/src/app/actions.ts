@@ -130,8 +130,8 @@ export async function runExport(bookName: string, nodes: TreeNode[], zipName: st
   try {
     const { exportNodes } = await import('./webExport')
     const r = await exportNodes(bookName, nodes, zipName, progress)
-    const images = r.images ? `、${r.images} 张图片` : ''
-    const failed = r.failedImages ? `；${r.failedImages} 张图片下载失败` : ''
+    const images = r.images ? `、${r.images} 个图片与附件` : ''
+    const failed = r.failedImages ? `；${r.failedImages} 个图片或附件下载失败` : ''
     toast(`已导出 ${r.docs} 篇文档${images}${failed}`, r.failedImages ? 'error' : 'success', { key: 'export' })
   } catch (e) {
     toast(`导出失败：${errorMessage(e)}`, 'error', { key: 'export' })

@@ -1,4 +1,5 @@
 import type { JSONContent } from '@tiptap/core'
+import { attachmentSource } from '../schema/attachment'
 import { docToMarkdown } from '../schema/markdown'
 
 // Lays out knowledge bases as an Obsidian-readable folder tree: every knowledge base is a folder,
@@ -134,6 +135,7 @@ export interface ExportedDoc {
   markdown: string
   // Image files (for example "<id>.png") the document refers to.
   assets: string[]
+  assetURLs: Record<string, string>
   // Links to documents that are not part of the plan, such as documents in the trash.
   missingLinks: string[]
 }
@@ -142,13 +144,23 @@ export interface ExportedDoc {
 // as written and is reported in missingLinks.
 export function exportDoc(content: JSONContent, file: string, plan: ExportPlan, unresolvedLink?: (href: string) => string): ExportedDoc {
   const assets = new Set<string>()
+  const assetURLs: Record<string, string> = {}
   const missingLinks: string[] = []
   const markdown = docToMarkdown(content, {
     imageSrc: (src) => {
       const m = assetSrc.exec(src)
       if (!m) return src
       assets.add(m[1])
+      assetURLs[m[1]] = `/assets/${m[1]}`
       return encodeLinkPath(relativePath(file, `${attachmentsDir}/${m[1]}`))
+    },
+    attachmentSrc: (src, name) => {
+      const m = attachmentSource.exec(src)
+      if (!m) throw new Error('无效的附件地址：' + name)
+      const filename = m[1] + '-' + fileName(name)
+      assets.add(filename)
+      assetURLs[filename] = src
+      return encodeLinkPath(relativePath(file, attachmentsDir + '/' + filename))
     },
     linkHref: (href) => {
       const m = docHref.exec(href)
@@ -162,5 +174,5 @@ export function exportDoc(content: JSONContent, file: string, plan: ExportPlan, 
       return encodeLinkPath(relativePath(file, path)) + (m[2] ?? '')
     },
   })
-  return { markdown, assets: [...assets], missingLinks }
+  return { markdown, assets: [...assets], assetURLs, missingLinks }
 }

@@ -42,11 +42,13 @@ export async function exportNodes(book: string, nodes: TreeNode[], zipName: stri
   const webURL = (href: string) => new URL(base.replace(/\/$/, '') + href, location.origin).href
   const markdown = new Map<string, string>()
   const assets = new Set<string>()
+  const assetURLs: Record<string, string> = {}
   let done = 0
   await pool(docs, async (entry) => {
     const doc = await api<Doc>(`docs/${entry.id}`)
     const out = exportDoc(doc.content, entry.file!, plan, webURL)
     markdown.set(entry.file!, out.markdown)
+    Object.assign(assetURLs, out.assetURLs)
     for (const a of out.assets) assets.add(a)
     progress(`正在导出文档 ${++done}/${docs.length}`)
   })
@@ -85,13 +87,13 @@ export async function exportNodes(book: string, nodes: TreeNode[], zipName: stri
   let failedImages = 0
   await pool(images, async (name) => {
     try {
-      const res = await fetch(`${base}assets/${name}`)
+      const res = await fetch(`${base}${assetURLs[name].replace(/^\//, '')}`)
       if (!res.ok) throw new Error(String(res.status))
       add(`${attachmentsDir}/${name}`, new Uint8Array(await res.arrayBuffer()), false)
     } catch {
       failedImages++
     }
-    progress(`正在下载图片 ${++fetched}/${images.length}`)
+    progress(`正在下载图片与附件 ${++fetched}/${images.length}`)
   })
   zip.end()
   await zipped

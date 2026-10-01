@@ -4,15 +4,23 @@
 
 操作 ali 前加载 server-operations 并显式读取 `/opt/AGENTS.md`。公开仓库不写正式公网地址；通过受信 SSH 别名取得现场信息。
 
-图片上传与大文档保存共同经过设备认证：程序单张图片上限 25 MiB、JSON 上限 16 MiB，Nginx 上限 26 MiB。内部认证子请求不另设 body 上限；大请求在进入程序前返回 500 时，见[统一认证误拦大请求](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求)。
+图片/附件上传与大文档保存共同经过设备认证：程序单个图片或附件上限 25 MiB、JSON 上限 16 MiB，Nginx 上限 26 MiB。内部认证子请求不另设 body 上限；大请求在进入程序前返回 500 时，见[统一认证误拦大请求](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求)。
+
+## 附件与备份兼容
+
+附件上传上限 25 MiB，复用现有 Nginx 26 MiB 请求限制、设备认证、assets 表和 data/assets/ 目录，无数据库迁移与权限变化。附件下载走 /attachments/{id}，强制作为文件下载并支持 Range；不在图片路由开放 .bin。原始文件不可覆盖，卡片删除不回收文件，以保证历史和模板引用。
+
+原生备份清单版本为 2，覆盖所有登记图片及 .bin 附件并核对 SHA-256；恢复同时接受旧版本 1 的图片备份。门户 media 备份沿用原生快照中的整个 assets 目录，无需修改共享收集器。使用附件之后，程序回退必须选择支持 attachment 节点与 .bin 备份的版本，旧程序无法安全保存此类文档或完成备份。文件名及资源路径的导入导出规则见 DESIGN 23.8。
+
+2026-10-01：Chromium、WebKit 桌面及 WebKit 375×667 验证嵌套附件卡片、选择/删除/撤销、重命名、下载、批量顺序、浅深主题与保存重开；上传失败重试、取消、粘贴/拖入、图片兼容及普通 Tab/焦点规则通过。HTML/Markdown 往返、网页 ZIP 与命令行导入导出的文件内容保持；隔离验证原生 v2 备份、v1 恢复兼容、损坏拒绝、源文档彻底删除后模板附件保留。正式实例只读 roundtrip：320 篇文档、215 个表格无差异。构建与类型检查通过，首次加载脚本约 123.86 KiB gzip。验证材料仅存本机 .local。
 
 ## 布局
 
-文档模板与内容片段存放于既有 `meta` 表的 `template:<id>`，包含独立 revision、正文 JSON 和格式版本，无数据库迁移。备份仍为整个 SQLite 快照和全部登记图片，源文档删除不回收图片，模板可独立复用；恢复模板库需走原生备份恢复，知识库 Markdown 导出不包含模板库。链接选择、预览与文末反向链接从存活正文推导，不新增索引文件或数据目录。接口及交互见 DESIGN 第 24 节，门户 API 声明同步维护。
+文档模板与内容片段存放于既有 `meta` 表的 `template:<id>`，包含独立 revision、正文 JSON 和格式版本，无数据库迁移。备份仍为整个 SQLite 快照和全部登记图片、附件，源文档删除不回收图片，模板可独立复用；恢复模板库需走原生备份恢复，知识库 Markdown 导出不包含模板库。链接选择、预览与文末反向链接从存活正文推导，不新增索引文件或数据目录。接口及交互见 DESIGN 第 24 节，门户 API 声明同步维护。
 
 2026-10-01 在合成隔离实例验证模板冲突检测、非法结构拒绝、源文档彻底删除，以及原生备份/恢复后的模板内容和登记图片；反向链接随文档删除、恢复和知识库回收站状态变化。正式实例只读 roundtrip 检查 320 篇文档、212 个表格无差异；本次没有迁移或批量修改正式正文。
 
-`/opt/yuyan/bin/yuyan` 为内嵌前端的 Linux amd64 程序。config 放本项目的 unit 与 Nginx location，data 放 `yuyan.db` 与 `assets/`（按内容寻址的图片），backups 放快照，docs 与 AGENTS.md 是受控文档副本，releases 留发布历史，current-commit 为程序来源。知识库分组保存在数据库现有 `meta` 表的 `book_groups` JSON 中，随一致性备份保留；旧库无需迁移，未配置时所有知识库均未分组。分组 API 与门户声明保持同步，分组不新增数据目录。
+`/opt/yuyan/bin/yuyan` 为内嵌前端的 Linux amd64 程序。config 放本项目的 unit 与 Nginx location，data 放 `yuyan.db` 与 `assets/`（按内容寻址的图片与附件，非图片附件扩展名为 `.bin`），backups 放快照，docs 与 AGENTS.md 是受控文档副本，releases 留发布历史，current-commit 为程序来源。知识库分组保存在数据库现有 `meta` 表的 `book_groups` JSON 中，随一致性备份保留；旧库无需迁移，未配置时所有知识库均未分组。分组 API 与门户声明保持同步，分组不新增数据目录。
 
 运行身份 yuyan，发布身份 yuyan-deploy；data/backups 为 0700，程序与配置由 root 管理。服务监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问，不增加公网端口。systemd 只允许写 data，内存上限 384 MiB（`GOMEMLIMIT=320MiB`），CPU 100%。图片由程序返回并带一年 `immutable` 缓存，Nginx 不直接读取 data，因此 data 保持 0700。
 
@@ -128,20 +136,20 @@ npm --prefix web run migrate-strong -- --server http://127.0.0.1:18199/ \
 
 ## 导出
 
-导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹（Markdown 表达不了的内容写成 HTML，例如设置了列宽行高的表格，见 DESIGN.md 第 18 节）：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。先建立上文的受信 SSH 隧道，再使用回环地址。
+导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹（Markdown 表达不了的内容写成 HTML，例如设置了列宽行高的表格，见 DESIGN.md 第 18 节）：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片与附件放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。先建立上文的受信 SSH 隧道，再使用回环地址。
 
 ```sh
 npm --prefix web run export -- --server http://127.0.0.1:18199/ --dry          # 只转换和检查，不写文件
 npm --prefix web run export -- --server http://127.0.0.1:18199/ --out ~/YuyanExport
 ```
 
-目标文件夹必须是新的、空的，或者是之前的导出结果。再次导出到同一文件夹时会刷新 Markdown，只下载缺少或校验不符的图片，并删除上次导出而本次已不存在的文件；导出之外的文件不会被改动，因此中断后重新运行即可继续。`.yuyan-export/` 里是清单和报告，报告列出下载失败的图片、指向回收站中文档的链接，以及因含有非法字符或同级重名而改过名的文件。全部图片约 340 MB，按服务器约 0.5 MB/s 的下行速度约需 12 分钟；2026-09-26 对正式实例演练，315 篇文档全部转换成功，1,511 张图片都存在。
+目标文件夹必须是新的、空的，或者是之前的导出结果。再次导出到同一文件夹时会刷新 Markdown，只下载缺少或校验不符的图片、附件，并删除上次导出而本次已不存在的文件；导出之外的文件不会被改动，因此中断后重新运行即可继续。`.yuyan-export/` 里是清单和报告，报告列出下载失败的图片与附件、指向回收站中文档的链接，以及因含有非法字符或同级重名而改过名的文件。全部图片约 340 MB，按服务器约 0.5 MB/s 的下行速度约需 12 分钟；2026-09-26 对正式实例演练，315 篇文档全部转换成功，1,511 张图片都存在。
 
 `npm --prefix web run seed -- --server <本地实例>/yuyan/` 向空的本地实例写入合成示例数据，用于试用界面和导出；它拒绝写入已有知识库的实例。
 
 ## 备份与恢复
 
-每天 Asia/Shanghai 04:00 加 0–5 分钟随机延迟，保留 14 份 daily。备份 unit 的可写目录必须是整个 /opt/yuyan，原因见共享的 [systemd 沙箱下照片硬链接备份失败](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#systemd-沙箱下照片硬链接备份失败)。备份包含 SQLite 一致性快照（`VACUUM INTO`）、图片硬链接和 SHA-256 清单。before-deploy / manual 不自动轮换；2026-09-27 已另取包含本项目数据库与全部已登记图片的全应用归档，下载到维护电脑并校验，见 [共享备份说明](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#手工数据归档)。当前没有自动异机同步；需要可供 Obsidian 使用的内容副本时，使用上节的导出工具。
+每天 Asia/Shanghai 04:00 加 0–5 分钟随机延迟，保留 14 份 daily。备份 unit 的可写目录必须是整个 /opt/yuyan，原因见共享的 [systemd 沙箱下照片硬链接备份失败](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#systemd-沙箱下照片硬链接备份失败)。备份包含 SQLite 一致性快照（`VACUUM INTO`）、图片/附件硬链接和 SHA-256 清单。before-deploy / manual 不自动轮换；2026-09-27 已另取包含本项目数据库与全部已登记图片的全应用归档，下载到维护电脑并校验，见 [共享备份说明](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#手工数据归档)。当前没有自动异机同步；需要可供 Obsidian 使用的内容副本时，使用上节的导出工具。
 
 ```sh
 systemctl status yuyan-backup.timer
@@ -150,7 +158,7 @@ journalctl -u yuyan-backup.service -n 50 --no-pager
 runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-UNIQUE
 ```
 
-备份目标目录必须不存在。备份里的图片是硬链接，与正式图片共用同一份数据，不能原地修改。只有带完整 manifest.json 的目录才可恢复。
+备份目标目录必须不存在。备份里的图片与附件是硬链接，与正式素材共用同一份数据，不能原地修改。只有带完整 manifest.json 的目录才可恢复。
 
 ```sh
 yuyan restore --from /path/to/backup --data /path/to/new-restore-directory

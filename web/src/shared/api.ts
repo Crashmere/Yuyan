@@ -144,6 +144,9 @@ export interface TrashItem {
 }
 
 export interface Asset {
+  size: number
+  mime: string
+  originalName: string
   id: string
   ext: string
   url: string
@@ -208,12 +211,12 @@ export function pageURL(path: string): string {
 
 // Stored image src values are app-relative (/assets/<id>.png).
 export function assetURL(src: string): string {
-  return src.startsWith('/assets/') ? base.replace(/\/$/, '') + src : src
+  return (src.startsWith('/assets/') || src.startsWith('/attachments/')) ? base.replace(/\/$/, '') + src : src
 }
 
 export function unassetURL(src: string): string {
-  const prefix = base.replace(/\/$/, '') + '/assets/'
-  return src.startsWith(prefix) ? src.slice(base.length - 1) : src
+  const prefix = base.replace(/\/$/, '')
+  return ['/assets/', '/attachments/'].some(p => src.startsWith(prefix + p)) ? src.slice(prefix.length) : src
 }
 
 export async function uploadImage(file: File): Promise<Asset> {

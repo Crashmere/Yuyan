@@ -29,8 +29,10 @@ import { fixColumnWidths, followColumnBorder, FramedTableView, TableShape } from
 import { resizeHitWidth, rowResizing, withResizeDelay } from './tableResize'
 import { tableControls } from './tableControls'
 import { UiShortcuts } from './uiShortcuts'
-import { insertImages, UploadPlaceholders } from './uploads'
+import { insertFiles, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
+import { Attachment } from '../schema/attachment'
+import AttachmentView from './views/AttachmentView.vue'
 import ImageView from './views/ImageView.vue'
 import ImageBoardView from './views/ImageBoardView.vue'
 import { ImageBoard } from '../schema/imageBoard'
@@ -47,6 +49,7 @@ export function editorExtensions(ui: EditorUi, foldKey?: string): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
+      attachment: Attachment.extend({ addNodeView() { return VueNodeViewRenderer(AttachmentView) } }).configure({ resolveSrc: assetURL, unresolveSrc: unassetURL }),
       columns: Columns.extend({ addNodeView() { return columnsView } }),
       foldBlock: FoldBlock.extend({ addNodeView() { return foldBlockView } }),
       imageBoard: ImageBoard.extend({
@@ -93,9 +96,10 @@ export function editorExtensions(ui: EditorUi, foldKey?: string): Extensions {
       placeholder: ({ node }) => (node.type.name === 'heading' ? '标题' : '输入 / 插入内容，也可以直接用 Markdown 语法'),
     }),
     FileHandler.configure({
-      allowedMimeTypes: imageTypes,
-      onPaste: (editor, files) => insertImages(editor, files),
-      onDrop: (editor, files, pos) => insertImages(editor, files, pos),
+      consumePasteEvent: true,
+
+      onPaste: (editor, files) => insertFiles(editor, files),
+      onDrop: (editor, files, pos) => insertFiles(editor, files, pos),
     }),
     UploadPlaceholders,
     ImageSizeStore,

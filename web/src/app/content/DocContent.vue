@@ -97,7 +97,7 @@ function onClick(e: MouseEvent) {
     return
   }
   const a = target.closest<HTMLAnchorElement>('a[href]')
-  if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target === '_blank') return
+  if (!a || a.hasAttribute('download') || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || a.target === '_blank') return
   const href = a.getAttribute('href') ?? ''
   if (href.startsWith('#')) {
     e.preventDefault()

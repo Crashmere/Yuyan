@@ -4,6 +4,7 @@ package render
 
 import (
 	"html"
+	"net/url"
 	"strconv"
 	"strings"
 	"unicode"
@@ -158,6 +159,8 @@ func (r *renderer) node(n doc.Node) {
 		r.b.WriteString("</div></li>")
 	case "codeBlock":
 		r.codeBlock(n)
+	case "attachment":
+		r.attachment(n)
 	case "image":
 		r.image(n)
 	case "imageBoard":
@@ -421,12 +424,26 @@ func (r *renderer) url(href string) string {
 	if r.opt.Parity {
 		return href
 	}
-	for _, p := range []string{"/docs/", "/assets/", "/books/"} {
+	for _, p := range []string{"/docs/", "/assets/", "/attachments/", "/books/"} {
 		if strings.HasPrefix(href, p) {
 			return strings.TrimSuffix(r.opt.BasePath, "/") + href
 		}
 	}
 	return href
+}
+
+func (r *renderer) attachment(n doc.Node) {
+	name := doc.AttachmentName(n.Attr("name"))
+	src := n.Attr("src")
+	href := ""
+	if doc.AttachmentSource.MatchString(src) {
+		href = r.url(src) + "?name=" + strings.ReplaceAll(url.QueryEscape(name), "+", "%20")
+	}
+	r.open("div", [][2]string{{"data-attachment", ""}, {"data-src", r.url(src)}, {"data-name", name}, {"data-size", n.Attr("size")}, {"data-mime", n.Attr("mime")}})
+	r.open("a", [][2]string{{"class", "yy-attachment-card"}, {"href", href}, {"download", name}})
+	r.open("span", [][2]string{{"class", "yy-attachment-icon"}, {"aria-hidden", "true"}})
+	r.b.WriteString(html.EscapeString(doc.AttachmentType(name)))
+	r.b.WriteString(`</span><span class="yy-attachment-info"><span class="yy-attachment-name">` + html.EscapeString(name) + `</span><span class="yy-attachment-size">` + doc.AttachmentSize(n.AttrInt("size", 0)) + `</span></span><span class="yy-attachment-download" aria-label="下载附件">↓</span></a></div>`)
 }
 
 func (r *renderer) image(n doc.Node) {

@@ -1,7 +1,7 @@
 {
   "id": "yuyan",
   "name": "Yuyan",
-  "description": "个人知识库、文档与图片。",
+  "description": "个人知识库、文档、图片与附件。",
   "icon": "/portal/static/icons/yuyan.svg",
   "url": "/yuyan/",
   "repo": "https://github.com/Crashmere/Yuyan",
@@ -20,7 +20,7 @@
       "id": "data",
       "name": "业务数据",
       "path": "/opt/yuyan/data",
-      "purpose": "数据库（文档、历史、模板与内容片段）、图片与历史迁移材料；临时文件不属于恢复数据。",
+      "purpose": "数据库（文档、历史、模板与内容片段）、内容寻址的图片与附件、历史迁移材料；临时文件不属于恢复数据。",
       "kind": "data",
       "browse": true,
       "cleanup": false
@@ -286,6 +286,16 @@
       "method": "DELETE",
       "path": "/api/templates/{id}",
       "description": "删除模板，检测版本冲突"
+    },
+    {
+      "method": "POST",
+      "path": "/api/attachments",
+      "description": "上传附件，单个最大 25 MiB，按内容去重且不可覆盖"
+    },
+    {
+      "method": "GET",
+      "path": "/attachments/{id}",
+      "description": "经设备认证下载附件，支持 HEAD、Range 和指定下载文件名"
     }
   ]
 }

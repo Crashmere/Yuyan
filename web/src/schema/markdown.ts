@@ -27,6 +27,7 @@ export interface ImportContext {
   strictStrong?: boolean
   // Obsidian treats a single newline inside a paragraph as a line break unless "strict line breaks" is on.
   breaks?: boolean
+  resolveAttachment?: (target: string) => Record<string, unknown> | null
   resolveImage?: (target: string, kind: 'markdown' | 'wiki' | 'html') => string | null
   resolveLink?: (target: string, kind: 'wiki' | 'markdown') => string | null
   issue?: (message: string) => void
@@ -228,6 +229,7 @@ class Converter {
       node,
       (src) => (this.ctx.resolveImage ? this.ctx.resolveImage(src, 'html') : src),
       (href) => this.linkHref(href),
+      (attrs) => this.ctx.resolveAttachment ? this.ctx.resolveAttachment(safeDecode(String(attrs.src))) : attrs,
     ))
   }
 
@@ -447,6 +449,7 @@ export function normalizeLanguage(lang: string): string {
 // Export: Tiptap JSON -> Markdown readable by Obsidian.
 
 export interface ExportContext {
+  attachmentSrc?: (src: string, name: string) => string
   imageSrc?: (src: string) => string
   linkHref?: (href: string) => string
   // Table columns are padded to line up unless this is false; comparing versions turns it off so
@@ -531,7 +534,7 @@ class Exporter {
   // Written with the schema's rendering, rows on lines of their own; a blank line, which would end
   // the HTML block in Markdown, is written as &#10;.
   private nodeHtml(n: JSONContent): string {
-    const mapped = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href)
+    const mapped = mapTargets(n, (src) => this.ctx.imageSrc?.(src) ?? src, (href) => this.ctx.linkHref?.(href) ?? href, attrs => ({ ...attrs, src: this.ctx.attachmentSrc?.(String(attrs.src), String(attrs.name)) ?? attrs.src }))
     // The static renderer wraps marks in reverse order to ProseMirror's DOM serializer.
     // Keep text colour innermost in both, so highlight backgrounds never cover gradient ink.
     const orderMarks = (n: PMNode): PMNode => {
@@ -646,7 +649,7 @@ function containsRichTable(n: JSONContent): boolean {
 }
 
 function containsBlockContainer(n: JSONContent): boolean {
-  return n.type === 'foldBlock' || n.type === 'highlightBlock' || n.type === 'columns' || !!n.content?.some(containsBlockContainer)
+  return n.type === 'attachment' || n.type === 'foldBlock' || n.type === 'highlightBlock' || n.type === 'columns' || !!n.content?.some(containsBlockContainer)
 }
 
 function tableNeedsHtml(n: JSONContent): boolean {
@@ -673,12 +676,17 @@ function documentSchema() {
 }
 
 // Rewrites the image sources and link targets inside a node, as the rest of the Markdown gets them.
-function mapTargets(n: JSONContent, image: (src: string) => string | null, link: (href: string) => string | null): JSONContent {
+function mapTargets(n: JSONContent, image: (src: string) => string | null, link: (href: string) => string | null, attachment: (attrs: Record<string, unknown>) => Record<string, unknown> | null = attrs => attrs): JSONContent {
   const out: JSONContent = { ...n }
   if (n.type === 'image' && typeof n.attrs?.src === 'string') out.attrs = { ...n.attrs, src: image(n.attrs.src) ?? n.attrs.src }
+  if (n.type === 'attachment') {
+    const attrs = attachment(n.attrs ?? {})
+    if (!attrs) return { type: 'paragraph', content: [{ type: 'text', text: '[附件缺失：' + String(n.attrs?.name ?? '附件') + ']' }] }
+    out.attrs = { ...n.attrs, ...attrs }
+  }
   if (n.marks) {
     out.marks = n.marks.map((m) => (m.type === 'link' && typeof m.attrs?.href === 'string' ? { ...m, attrs: { ...m.attrs, href: link(m.attrs.href) ?? m.attrs.href } } : m))
   }
-  if (n.content) out.content = n.content.map((c) => mapTargets(c, image, link))
+  if (n.content) out.content = n.content.map((c) => mapTargets(c, image, link, attachment))
   return out
 }

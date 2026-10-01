@@ -28,7 +28,7 @@ import ImageToolsDialog from './ImageToolsDialog.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
 import { cancelSelection } from './cancelSelection'
-import { insertImages, pendingUploads } from './uploads'
+import { insertImages, insertAttachments, pendingUploads } from './uploads'
 import { clearUnusedBlockSpaces } from './blockSpaces'
 import { openTemplates, saveEditorTemplate } from './templates'
 import { setupLinkPreviews } from '../shared/linkPreview'
@@ -57,6 +57,7 @@ const status = ref<SaveStatus>('loading')
 const failure = ref('')
 const draftOffer = ref<Draft | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
+const attachmentInput = ref<HTMLInputElement | null>(null)
 const titleInput = ref<HTMLTextAreaElement | null>(null)
 const outlineOpen = ref(false)
 
@@ -78,6 +79,7 @@ const ui: EditorUi = {
     if (selected.length) imageEdit.value = { mode, positions: selected }
   },
   pickImage: () => fileInput.value?.click(),
+  pickAttachment: () => attachmentInput.value?.click(),
   openLink() {
     const e = editor.value
     if (!e || e.isActive('codeBlock')) return
@@ -312,11 +314,11 @@ function discardDraft() {
   draftOffer.value = null
 }
 
-function onFilePicked(e: Event) {
+function onFilePicked(e: Event, attachment = false) {
   const input = e.target as HTMLInputElement
   const files = [...(input.files ?? [])]
   input.value = ''
-  if (editor.value && files.length) insertImages(editor.value, files)
+  if (editor.value && files.length) (attachment ? insertAttachments : insertImages)(editor.value, files)
 }
 
 function autosizeTitle() {
@@ -465,6 +467,7 @@ onBeforeUnmount(() => {
     <HighlightBlockToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit || !!tableGrid || findOpen" />
     <ImageToolsDialog v-if="imageEdit" v-bind="imageEdit" @close="imageEdit = null" />
 
+    <input ref="attachmentInput" type="file" multiple hidden @change="onFilePicked($event, true)" />
     <input ref="fileInput" type="file" :accept="imageTypes.join(',')" multiple hidden @change="onFilePicked" />
   </div>
 </template>

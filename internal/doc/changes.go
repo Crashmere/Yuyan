@@ -70,7 +70,7 @@ func changeBlocks(root Node) []changeBlock {
 	stripMedia = func(n Node) Node {
 		children := []Node(nil)
 		for _, c := range n.Content {
-			if c.Type != "image" && c.Type != "inlineMath" && c.Type != "blockMath" {
+			if c.Type != "attachment" && c.Type != "image" && c.Type != "inlineMath" && c.Type != "blockMath" {
 				children = append(children, stripMedia(c))
 			}
 		}
@@ -82,7 +82,7 @@ func changeBlocks(root Node) []changeBlock {
 	}
 	var media func(Node, string)
 	media = func(n Node, context string) {
-		if n.Type == "image" || n.Type == "inlineMath" || n.Type == "blockMath" {
+		if n.Type == "attachment" || n.Type == "image" || n.Type == "inlineMath" || n.Type == "blockMath" {
 			add(n, context)
 			return
 		}
@@ -111,7 +111,7 @@ func changeBlocks(root Node) []changeBlock {
 				add(clean, context)
 			}
 			media(n, context)
-		case "image", "inlineMath", "blockMath":
+		case "attachment", "image", "inlineMath", "blockMath":
 			add(n, context)
 		case "imageBoard":
 			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
@@ -189,8 +189,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 	match(func(v changeBlock) string { return v.key })
 	match(func(v changeBlock) string {
 		switch v.node.Type {
-		case "image":
-			return "image:" + v.node.Attr("src")
+		case "attachment", "image":
+			return v.node.Type + ":" + v.node.Attr("src")
 		case "heading":
 			return "heading:" + TextContent(v.node)
 		}
@@ -198,7 +198,7 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 	})
 	for _, scoped := range []bool{true, false} {
 		match(func(v changeBlock) string {
-			if v.node.Type == "image" {
+			if v.node.Type == "image" || v.node.Type == "attachment" {
 				return ""
 			}
 			if scoped {
@@ -231,6 +231,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 	}
 	name := func(n Node) string {
 		switch n.Type {
+		case "attachment":
+			return "附件"
 		case "image":
 			return "图片"
 		case "imageBoard":
@@ -302,6 +304,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			} else {
 				add("调整折叠块标题格式", places...)
 			}
+		case "attachment":
+			add("修改附件信息", places...)
 		case "image":
 			if attrsChanged("crop") {
 				add("裁切图片", places...)

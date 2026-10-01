@@ -1,7 +1,7 @@
 import type { Component } from 'vue'
 import type { Editor } from '@tiptap/core'
 import {
-  Bold, Code, Columns2, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
+  Bold, Code, Columns2, Paperclip, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
   ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow, PanelTopClose, Square, PanelsTopLeft,
 } from 'lucide-vue-next'
 import type { EditorUi } from './context'
@@ -127,6 +127,7 @@ export const insertItems: InsertItem[] = [
     run: (e) => e.chain().focus().insertContent({ type: 'codeBlock', attrs: { language: 'mermaid' }, content: [{ type: 'text', text: 'graph TD\n  A[开始] --> B[结束]' }] }).run(),
   },
   { id: 'table', label: '表格', description: '选择行数和列数', icon: Table, group: '插入', syntax: ['|'], pinyin: 'biao ge', keywords: 'bg table', run: (e, ui, anchor) => ui.openTableGrid(anchor ?? coordsRect(e)) },
+  { id: 'attachment', label: '附件', description: '上传文件，单个最大 25 MiB', icon: Paperclip, group: '插入', pinyin: 'fu jian', keywords: 'fj attachment file pdf word excel zip 文件', run: (_e, ui) => ui.pickAttachment() },
   { id: 'image', label: '图片', description: '上传图片，也可以直接粘贴或拖入', icon: Image, group: '插入', syntax: ['![]()'], pinyin: 'tu pian', keywords: 'tp image picture', run: (_e, ui) => ui.pickImage() },
   { id: 'link', label: '链接', description: '网址或本站文档的链接', icon: Link, group: '插入', syntax: ['[]()'], pinyin: 'lian jie', keywords: 'lj link url', run: (_e, ui) => ui.openLink() },
   { id: 'hr', label: '分割线', description: '分隔上下内容', icon: Minus, group: '插入', markdown: '---', syntax: ['***', '___'], pinyin: 'fen ge xian', keywords: 'fgx hr divider', run: (e) => e.chain().focus().setHorizontalRule().run() },

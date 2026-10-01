@@ -18,7 +18,7 @@ import (
 
 const manifestFile = "manifest.json"
 
-var backupAssetName = regexp.MustCompile(`^assets/[0-9a-f]{32}\.(png|jpg|gif|webp|bmp)$`)
+var backupAssetName = regexp.MustCompile(`^assets/[0-9a-f]{32}\.(png|jpg|gif|webp|bmp|bin)$`)
 
 // BackupManifest lists every file of a backup with its SHA-256.
 type BackupManifest struct {
@@ -27,7 +27,7 @@ type BackupManifest struct {
 	Files     map[string]string `json:"files"`
 }
 
-// Backup writes a consistent snapshot of the database and hard links to every recorded image into
+// Backup writes a consistent snapshot of the database and hard links to every recorded asset into
 // out, which must not exist yet. Hard links require data and backups on the same mount point.
 func (s *Store) Backup(ctx context.Context, out string) error {
 	if err := os.Mkdir(out, 0o700); err != nil {
@@ -58,7 +58,7 @@ func (s *Store) Backup(ctx context.Context, out string) error {
 	if err := snap.QueryRowContext(ctx, `PRAGMA integrity_check`).Scan(&integrity); err != nil || integrity != "ok" {
 		return fmt.Errorf("snapshot integrity check failed: %v %s", err, integrity)
 	}
-	m := BackupManifest{Version: 1, CreatedAt: s.stamp(), Files: map[string]string{}}
+	m := BackupManifest{Version: 2, CreatedAt: s.stamp(), Files: map[string]string{}}
 	if m.Files[dbFile], err = fileDigest(dbPath); err != nil {
 		return err
 	}
@@ -74,11 +74,11 @@ func (s *Store) Backup(ctx context.Context, out string) error {
 		}
 		rel := "assets/" + id + "." + ext
 		if !backupAssetName.MatchString(rel) {
-			return fmt.Errorf("invalid image name %s", rel)
+			return fmt.Errorf("invalid asset name %s", rel)
 		}
 		dst := filepath.Join(out, filepath.FromSlash(rel))
 		if err := os.Link(s.AssetPath(id, ext), dst); err != nil {
-			return fmt.Errorf("hard-link image backup: %w", err)
+			return fmt.Errorf("hard-link asset backup: %w", err)
 		}
 		got, err := fileDigest(dst)
 		if err != nil {
@@ -113,7 +113,7 @@ func VerifyBackup(dir string) (BackupManifest, error) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		return m, err
 	}
-	if m.Version != 1 || m.Files[dbFile] == "" {
+	if (m.Version != 1 && m.Version != 2) || m.Files[dbFile] == "" {
 		return m, errors.New("invalid backup manifest")
 	}
 	for rel, want := range m.Files {

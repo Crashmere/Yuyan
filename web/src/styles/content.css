@@ -874,3 +874,19 @@ pre:hover > .yy-copy {
 .yy-content :is(img, [data-image-frame]):has(+ [data-image-frame]),
 .yy-content [data-image-frame]:has(+ img) { margin-bottom: 0.75em; vertical-align: top; }
 .yy-content [data-board-plane] [data-image-frame] { margin: 0; }
+.yy-content [data-attachment] { margin: 12px 0; max-width: 100%; }
+.yy-content .yy-attachment-card {
+  display: flex; align-items: center; gap: 12px; box-sizing: border-box;
+  width: 100%; max-width: 520px; min-width: 0; padding: 12px 14px;
+  border: 1px solid var(--yy-border); border-radius: 8px;
+  background: var(--yy-bg); color: var(--yy-text); text-decoration: none;
+  font: 14px/1.5 var(--yy-font); transition: background .15s, border-color .15s;
+}
+.yy-content a.yy-attachment-card:hover { background: var(--yy-bg-muted); border-color: var(--yy-border-strong); color: var(--yy-text); text-decoration: none; }
+.yy-attachment-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 40px; height: 44px; border: 1px solid var(--yy-border); border-radius: 4px 10px 4px 4px; background: var(--yy-bg-muted); color: var(--yy-text-2); font: 600 10px/1 var(--yy-font); letter-spacing: .2px; }
+.yy-attachment-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.yy-attachment-name { overflow-wrap: anywhere; white-space: normal; }
+.yy-attachment-size { color: var(--yy-text-3); font-size: 12px; }
+.yy-attachment-download { color: var(--yy-text-2); font-size: 24px; padding: 0 3px; }
+.yy-content .yy-attachment-action { flex: 0 0 26px; color: var(--yy-text-2); text-decoration: none; }
+.yy-content [data-attachment].ProseMirror-selectednode .yy-attachment-card { border-color: var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 6%, var(--yy-bg)); }

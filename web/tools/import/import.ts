@@ -60,11 +60,11 @@ class Client {
     return data as T
   }
 
-  async upload(data: Buffer, name: string): Promise<{ url: string }> {
-    if (this.dry) return { url: `/assets/dry${++this.fakeId}.png` }
+  async upload(data: Buffer, name: string, attachment = false): Promise<{ url: string }> {
+    if (this.dry) return { url: attachment ? '/attachments/' + (++this.fakeId).toString(16).padStart(32, '0') : `/assets/dry${++this.fakeId}.png` }
     const form = new FormData()
     form.append('file', new Blob([new Uint8Array(data)]), name)
-    const res = await fetch(this.base + 'api/assets', { method: 'POST', body: form })
+    const res = await fetch(this.base + (attachment ? 'api/attachments' : 'api/assets'), { method: 'POST', body: form })
     const out = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(`upload ${name}: ${res.status} ${out.message ?? ''}`)
     return out
@@ -97,7 +97,7 @@ function kbOf(path: string): string {
 const collator = new Intl.Collator('zh-Hans-CN', { numeric: true })
 
 function plan(idx: FileIndex) {
-  const notes = idx.files.filter((f) => f.endsWith('.md'))
+  const notes = idx.files.filter((f) => f.endsWith('.md') && !/^attachments\/[a-f0-9]{32}-/.test(f))
   const kbs = new Map<string, { groups: GroupPlan[]; docs: DocPlan[] }>()
   for (const path of notes) {
     const kb = kbOf(path)
@@ -131,6 +131,8 @@ interface Report {
   docs: number
   images: number
   imageBytes: number
+  attachments: number
+  attachmentBytes: number
   ambiguous: string[]
   missingImages: string[]
   externalImages: string[]
@@ -164,7 +166,7 @@ async function main() {
 
   const kbs = plan(idx)
   const report: Report = {
-    books: [], groups: 0, docs: 0, images: 0, imageBytes: 0, ambiguous: [], missingImages: [], externalImages: [],
+    books: [], groups: 0, docs: 0, images: 0, imageBytes: 0, attachments: 0, attachmentBytes: 0, ambiguous: [], missingImages: [], externalImages: [],
     missingLinks: [], issues: new Map(), math: [], languages: new Map(), callouts: new Map(), largest: [],
   }
   const docIds = new Map<string, number>()
@@ -196,14 +198,17 @@ async function main() {
 
   // Pass 2: convert each note, uploading the images it uses.
   const uploaded = new Map<string, string>()
+  const uploadedAttachments = new Map<string, { url: string; size: number; mime?: string }>()
   for (const [path, id] of docIds) {
     const markdown = readFileSync(join(args.source, path), 'utf8')
     const scope = docScope.get(path)!
     const breaks = idx.vaultOf(path)?.breaks ?? true
     report.largest.push({ path, kb: Math.round(Buffer.byteLength(markdown) / 1024) })
 
+    const attachmentTargets = new Set<string>()
+    const attachmentAttrs = new Map<string, Record<string, unknown> | null>()
     const wanted: { target: string; kind: string }[] = []
-    markdownToDoc(markdown, { breaks, resolveImage: (target, kind) => (wanted.push({ target, kind }), target) })
+    markdownToDoc(markdown, { breaks, resolveAttachment: target => { attachmentTargets.add(target); return { src: target } }, resolveImage: (target, kind) => (wanted.push({ target, kind }), target) })
     const images = new Map<string, string | null>()
     for (const { target, kind } of wanted) {
       const key = `${kind}|${target}`
@@ -233,9 +238,28 @@ async function main() {
     }
 
     const issues: string[] = []
+    for (const target of attachmentTargets) {
+      const resolved = resolveFile(idx, target, path, scope, null)
+      if (resolved.kind !== 'found') {
+        attachmentAttrs.set(target, null)
+        issues.push('附件无法导入：' + target + '（' + resolved.kind + '）')
+        continue
+      }
+      let uploadedFile = uploadedAttachments.get(resolved.path)
+      if (!uploadedFile) {
+        const data = readFileSync(join(args.source, resolved.path))
+        const asset = await client.upload(data, posix.basename(resolved.path), true) as { url: string; size?: number; mime?: string }
+        uploadedFile = { ...asset, size: asset.size ?? data.length }
+        uploadedAttachments.set(resolved.path, uploadedFile)
+        report.attachments++
+        report.attachmentBytes += data.length
+      }
+      attachmentAttrs.set(target, { src: uploadedFile.url, size: uploadedFile.size, ...(uploadedFile.mime ? { mime: uploadedFile.mime } : {}) })
+    }
     const doc = markdownToDoc(markdown, {
       breaks,
       issue: (m) => issues.push(m),
+      resolveAttachment: target => attachmentAttrs.get(target) ?? null,
       resolveImage: (target, kind) => images.get(`${kind}|${target}`) ?? null,
       resolveLink: (target, kind) => {
         const [file, heading] = target.split('#')
@@ -295,6 +319,7 @@ function writeReport(args: Args, r: Report, ms: number) {
 
 - 知识库 ${r.books.length} 个，分组 ${r.groups} 个，文档 ${r.docs} 篇
 - 图片 ${r.images} 个文件，共 ${(r.imageBytes / 1048576).toFixed(1)} MiB（服务端按内容去重）
+- 附件 ${r.attachments} 个文件，共 ${(r.attachmentBytes / 1048576).toFixed(1)} MiB
 
 | 知识库 | 文档 |
 | --- | --- |
@@ -336,7 +361,7 @@ ${r.issues.size ? [...r.issues].map(([p, is]) => `- ${p}\n${is.map((i) => `  - $
 `
   mkdirSync(dirname(args.report), { recursive: true })
   writeFileSync(args.report, out)
-  console.log(`导入完成：${r.books.length} 个知识库，${r.docs} 篇文档，${r.images} 张图片；报告 ${args.report}`)
+  console.log(`导入完成：${r.books.length} 个知识库，${r.docs} 篇文档，${r.images} 张图片、${r.attachments} 个附件；报告 ${args.report}`)
 }
 
 main().catch((e) => {

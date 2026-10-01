@@ -51,13 +51,25 @@ func (s *Store) AssetPath(id, ext string) string {
 // PutAsset stores an image under the first 128 bits of its SHA-256. Identical bytes map to the
 // same object; existing files are never overwritten.
 func (s *Store) PutAsset(ctx context.Context, data []byte, originalName string) (Asset, error) {
-	if len(data) == 0 || len(data) > MaxAssetBytes {
+	return s.putAsset(ctx, data, originalName, false)
+}
+
+// PutAttachment shares immutable media storage with images. Arbitrary files are never served inline.
+func (s *Store) PutAttachment(ctx context.Context, data []byte, originalName string) (Asset, error) {
+	return s.putAsset(ctx, data, originalName, true)
+}
+
+func (s *Store) putAsset(ctx context.Context, data []byte, originalName string, attachment bool) (Asset, error) {
+	if (!attachment && len(data) == 0) || len(data) > MaxAssetBytes {
 		return Asset{}, ErrInvalid
 	}
 	mime := http.DetectContentType(data)
 	ext, ok := imageExt[mime]
 	if !ok {
-		return Asset{}, ErrUnsupported
+		if !attachment {
+			return Asset{}, ErrUnsupported
+		}
+		ext = "bin"
 	}
 	sum := sha256.Sum256(data)
 	full := hex.EncodeToString(sum[:])
@@ -72,10 +84,8 @@ func (s *Store) PutAsset(ctx context.Context, data []byte, originalName string) 
 		width, height = cfg.Width, cfg.Height
 	}
 	path := s.AssetPath(id, ext)
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		if err := writeFileAtomic(path, data); err != nil {
-			return Asset{}, err
-		}
+	if err := writeAssetImmutable(path, data, full); err != nil {
+		return Asset{}, err
 	}
 	_, err := s.DB.ExecContext(ctx, `
 INSERT OR IGNORE INTO assets(id, sha256, ext, mime, size, width, height, original_name, created_at)
@@ -84,6 +94,37 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, full, ext, mime, len(data), nullInt(wid
 		return Asset{}, err
 	}
 	return s.GetAsset(ctx, id)
+}
+
+// Publish a complete file without replacing an existing inode (backups use hard links).
+func writeAssetImmutable(path string, data []byte, digest string) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".upload-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err = tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if err = os.Link(tmp.Name(), path); err != nil && !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	got, err := fileDigest(path)
+	if err != nil {
+		return err
+	}
+	if got != digest {
+		return errors.New("stored asset digest mismatch")
+	}
+	return nil
 }
 
 func nullInt(v int) any {

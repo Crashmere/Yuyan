@@ -12,6 +12,7 @@ export interface EditorContext {
 
 export interface EditorUi {
   pickImage: () => void
+  pickAttachment: () => void
   openLink: () => void
   openTemplates: () => void
   saveSnippet: () => void

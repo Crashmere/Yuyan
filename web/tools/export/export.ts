@@ -92,7 +92,7 @@ function progress(label: string, done: number, total: number, extra = '') {
 
 // An asset's name is the first 128 bits of the SHA-256 of its bytes.
 function assetMatches(file: string, data: Uint8Array): boolean {
-  return createHash('sha256').update(data).digest('hex').slice(0, 32) === file.split('.')[0]
+  return createHash('sha256').update(data).digest('hex').slice(0, 32) === file.slice(0, 32)
 }
 
 function writeAtomic(path: string, data: string | Uint8Array) {
@@ -138,11 +138,11 @@ function formatReport(args: Args, r: Report, ms: number): string {
 导出时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}${args.dry ? '（演练，未写入文件）' : ''}；耗时 ${(ms / 1000).toFixed(1)} 秒
 
 - 知识库 ${r.books} 个，分组 ${r.groups} 个，文档 ${r.docs} 篇
-- 图片 ${r.assets} 张${args.dry ? '' : `，本次下载 ${r.downloaded} 张（${(r.downloadedBytes / 1048576).toFixed(1)} MiB），其余已存在且校验通过`}
+- 图片与附件 ${r.assets} 个${args.dry ? '' : `，本次下载 ${r.downloaded} 个（${(r.downloadedBytes / 1048576).toFixed(1)} MiB），其余已存在且校验通过`}
 
-## 下载失败或不存在的图片（${r.failedAssets.length}）
+## 下载失败或不存在的图片与附件（${r.failedAssets.length}）
 
-${args.dry ? '' : '重新运行导出会继续下载缺少的图片。\n\n'}${list(r.failedAssets)}
+${args.dry ? '' : '重新运行导出会继续下载缺少的图片与附件。\n\n'}${list(r.failedAssets)}
 
 ## 指向不存在文档的链接（${r.missingLinks.length}）
 
@@ -183,10 +183,12 @@ async function main() {
 
   const docs = [...plan.entries.values()].filter((e) => e.kind === 'doc')
   const assetUsers = new Map<string, string>()
+  const assetURLs: Record<string, string> = {}
   let converted = 0
   await pool(docs, async (entry) => {
     const { content } = await getJSON<{ content: JSONContent }>(args.server, `docs/${entry.id}`)
     const out = exportDoc(content, entry.file!, plan)
+    Object.assign(assetURLs, out.assetURLs)
     for (const a of out.assets) if (!assetUsers.has(a)) assetUsers.set(a, entry.file!)
     for (const href of out.missingLinks) report.missingLinks.push(`${entry.file}：${href}`)
     if (!args.dry) writeAtomic(join(args.out, entry.file!), out.markdown)
@@ -197,7 +199,7 @@ async function main() {
   report.assets = assets.length
   let checked = 0
   await pool(assets, async (file) => {
-    const url = new URL(`assets/${file}`, args.server)
+    const url = new URL(assetURLs[file].replace(/^\//, ''), args.server)
     try {
       if (args.dry) {
         const res = await request(url, 'HEAD')
@@ -208,7 +210,7 @@ async function main() {
           const res = await request(url)
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const data = new Uint8Array(await res.arrayBuffer())
-          if (!assetMatches(file, data)) throw new Error('内容与图片 ID 不符')
+          if (!assetMatches(file, data)) throw new Error('内容与图片与附件 ID 不符')
           writeAtomic(path, data)
           report.downloaded++
           report.downloadedBytes += data.length
@@ -217,7 +219,7 @@ async function main() {
     } catch (e) {
       report.failedAssets.push(`${file}（${assetUsers.get(file)}）：${e instanceof Error ? e.message : e}`)
     }
-    progress('图片', ++checked, assets.length, args.dry ? '' : `，已下载 ${(report.downloadedBytes / 1048576).toFixed(1)} MiB`)
+    progress('图片与附件', ++checked, assets.length, args.dry ? '' : `，已下载 ${(report.downloadedBytes / 1048576).toFixed(1)} MiB`)
   })
 
   report.missingLinks.sort()
@@ -236,10 +238,10 @@ async function main() {
     if (previous) removeStale(args.out, previous, manifest)
     writeAtomic(join(args.out, metaDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
     writeAtomic(join(args.out, metaDir, 'report.md'), text)
-    console.log(`导出到 ${args.out}：${report.docs} 篇文档，${report.assets} 张图片；报告 ${join(metaDir, 'report.md')}`)
+    console.log(`导出到 ${args.out}：${report.docs} 篇文档，${report.assets} 个图片与附件；报告 ${join(metaDir, 'report.md')}`)
   }
   if (report.failedAssets.length) {
-    console.error(`${report.failedAssets.length} 张图片${args.dry ? '不存在' : '下载失败，重新运行可以继续'}`)
+    console.error(`${report.failedAssets.length} 个图片与附件${args.dry ? '不存在' : '下载失败，重新运行可以继续'}`)
     process.exitCode = 1
   }
 }

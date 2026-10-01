@@ -1441,3 +1441,6 @@ body.yy-row-dragging * {
   .yy-codeblock-bar > * { flex-shrink: 0; }
   .yy-codeblock-title .yy-lang-trigger { max-width: 100%; }
 }
+.yy-upload.yy-upload-attachment { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 10px; width: min(100%, 490px); padding: 12px; box-sizing: border-box; }
+.yy-upload-attachment .yy-upload-filename { flex: 1; min-width: 100px; overflow-wrap: anywhere; font-size: 13px; }
+.yy-upload-attachment .yy-upload-status { position: static; width: 100%; background: none; color: var(--yy-text-2); }
