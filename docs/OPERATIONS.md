@@ -4,17 +4,19 @@
 
 操作 ali 前加载 server-operations 并显式读取 `/opt/AGENTS.md`。公开仓库不写正式公网地址；通过受信 SSH 别名取得现场信息。
 
-图片/附件上传与大文档保存共同经过设备认证：程序单个图片或附件上限 25 MiB、JSON 上限 16 MiB，Nginx 上限 26 MiB。内部认证子请求不另设 body 上限；大请求在进入程序前返回 500 时，见[统一认证误拦大请求](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求)。
+图片/附件上传与大文档保存共同经过设备认证：附件接口不设上传大小上限并采用流式接收；图片接口仍限制单张 25 MiB，JSON 上限 16 MiB，其他业务请求的 Nginx 上限为 26 MiB。内部认证子请求不另设 body 上限；大请求在进入程序前返回 500 时，见[统一认证误拦大请求](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求)。
 
 ## 附件与备份兼容
 
-附件上传上限 25 MiB，复用现有 Nginx 26 MiB 请求限制、设备认证、assets 表和 data/assets/ 目录，无数据库迁移与权限变化。附件下载走 /attachments/{id}，强制作为文件下载并支持 Range；不在图片路由开放 .bin。原始文件不可覆盖，卡片删除不回收文件，以保证历史和模板引用。
+附件上传不设文件大小上限。仅 /yuyan/api/attachments 的 Nginx 子 location 设置 client_max_body_size 0 和 proxy_request_buffering off，继承现有设备认证、Host/来源转发与空闲超时；其他请求保留 26 MiB 限制。应用流式接收至 data/assets/.upload-*、增量计算 SHA-256，完整表单与文件成功后发布并登记；不使用 /tmp 缓存整文件、不整文件读入内存。仅附件接收改用两分钟读空闲超时，持续上传不受普通请求的两分钟总期限影响。复用 assets 表与目录，无数据库迁移或权限变化。附件下载走 /attachments/{id}，强制作为文件下载并支持 Range；不在图片路由开放 .bin。原始文件不可覆盖。卡片、文档/知识库（包括回收站彻底删除）与模板删除都不会删除 assets 记录或实际文件；当前尚无未引用文件回收。上传成功后放弃编辑也保留文件；正常取消/失败清理未完成临时文件，强制退出遗留的临时文件不自动清理。原生备份包含所有登记素材，不仅是当前仍被引用的素材。
 
 阅读卡片点击打开预览，只有独立下载按钮触发下载。只读元信息/文本/目录接口为 `/api/attachments/{id}/preview`，位图、PDF 与音视频内容走 `/attachments/{id}/content`，均受现有认证保护；内容接口按文件签名限制类型，HTML/SVG 只能以文本预览或下载。压缩包只列目录，不解压落盘或读取其他分卷；支持格式与读取限制见 DESIGN 23.8。PDF.js 及字体、CMap、解码资源在本机随前端构建，版本化资源位于 `static/assets/pdfjs-<版本>/`，打开 PDF 后才加载，不向第三方传送文件。无服务器新运行时、持久化目录或备份格式变更。
 
+附件下载与媒体预览内容输出采用两分钟写空闲超时，不再因总下载时间超过普通响应期限而中断；Range 保持。2026-10-01 以 100 MiB 附件验证上传、去重、下载哈希与备份恢复，抽样服务端 RSS 约 31 MiB；130 秒连续上传、短响应期限下的节流下载通过。Chromium 桌面、WebKit 375×667 的选择器上传与保存重开、隔离 Nginx 大文件与认证检查、取消/残缺表单清理、无引用素材继续保留均通过。完整构建、Go vet 与正式实例只读 roundtrip（320 篇文档、215 个表格）无差异。
+
 2026-10-01 预览检查：Chromium、WebKit 桌面及 375×667、手机横屏通过阅读预览/下载分离、目录展开/搜索、PDF 翻页、图片音频、失败重试/关闭取消、浅深色及键盘焦点规则。常见压缩格式、过大目录/解压流截断、UTF-8/UTF-16、主动内容隔离、HEAD/Range 均以本机合成附件验证。完整构建与 Go vet 通过；首次脚本约 124.50 KiB gzip，新增只读接口已登记门户，无正文或备份迁移。
 
-原生备份清单版本为 2，覆盖所有登记图片及 .bin 附件并核对 SHA-256；恢复同时接受旧版本 1 的图片备份。门户 media 备份沿用原生快照中的整个 assets 目录，无需修改共享收集器。使用附件之后，程序回退必须选择支持 attachment 节点与 .bin 备份的版本，旧程序无法安全保存此类文档或完成备份。文件名及资源路径的导入导出规则见 DESIGN 23.8。
+原生备份清单版本为 2，覆盖所有登记图片及 .bin 附件并核对 SHA-256；恢复同时接受旧版本 1 的图片备份。门户 media 备份沿用原生快照中的整个 assets 目录，无需修改共享收集器。使用附件之后，程序回退必须选择支持 attachment 节点与 .bin 备份的版本，旧程序无法安全保存此类文档或完成备份。保存过大于 25 MiB 的附件后，回退还必须选择已取消附件正文大小校验的版本。文件名及资源路径的导入导出规则见 DESIGN 23.8。
 
 2026-10-01：Chromium、WebKit 桌面及 WebKit 375×667 验证嵌套附件卡片、选择/删除/撤销、重命名、下载、批量顺序、浅深主题与保存重开；上传失败重试、取消、粘贴/拖入、图片兼容及普通 Tab/焦点规则通过。HTML/Markdown 往返、网页 ZIP 与命令行导入导出的文件内容保持；隔离验证原生 v2 备份、v1 恢复兼容、损坏拒绝、源文档彻底删除后模板附件保留。正式实例只读 roundtrip：320 篇文档、215 个表格无差异。构建与类型检查通过，首次加载脚本约 123.86 KiB gzip。验证材料仅存本机 .local。
 
@@ -28,7 +30,7 @@
 
 运行身份 yuyan，发布身份 yuyan-deploy；data/backups 为 0700，程序与配置由 root 管理。服务监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问，不增加公网端口。systemd 只允许写 data，内存上限 384 MiB（`GOMEMLIMIT=320MiB`），CPU 100%。图片由程序返回并带一年 `immutable` 缓存，Nginx 不直接读取 data，因此 data 保持 0700。
 
-Nginx location 对 HTML、JSON、JS、CSS 开启 gzip：服务器下行只有约 0.5 MB/s，最长的文档页面约 970 KB，压缩后约 300 KB。Go 把 `.js` 返回为 `text/javascript`，`gzip_types` 必须列出它，见共享的 [Go 程序返回的 JavaScript 没有被 Nginx 压缩](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#go-程序返回的-javascript-没有被-nginx-压缩)。请求体上限 26 MiB（程序单张图片上限 25 MiB）。
+Nginx location 对 HTML、JSON、JS、CSS 开启 gzip：服务器下行只有约 0.5 MB/s，最长的文档页面约 970 KB，压缩后约 300 KB。Go 把 `.js` 返回为 `text/javascript`，`gzip_types` 必须列出它，见共享的 [Go 程序返回的 JavaScript 没有被 Nginx 压缩](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#go-程序返回的-javascript-没有被-nginx-压缩)。附件上传路由单独取消大小上限并关闭请求体缓冲，其他请求上限 26 MiB（程序单张图片上限 25 MiB）。修改此文件后需将同提交 deploy/nginx-location.conf 同步到 /opt/yuyan/config/nginx-location.conf，nginx -t 通过后平滑 reload；make deploy 不自动同步 Nginx 配置。
 
 当前公网使用 HTTPS 与统一设备认证，授权设备可以查看和修改内容；版本历史、回收站和每日备份用于恢复。
 

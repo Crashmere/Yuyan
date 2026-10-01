@@ -12,6 +12,7 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,28 +52,43 @@ func (s *Store) AssetPath(id, ext string) string {
 // PutAsset stores an image under the first 128 bits of its SHA-256. Identical bytes map to the
 // same object; existing files are never overwritten.
 func (s *Store) PutAsset(ctx context.Context, data []byte, originalName string) (Asset, error) {
-	return s.putAsset(ctx, data, originalName, false)
-}
-
-// PutAttachment shares immutable media storage with images. Arbitrary files are never served inline.
-func (s *Store) PutAttachment(ctx context.Context, data []byte, originalName string) (Asset, error) {
-	return s.putAsset(ctx, data, originalName, true)
-}
-
-func (s *Store) putAsset(ctx context.Context, data []byte, originalName string, attachment bool) (Asset, error) {
-	if (!attachment && len(data) == 0) || len(data) > MaxAssetBytes {
+	if len(data) == 0 || len(data) > MaxAssetBytes {
 		return Asset{}, ErrInvalid
 	}
-	mime := http.DetectContentType(data)
+	if _, ok := imageExt[http.DetectContentType(data)]; !ok {
+		return Asset{}, ErrUnsupported
+	}
+	return s.PutAttachment(ctx, bytes.NewReader(data), originalName)
+}
+
+// PutAttachment streams into immutable media storage without a file-size limit. The temporary
+// file lives on the data volume, not /tmp; memory use does not grow with the upload size.
+func (s *Store) PutAttachment(ctx context.Context, source io.Reader, originalName string) (Asset, error) {
+	tmp, err := os.CreateTemp(filepath.Join(s.dir, "assets"), ".upload-*")
+	if err != nil {
+		return Asset{}, err
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	hash := sha256.New()
+	size, err := io.Copy(io.MultiWriter(tmp, hash), assetReader{ctx, source})
+	if err != nil {
+		return Asset{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return Asset{}, err
+	}
+	header := make([]byte, 512)
+	n, err := tmp.ReadAt(header, 0)
+	if err != nil && err != io.EOF {
+		return Asset{}, err
+	}
+	mime := http.DetectContentType(header[:n])
 	ext, ok := imageExt[mime]
 	if !ok {
-		if !attachment {
-			return Asset{}, ErrUnsupported
-		}
 		ext = "bin"
 	}
-	sum := sha256.Sum256(data)
-	full := hex.EncodeToString(sum[:])
+	full := hex.EncodeToString(hash.Sum(nil))
 	id := full[:32]
 	if a, err := s.GetAsset(ctx, id); err == nil {
 		return a, nil
@@ -80,43 +96,56 @@ func (s *Store) putAsset(ctx context.Context, data []byte, originalName string, 
 		return Asset{}, err
 	}
 	var width, height int
-	if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
-		width, height = cfg.Width, cfg.Height
+	if ok {
+		metadataBytes := size
+		if size > MaxAssetBytes {
+			metadataBytes = 1 << 20
+		}
+		if cfg, _, err := image.DecodeConfig(io.NewSectionReader(tmp, 0, metadataBytes)); err == nil {
+			width, height = cfg.Width, cfg.Height
+		}
 	}
-	path := s.AssetPath(id, ext)
-	if err := writeAssetImmutable(path, data, full); err != nil {
+	if err := tmp.Sync(); err != nil {
 		return Asset{}, err
 	}
-	_, err := s.DB.ExecContext(ctx, `
+	if err := tmp.Close(); err != nil {
+		return Asset{}, err
+	}
+	if err := ctx.Err(); err != nil {
+		return Asset{}, err
+	}
+	if err := publishAsset(tmp.Name(), s.AssetPath(id, ext), full); err != nil {
+		return Asset{}, err
+	}
+	_, err = s.DB.ExecContext(ctx, `
 INSERT OR IGNORE INTO assets(id, sha256, ext, mime, size, width, height, original_name, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, full, ext, mime, len(data), nullInt(width), nullInt(height), originalName, s.stamp())
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, full, ext, mime, size, nullInt(width), nullInt(height), originalName, s.stamp())
 	if err != nil {
 		return Asset{}, err
 	}
 	return s.GetAsset(ctx, id)
 }
 
+type assetReader struct {
+	ctx    context.Context
+	source io.Reader
+}
+
+func (r assetReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.source.Read(p)
+}
+
 // Publish a complete file without replacing an existing inode (backups use hard links).
-func writeAssetImmutable(path string, data []byte, digest string) error {
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".upload-*")
-	if err != nil {
+func publishAsset(tmp, path, digest string) error {
+	if err := os.Link(tmp, path); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrExist) {
 		return err
 	}
-	defer os.Remove(tmp.Name())
-	if _, err = tmp.Write(data); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err = tmp.Sync(); err != nil {
-		tmp.Close()
-		return err
-	}
-	if err = tmp.Close(); err != nil {
-		return err
-	}
-	if err = os.Link(tmp.Name(), path); err != nil && !errors.Is(err, os.ErrExist) {
-		return err
-	}
+	// Another upload may have published the same object before its database row was visible.
 	got, err := fileDigest(path)
 	if err != nil {
 		return err

@@ -132,6 +132,7 @@ func previewText(data []byte, truncated bool) (string, bool) {
 }
 
 func (s *Server) attachmentContent(w http.ResponseWriter, r *http.Request) {
+	w = attachmentWriter{w, http.NewResponseController(w)}
 	a, name, err := s.previewAsset(r)
 	if err != nil {
 		writeError(w, err)

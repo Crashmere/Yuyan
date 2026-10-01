@@ -1,7 +1,6 @@
 import { Node } from '@tiptap/core'
 
 export const attachmentSource = /^\/attachments\/([0-9a-f]{32})$/
-export const maxAttachmentBytes = 25 * 1024 * 1024
 export function attachmentName(value: string): string {
   const name = Array.from(value.replace(/\\/g, '/').split('/').pop()!.replace(/[\u0000-\u001f\u007f-\u009f\u202d\u202e]/g, '').trim()).slice(0, 200).join('')
   return !name || name === '.' || name === '..' ? '附件' : name
@@ -11,7 +10,7 @@ export function attachmentType(name: string): string {
   return ext && Array.from(ext).length <= 8 ? ext.toUpperCase() : 'FILE'
 }
 export function attachmentSize(size: number): string {
-  return size < 1024 ? `${size} B` : size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`
+  return size < 1024 ? `${size} B` : size < 1024 ** 2 ? `${(size / 1024).toFixed(1)} KB` : size < 1024 ** 3 ? `${(size / 1024 ** 2).toFixed(1)} MB` : size < 1024 ** 4 ? `${(size / 1024 ** 3).toFixed(1)} GB` : `${(size / 1024 ** 4).toFixed(1)} TB`
 }
 export function attachmentHref(src: string, name: string): string {
   if (attachmentSource.test(src)) return `${src}?name=${encodeURIComponent(name).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase())}`

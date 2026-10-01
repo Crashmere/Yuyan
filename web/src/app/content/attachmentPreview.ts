@@ -49,5 +49,5 @@ export function archiveTree(entries: ArchiveEntry[]) {
 }
 
 export function fileSize(size: number) {
-  return size < 1024 ? `${size} B` : size < 1048576 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1048576).toFixed(1)} MB`
+  return size < 1024 ? `${size} B` : size < 1024 ** 2 ? `${(size / 1024).toFixed(1)} KB` : size < 1024 ** 3 ? `${(size / 1024 ** 2).toFixed(1)} MB` : size < 1024 ** 4 ? `${(size / 1024 ** 3).toFixed(1)} GB` : `${(size / 1024 ** 4).toFixed(1)} TB`
 }

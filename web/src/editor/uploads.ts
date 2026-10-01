@@ -4,7 +4,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { base, type Asset } from '../shared/api'
 import { imageSizes } from './images'
 import { closeHistory } from '@tiptap/pm/history'
-import { attachmentName, attachmentType, maxAttachmentBytes } from '../schema/attachment'
+import { attachmentName, attachmentType } from '../schema/attachment'
 import { keepBlockSpace } from './blockSpaces'
 
 // An image being uploaded shows a placeholder with its progress where it will appear. A failed
@@ -122,7 +122,7 @@ async function send(editor: Editor, up: Upload) {
       button('重试', () => { void send(editor, up) }), button('移除', () => remove(editor, up)),
     )
   }
-  if (up.file.size > maxAttachmentBytes) { fail(new Error('单个文件不能超过 25 MiB')); return }
+  if (!up.attachment && up.file.size > 25 * 1024 * 1024) { fail(new Error('单张图片不能超过 25 MiB')); return }
   const { promise, xhr } = uploadFile(up.file, (f) => {
     bar.style.width = `${Math.round(f * 100)}%`
     text.textContent = f < 1 ? `上传中 ${Math.round(f * 100)}%` : '处理中'

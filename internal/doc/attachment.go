@@ -15,8 +15,9 @@ func validAttachment(n Node) bool {
 	name, nameOK := n.Attrs["name"].(string)
 	size, sizeOK := n.Attrs["size"].(float64)
 	mime, mimeOK := n.Attrs["mime"].(string)
+	// Preserve exact integer sizes when the JSON document is read by JavaScript.
 	return srcOK && AttachmentSource.MatchString(src) && nameOK && name == AttachmentName(name) &&
-		sizeOK && size >= 0 && size <= 25<<20 && size == math.Trunc(size) &&
+		sizeOK && size >= 0 && size <= 1<<53-1 && size == math.Trunc(size) &&
 		mimeOK && len(mime) <= 255 && len(n.Content) == 0 && n.Text == ""
 }
 
@@ -46,7 +47,13 @@ func AttachmentSize(size int) string {
 	if size < 1024*1024 {
 		return fmt.Sprintf("%.1f KB", float64(size)/1024)
 	}
-	return fmt.Sprintf("%.1f MB", float64(size)/(1024*1024))
+	if size < 1024*1024*1024 {
+		return fmt.Sprintf("%.1f MB", float64(size)/(1024*1024))
+	}
+	if size < 1024*1024*1024*1024 {
+		return fmt.Sprintf("%.1f GB", float64(size)/(1024*1024*1024))
+	}
+	return fmt.Sprintf("%.1f TB", float64(size)/(1024*1024*1024*1024))
 }
 
 func AttachmentType(name string) string {

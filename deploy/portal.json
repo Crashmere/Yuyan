@@ -290,7 +290,7 @@
     {
       "method": "POST",
       "path": "/api/attachments",
-      "description": "上传附件，单个最大 25 MiB，按内容去重且不可覆盖"
+      "description": "流式上传附件，不设文件大小上限，按内容去重且不可覆盖"
     },
     {
       "method": "GET",
