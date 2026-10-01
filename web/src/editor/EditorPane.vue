@@ -179,7 +179,7 @@ async function save() {
   try {
     const res = await api<{ revision: number }>(`docs/${props.doc.id}`, {
       method: 'PUT',
-      json: { title: savedTitle, content: editor.value.getJSON(), baseRevision: revision.value },
+      json: { title: savedTitle, content: editor.value.getJSON(), baseRevision: revision.value, sessionRevision: props.doc.revision },
     })
     revision.value = res.revision
     retryDelay = 2000

@@ -165,6 +165,16 @@ FROM docs d JOIN books b ON b.id = d.book_id WHERE d.id = ?`, id).
 // SaveDoc replaces title and content when baseRevision matches; otherwise it returns ErrConflict
 // together with the current revision so the editor can warn instead of overwriting.
 func (s *Store) SaveDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision int64) (int64, string, error) {
+	return s.saveDoc(ctx, id, title, content, baseRevision, false)
+}
+
+// The first save of an editing session keeps a fresh baseline for cancellation,
+// including media whose older history may expire while the editor stays open.
+func (s *Store) SaveEditingDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision, sessionRevision int64) (int64, string, error) {
+	return s.saveDoc(ctx, id, title, content, baseRevision, sessionRevision > 0 && sessionRevision == baseRevision)
+}
+
+func (s *Store) saveDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision int64, sessionStart bool) (int64, string, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		title = "无标题文档"
@@ -179,8 +189,9 @@ func (s *Store) SaveDoc(ctx context.Context, id int64, title string, content doc
 	}
 	defer tx.Rollback()
 	var current int64
+	var beforeTitle, beforeContent string
 	var deleted sql.NullString
-	err = tx.QueryRowContext(ctx, `SELECT revision, deleted_at FROM docs WHERE id = ?`, id).Scan(&current, &deleted)
+	err = tx.QueryRowContext(ctx, `SELECT revision, deleted_at, title, content FROM docs WHERE id = ?`, id).Scan(&current, &deleted, &beforeTitle, &beforeContent)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && deleted.Valid) {
 		return 0, "", ErrNotFound
 	}
@@ -194,6 +205,11 @@ func (s *Store) SaveDoc(ctx context.Context, id int64, title string, content doc
 		return current, "", err
 	}
 	now := s.stamp()
+	if sessionStart {
+		if err := insertVersion(ctx, tx, id, current, beforeTitle, beforeContent, "before-edit", now); err != nil {
+			return current, "", err
+		}
+	}
 	next := current + 1
 	if _, err := tx.ExecContext(ctx, `
 UPDATE docs SET title = ?, content = ?, schema_version = ?, plain_text = ?, revision = ?, updated_at = ? WHERE id = ?`,
@@ -249,7 +265,10 @@ func (s *Store) DiscardEdits(ctx context.Context, id int64, title string, conten
 	if err := retainContentAssets(ctx, tx, content); err != nil {
 		return current, err
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM doc_versions WHERE doc_id = ? AND revision > ?`, id, since); err != nil {
+	if err := rememberVersionIDs(ctx, tx); err != nil {
+		return current, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM doc_versions WHERE doc_id = ? AND (revision > ? OR (revision = ? AND reason = 'before-edit'))`, id, since, since); err != nil {
 		return 0, err
 	}
 	next := current + 1
@@ -372,9 +391,16 @@ func olderThan(stamp, now string, d time.Duration) bool {
 }
 
 func insertVersion(ctx context.Context, tx *sql.Tx, docID, revision int64, title, content, reason, now string) error {
+	if err := rememberVersionIDs(ctx, tx); err != nil {
+		return err
+	}
+	var versionID int64
+	if err := tx.QueryRowContext(ctx, `UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'version_sequence' RETURNING CAST(value AS INTEGER)`).Scan(&versionID); err != nil {
+		return err
+	}
 	_, err := tx.ExecContext(ctx, `
-INSERT INTO doc_versions(doc_id, revision, title, content, schema_version, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		docID, revision, title, content, doc.SchemaVersion, reason, now)
+INSERT INTO doc_versions(id, doc_id, revision, title, content, schema_version, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		versionID, docID, revision, title, content, doc.SchemaVersion, reason, now)
 	return err
 }
 

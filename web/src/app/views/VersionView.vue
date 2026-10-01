@@ -11,7 +11,6 @@ import { loading, loadTree, setPage } from '../store'
 import { formatTime } from '../time'
 import VersionDiff from '../versions/VersionDiff.vue'
 import VersionSummary from '../versions/VersionSummary.vue'
-import NotFoundState from './NotFoundState.vue'
 import { reasons } from './versions'
 
 const route = useRoute()
@@ -64,7 +63,11 @@ async function restore() {
       <button v-if="!isCurrent" type="button" class="yy-btn primary" @click="restore"><RotateCcw :size="15" />恢复此版本</button>
     </template>
   </Teleport>
-  <main v-if="missing" class="yy-page"><NotFoundState /></main>
+  <main v-if="missing" class="yy-page">
+    <h1 class="yy-page-title">版本已过期或不存在</h1>
+    <p class="yy-page-sub">历史版本仅保留 30 天，当前正文不受影响。</p>
+    <RouterLink to="/" class="yy-btn">回到首页</RouterLink>
+  </main>
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
   <main v-else-if="view" class="yy-doc-page">
     <article class="yy-article">

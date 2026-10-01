@@ -219,7 +219,11 @@ func summarizeVersion(v store.Version, previous *store.Version, current store.Do
 	info := infoOf(v)
 	info.MatchesCurrent = v.Title == current.Title && doc.SameContent(v.Content, current.Content)
 	if previous == nil {
-		info.Summary = doc.ChangeSummary{Labels: []string{"初始内容"}, Sections: []string{}}
+		label := "保留的最早版本"
+		if v.Revision == 1 && v.Reason == "create" {
+			label = "初始内容"
+		}
+		info.Summary = doc.ChangeSummary{Labels: []string{label}, Sections: []string{}}
 	} else {
 		info.Summary = doc.SummarizeChanges(previous.Title, previous.Content, v.Title, v.Content)
 	}
@@ -407,9 +411,10 @@ func (s *Server) apiCreateDoc(w http.ResponseWriter, r *http.Request) error {
 }
 
 type saveDocInput struct {
-	Title        string          `json:"title"`
-	Content      json.RawMessage `json:"content"`
-	BaseRevision int64           `json:"baseRevision"`
+	Title           string          `json:"title"`
+	Content         json.RawMessage `json:"content"`
+	BaseRevision    int64           `json:"baseRevision"`
+	SessionRevision int64           `json:"sessionRevision"`
 }
 
 func (s *Server) apiSaveDoc(w http.ResponseWriter, r *http.Request) error {
@@ -425,7 +430,7 @@ func (s *Server) apiSaveDoc(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return badRequest("%v", err)
 	}
-	revision, updated, err := s.store.SaveDoc(r.Context(), id, in.Title, content, in.BaseRevision)
+	revision, updated, err := s.store.SaveEditingDoc(r.Context(), id, in.Title, content, in.BaseRevision, in.SessionRevision)
 	if errors.Is(err, store.ErrConflict) {
 		return conflictError{revision: revision}
 	}

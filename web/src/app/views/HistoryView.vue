@@ -54,7 +54,7 @@ async function restore(v: VersionInfo) {
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
   <main v-else-if="doc" class="yy-page yy-history-page">
     <h1 class="yy-page-title">历史版本</h1>
-    <p class="yy-page-sub">快照保存的是当时修改后的完整内容。编辑中每隔 10 分钟保存一次，结束编辑时再保存；摘要和“本次改动”均以上一条快照为基准。</p>
+    <p class="yy-page-sub">历史版本保留 30 天，每天凌晨清理，当前正文始终保留。首次保存保留编辑前的内容，编辑中每隔 10 分钟、结束编辑时记录快照；摘要和“本次改动”以上一条快照为基准。</p>
     <section class="yy-history-current" aria-label="当前内容">
       <div class="yy-version-body">
         <div class="yy-version-meta"><strong>当前内容</strong><span>r{{ doc.revision }} · {{ formatTime(doc.updatedAt) }}</span></div>
@@ -62,14 +62,16 @@ async function restore(v: VersionInfo) {
           <p>已自动保存，尚未生成快照。相对最近快照：</p>
           <VersionSummary :summary="pending" />
         </template>
-        <p v-else>与最新快照内容一致。</p>
+        <p v-else-if="versions.length">与最新快照内容一致。</p>
+        <p v-else>当前正文已保存。</p>
       </div>
       <div class="yy-version-actions">
         <RouterLink :to="`/docs/${id}`" class="yy-btn small">查看文档</RouterLink>
         <RouterLink v-if="pending && versions[0]" :to="`/versions/${versions[0].id}?compare=current`" class="yy-btn small">查看差异</RouterLink>
       </div>
     </section>
-    <ul class="yy-version-list">
+    <p v-if="!versions.length" class="yy-page-sub">最近 30 天没有历史版本。</p>
+    <ul v-else class="yy-version-list">
       <li v-for="(v, i) in versions" :key="v.id">
         <div class="yy-version-info">
           <RouterLink :to="`/versions/${v.id}`" class="yy-version-time">{{ formatTime(v.createdAt) }}</RouterLink>

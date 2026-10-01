@@ -41,6 +41,12 @@ func (s *Store) RunAssetGC(ctx context.Context) {
 	defer ticker.Stop()
 	first := true
 	for {
+		versions, err := s.pruneVersions(ctx, false, true)
+		if err != nil && ctx.Err() == nil {
+			slog.Error("version retention", "error", err)
+		} else if versions.Ran {
+			slog.Info("version retention", "retentionDays", 30, "deleted", versions.Deleted, "nextRun", versions.NextRun)
+		}
 		result, err := s.CollectAssets(ctx)
 		if err == nil && first {
 			slog.Info("asset cleanup ready", "gracePeriod", AssetGracePeriod, "interval", time.Minute, "referenced", result.Referenced, "pending", result.Pending)

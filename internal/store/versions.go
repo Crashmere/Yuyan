@@ -4,9 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/Crashmere/Yuyan/internal/doc"
 )
+
+var ErrVersionNotFound = fmt.Errorf("%w: 历史版本已过期或不存在", ErrNotFound)
 
 type Version struct {
 	ID        int64    `json:"id"`
@@ -42,13 +45,19 @@ SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_version
 }
 
 func (s *Store) GetVersion(ctx context.Context, id int64) (Version, error) {
+	return getVersion(ctx, s.DB, id)
+}
+
+func getVersion(ctx context.Context, q interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, id int64) (Version, error) {
 	var v Version
 	var content string
-	err := s.DB.QueryRowContext(ctx, `
+	err := q.QueryRowContext(ctx, `
 SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_versions WHERE id = ?`, id).
 		Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt, &content)
 	if errors.Is(err, sql.ErrNoRows) {
-		return v, ErrNotFound
+		return v, ErrVersionNotFound
 	}
 	if err != nil {
 		return v, err
@@ -105,35 +114,48 @@ func (s *Store) Snapshot(ctx context.Context, docID int64) error {
 
 // RestoreVersion keeps the current state as a version first, then makes the chosen version current.
 func (s *Store) RestoreVersion(ctx context.Context, versionID, baseRevision int64) (int64, error) {
-	v, err := s.GetVersion(ctx, versionID)
-	if err != nil {
-		return 0, err
-	}
-	if err := s.Snapshot(ctx, v.DocID); err != nil {
-		return 0, err
-	}
-	next, now, err := s.SaveDoc(ctx, v.DocID, v.Title, v.Content, baseRevision)
-	if err != nil {
-		return next, err
-	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
+	v, err := getVersion(ctx, tx, versionID)
+	if err != nil {
+		return 0, err
+	}
+	var current, bookID int64
+	var title, content string
+	var deleted sql.NullString
+	err = tx.QueryRowContext(ctx, `SELECT revision, book_id, title, content, deleted_at FROM docs WHERE id = ?`, v.DocID).Scan(&current, &bookID, &title, &content, &deleted)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && deleted.Valid) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, err
+	}
+	if current != baseRevision {
+		return current, ErrConflict
+	}
+	if err := checkBookAlive(ctx, tx, bookID); err != nil {
+		return 0, err
+	}
+	if err := retainContentAssets(ctx, tx, v.Content); err != nil {
+		return 0, err
+	}
+	now, next := s.stamp(), current+1
+	// Capture a fresh rollback point in the same transaction as the restore. An
+	// existing snapshot of this revision may itself be about to expire.
+	if err := insertVersion(ctx, tx, v.DocID, current, title, content, "before-restore", now); err != nil {
+		return 0, err
+	}
 	data, err := v.Content.Marshal()
 	if err != nil {
 		return 0, err
 	}
-	var exists int
-	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM doc_versions WHERE doc_id = ? AND revision = ?`, v.DocID, next).Scan(&exists); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE docs SET title = ?, content = ?, schema_version = ?, plain_text = ?, revision = ?, updated_at = ? WHERE id = ?`, v.Title, string(data), doc.SchemaVersion, doc.PlainText(v.Content), next, now, v.DocID); err != nil {
 		return 0, err
 	}
-	if exists == 0 {
-		if err := insertVersion(ctx, tx, v.DocID, next, v.Title, string(data), "restore", now); err != nil {
-			return 0, err
-		}
-	} else if _, err := tx.ExecContext(ctx, `UPDATE doc_versions SET reason = 'restore' WHERE doc_id = ? AND revision = ?`, v.DocID, next); err != nil {
+	if err := insertVersion(ctx, tx, v.DocID, next, v.Title, string(data), "restore", now); err != nil {
 		return 0, err
 	}
 	return next, tx.Commit()

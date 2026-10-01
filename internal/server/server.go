@@ -293,6 +293,8 @@ func errorResponse(err error) (int, apiError) {
 		return http.StatusConflict, apiError{Error: "conflict", Message: "文档已在别处修改", Revision: conflict.revision}
 	case errors.Is(err, store.ErrMissingAsset):
 		return http.StatusUnprocessableEntity, apiError{Error: "missing_asset", Message: err.Error()}
+	case errors.Is(err, store.ErrVersionNotFound):
+		return http.StatusNotFound, apiError{Error: "version_not_found", Message: "历史版本已过期或不存在"}
 	case errors.Is(err, store.ErrNotFound):
 		return http.StatusNotFound, apiError{Error: "not_found", Message: "内容不存在或已删除"}
 	case errors.Is(err, store.ErrUnsupported):

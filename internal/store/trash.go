@@ -88,6 +88,9 @@ INSERT INTO purge SELECT id FROM docs WHERE deleted_at IS NOT NULL;`); err != ni
 }
 
 func purgeBooks(ctx context.Context, tx *sql.Tx, where string, args ...any) error {
+	if err := rememberVersionIDs(ctx, tx); err != nil {
+		return err
+	}
 	books := `SELECT id FROM books WHERE ` + where
 	groups, err := readBookGroups(ctx, tx)
 	if err != nil {
@@ -135,6 +138,9 @@ func purgeBooks(ctx context.Context, tx *sql.Tx, where string, args ...any) erro
 // purgeListed deletes the documents in the temp table purge and their versions, first detaching
 // any remaining document that still points at one of them.
 func purgeListed(ctx context.Context, tx *sql.Tx) error {
+	if err := rememberVersionIDs(ctx, tx); err != nil {
+		return err
+	}
 	for _, q := range []string{
 		`UPDATE docs SET parent_id = NULL WHERE parent_id IN (SELECT id FROM purge) AND id NOT IN (SELECT id FROM purge)`,
 		`DELETE FROM doc_versions WHERE doc_id IN (SELECT id FROM purge)`,
