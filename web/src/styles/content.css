@@ -15,14 +15,24 @@
   margin: 0.75em 0;
 }
 
-/* Columns have no reading chrome. Constrain their children, including wide tables and code. */
-.yy-columns { min-width: 0; }
+/* A quiet frame and dashed dividers distinguish a column layout, including empty columns. */
+.yy-columns {
+  min-width: 0; padding: 16px 20px;
+  border: 1px solid color-mix(in srgb, var(--yy-primary) 12%, var(--yy-border));
+  border-radius: 6px;
+}
 .yy-columns-grid { display: grid; gap: 24px; }
-.yy-column { min-width: 0; container: yy-column / inline-size; }
+.yy-column { position: relative; min-width: 0; min-height: 3em; container: yy-column / inline-size; }
+.yy-column + .yy-column::before {
+  content: ''; position: absolute; left: -12.5px; top: 0; bottom: 0;
+  border-left: 1px dashed var(--yy-border); pointer-events: none;
+}
 .yy-column > :first-child { margin-top: 0; }
 .yy-column > :last-child { margin-bottom: 0; }
 @media (max-width: 720px) {
   .yy-columns, .yy-columns-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .yy-columns { padding: 16px; }
+  .yy-column + .yy-column::before { left: 0; right: 0; top: -12.5px; bottom: auto; border-left: 0; border-top: 1px dashed var(--yy-border); }
 }
 
 /* Neutral folding cards and soft highlight blocks, shared by the reader and editor. */

@@ -28,6 +28,7 @@ import ImageToolsDialog from './ImageToolsDialog.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
 import { insertImages, pendingUploads } from './uploads'
+import { clearUnusedBlockSpaces } from './blockSpaces'
 import { captureEditingPosition, restoreReadingPosition } from './readingPosition'
 import 'katex/dist/katex.min.css'
 import '../styles/editor.css'
@@ -204,6 +205,7 @@ async function save() {
 // uploading are waited for first, so they are part of what gets saved.
 async function flush(): Promise<boolean> {
   if (discarded) return true
+  if (editor.value) clearUnusedBlockSpaces(editor.value.view)
   while (editor.value && pendingUploads(editor.value) > 0) await new Promise((r) => setTimeout(r, 100))
   clearTimeout(saveTimer)
   for (let attempt = 0; attempt < 3; attempt++) {

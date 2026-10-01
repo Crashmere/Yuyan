@@ -1,8 +1,36 @@
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
-import { NodeSelection, Plugin, TextSelection } from '@tiptap/pm/state'
+import { NodeSelection, Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
+
+interface PendingSpace { pos: number; node: PMNode }
+const spacesKey = new PluginKey<PendingSpace[]>('blockSpaces')
+
+// Uploads use decorations before their real content arrives. Starting one makes this an
+// intentional insertion, so leaving the paragraph must not remove its upload destination.
+export function keepBlockSpace(tr: Transaction, pos: number): Transaction {
+  return tr.setMeta(spacesKey, { keep: pos })
+}
+
+function cleanup(state: EditorState, leaving = false): Transaction | null {
+  const pending = spacesKey.getState(state) ?? []
+  const unused = pending.filter(({ pos }) => leaving || !state.selection.ranges.some(({ $from, $to }) => $from.pos <= pos + 1 && $to.pos >= pos + 1))
+  if (!unused.length) return null
+  const tr = state.tr
+  for (const { pos, node } of unused.sort((a, b) => b.pos - a.pos)) {
+    const $pos = tr.doc.resolve(pos)
+    if (tr.doc.nodeAt(pos) === node && $pos.parent.canReplace($pos.index(), $pos.index() + 1)) tr.delete(pos, pos + node.nodeSize)
+  }
+  // Cleanup must never resurrect an accidental blank line when the next edit is undone.
+  return tr.docChanged ? tr.setMeta('addToHistory', false) : null
+}
+
+export function clearUnusedBlockSpaces(view: EditorView) {
+  if (view.isDestroyed || view.composing) return
+  const tr = cleanup(view.state, true)
+  if (tr) view.dispatch(tr)
+}
 
 function needsSpace(node: PMNode): boolean {
   if (['table', 'horizontalRule', 'codeBlock', 'blockMath', 'callout', 'imageBoard', 'foldBlock', 'highlightBlock', 'columns'].includes(node.type.name)) return true
@@ -27,7 +55,60 @@ export const BlockSpaces = Extension.create({
   // Resizing and node-specific controls get first refusal on their own hit areas.
   priority: 50,
   addProseMirrorPlugins() {
-    return [new Plugin({
+    let editorView: EditorView | undefined
+    return [new Plugin<PendingSpace[]>({
+      key: spacesKey,
+      state: {
+        init: () => [],
+        apply(tr, pending) {
+          const meta = tr.getMeta(spacesKey) as { add?: number; keep?: number } | undefined
+          const next: PendingSpace[] = []
+          for (const space of pending) {
+            let pos = space.pos, touched = false
+            for (const map of tr.mapping.maps) {
+              map.forEach((from, to) => { if (from <= pos + 1 && to >= pos + 1) touched = true })
+              const mapped = map.mapResult(pos, 1)
+              touched ||= mapped.deleted; pos = mapped.pos
+            }
+            // Unchanged nodes retain their identity. Typing, splitting, changing block styles,
+            // or replacing/moving a container makes the paragraph intentional, even if empty.
+            if (touched || tr.doc.nodeAt(pos) !== space.node || meta?.keep === pos + 1) continue
+            if (tr.storedMarksSet && tr.storedMarks && tr.selection.from === pos + 1) continue
+            next.push({ ...space, pos })
+          }
+          if (meta?.add !== undefined) next.push({ pos: meta.add, node: tr.doc.nodeAt(meta.add)! })
+          return next
+        },
+      },
+      appendTransaction(_transactions, _old, state) { return editorView?.composing ? null : cleanup(state) },
+      view(view) {
+        editorView = view
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const schedule = () => {
+          clearTimeout(timer)
+          timer = setTimeout(() => {
+            if (view.composing) return
+            const active = view.dom.ownerDocument.activeElement
+            // Formatting and insertion panels still operate on the current paragraph. Wait
+            // for their command or a real departure instead of deleting their saved anchor.
+            if (active?.closest('.yy-toolbar, .yy-float, [role="menu"], [role="dialog"]')) return
+            const tr = cleanup(view.state, active !== view.dom)
+            if (tr) view.dispatch(tr)
+          }, 30)
+        }
+        const doc = view.dom.ownerDocument
+        doc.addEventListener('focusin', schedule)
+        doc.addEventListener('pointerup', schedule)
+        view.dom.addEventListener('blur', schedule, true)
+        view.dom.addEventListener('compositionend', schedule)
+        return { destroy() {
+          editorView = undefined
+          clearTimeout(timer)
+          doc.removeEventListener('focusin', schedule); doc.removeEventListener('pointerup', schedule)
+          view.dom.removeEventListener('blur', schedule, true)
+          view.dom.removeEventListener('compositionend', schedule)
+        } }
+      },
       props: {
         handleDOMEvents: {
           mousedown(view, event) {
@@ -76,7 +157,7 @@ export const BlockSpaces = Extension.create({
             const { pos, empty } = found as Space
             let tr = view.state.tr
             const insertAt = pos
-            if (empty === null) tr = closeHistory(tr.insert(insertAt, view.state.schema.nodes.paragraph.create()))
+            if (empty === null) tr = closeHistory(tr.insert(insertAt, view.state.schema.nodes.paragraph.create()).setMeta(spacesKey, { add: insertAt }))
             tr.setSelection(TextSelection.create(tr.doc, empty ?? insertAt + 1))
             event.preventDefault()
             view.dispatch(tr.scrollIntoView())

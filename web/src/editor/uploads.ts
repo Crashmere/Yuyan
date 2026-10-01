@@ -3,6 +3,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { base, type Asset } from '../shared/api'
 import { imageSizes } from './images'
+import { keepBlockSpace } from './blockSpaces'
 
 // An image being uploaded shows a placeholder with its progress where it will appear. A failed
 // upload keeps the placeholder with retry and remove buttons. Placeholders are decorations, so they
@@ -81,7 +82,7 @@ function start(editor: Editor, file: File, pos: number) {
   up.el.append(img, status)
   uploads(editor).set(up.id, up)
   const meta: Meta = { add: { id: up.id, pos, el: up.el } }
-  editor.view.dispatch(editor.state.tr.setMeta(key, meta).setMeta('addToHistory', false))
+  editor.view.dispatch(keepBlockSpace(editor.state.tr, pos).setMeta(key, meta).setMeta('addToHistory', false))
   send(editor, up)
 }
 

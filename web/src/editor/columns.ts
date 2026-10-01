@@ -49,6 +49,22 @@ export function setColumnCount(editor: Editor, count: number) {
   commit(editor, pos, node, node.type.create({ ...node.attrs, widths: null }, children), offset)
 }
 
+export function insertColumn(editor: Editor, pos: number, index: number): boolean {
+  const node = editor.state.doc.nodeAt(pos)
+  if (!editor.isEditable || !node || node.type.name !== 'columns' || node.childCount >= 4
+    || !Number.isInteger(index) || index < 0 || index > node.childCount) return false
+  let at = pos + 1
+  for (let i = 0; i < index; i++) at += node.child(i).nodeSize
+  const widths = columnWidths(node.attrs.widths, node.childCount)
+  if (widths) widths.splice(index, 0, Math.round(widths.reduce((sum, w) => sum + w, 0) / widths.length))
+  const tr = editor.state.tr.insert(at, editor.schema.nodes.column.createAndFill()!)
+    .setNodeMarkup(pos, undefined, { ...node.attrs, widths })
+  tr.setSelection(TextSelection.create(tr.doc, at + 2)).scrollIntoView()
+  editor.view.dispatch(closeHistory(tr)); editor.view.dispatch(closeHistory(editor.state.tr))
+  editor.commands.focus(undefined, { scrollIntoView: false })
+  return true
+}
+
 export function setColumnWidths(editor: Editor, widths: number[] | null) {
   const active = activeColumns(editor.state)
   if (!active || (widths !== null && !columnWidths(widths, active.node.childCount))) return
@@ -84,16 +100,33 @@ export function unwrapColumns(editor: Editor) {
 export const columnsView: NodeViewRenderer = ({ node: initial, editor, getPos }) => {
   let node = initial, cancel: (() => void) | undefined
   const dom = document.createElement('div'), contentDOM = document.createElement('div'), handles = document.createElement('div')
+  const inserts = document.createElement('div'), preview = document.createElement('div')
+  let inserting: number | null = null, frame = 0
   dom.className = 'yy-columns yy-columns-editor'; dom.dataset.columns = ''
   contentDOM.className = 'yy-columns-grid'; contentDOM.dataset.columnsContent = ''
   handles.className = 'yy-column-handles'; handles.contentEditable = 'false'
-  dom.append(contentDOM, handles)
+  inserts.className = 'yy-column-inserts'; inserts.contentEditable = 'false'
+  preview.className = 'yy-column-insert-line'; preview.contentEditable = 'false'; preview.hidden = true
+  dom.append(contentDOM, handles, inserts, preview)
   function measure() {
     const rect = dom.getBoundingClientRect(), columns = Array.from(contentDOM.children)
+    if (columns.length !== node.childCount) { preview.hidden = true; return }
     Array.from(handles.children).forEach((handle, i) => {
       const left = columns[i]?.getBoundingClientRect(), right = columns[i + 1]?.getBoundingClientRect()
       if (left && right) (handle as HTMLElement).style.left = `${(left.right + right.left) / 2 - rect.left}px`
     })
+    const stacked = matchMedia('(max-width: 720px)').matches
+    Array.from(inserts.children).forEach((button, i) => {
+      const before = columns[i - 1]?.getBoundingClientRect(), after = columns[i]?.getBoundingClientRect()
+      const at = i === 0 ? 0 : i === columns.length ? (stacked ? rect.height : rect.width) - 2
+        : stacked ? (before.bottom + after.top) / 2 - rect.top : (before.right + after.left) / 2 - rect.left
+      Object.assign((button as HTMLElement).style, { left: `${stacked ? 0 : at}px`, top: `${stacked ? at : 0}px` })
+      if (inserting === i) Object.assign(preview.style, {
+        left: `${stacked ? 0 : at}px`, top: `${stacked ? at : 0}px`,
+        width: stacked ? '100%' : '2px', height: stacked ? '2px' : '100%',
+      })
+    })
+    preview.hidden = inserting === null
   }
   function paint(widths = node.attrs.widths) {
     contentDOM.style.gridTemplateColumns = columnGrid(widths, node.childCount)
@@ -102,14 +135,30 @@ export const columnsView: NodeViewRenderer = ({ node: initial, editor, getPos })
     measure()
   }
   function draw() {
-    handles.replaceChildren()
+    handles.replaceChildren(); inserts.replaceChildren(); inserting = null
     for (let i = 0; i < node.childCount - 1; i++) {
       const handle = document.createElement('button')
       handle.type = 'button'; handle.className = 'yy-column-resize'; handle.tabIndex = -1
       handle.setAttribute('aria-label', `调整第 ${i + 1} 栏宽度`); handle.dataset.tip = '拖动调整栏宽'
       handle.addEventListener('pointerdown', e => start(e, i, handle)); handles.append(handle)
     }
+    if (node.childCount < 4) for (let i = 0; i <= node.childCount; i++) {
+      const button = document.createElement('button')
+      button.type = 'button'; button.className = 'yy-column-insert'; button.dataset.index = String(i)
+      const label = i === node.childCount ? '在末尾添加一栏' : `在第 ${i + 1} 栏前添加一栏`
+      button.setAttribute('aria-label', label); button.dataset.tip = label
+      button.addEventListener('mousedown', e => e.preventDefault())
+      button.addEventListener('pointerenter', () => { inserting = i; measure() })
+      button.addEventListener('pointerleave', () => { inserting = null; measure() })
+      button.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation()
+        const pos = getPos()
+        if (pos !== undefined && !editor.view.composing) insertColumn(editor, pos, i)
+      })
+      inserts.append(button)
+    }
     paint()
+    cancelAnimationFrame(frame); frame = requestAnimationFrame(measure)
   }
   function start(event: PointerEvent, index: number, handle: HTMLElement) {
     if (event.button !== 0 || !editor.isEditable || editor.view.composing) return
@@ -150,8 +199,8 @@ export const columnsView: NodeViewRenderer = ({ node: initial, editor, getPos })
   return {
     dom, contentDOM,
     update(next) { if (next.type !== node.type) return false; cancel?.(); node = next; draw(); return true },
-    stopEvent: e => handles.contains(e.target as globalThis.Node),
+    stopEvent: e => handles.contains(e.target as globalThis.Node) || inserts.contains(e.target as globalThis.Node),
     ignoreMutation: m => m.type !== 'selection' && (m.target === contentDOM ? m.type === 'attributes' : !contentDOM.contains(m.target)),
-    destroy() { cancel?.(); observer.disconnect() },
+    destroy() { cancel?.(); cancelAnimationFrame(frame); observer.disconnect() },
   }
 }
