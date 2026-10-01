@@ -2,6 +2,7 @@
 
 - [DESIGN.md](DESIGN.md)：需求、已确认的决策、架构与实施阶段，是方案讨论的统一入口。
 - [OPERATIONS.md](OPERATIONS.md)：安装、发布与回退、正式导入、备份与恢复、诊断。
+- [yuyan-doc 同步维护](#yuyan-doc-同步维护)：平台能力变更时，个人文档操作技能的更新范围与完成条件。
 - [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md)：已停止的 Obsidian 方案讨论记录，其中第 3 节的笔记库调查仍作为导入依据。
 
 已部署到 ali 并正式导入全部笔记（阶段 C，见 DESIGN.md 11.2），用户已在电脑和手机上确认可以正常使用。界面与编辑体验改版（阶段 D，DESIGN.md 第 12 节）已全部发布，用户已验收。阶段 E 第一批（搜索面板、版本对比、图片预留尺寸）已发布，结果见 DESIGN.md 13.6，用户已验收。第二批小功能（搜索知识库与全拼、从搜索结果定位、大纲隐藏、菜单滚动提示）已发布，见 DESIGN.md 第 14 节；第三批反馈修复与阅读改进见第 15 节；第四批语雀式代码块与 `[!code]` 迁移见第 16 节；第五批大纲按语雀方式收起见第 17 节；第六批（统一按钮提示、取消编辑、表格宽高等十项）见第 18 节；图片、段落与表格对齐见第 19 节；统一选区移除见第 20 节；代码块增强第一批（代码输入、JetBrains 快捷键、格式化、语法折叠、行选择、放大、块内查找）见第 21 节。快捷键与文档层级（双 Esc 保存、全局快捷键面板、标题批量升降、多层列表标记）见第 22 节。
@@ -27,3 +28,17 @@ Markdown 之外的格式扩展第一批见 DESIGN.md 第 23 节：文字颜色�
 斜杠插入菜单搜索见 DESIGN.md 12.6：与 Cmd/Ctrl + K 共用拼音匹配，支持全拼、首字母、混输、部分名称及 Markdown 语法别名。
 
 折叠块与高亮块见 DESIGN.md 23.6：无底色的可折叠标题/正文卡片，以及可选 10 种柔和底色的内容块；编辑、阅读与 HTML 导入导出共用格式。
+
+## yuyan-doc 同步维护
+
+Agent 操作 Yuyan 的入口是个人技能仓库中的 [yuyan-doc](https://github.com/Crashmere/agent-config/blob/main/skills/yuyan-doc/SKILL.md)，本地通常位于 `~/agent-config/skills/yuyan-doc/`。平台能力新增、修改或删除时，使用 personal-skill-management，在同一任务中同步更新受影响的技能说明和脚本，作为本次能力变更的完成条件；不能因 `schemaVersion` 未变化而跳过。
+
+| 平台变化 | 技能中需要核对和更新的内容 |
+| --- | --- |
+| 正文节点、marks、属性、默认值、结构约束或 Markdown/HTML 导入导出 | `references/format.md`、`references/editing.md`，以及 `scripts/document.mjs` 的校验和转换调用、读写与导出流程 |
+| API 路由、参数、响应、错误语义、连接方式或鉴权 | `references/api.md`、`SKILL.md` 的连接说明，以及 `scripts/runtime.mjs`、`scripts/yuyan-doc.mjs` 中受影响的请求、允许列表和流程 |
+| 文档与目录操作、模板/片段、链接、媒体、历史或 revision 规则及能力边界 | `SKILL.md` 和对应参考中的操作步骤、示例、限制及失败处理，以及受影响的脚本行为；删除已失效的能力说明 |
+
+所有技能脚本、参考资料和技能专用验证材料都放在个人技能仓库；继续只读复用 Yuyan 现有 schema 与转换器，不复制第二套格式定义。新增可供 agent 使用的能力时，补齐使用方式与示例；仅改变视觉或快捷键、且不影响技能操作的改动，核对后在交付中说明无须修改技能即可。
+
+只验证受影响的流程：涉及脚本、格式或写入行为时，在隔离实例用合成文档检查相关读写、格式保留和冲突处理，生产只读验证；不要求全量回归或新增永久测试。纯说明变更检查链接、内容一致性和 diff。收尾按 personal-skill-management 提交、推送个人技能仓库，并按 server-operations 同步本项目服务器文档；交付时说明技能更新或不受影响的结论，未完成的适配须明确列出。

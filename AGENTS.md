@@ -6,6 +6,8 @@ GitHub 只备份源码和配置，推送不触发测试或部署。本机入口�
 
 先读 [docs/README.md](docs/README.md)，再按任务读取设计与验证文档。
 
+Yuyan 平台能力新增、修改或删除时，必须在同一任务中同步维护个人技能仓库 `Crashmere/agent-config` 的 `skills/yuyan-doc/`，使用 personal-skill-management；更新范围和验证要求见 [yuyan-doc 同步维护](docs/README.md#yuyan-doc-同步维护)。所有技能脚本、参考资料和技能专用验证材料均归个人技能仓库，Yuyan 仓库只保留项目代码及维护约定。
+
 文档/章节链接、悬停预览、文末反向链接及模板/片段见 DESIGN 第 24 节。链接复用 `/docs/<id>#<slug>` 与阅读渲染的锚点；`internal/server/links.go` 从存活正文推导关系。模板存于 `meta` 的 `template:<id>`，独立 revision 和现有 JSON 格式；`editor/templates.ts` 闭合选区结构并通过单次事务插入。原生备份覆盖模板和图片，不从源文档删除动作回收模板引用的资源。
 
 - Yuyan（语燕）是用户一人使用的网页知识库，功能参照语雀网页版中适合单人使用的部分：知识库与文档树、所见即所得编辑、阅读页。
