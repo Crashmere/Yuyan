@@ -12,7 +12,7 @@ import remarkStringify from 'remark-stringify'
 import { codeFromCallout, codeMeta, parseCodeMeta } from './codeBlock'
 import { schemaExtensions } from './extensions'
 import { alignment } from './alignment'
-import { remarkStrong } from './strong'
+import { remarkStrong, reportUnparsedStrong } from './strong'
 
 // Markdown <-> Tiptap JSON using remark, with Obsidian's extensions: callouts, ==highlight==,
 // [[wiki links]], ![[embeds]], image sizes (![alt|300](src)) and single-newline line breaks.
@@ -48,6 +48,7 @@ export function markdownToDoc(markdown: string, ctx: ImportContext = {}): JSONCo
   const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath)
   if (!ctx.strictStrong) parser.use(remarkStrong)
   const tree = parser.parse(markdown) as Root
+  if (ctx.issue) reportUnparsedStrong(tree, markdown, ctx.issue)
   const defs = new Map<string, { url: string; title?: string | null }>()
   collectDefinitions(tree, defs)
   const content = new Converter(ctx, defs).blocks(tree.children)
