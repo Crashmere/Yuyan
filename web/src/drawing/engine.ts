@@ -105,6 +105,22 @@ function persistentScene(draft: SceneDraft): SceneDraft {
   return { elements, appState: { viewBackgroundColor: draft.appState.viewBackgroundColor || '#ffffff' }, files }
 }
 
+function serializeSVG(svg: SVGSVGElement): string {
+  // The engine gives frame clip-path attributes the SVG namespace, although
+  // presentation attributes must be unqualified. HTML serialization hid this;
+  // normalize them before XML serialization so frame clipping still works.
+  for (const el of [svg, ...svg.querySelectorAll('*')]) {
+    const clip = el.getAttributeNodeNS('http://www.w3.org/2000/svg', 'clip-path')
+    if (clip) {
+      const value = clip.value
+      el.removeAttributeNode(clip)
+      el.setAttribute('clip-path', value)
+    }
+  }
+  // outerHTML uses HTML entities such as &nbsp;, which are invalid in SVG XML.
+  return new XMLSerializer().serializeToString(svg)
+}
+
 export async function buildPackage(draft: SceneDraft): Promise<DrawingPackage> {
   const lib = await engineLibrary(), frozen = persistentScene(structuredClone(draft))
   const files: DrawingPackage['files'] = {}
@@ -114,7 +130,9 @@ export async function buildPackage(draft: SceneDraft): Promise<DrawingPackage> {
     const asset = await uploadImage(new File([blob], 'drawing-image', { type: file.mimeType }))
     files[id] = { src: asset.url, mimeType: asset.mime }
   }
-  const options = { elements: frozen.elements, appState: { ...frozen.appState, exportBackground: true, exportWithDarkMode: false, exportEmbedScene: false }, files: frozen.files, exportPadding: 20 }
+  // Excalidraw otherwise defaults exportScale to devicePixelRatio. SVG viewport
+  // dimensions must match its viewBox, and PNG sizing must not depend on a screen.
+  const options = { elements: frozen.elements, appState: { ...frozen.appState, exportScale: 1, exportBackground: true, exportWithDarkMode: false, exportEmbedScene: false }, files: frozen.files, exportPadding: 20 }
   let preview: DrawingPackage['preview']
   if (Object.keys(files).length || frozen.elements.some(e => e.type === 'text' && e.fontFamily !== 2)) {
     const canvas = await lib.exportToCanvas({ ...options, maxWidthOrHeight: 2400 })
@@ -133,7 +151,7 @@ export async function buildPackage(draft: SceneDraft): Promise<DrawingPackage> {
       }
       for (const a of [...el.attributes]) if (a.name === 'style' || a.name.startsWith('data-') || a.name === 'class') el.removeAttribute(a.name)
     }
-    preview = { mime: 'image/svg+xml', data: svg.outerHTML, width: Math.ceil(Number(svg.getAttribute('width'))), height: Math.ceil(Number(svg.getAttribute('height'))) }
+    preview = { mime: 'image/svg+xml', data: serializeSVG(svg), width: Math.ceil(Number(svg.getAttribute('width'))), height: Math.ceil(Number(svg.getAttribute('height'))) }
   }
   return { format: 'yuyan-drawing', version: 1, engine: 'excalidraw', engineVersion: '0.18.1', scene: { elements: frozen.elements as unknown as Record<string, any>[], appState: frozen.appState }, files, preview }
 }
@@ -142,7 +160,7 @@ export async function downloadScene(draft: SceneDraft, format: 'excalidraw' | 's
   const lib = await engineLibrary(), scene = persistentScene(draft)
   let blob: Blob
   if (format === 'excalidraw') blob = new Blob([lib.serializeAsJSON(scene.elements, scene.appState, scene.files, 'local')], { type: 'application/json' })
-  else if (format === 'svg') blob = new Blob([(await lib.exportToSvg({ elements: scene.elements, appState: { ...scene.appState, exportBackground: true, exportEmbedScene: false }, files: scene.files })).outerHTML], { type: 'image/svg+xml' })
+  else if (format === 'svg') blob = new Blob([serializeSVG(await lib.exportToSvg({ elements: scene.elements, appState: { ...scene.appState, exportBackground: true, exportEmbedScene: false }, files: scene.files }))], { type: 'image/svg+xml' })
   else blob = await lib.exportToBlob({ elements: scene.elements, appState: { ...scene.appState, exportBackground: true, exportEmbedScene: false }, files: scene.files, mimeType: 'image/png' })
   const url = URL.createObjectURL(blob), a = document.createElement('a')
   a.href = url; a.download = `drawing.${format}`; a.click()
