@@ -58,6 +58,9 @@ func Decode(data []byte) (Package, error) {
 	if p.Format != "yuyan-drawing" || p.Version != 1 || p.Engine != "excalidraw" || p.EngineVersion != EngineVersion {
 		return p, errors.New("unsupported drawing format or engine version")
 	}
+	if p.Files == nil {
+		p.Files = map[string]File{}
+	}
 	elements, ok := p.Scene["elements"].([]any)
 	if !ok || len(elements) == 0 || len(elements) > 10000 || len(p.Scene) != 2 {
 		return p, errors.New("drawing must contain 1–10000 elements")
