@@ -1,6 +1,7 @@
 # Yuyan 文档
 
 - [DESIGN.md](DESIGN.md)：需求、已确认的决策、架构与实施阶段，是方案讨论的统一入口。
+- [WHITEBOARD.md](WHITEBOARD.md)：通用画板的引擎取舍、文档集成、存储和分阶段实施建议；目前为规划，尚未实现。
 - [OPERATIONS.md](OPERATIONS.md)：安装、发布与回退、正式导入、备份与恢复、诊断。
 - [yuyan-doc 同步维护](#yuyan-doc-同步维护)：平台能力变更时，个人文档操作技能的更新范围与完成条件。
 - [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md)：已停止的 Obsidian 方案讨论记录，其中第 3 节的笔记库调查仍作为导入依据。
