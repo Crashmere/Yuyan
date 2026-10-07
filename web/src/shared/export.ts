@@ -1,4 +1,5 @@
 import type { JSONContent } from '@tiptap/core'
+import { drawingSource } from '../schema/drawing'
 import { attachmentSource } from '../schema/attachment'
 import { docToMarkdown } from '../schema/markdown'
 
@@ -147,6 +148,19 @@ export function exportDoc(content: JSONContent, file: string, plan: ExportPlan, 
   const assetURLs: Record<string, string> = {}
   const missingLinks: string[] = []
   const markdown = docToMarkdown(content, {
+    drawingSrc: src => {
+      const m = drawingSource.exec(src)
+      if (!m) throw new Error('无效的画板地址')
+      const filename = m[1] + '.yuyan.json'
+      assets.add(filename)
+      assetURLs[filename] = src + '/file'
+      // Both preview formats are represented by the node's immutable metadata.
+      const find = (n: JSONContent): string | undefined => n.type === 'drawing' && n.attrs?.src === src ? String(n.attrs.previewMime) : n.content?.map(find).find(Boolean)
+      const preview = m[1] + (find(content) === 'image/png' ? '.png' : '.svg')
+      assets.add(preview)
+      assetURLs[preview] = src + '/preview'
+      return encodeLinkPath(relativePath(file, attachmentsDir + '/' + filename))
+    },
     imageSrc: (src) => {
       const m = assetSrc.exec(src)
       if (!m) return src

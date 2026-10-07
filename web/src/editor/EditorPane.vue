@@ -347,7 +347,7 @@ function pageKeys(e: KeyboardEvent) {
   if (outlineOpen.value && e.key === 'Escape' && !e.isComposing) {
     e.preventDefault(); outlineOpen.value = false; return
   }
-  if (e.defaultPrevented || (e.target as Element)?.closest('.cm-editor, .yy-code-dialog')) return
+  if (e.defaultPrevented || (e.target as Element)?.closest('.cm-editor, .yy-code-dialog, .yy-drawing-dialog')) return
   if (!(e.metaKey || e.ctrlKey) || e.altKey || e.isComposing) return
   if (e.key === 'f' || e.key === 'F') {
     e.preventDefault()
@@ -360,14 +360,19 @@ watch(title, () => {
   void nextTick(autosizeTitle)
 })
 
+function characters(e: Pick<Editor, 'state' | 'storage'>): number {
+  let count = e.storage.characterCount.characters()
+  e.state.doc.descendants(node => { if (node.type.name === 'drawing') count += Array.from((String(node.attrs.text) + String(node.attrs.caption)).replace(/\s/g, '')).length })
+  return count
+}
 let previewCleanup = () => {}
 onMounted(async () => {
   const d = props.doc
   const e = new Editor({
-    extensions: editorExtensions(ui, String(d.id)),
+    extensions: editorExtensions(ui, String(d.id), () => revision.value),
     content: d.content,
     onUpdate: ({ editor: ed }) => {
-      emit('words', ed.storage.characterCount.characters())
+      emit('words', characters(ed))
       changed()
     },
     onTransaction: ({ transaction, appendedTransactions }) => {
@@ -382,7 +387,7 @@ onMounted(async () => {
   })
   editor.value = e
   previewCleanup = setupLinkPreviews(e.view.dom)
-  emit('words', e.storage.characterCount.characters())
+  emit('words', characters(e))
   const draft = readDraft()
   if (draft && (draft.title !== d.title || JSON.stringify(draft.content) !== JSON.stringify(d.content))) draftOffer.value = draft
   else if (draft) localStorage.removeItem(draftKey)

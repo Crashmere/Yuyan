@@ -106,6 +106,9 @@ func (s *Store) collectAssets(ctx context.Context, dryRun bool) (AssetGCResult, 
 	if err != nil {
 		return result, err
 	}
+	if err := s.drawingReferences(ctx, tx, refs, states); err != nil {
+		return result, err
+	}
 	files, err := s.collectibleFiles(ctx, tx)
 	if err != nil {
 		return result, err

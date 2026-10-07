@@ -894,3 +894,18 @@ pre:hover > .yy-copy {
 .yy-attachment-download { color: var(--yy-text-2); font-size: 24px; padding: 0 3px; }
 .yy-content .yy-attachment-action { flex: 0 0 26px; color: var(--yy-text-2); text-decoration: none; }
 .yy-content [data-attachment].ProseMirror-selectednode .yy-attachment-card { border-color: var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 6%, var(--yy-bg)); }
+
+/* Drawing previews reserve their aspect ratio and stay light in reading views. */
+.yy-drawing { position: relative; box-sizing: border-box; }
+.yy-drawing > img, .yy-content .yy-drawing > img { display: block; width: 100%; height: auto; max-width: 100%; border-radius: 4px; background: #fff; }
+.yy-drawing > figcaption { color: var(--muted); font-size: 13px; text-align: center; white-space: pre-wrap; margin-top: 6px; }
+.yy-drawing > figcaption:empty { display: none; }
+.yy-drawing-text { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.yy-drawing-source { display: inline-block; font-size: 12px; margin-top: 4px; }
+.yy-drawing-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; padding: 8px 0; font-size: 12px; }
+.yy-drawing-controls label { display: flex; align-items: center; gap: 4px; }
+.yy-drawing-controls input[type=number] { width: 80px; }
+.yy-drawing-controls select { width: auto; }
+.yy-drawing-caption-input { width: 180px; max-width: 100%; }
+
+.yy-drawing-match { outline: 2px solid #e8b931; outline-offset: 5px; }

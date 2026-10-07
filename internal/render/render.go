@@ -97,6 +97,8 @@ func (r *renderer) open(tag string, attrs [][2]string) {
 
 func (r *renderer) node(n doc.Node) {
 	switch n.Type {
+	case "drawing":
+		r.drawing(n)
 	case "paragraph":
 		var attrs [][2]string
 		if a := alignment(n.Attr("textAlign")); a != "" {
@@ -424,7 +426,7 @@ func (r *renderer) url(href string) string {
 	if r.opt.Parity {
 		return href
 	}
-	for _, p := range []string{"/docs/", "/assets/", "/attachments/", "/books/"} {
+	for _, p := range []string{"/drawings/", "/docs/", "/assets/", "/attachments/", "/books/"} {
 		if strings.HasPrefix(href, p) {
 			return strings.TrimSuffix(r.opt.BasePath, "/") + href
 		}

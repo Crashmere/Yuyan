@@ -1,7 +1,7 @@
 {
   "id": "yuyan",
   "name": "Yuyan",
-  "description": "个人知识库、文档、图片与附件。",
+  "description": "个人知识库、文档、可编辑画板、图片与附件。",
   "icon": "/portal/static/icons/yuyan.svg",
   "url": "/yuyan/",
   "repo": "https://github.com/Crashmere/Yuyan",
@@ -20,7 +20,7 @@
       "id": "data",
       "name": "业务数据",
       "path": "/opt/yuyan/data",
-      "purpose": "数据库（文档、保留 30 天的历史、模板与内容片段）、内容寻址的图片与附件、历史迁移材料；历史每天北京时间 03:00 清理且不保底保留，当前及回收站正文保持；图片与附件失去所有正文、历史、回收站或模板引用后连续一小时由应用自动回收，临时文件不属于恢复数据。",
+      "purpose": "数据库（文档、保留 30 天的历史、模板与内容片段）、内容寻址的图片与附件、历史迁移材料；历史每天北京时间 03:00 清理且不保底保留，当前及回收站正文保持；图片与附件失去所有正文、历史、回收站或模板引用后连续一小时由应用自动回收，临时文件不属于恢复数据。 画板包复用 assets，预览保存在包内；回收展开图片依赖，包宽限期内也保护图片，未知或损坏包使当轮回收停止。",
       "kind": "data",
       "browse": true,
       "cleanup": false
@@ -306,6 +306,26 @@
       "method": "GET",
       "path": "/attachments/{id}/content",
       "description": "经设备认证读取可预览的图片、PDF、音视频，支持 HEAD 和 Range；拒绝其他类型直读"
+    },
+    {
+      "method": "POST",
+      "path": "/api/drawings",
+      "description": "校验并发布不可变画板包和预览，检查图片依赖，返回文档节点"
+    },
+    {
+      "method": "GET",
+      "path": "/api/drawings/{id}",
+      "description": "读取受支持的画板场景包"
+    },
+    {
+      "method": "GET",
+      "path": "/drawings/{id}/preview",
+      "description": "受认证的 SVG/PNG 画板预览，独立安全校验"
+    },
+    {
+      "method": "GET",
+      "path": "/drawings/{id}/file",
+      "description": "受认证下载精确原始画板包"
     }
   ]
 }

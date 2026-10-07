@@ -92,7 +92,7 @@ func (s *Store) CreateDoc(ctx context.Context, in CreateDocInput) (Doc, error) {
 	if err := checkBookAlive(ctx, tx, in.BookID); err != nil {
 		return Doc{}, err
 	}
-	if err := retainContentAssets(ctx, tx, content); err != nil {
+	if err := s.retainContentAssets(ctx, tx, content); err != nil {
 		return Doc{}, err
 	}
 	if in.ParentID != nil {
@@ -201,7 +201,7 @@ func (s *Store) saveDoc(ctx context.Context, id int64, title string, content doc
 	if current != baseRevision {
 		return current, "", ErrConflict
 	}
-	if err := retainContentAssets(ctx, tx, content); err != nil {
+	if err := s.retainContentAssets(ctx, tx, content); err != nil {
 		return current, "", err
 	}
 	now := s.stamp()
@@ -262,7 +262,7 @@ func (s *Store) DiscardEdits(ctx context.Context, id int64, title string, conten
 	if current != base {
 		return current, ErrConflict
 	}
-	if err := retainContentAssets(ctx, tx, content); err != nil {
+	if err := s.retainContentAssets(ctx, tx, content); err != nil {
 		return current, err
 	}
 	if err := rememberVersionIDs(ctx, tx); err != nil {

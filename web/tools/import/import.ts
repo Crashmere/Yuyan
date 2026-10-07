@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto'
+import { importDrawingPackage } from '../../src/drawing/portable'
+import type { DrawingPackage } from '../../src/drawing/types'
 // Imports the Obsidian notes into a Yuyan instance once, then writes a report of everything that
 // needs a human decision. Run against a local instance first:
 //   npm --prefix web run import -- --source <repo> --server http://127.0.0.1:18084/yuyan/
@@ -52,7 +55,7 @@ class Client {
     if (this.dry) return { id: ++this.fakeId, url: `/assets/dry${this.fakeId}.png`, stats: { books: 0 } } as T
     const res = await fetch(this.base + 'api/' + path, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json', 'X-Yuyan-Features': 'drawing-v1' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     const data = await res.json().catch(() => ({}))
@@ -129,6 +132,7 @@ interface Report {
   books: { name: string; docs: number }[]
   groups: number
   docs: number
+  drawings: number
   images: number
   imageBytes: number
   attachments: number
@@ -166,7 +170,7 @@ async function main() {
 
   const kbs = plan(idx)
   const report: Report = {
-    books: [], groups: 0, docs: 0, images: 0, imageBytes: 0, attachments: 0, attachmentBytes: 0, ambiguous: [], missingImages: [], externalImages: [],
+    books: [], groups: 0, docs: 0, drawings: 0, images: 0, imageBytes: 0, attachments: 0, attachmentBytes: 0, ambiguous: [], missingImages: [], externalImages: [],
     missingLinks: [], issues: new Map(), math: [], languages: new Map(), callouts: new Map(), largest: [],
   }
   const docIds = new Map<string, number>()
@@ -205,10 +209,12 @@ async function main() {
     const breaks = idx.vaultOf(path)?.breaks ?? true
     report.largest.push({ path, kb: Math.round(Buffer.byteLength(markdown) / 1024) })
 
+    const drawingTargets = new Set<string>()
+    const drawingAttrs = new Map<string, Record<string, unknown>>()
     const attachmentTargets = new Set<string>()
     const attachmentAttrs = new Map<string, Record<string, unknown> | null>()
     const wanted: { target: string; kind: string }[] = []
-    markdownToDoc(markdown, { breaks, resolveAttachment: target => { attachmentTargets.add(target); return { src: target } }, resolveImage: (target, kind) => (wanted.push({ target, kind }), target) })
+    markdownToDoc(markdown, { breaks, resolveDrawing: target => { drawingTargets.add(target); return { src: target } }, resolveAttachment: target => { attachmentTargets.add(target); return { src: target } }, resolveImage: (target, kind) => (wanted.push({ target, kind }), target) })
     const images = new Map<string, string | null>()
     for (const { target, kind } of wanted) {
       const key = `${kind}|${target}`
@@ -237,6 +243,22 @@ async function main() {
       }
     }
 
+    for (const target of drawingTargets) {
+      const resolved = resolveFile(idx, target, path, scope, null)
+      if (resolved.kind !== 'found') throw new Error('画板源文件缺失：' + target)
+      const pkg = JSON.parse(readFileSync(join(args.source, resolved.path), 'utf8')) as DrawingPackage
+      const node = await importDrawingPackage(pkg, async src => {
+        const sibling = join(args.source, posix.dirname(resolved.path), posix.basename(src))
+        const data = readFileSync(sibling)
+        if (createHash('sha256').update(data).digest('hex').slice(0, 32) !== posix.basename(src).split('.')[0]) throw new Error('画板图片与内容哈希不符：' + src)
+        report.images++; report.imageBytes += data.length
+        if (args.dry) return { url: src, mime: Object.values(pkg.files).find(f => f.src === src)!.mimeType }
+        return await client.upload(data, posix.basename(src)) as { url: string; mime: string }
+      }, async p => args.dry ? { type: 'drawing', attrs: { src: '/drawings/' + '0'.repeat(32), text: p.text, version: 1, width: 800, blockAlign: 'center', caption: '', previewMime: p.preview.mime, previewWidth: p.preview.width, previewHeight: p.preview.height } } : client.json<JSONContent>('POST', 'drawings', p))
+      const { width: _w, blockAlign: _a, caption: _c, ...derived } = node.attrs!
+      drawingAttrs.set(target, derived)
+      report.drawings++
+    }
     const issues: string[] = []
     for (const target of attachmentTargets) {
       const resolved = resolveFile(idx, target, path, scope, null)
@@ -259,6 +281,7 @@ async function main() {
     const doc = markdownToDoc(markdown, {
       breaks,
       issue: (m) => issues.push(m),
+      resolveDrawing: target => drawingAttrs.get(target) ?? null,
       resolveAttachment: target => attachmentAttrs.get(target) ?? null,
       resolveImage: (target, kind) => images.get(`${kind}|${target}`) ?? null,
       resolveLink: (target, kind) => {
@@ -318,6 +341,7 @@ function writeReport(args: Args, r: Report, ms: number) {
 ## 概要
 
 - 知识库 ${r.books.length} 个，分组 ${r.groups} 个，文档 ${r.docs} 篇
+- 画板 ${r.drawings} 个引用（包内图片计入下项）
 - 图片 ${r.images} 个文件，共 ${(r.imageBytes / 1048576).toFixed(1)} MiB（服务端按内容去重）
 - 附件 ${r.attachments} 个文件，共 ${(r.attachmentBytes / 1048576).toFixed(1)} MiB
 
@@ -361,7 +385,7 @@ ${r.issues.size ? [...r.issues].map(([p, is]) => `- ${p}\n${is.map((i) => `  - $
 `
   mkdirSync(dirname(args.report), { recursive: true })
   writeFileSync(args.report, out)
-  console.log(`导入完成：${r.books.length} 个知识库，${r.docs} 篇文档，${r.images} 张图片、${r.attachments} 个附件；报告 ${args.report}`)
+  console.log(`导入完成：${r.books.length} 个知识库，${r.docs} 篇文档，${r.drawings} 个画板、${r.images} 张图片、${r.attachments} 个附件；报告 ${args.report}`)
 }
 
 main().catch((e) => {

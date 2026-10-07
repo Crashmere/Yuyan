@@ -32,6 +32,8 @@ import { UiShortcuts } from './uiShortcuts'
 import { insertFiles, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
 import { Attachment } from '../schema/attachment'
+import { Drawing } from '../schema/drawing'
+import DrawingView from './views/DrawingView.vue'
 import AttachmentView from './views/AttachmentView.vue'
 import ImageView from './views/ImageView.vue'
 import ImageBoardView from './views/ImageBoardView.vue'
@@ -45,10 +47,14 @@ import { BlockContainers, foldBlockView } from './blockContainers'
 
 export const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp']
 
-export function editorExtensions(ui: EditorUi, foldKey?: string): Extensions {
+export function editorExtensions(ui: EditorUi, foldKey?: string, drawingRevision: () => number = () => 0): Extensions {
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
+      drawing: Drawing.extend({
+        addOptions() { return { ...this.parent?.(), draftScope: () => `${foldKey}:${drawingRevision()}` } },
+        addNodeView() { return props => managedNodeView(VueNodeViewRenderer(DrawingView)(props)) },
+      }).configure({ resolveSrc: assetURL, unresolveSrc: unassetURL }),
       attachment: Attachment.extend({ addNodeView() { return VueNodeViewRenderer(AttachmentView) } }).configure({ resolveSrc: assetURL, unresolveSrc: unassetURL }),
       columns: Columns.extend({ addNodeView() { return columnsView } }),
       foldBlock: FoldBlock.extend({ addNodeView() { return foldBlockView } }),

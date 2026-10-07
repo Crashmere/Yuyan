@@ -1,3 +1,5 @@
+import { drawingDependencies } from '../drawing/portable'
+import type { DrawingPackage } from '../drawing/types'
 import { strToU8, Zip, ZipDeflate, ZipPassThrough } from 'fflate'
 import { api, base, type Doc, type TreeNode } from '../shared/api'
 import { attachmentsDir, exportDoc, fileName, planNodes } from '../shared/export'
@@ -47,6 +49,9 @@ export async function exportNodes(book: string, nodes: TreeNode[], zipName: stri
   await pool(docs, async (entry) => {
     const doc = await api<Doc>(`docs/${entry.id}`)
     const out = exportDoc(doc.content, entry.file!, plan, webURL)
+    const deps = await drawingDependencies(doc.content, id => api<DrawingPackage>(`drawings/${id}`))
+    Object.assign(assetURLs, deps)
+    for (const name of Object.keys(deps)) assets.add(name)
     markdown.set(entry.file!, out.markdown)
     Object.assign(assetURLs, out.assetURLs)
     for (const a of out.assets) assets.add(a)

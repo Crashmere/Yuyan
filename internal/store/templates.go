@@ -86,7 +86,7 @@ func (s *Store) CreateTemplate(ctx context.Context, name, kind string, content d
 		return t, err
 	}
 	defer tx.Rollback()
-	if err := retainContentAssets(ctx, tx, content); err != nil {
+	if err := s.retainContentAssets(ctx, tx, content); err != nil {
 		return t, err
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO meta(key, value) VALUES (?, ?)`, "template:"+t.ID, string(data)); err != nil {

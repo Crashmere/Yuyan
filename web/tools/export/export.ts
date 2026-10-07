@@ -1,3 +1,5 @@
+import { drawingDependencies } from '../../src/drawing/portable'
+import type { DrawingPackage } from '../../src/drawing/types'
 // Exports every knowledge base as Markdown plus images that Obsidian can open:
 //   npm --prefix web run export -- --server http://127.0.0.1:18084/yuyan/ --out ~/YuyanExport
 // Running it again into the same folder refreshes the Markdown and downloads only missing images,
@@ -188,6 +190,9 @@ async function main() {
   await pool(docs, async (entry) => {
     const { content } = await getJSON<{ content: JSONContent }>(args.server, `docs/${entry.id}`)
     const out = exportDoc(content, entry.file!, plan)
+    const deps = await drawingDependencies(content, id => getJSON<DrawingPackage>(args.server, `drawings/${id}`))
+    Object.assign(assetURLs, deps)
+    for (const a of Object.keys(deps)) if (!assetUsers.has(a)) assetUsers.set(a, entry.file!)
     Object.assign(assetURLs, out.assetURLs)
     for (const a of out.assets) if (!assetUsers.has(a)) assetUsers.set(a, entry.file!)
     for (const href of out.missingLinks) report.missingLinks.push(`${entry.file}：${href}`)
@@ -206,11 +211,11 @@ async function main() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
       } else {
         const path = join(args.out, attachmentsDir, file)
-        if (!existsSync(path) || !assetMatches(file, readFileSync(path))) {
+        if (assetURLs[file].endsWith('/preview') || !existsSync(path) || !assetMatches(file, readFileSync(path))) {
           const res = await request(url)
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const data = new Uint8Array(await res.arrayBuffer())
-          if (!assetMatches(file, data)) throw new Error('内容与图片与附件 ID 不符')
+          if (!assetURLs[file].endsWith('/preview') && !assetMatches(file, data)) throw new Error('内容与图片与附件 ID 不符')
           writeAtomic(path, data)
           report.downloaded++
           report.downloadedBytes += data.length

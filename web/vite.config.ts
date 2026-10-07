@@ -11,6 +11,21 @@ const pdfVersion = JSON.parse(readFileSync(new URL('package.json', pdfRoot), 'ut
 export default defineConfig({
   base: './',
   plugins: [vue(), {
+    name: 'drawing-resources',
+    generateBundle() {
+      const root = new URL('./node_modules/@excalidraw/excalidraw/dist/prod/', import.meta.url)
+      const copy = (dir: string) => {
+        for (const entry of readdirSync(new URL(dir, root), { withFileTypes: true })) {
+          const path = dir + entry.name
+          if (entry.isDirectory()) copy(path + '/')
+          else this.emitFile({ type: 'asset', fileName: `assets/excalidraw-0.18.1/${path}`, source: readFileSync(new URL(path, root)) })
+        }
+      }
+      copy('fonts/')
+      const licenses = new URL('./licenses/excalidraw/', import.meta.url)
+      for (const name of readdirSync(licenses)) this.emitFile({ type: 'asset', fileName: `assets/excalidraw-0.18.1/licenses/${name}`, source: readFileSync(new URL(name, licenses)) })
+    },
+  }, {
     name: 'pdf-preview-resources',
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: `assets/pdfjs-${pdfVersion}/LICENSE`, source: readFileSync(new URL('LICENSE', pdfRoot)) })
@@ -29,7 +44,8 @@ export default defineConfig({
     manifest: 'manifest.json',
     chunkSizeWarningLimit: 4096,
     rollupOptions: {
-      input: { app: 'src/app/main.ts' },
+      preserveEntrySignatures: 'strict',
+      input: { app: 'src/app/main.ts', 'drawing-tool': 'src/drawing/tool.ts' },
     },
   },
 })

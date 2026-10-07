@@ -125,6 +125,10 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.HandleFunc("GET /", s.appPage(routeNotFound))
 
 	mux.HandleFunc("GET /assets/{file}", s.assetFile)
+	mux.HandleFunc("GET /drawings/{id}/preview", s.drawingPreview)
+	mux.HandleFunc("GET /drawings/{id}/file", s.drawingFile)
+	mux.Handle("GET /api/drawings/{id}", s.get(s.apiDrawing))
+	mux.Handle("POST /api/drawings", s.write(s.apiPutDrawing))
 	mux.HandleFunc("GET /attachments/{id}", s.attachmentFile)
 	mux.HandleFunc("GET /attachments/{id}/content", s.attachmentContent)
 	mux.HandleFunc("GET /static/chroma.css", func(w http.ResponseWriter, r *http.Request) {

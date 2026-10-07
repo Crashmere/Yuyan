@@ -139,7 +139,7 @@ func (s *Store) RestoreVersion(ctx context.Context, versionID, baseRevision int6
 	if err := checkBookAlive(ctx, tx, bookID); err != nil {
 		return 0, err
 	}
-	if err := retainContentAssets(ctx, tx, v.Content); err != nil {
+	if err := s.retainContentAssets(ctx, tx, v.Content); err != nil {
 		return 0, err
 	}
 	now, next := s.stamp(), current+1

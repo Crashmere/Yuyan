@@ -65,6 +65,12 @@ func (s *Store) PutAsset(ctx context.Context, data []byte, originalName string) 
 // PutAttachment streams into immutable media storage without a file-size limit. The temporary
 // file lives on the data volume, not /tmp; memory use does not grow with the upload size.
 func (s *Store) PutAttachment(ctx context.Context, source io.Reader, originalName string) (Asset, error) {
+	return s.putAttachment(ctx, source, originalName, nil)
+}
+
+// beforeCommit lets typed immutable packages register and protect their dependencies
+// in the same transaction and directory lock as publication.
+func (s *Store) putAttachment(ctx context.Context, source io.Reader, originalName string, beforeCommit func(*sql.Tx, string) error) (Asset, error) {
 	tmp, err := os.CreateTemp(filepath.Join(s.dir, "assets"), ".upload-*")
 	if err != nil {
 		return Asset{}, err
@@ -121,6 +127,11 @@ func (s *Store) PutAttachment(ctx context.Context, source io.Reader, originalNam
 	}
 	defer tx.Rollback()
 	if a, err := getAsset(ctx, tx, id); err == nil {
+		if beforeCommit != nil {
+			if err := beforeCommit(tx, id); err != nil {
+				return Asset{}, err
+			}
+		}
 		if err := writeAssetGCState(ctx, tx, a.ID+"."+a.Ext, assetGCState{UnreferencedAt: s.now().UTC()}); err != nil {
 			return Asset{}, err
 		}
@@ -139,6 +150,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, id, full, ext, mime, size, nullInt(width), 
 	}
 	if err := writeAssetGCState(ctx, tx, id+"."+ext, assetGCState{UnreferencedAt: s.now().UTC()}); err != nil {
 		return Asset{}, err
+	}
+	if beforeCommit != nil {
+		if err := beforeCommit(tx, id); err != nil {
+			return Asset{}, err
+		}
 	}
 	a, err := getAsset(ctx, tx, id)
 	if err != nil {

@@ -183,6 +183,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     return body as T
   }
   const headers = new Headers(init.headers)
+  headers.set('X-Yuyan-Features', 'drawing-v1')
   let body = init.body
   if (init.json !== undefined) {
     headers.set('Content-Type', 'application/json')
@@ -211,12 +212,12 @@ export function pageURL(path: string): string {
 
 // Stored image src values are app-relative (/assets/<id>.png).
 export function assetURL(src: string): string {
-  return (src.startsWith('/assets/') || src.startsWith('/attachments/')) ? base.replace(/\/$/, '') + src : src
+  return (src.startsWith('/assets/') || src.startsWith('/attachments/') || src.startsWith('/drawings/')) ? base.replace(/\/$/, '') + src : src
 }
 
 export function unassetURL(src: string): string {
   const prefix = base.replace(/\/$/, '')
-  return ['/assets/', '/attachments/'].some(p => src.startsWith(prefix + p)) ? src.slice(prefix.length) : src
+  return ['/assets/', '/attachments/', '/drawings/'].some(p => src.startsWith(prefix + p)) ? src.slice(prefix.length) : src
 }
 
 export async function uploadImage(file: File): Promise<Asset> {

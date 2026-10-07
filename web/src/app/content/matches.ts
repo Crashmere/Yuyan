@@ -7,7 +7,7 @@ import { reveal } from './folds'
 
 const name = 'yy-search'
 // Matches do not run from one of these into the next, as the server's plain text breaks there too.
-const blocks = 'p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .yy-fold-title, .code-title, .yy-line, pre'
+const blocks = '.yy-drawing-text, p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .yy-fold-title, .code-title, .yy-line, pre'
 // Formulas and diagrams are redrawn from their source; buttons and language labels are not part of
 // the text.
 const skipped = '[data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang'
@@ -67,10 +67,12 @@ export function showMatches(root: HTMLElement, query: string): number {
     const fold = pre.closest('.code-block')?.nextElementSibling
     if (fold instanceof HTMLButtonElement && fold.classList.contains('yy-code-fold')) fold.click()
   }
-  at.scrollIntoView({ block: 'center' })
+  ;(at.closest('.yy-drawing') ?? at).scrollIntoView({ block: 'center' })
+  at.closest('.yy-drawing')?.classList.add('yy-drawing-match')
   return ranges.length
 }
 
 export function clearMatches() {
+  document.querySelectorAll('.yy-drawing-match').forEach(el => el.classList.remove('yy-drawing-match'))
   if ('highlights' in CSS) CSS.highlights.delete(name)
 }
