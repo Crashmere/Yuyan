@@ -1444,3 +1444,44 @@ body.yy-row-dragging * {
 .yy-upload.yy-upload-attachment { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 10px; width: min(100%, 490px); padding: 12px; box-sizing: border-box; }
 .yy-upload-attachment .yy-upload-filename { flex: 1; min-width: 100px; overflow-wrap: anywhere; font-size: 13px; }
 .yy-upload-attachment .yy-upload-status { position: static; width: 100%; background: none; color: var(--yy-text-2); }
+
+/* Intrinsic table measurement lives beside, never inside, the editable document. Explicit
+   line breaks remain; only automatic wrapping and previous column constraints are removed. */
+.yy-table-fit-measure {
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+.yy-table-fit-measure * {
+  white-space: pre !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  hyphens: none !important;
+}
+.yy-table-fit-measure table {
+  display: table !important;
+  table-layout: auto !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+.yy-table-fit-measure :is(td, th) {
+  width: auto !important;
+  min-width: 25px !important;
+  max-width: none !important;
+}
+.yy-table-fit-measure .yy-codeblock-body {
+  display: block !important;
+}
+.yy-table-fit-measure > table > tbody:last-child > tr > td {
+  padding: 0 !important;
+  border: 0 !important;
+}

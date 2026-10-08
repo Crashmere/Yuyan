@@ -27,7 +27,7 @@ const props = defineProps<{ hidden: boolean }>()
 const { editor, tick, ui } = useEditorContext()
 const stylesOpen = ref(false)
 const options = {
-  offset: () => editor.value?.state.selection instanceof CellSelection ? 40 : 8,
+  offset: () => editor.value?.state.selection instanceof CellSelection || editor.value?.state.selection.empty ? 40 : 8,
   flip: () => ({ padding: { top: (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 8, left: 8, right: 8, bottom: 8 } }),
   shift: { padding: 8 },
 }
@@ -47,7 +47,7 @@ const state = computed(() => {
   const e = editor.value
   if (!e) return null
   const images = selectionContent(e.state).images.length
-  return { text: hasTextTools(e), images, style: currentStyle(e)?.label ?? (images ? '多种样式' : '正文'), marks: Object.fromEntries(markButtons.map((m) => [m.name, textMarkActive(e, m.name)])), link: textMarkActive(e, 'link') }
+  return { empty: e.state.selection.empty, text: hasTextTools(e), images, style: currentStyle(e)?.label ?? (images ? '多种样式' : '正文'), marks: Object.fromEntries(markButtons.map((m) => [m.name, textMarkActive(e, m.name)])), link: textMarkActive(e, 'link') }
 })
 
 function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTMLElement; view: EditorView }) {
@@ -55,7 +55,8 @@ function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTM
   const focused = view.hasFocus() || insideCode || element.contains(document.activeElement)
   const selection = e.state.selection
   const image = selection instanceof NodeSelection && ['image', 'imageBoard'].includes(selection.node.type.name)
-  const show = !props.hidden && !formatPainterState(e.state) && focused && e.isEditable && !selection.empty && !image
+  const tableCaret = selection.empty && e.isActive('table') && !insideCode
+  const show = !props.hidden && !formatPainterState(e.state) && focused && e.isEditable && (!selection.empty || tableCaret) && !image
   if (!show) stylesOpen.value = false
   return show
 }
@@ -89,9 +90,11 @@ function anchor() {
       return new DOMRect(Math.min(a.left, b.left), Math.min(a.top, b.top), Math.max(1, Math.abs(a.right - b.left)), Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top))
     } }
   }
-  if (!(selection instanceof CellSelection)) return null
-  const first = e.view.nodeDOM(selection.$anchorCell.pos)
-  const last = e.view.nodeDOM(selection.$headCell.pos)
+  if (!(selection instanceof CellSelection) && !(selection.empty && e.isActive('table'))) return null
+  const caretDOM = selection.empty ? e.view.domAtPos(selection.from).node : null
+  const caretCell = (caretDOM instanceof Element ? caretDOM : caretDOM?.parentElement)?.closest('td, th')
+  const first = selection instanceof CellSelection ? e.view.nodeDOM(selection.$anchorCell.pos) : caretCell
+  const last = selection instanceof CellSelection ? e.view.nodeDOM(selection.$headCell.pos) : caretCell
   if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) return null
   return {
     contextElement: first,
@@ -157,8 +160,8 @@ function anchor() {
         <span class="yy-bubble-sep"></span>
         <AlignmentMenu />
       </template>
-      <RemoveSelectionButton />
-      <button type="button" class="yy-bubble-btn" data-tip="保存为内容片段" aria-label="保存为内容片段" @mousedown.prevent @click="ui.saveSnippet()"><Layers :size="16" /></button>
+      <RemoveSelectionButton v-if="!state.empty" />
+      <button v-if="!state.empty" type="button" class="yy-bubble-btn" data-tip="保存为内容片段" aria-label="保存为内容片段" @mousedown.prevent @click="ui.saveSnippet()"><Layers :size="16" /></button>
     </div>
   </BubbleMenu>
 </template>

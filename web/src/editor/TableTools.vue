@@ -3,13 +3,16 @@ import { computed } from 'vue'
 import { findParentNode, type ChainedCommands } from '@tiptap/core'
 import { closeHistory } from '@tiptap/pm/history'
 import { CellSelection } from '@tiptap/pm/tables'
-import { Columns2, Merge, TableProperties } from 'lucide-vue-next'
+import { Columns2, Merge, TableProperties, ArrowLeftRight } from 'lucide-vue-next'
 import ActionMenu from '../ui/ActionMenu.vue'
 import ColorPicker from './ColorPicker.vue'
 import { useEditorContext } from './context'
+import { fitTableColumns, tablesInSelection } from './tableFit'
 
 defineProps<{ compact?: boolean }>()
 const { editor, tick } = useEditorContext()
+const tableCount = computed(() => { void tick.value; return editor.value ? tablesInSelection(editor.value.state).length : 0 })
+const fitLabel = computed(() => tableCount.value > 1 ? `按内容适配列宽（${tableCount.value} 个表格）` : '按内容适配列宽')
 function apply(command: (chain: ChainedCommands) => ChainedCommands) {
   const e = editor.value
   if (!e) return
@@ -36,13 +39,16 @@ const items = computed(() => {
 </script>
 
 <template>
-  <template v-if="editor && state">
+  <template v-if="editor && tableCount">
     <span :class="compact ? 'yy-bubble-sep' : 'yy-toolbar-sep'"></span>
-    <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="合并单元格" data-tip="合并单元格" :disabled="!state.merge" @mousedown.prevent @click="apply(chain => chain.mergeCells())"><Merge :size="17" /></button>
-    <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="拆分单元格" data-tip="拆分单元格" :disabled="!state.split" @mousedown.prevent @click="apply(chain => chain.splitCell())"><Columns2 :size="17" /></button>
-    <ColorPicker kind="cell" :compact="compact" :value="state.background" :mixed="state.backgroundMixed" @pick="color => apply(chain => chain.setCellAttribute('backgroundColor', color))" />
-    <ActionMenu :items="items" :restore-focus="false">
-      <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="表格设置" data-tip="表格设置" @mousedown.prevent><TableProperties :size="17" /></button>
-    </ActionMenu>
+    <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" :aria-label="fitLabel" :data-tip="fitLabel" @mousedown.prevent @click="fitTableColumns(editor)"><ArrowLeftRight :size="17" /></button>
+    <template v-if="state">
+      <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="合并单元格" data-tip="合并单元格" :disabled="!state.merge" @mousedown.prevent @click="apply(chain => chain.mergeCells())"><Merge :size="17" /></button>
+      <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="拆分单元格" data-tip="拆分单元格" :disabled="!state.split" @mousedown.prevent @click="apply(chain => chain.splitCell())"><Columns2 :size="17" /></button>
+      <ColorPicker kind="cell" :compact="compact" :value="state.background" :mixed="state.backgroundMixed" @pick="color => apply(chain => chain.setCellAttribute('backgroundColor', color))" />
+      <ActionMenu :items="items" :restore-focus="false">
+        <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="表格设置" data-tip="表格设置" @mousedown.prevent><TableProperties :size="17" /></button>
+      </ActionMenu>
+    </template>
   </template>
 </template>
