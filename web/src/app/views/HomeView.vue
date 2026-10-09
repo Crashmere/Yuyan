@@ -19,7 +19,7 @@ setTitle()
 
 const viewed = ref(recentlyViewed())
 const edited = ref<DocSummary[]>([])
-const totalChars = ref<number | null>(null)
+const stats = ref<{ chars: number; bookChars: Record<number, number> } | null>(null)
 const tab = ref<'viewed' | 'edited'>(viewed.value.length ? 'viewed' : 'edited')
 const dragId = ref<number | null>(null)
 const dragGroupId = ref<string | null>(null)
@@ -120,11 +120,11 @@ watch(() => state.booksLoaded ? state.books : null, async (books, _, onCleanup) 
   let active = true
   onCleanup(() => { active = false })
   try {
-    const stats = await api<{ chars: number }>('stats')
-    if (active) totalChars.value = stats.chars
+    const result = await api<NonNullable<typeof stats.value>>('stats')
+    if (active) stats.value = result
   } catch (e) {
     if (!active) return
-    totalChars.value = null
+    stats.value = null
     toast(`字数统计加载失败：${errorMessage(e)}`, 'error')
   }
 }, { immediate: true })
@@ -191,7 +191,10 @@ async function dropInGroup(groupId: string) {
                   <span class="yy-book-icon"><BookOpen :size="18" /></span>
                   <span class="yy-book-card-name">{{ b.name }}</span>
                   <span class="yy-book-card-desc">{{ b.description || '暂无简介' }}</span>
-                  <span class="yy-book-card-meta">{{ b.docCount }} 篇文档</span>
+                  <span class="yy-book-card-meta">
+                    <span>{{ b.docCount }} 篇文档</span>
+                    <span v-if="stats && stats.bookChars[b.id] !== undefined" class="yy-book-card-chars">{{ stats.bookChars[b.id].toLocaleString('zh-CN') }} 字</span>
+                  </span>
                   <ActionMenu :items="bookMenu(b)"><IconButton small class="yy-book-card-menu" :label="b.name + '知识库操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
                 </div>
                 <div v-if="dragId !== null && dragGroupId === group.id" key="drop-end" class="yy-book-drop-end" :class="{ active: overEndGroupId === group.id }">
@@ -204,7 +207,7 @@ async function dropInGroup(groupId: string) {
           </div>
         </section>
       </TransitionGroup>
-      <p v-if="totalChars !== null" class="yy-home-stats">共 {{ totalChars.toLocaleString('zh-CN') }} 字</p>
+      <p v-if="stats" class="yy-home-stats">共 {{ stats.chars.toLocaleString('zh-CN') }} 字</p>
     </section>
 
     <section>

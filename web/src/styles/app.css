@@ -1422,10 +1422,20 @@ a.yy-crumb:hover {
   -webkit-line-clamp: 1;
 }
 .yy-book-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
   grid-column: 1 / 3;
   margin-top: 2px;
   color: var(--yy-text-3);
   font-size: 12px;
+}
+.yy-book-card-chars {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .yy-book-card-link { position: absolute; inset: 0; border-radius: inherit; }
 .yy-book-card-menu { position: absolute; top: 12px; right: 10px; z-index: 1; }
