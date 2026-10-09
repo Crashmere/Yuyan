@@ -87,6 +87,7 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 		switch rt {
 		case routeHome:
 			p.add("recent", r, s.recent)
+			p.add("stats", r, s.stats)
 		case routeBook:
 			if v, ok := main("books/"+id, s.book); ok {
 				title = v.(store.Book).Name

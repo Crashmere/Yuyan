@@ -139,6 +139,11 @@
     },
     {
       "method": "GET",
+      "path": "/api/stats",
+      "description": "所有存活文档的正文总字数，排除空白、目录分组、回收站知识库与文档"
+    },
+    {
+      "method": "GET",
       "path": "/api/titles",
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },

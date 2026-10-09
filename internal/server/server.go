@@ -150,6 +150,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("POST /api/books/{id}/restore", s.write(s.apiRestoreBook))
 	mux.Handle("GET /api/books/{id}/tree", s.get(s.tree))
 	mux.Handle("GET /api/recent", s.get(s.recent))
+	mux.Handle("GET /api/stats", s.get(s.stats))
 	mux.Handle("GET /api/titles", s.get(s.titles))
 	mux.Handle("GET /api/link-targets", s.get(s.linkTargets))
 	mux.Handle("GET /api/docs/{id}/preview", s.get(s.linkPreview))

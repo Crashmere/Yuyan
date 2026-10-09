@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { BookOpen, ChevronRight, Ellipsis, FileText, FolderInput, FolderPlus, GripVertical, Plus } from 'lucide-vue-next'
 import { api, errorMessage, type DocSummary } from '../../shared/api'
@@ -19,6 +19,7 @@ setTitle()
 
 const viewed = ref(recentlyViewed())
 const edited = ref<DocSummary[]>([])
+const totalChars = ref<number | null>(null)
 const tab = ref<'viewed' | 'edited'>(viewed.value.length ? 'viewed' : 'edited')
 const dragId = ref<number | null>(null)
 const dragGroupId = ref<string | null>(null)
@@ -113,6 +114,21 @@ onMounted(async () => {
   }
 })
 
+// Refresh on entry and after home-page book changes, including moving a book to the trash.
+watch(() => state.booksLoaded ? state.books : null, async (books, _, onCleanup) => {
+  if (!books) return
+  let active = true
+  onCleanup(() => { active = false })
+  try {
+    const stats = await api<{ chars: number }>('stats')
+    if (active) totalChars.value = stats.chars
+  } catch (e) {
+    if (!active) return
+    totalChars.value = null
+    toast(`字数统计加载失败：${errorMessage(e)}`, 'error')
+  }
+}, { immediate: true })
+
 // Dropping a card on another puts it in that card's place: after the target when moving
 // forward, before it when moving back.
 async function dropOn(target: number, groupId: string) {
@@ -188,6 +204,7 @@ async function dropInGroup(groupId: string) {
           </div>
         </section>
       </TransitionGroup>
+      <p v-if="totalChars !== null" class="yy-home-stats">共 {{ totalChars.toLocaleString('zh-CN') }} 字</p>
     </section>
 
     <section>

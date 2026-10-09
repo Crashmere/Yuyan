@@ -71,6 +71,10 @@ func (s *Server) recent(r *http.Request) (any, error) {
 	return nonNil(recent), err
 }
 
+func (s *Server) stats(r *http.Request) (any, error) {
+	return s.store.DocumentStats(r.Context())
+}
+
 type titleEntry struct {
 	ID       int64    `json:"id"`
 	Title    string   `json:"title"`

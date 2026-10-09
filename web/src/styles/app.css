@@ -1297,6 +1297,13 @@ a.yy-crumb:hover {
 .yy-home section + section {
   margin-top: 40px;
 }
+.yy-home-stats {
+  margin: 16px 0 0;
+  color: var(--yy-text-3);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
 .yy-section-bar {
   display: flex;
   align-items: center;
