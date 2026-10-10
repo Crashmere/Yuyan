@@ -199,7 +199,7 @@ async function dropInGroup(groupId: string) {
                     <span>{{ b.docCount }} 篇文档</span>
                     <span v-if="stats && stats.bookChars[b.id] !== undefined" class="yy-book-card-chars">{{ stats.bookChars[b.id].toLocaleString('zh-CN') }} 字</span>
                   </span>
-                  <ActionMenu :items="bookMenu(b, { receive: true })"><IconButton small class="yy-book-card-menu" :label="b.name + '知识库操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
+                  <ActionMenu :items="bookMenu(b, { receive: true, create: false })"><IconButton small class="yy-book-card-menu" :label="b.name + '知识库操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
                 </div>
                 <button v-if="!group.id" key="add" type="button" class="yy-book-card add" @click="newBook()"><Plus :size="20" />新建知识库</button>
                 <p v-else-if="!group.books.length" key="empty" class="yy-book-group-empty">拖动知识库到这里，或通过知识库菜单移入</p>

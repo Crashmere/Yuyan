@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
 import { templateRequest } from '../shared/templates'
-import { receiveDocsRequest } from './actions'
+import { bookToGroupRequest, receiveDocsRequest } from './actions'
 import AppLayout from './layout/AppLayout.vue'
 import MoveDialog from './tree/MoveDialog.vue'
 import DialogHost from '../ui/DialogHost.vue'
@@ -9,6 +9,7 @@ import ToastHost from '../ui/ToastHost.vue'
 import '../styles/library.css'
 const TemplateDialog = defineAsyncComponent(() => import('./templates/TemplateDialog.vue'))
 const ReceiveDocsDialog = defineAsyncComponent(() => import('./tree/ReceiveDocsDialog.vue'))
+const BookToGroupDialog = defineAsyncComponent(() => import('./tree/BookToGroupDialog.vue'))
 </script>
 
 <template>
@@ -18,4 +19,5 @@ const ReceiveDocsDialog = defineAsyncComponent(() => import('./tree/ReceiveDocsD
   <ToastHost />
   <TemplateDialog v-if="templateRequest" />
   <ReceiveDocsDialog v-if="receiveDocsRequest" />
+  <BookToGroupDialog v-if="bookToGroupRequest" />
 </template>

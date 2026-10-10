@@ -1,5 +1,5 @@
 import { computed, reactive, shallowRef } from 'vue'
-import { api, ApiError, type Book, type BookGroup, type BookGroups, type Doc, type TreeNode } from '../shared/api'
+import { api, ApiError, type Book, type BookGroup, type BookGroups, type Doc, type DocMeta, type TreeNode } from '../shared/api'
 import { forgetViewed } from './prefs'
 import type { JSONContent } from '@tiptap/core'
 
@@ -234,6 +234,30 @@ export async function extractGroup(bookId: number, node: TreeNode) {
   invalidateTree(book.id)
   const refreshed = await refresh(bookId, book.id).then(() => true, () => { state.booksLoaded = false; return false })
   return { book, refreshed }
+}
+
+export interface BookToGroupInput { name: string; targetBookId: number; rootIds: number[] }
+
+export async function bookToGroup(bookId: number, input: BookToGroupInput) {
+  let result: { group: DocMeta; book: Book }
+  try {
+    result = await api(`books/${bookId}/to-group`, { method: 'POST', json: input })
+  } catch (e) {
+    await loadBooks(true).catch(() => {})
+    if (e instanceof ApiError && e.status === 409) throw new Error('知识库名称或目录已变化，请重新选择后重试')
+    throw e
+  }
+  const { group, book } = result
+  const roots = state.trees[bookId] ?? []
+  const target = state.trees[book.id]
+  if (target) target.push({ ...group, chars: 0, images: 0, children: roots.map((child) => ({ ...child, parentId: group.id })) })
+  delete state.trees[bookId]
+  state.books = state.books.filter((b) => b.id !== bookId).map((b) => b.id === book.id ? { ...b, ...book } : b)
+  confirmedBooks = state.books
+  invalidateTree(bookId)
+  invalidateTree(book.id)
+  const refreshed = await refresh(book.id).then(() => true, () => { state.booksLoaded = false; return false })
+  return { ...result, refreshed }
 }
 
 export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 'move' | 'trash', target?: { bookId: number; parentId: number | null }) {

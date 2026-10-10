@@ -148,6 +148,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("PATCH /api/books/{id}", s.write(s.apiUpdateBook))
 	mux.Handle("DELETE /api/books/{id}", s.write(s.apiDeleteBook))
 	mux.Handle("POST /api/books/{id}/restore", s.write(s.apiRestoreBook))
+	mux.Handle("POST /api/books/{id}/to-group", s.write(s.apiBookToGroup))
 	mux.Handle("GET /api/books/{id}/tree", s.get(s.tree))
 	mux.Handle("GET /api/recent", s.get(s.recent))
 	mux.Handle("GET /api/stats", s.get(s.stats))

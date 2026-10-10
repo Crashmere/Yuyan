@@ -128,6 +128,11 @@
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },
     {
+      "method": "POST",
+      "path": "/api/books/{id}/to-group",
+      "description": "将知识库转为另一知识库根目录下的同名分组：原子移动全部内容并将原空库移入回收站"
+    },
+    {
       "method": "GET",
       "path": "/api/books/{id}/tree",
       "description": "以项目 API 路由和 DESIGN.md 为准"

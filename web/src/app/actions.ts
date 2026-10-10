@@ -147,6 +147,32 @@ export interface MoveRequest {
 
 export const moveRequest = shallowRef<MoveRequest | null>(null)
 export const receiveDocsRequest = shallowRef<Book | null>(null)
+export const bookToGroupRequest = shallowRef<{ book: Book; resolve: (input: store.BookToGroupInput | null) => void } | null>(null)
+const convertingBooks = new Set<number>()
+
+export function bookToGroup(book: Book) {
+  if (convertingBooks.has(book.id) || bookToGroupRequest.value) return
+  convertingBooks.add(book.id)
+  return attempt(async () => {
+    try {
+      const input = await new Promise<store.BookToGroupInput | null>((resolve) => {
+        bookToGroupRequest.value = { book, resolve }
+      })
+      if (!input) return
+      const editor = store.editing.value
+      if (editor) {
+        if (!await editor.flush()) throw new Error('当前文档尚未保存，请处理保存问题后重试')
+        if (await router.replace(`/docs/${editor.docId}`)) return
+      }
+      const route = router.currentRoute.value
+      const { group, refreshed } = await store.loading(store.bookToGroup(book.id, input))
+      toast(`已转为分组“${group.title}”${refreshed ? '' : '，请刷新页面以更新目录'}`, 'success')
+      if (router.currentRoute.value === route) await router.push(`/docs/${group.id}`)
+    } finally {
+      convertingBooks.delete(book.id)
+    }
+  }, '转为分组失败')
+}
 
 export function moveDocTo(bookId: number, node: TreeNode) {
   return attempt(async () => {
@@ -255,16 +281,19 @@ export function copyBookLink(id: number) {
   }, '复制失败')
 }
 
-export function bookMenu(book: Book, options: { receive?: boolean } = {}): MenuEntry[] {
+export function bookMenu(book: Book, options: { receive?: boolean; create?: boolean } = {}): MenuEntry[] {
   return [
-    { label: '新建文档', icon: FilePlus, run: () => newDoc(book.id, null) },
-    { label: '从模板新建', icon: PanelsTopLeft, run: () => newFromTemplate(book.id, null) },
-    { label: '新建目录分组', icon: FolderPlus, run: () => newGroup(book.id, null) },
+    ...(options.create === false ? [] : [
+      { label: '新建文档', icon: FilePlus, run: () => newDoc(book.id, null) },
+      { label: '从模板新建', icon: PanelsTopLeft, run: () => newFromTemplate(book.id, null) },
+      { label: '新建目录分组', icon: FolderPlus, run: () => newGroup(book.id, null) },
+    ]),
     ...(options.receive ? [{ label: '从其他知识库移入', icon: FolderInput, run: () => { receiveDocsRequest.value = book } }] : []),
     null,
     { label: '重命名', icon: PencilLine, run: () => renameBook(book) },
     { label: '编辑简介', icon: SquarePen, run: () => editBookDescription(book) },
-    { label: '移至知识库分组', icon: FolderInput, children: bookGroupChoices(book.id) },
+    { label: '移动到', icon: FolderInput, children: bookGroupChoices(book.id) },
+    { label: '转为分组…', icon: FolderOutput, run: () => bookToGroup(book) },
     { label: '复制链接', icon: ClipboardCopy, run: () => copyBookLink(book.id) },
     { label: '导出知识库', icon: Download, run: () => exportBook(book) },
     null,
