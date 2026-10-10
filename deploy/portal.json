@@ -194,6 +194,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/docs/{id}/extract",
+      "description": "将目录分组提取为同名知识库：继承首页分组，原子移动子项到新库根目录并将原空分组移入回收站"
+    },
+    {
+      "method": "POST",
       "path": "/api/docs/{id}/restore",
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },

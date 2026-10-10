@@ -112,6 +112,30 @@ export function dissolveGroup(bookId: number, node: TreeNode) {
   }, '解散分组失败')
 }
 
+const extractingGroups = new Set<number>()
+
+export function extractGroup(bookId: number, node: TreeNode) {
+  if (node.kind !== 'group' || extractingGroups.has(node.id)) return
+  extractingGroups.add(node.id)
+  return attempt(async () => {
+    try {
+      if (!await confirm({ title: `将“${node.title}”提取为知识库？`, message: '将以分组名新建知识库，组内文档和子分组按原顺序移到新库根目录，内部层级保留。新库与原知识库归在同一首页分组，原目录分组移入回收站。', confirmText: '提取为知识库' })) return
+      // Finish the editor before switching books. A failed save leaves the structure untouched.
+      const editor = store.editing.value
+      if (editor) {
+        if (!await editor.flush()) throw new Error('当前文档尚未保存，请处理保存问题后重试')
+        if (await router.replace(`/docs/${editor.docId}`)) return
+      }
+      const route = router.currentRoute.value
+      const { book, refreshed } = await store.loading(store.extractGroup(bookId, node))
+      toast(`已提取为知识库“${book.name}”${refreshed ? '' : '，请刷新页面以更新目录'}`, 'success')
+      if (router.currentRoute.value === route) await router.push(`/books/${book.id}`)
+    } finally {
+      extractingGroups.delete(node.id)
+    }
+  }, '提取知识库失败')
+}
+
 export interface MoveRequest {
   bookId: number
   node: TreeNode
@@ -177,6 +201,7 @@ export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () 
     ...(node.kind === 'doc' ? [{ label: '编辑', icon: SquarePen, run: () => void router.push(`/docs/${node.id}/edit`) }] : []),
     { label: '重命名', icon: PencilLine, run: options.rename ?? (() => renameDoc(bookId, node)) },
     { label: '移动到…', icon: FolderInput, run: () => moveDocTo(bookId, node) },
+    ...(node.kind === 'group' ? [{ label: '提取为知识库', icon: BookPlus, run: () => extractGroup(bookId, node) }] : []),
     ...(node.kind === 'doc' ? [{ label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(node.id) }] : []),
     ...(node.kind === 'doc' ? [{ label: '保存为文档模板', icon: PanelsTopLeft, run: () => saveDocTemplate(node.id) }] : []),
     ...(options.history && node.kind === 'doc' ? [{ label: '历史版本', icon: History, run: () => void router.push(`/docs/${node.id}/history`) }] : []),

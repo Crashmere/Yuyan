@@ -210,6 +210,32 @@ export async function dissolveGroup(bookId: number, node: TreeNode) {
   catch { return false }
 }
 
+export async function extractGroup(bookId: number, node: TreeNode) {
+  let result: { book: Book; bookGroups: BookGroups }
+  try {
+    result = await api(`docs/${node.id}/extract`, { method: 'POST', json: { bookId, title: node.title, parentId: node.parentId, childIds: (node.children ?? []).map((child) => child.id) } })
+  } catch (e) {
+    await refresh(bookId).catch(() => {})
+    if (e instanceof ApiError && e.status === 409) throw new Error('分组名称或目录已变化，请重新选择后重试')
+    throw e
+  }
+  const { book, bookGroups } = result
+  const found = locate(bookId, node.id)
+  state.trees[book.id] = (found?.node.children ?? node.children ?? []).map((child) => ({ ...child, parentId: null }))
+  if (found) found.siblings.splice(found.siblings.indexOf(found.node), 1)
+  state.books = [...state.books.map((b) => b.id === bookId ? { ...b, docCount: Math.max(0, b.docCount - book.docCount) } : b), book]
+  confirmedBooks = state.books
+  if (bookGroups.revision >= confirmedBookGroups.revision) {
+    confirmedBookGroups = bookGroups
+    state.bookGroups = bookGroups
+  }
+  forgetViewed([node.id])
+  invalidateTree(bookId)
+  invalidateTree(book.id)
+  const refreshed = await refresh(bookId, book.id).then(() => true, () => { state.booksLoaded = false; return false })
+  return { book, refreshed }
+}
+
 export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 'move' | 'trash', target?: { bookId: number; parentId: number | null }) {
   let result: { ids: number[] }
   try {
