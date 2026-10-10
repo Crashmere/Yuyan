@@ -1442,6 +1442,8 @@ a.yy-crumb:hover {
 .yy-section-actions { display: flex; gap: 8px; }
 .yy-book-group { position: relative; isolation: isolate; transition: opacity 150ms; }
 .yy-book-groups-move { transition: transform 200ms ease-out; }
+.yy-home.settling-drop .yy-book-card,
+.yy-home.settling-drop .yy-book-group { transition: none; }
 .yy-book-group.group-dragging { opacity: 0.4; }
 .yy-book-group.drop-before::after,
 .yy-book-group.drop-after::after {

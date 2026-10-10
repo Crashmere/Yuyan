@@ -4,8 +4,8 @@ import { forgetViewed } from './prefs'
 import type { JSONContent } from '@tiptap/core'
 
 // Shared client state: the knowledge base list, the trees seen so far, and what the current page
-// is about (for the sidebar and the breadcrumb). Writes go to the server first and then refresh
-// what they changed, so the state never runs ahead of the database.
+// is about (for the sidebar and the breadcrumb). Most writes refresh after saving; book grouping
+// updates immediately so a dropped card stays at its destination while the request is in flight.
 
 export const state = reactive({
   books: [] as Book[],
@@ -17,6 +17,7 @@ export const state = reactive({
   loading: 0,
   navigating: false,
 })
+let confirmedBookGroups: BookGroups = state.bookGroups
 
 export async function loading<T>(work: Promise<T>): Promise<T> {
   state.loading++
@@ -36,6 +37,7 @@ export async function loadBooks(force = false): Promise<Book[]> {
   if (state.booksLoaded && !force) return state.books
   const [books, groups] = await Promise.all([api<Book[]>('books'), api<BookGroups>('book-groups')])
   state.books = books
+  confirmedBookGroups = groups
   state.bookGroups = groups
   state.booksLoaded = true
   return state.books
@@ -50,11 +52,18 @@ export const bookSections = computed(() => {
 })
 
 export async function saveBookGroups(groups: BookGroup[]) {
+  const previous = state.bookGroups
+  state.bookGroups = { revision: previous.revision, groups }
+  const pending = state.bookGroups
   try {
-    state.bookGroups = await api<BookGroups>('book-groups', { method: 'PUT', json: { groups, baseRevision: state.bookGroups.revision } })
+    const saved = await api<BookGroups>('book-groups', { method: 'PUT', json: { groups, baseRevision: previous.revision } })
+    if (saved.revision > confirmedBookGroups.revision) confirmedBookGroups = saved
+    if (state.bookGroups === pending) state.bookGroups = saved
   } catch (e) {
-    await loadBooks(true)
-    if (e instanceof ApiError && e.status === 409) throw new Error('分组已在别处修改，已刷新列表，请重试')
+    if (state.bookGroups === pending) state.bookGroups = confirmedBookGroups
+    // Roll back to confirmed data, including overlapping failed moves while offline.
+    const refreshed = await loadBooks(true).then(() => true, () => false)
+    if (e instanceof ApiError && e.status === 409) throw new Error(`分组已在别处修改，${refreshed ? '已刷新列表，请重试' : '请刷新列表后重试'}`)
     throw e
   }
 }
