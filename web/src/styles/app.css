@@ -1346,8 +1346,20 @@ a.yy-crumb:hover {
 .yy-book-card.over {
   border-color: var(--yy-primary);
   box-shadow: 0 0 0 1px var(--yy-primary);
-  transform: translateY(-3px);
 }
+.yy-book-card.drop-before::before,
+.yy-book-card.drop-after::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -9px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--yy-primary);
+  pointer-events: none;
+}
+.yy-book-card.drop-after::before { left: auto; right: -9px; }
 .yy-book-list-enter-active { transition: opacity 180ms ease-out, transform 180ms ease-out; }
 .yy-book-list-enter-from { opacity: 0; transform: translateY(8px) scale(0.98); }
 .yy-book-list-move { transition: transform 180ms ease-out; }

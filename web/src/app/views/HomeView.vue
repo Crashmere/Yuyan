@@ -11,7 +11,7 @@ import { closedBookGroups, toggleBookGroup } from '../bookGroups'
 import { bookColor } from '../bookColor'
 import { recentlyViewed } from '../prefs'
 import { setTitle } from '../router'
-import { bookSections, loadBooks, loading, reorderBooks, saveBookGroups, setPage, state } from '../store'
+import { bookSections, loadBooks, loading, saveBookGroups, setPage, state } from '../store'
 import { fromNow } from '../time'
 
 setPage(null)
@@ -24,6 +24,7 @@ const tab = ref<'viewed' | 'edited'>(viewed.value.length ? 'viewed' : 'edited')
 const dragId = ref<number | null>(null)
 const dragGroupId = ref<string | null>(null)
 const overId = ref<number | null>(null)
+const bookOrderSide = ref<'before' | 'after'>('before')
 const overGroupId = ref<string | null>(null)
 const overEndGroupId = ref<string | null>(null)
 const draggedGroupId = ref<string | null>(null)
@@ -80,8 +81,14 @@ function dragOver(event: DragEvent, groupId: string, bookId: number | null = nul
   event.preventDefault()
   if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
   overGroupId.value = groupId !== dragGroupId.value ? groupId : null
-  overId.value = groupId === dragGroupId.value ? bookId : null
-  overEndGroupId.value = groupId === dragGroupId.value && bookId === null ? groupId : null
+  overId.value = bookId
+  if (bookId !== null) bookOrderSide.value = cardSide(event)
+  overEndGroupId.value = bookId === null ? groupId : null
+}
+
+function cardSide(event: DragEvent): 'before' | 'after' {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  return event.clientX < rect.left + rect.width / 2 ? 'before' : 'after'
 }
 
 function leaveGroup(event: DragEvent, groupId: string) {
@@ -137,34 +144,18 @@ watch(() => state.booksLoaded ? state.books : null, async (books, _, onCleanup) 
   }
 }, { immediate: true })
 
-// Dropping a card on another puts it in that card's place: after the target when moving
-// forward, before it when moving back.
-async function dropOn(target: number, groupId: string) {
+// The same left/right insertion target applies within a group and across groups.
+async function dropOn(event: DragEvent, target: number, groupId: string) {
   if (draggedGroupId.value !== null) return dropGroup(groupId)
   const from = dragId.value
+  const side = cardSide(event)
   finishDrop()
   if (from == null || from === target) return
-  const oldGroup = state.bookGroups.groups.find((g) => g.bookIds.includes(from))?.id ?? ''
-  if (oldGroup !== groupId) { await moveBookGroup(from, groupId); return }
-  const forward = state.books.findIndex((b) => b.id === from) < state.books.findIndex((b) => b.id === target)
-  const moved = state.books.find((b) => b.id === from)!
-  const books = state.books.filter((b) => b.id !== from)
-  books.splice(books.findIndex((b) => b.id === target) + (forward ? 1 : 0), 0, moved)
-  state.books = books
-  try {
-    await reorderBooks(books.map((b) => b.id))
-  } catch (e) {
-    toast(`排序失败：${errorMessage(e)}`, 'error')
-  }
+  await moveBookGroup(from, groupId, { bookId: target, side })
 }
 async function dropInGroup(groupId: string) {
   if (draggedGroupId.value !== null) return dropGroup(groupId)
   const from = dragId.value
-  const oldGroup = dragGroupId.value
-  if (oldGroup === groupId) {
-    const last = bookSections.value.find((g) => g.id === groupId)?.books.at(-1)
-    if (last) return dropOn(last.id, groupId)
-  }
   finishDrop()
   if (from !== null) await moveBookGroup(from, groupId)
 }
@@ -193,8 +184,8 @@ async function dropInGroup(groupId: string) {
           <div class="yy-book-group-content" :class="{ collapsed: state.bookGroups.groups.length > 0 && closedBookGroups.has(group.id) }" :inert="state.bookGroups.groups.length > 0 && closedBookGroups.has(group.id)">
             <div class="yy-book-group-clip">
               <TransitionGroup tag="div" name="yy-book-list" class="yy-book-grid" :css="!settlingDrop">
-                <div v-for="b in group.books" :key="b.id" class="yy-book-card" :class="{ dragging: dragId === b.id, over: overId === b.id && dragId !== b.id }" :style="bookColor(b.id)" draggable="true"
-                  @dragstart="startDrag($event, b.id, group.id)" @dragenter.stop="dragOver($event, group.id, b.id)" @dragover.stop="dragOver($event, group.id, b.id)" @drop.prevent.stop="dropOn(b.id, group.id)" @dragend="resetDrag">
+                <div v-for="b in group.books" :key="b.id" class="yy-book-card" :class="{ dragging: dragId === b.id, over: overId === b.id && dragId !== b.id, 'drop-before': overId === b.id && dragId !== b.id && bookOrderSide === 'before', 'drop-after': overId === b.id && dragId !== b.id && bookOrderSide === 'after' }" :style="bookColor(b.id)" draggable="true"
+                  @dragstart="startDrag($event, b.id, group.id)" @dragenter.stop="dragOver($event, group.id, b.id)" @dragover.stop="dragOver($event, group.id, b.id)" @drop.prevent.stop="dropOn($event, b.id, group.id)" @dragend="resetDrag">
                   <RouterLink :to="`/books/${b.id}`" class="yy-book-card-link" :aria-label="b.name" draggable="false" />
                   <span class="yy-book-icon"><BookOpen :size="18" /></span>
                   <span class="yy-book-card-name">{{ b.name }}</span>
@@ -205,7 +196,7 @@ async function dropInGroup(groupId: string) {
                   </span>
                   <ActionMenu :items="bookMenu(b)"><IconButton small class="yy-book-card-menu" :label="b.name + '知识库操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
                 </div>
-                <div v-if="dragId !== null && dragGroupId === group.id" key="drop-end" class="yy-book-drop-end" :class="{ active: overEndGroupId === group.id }">
+                <div v-if="dragId !== null && (dragGroupId === group.id || overGroupId === group.id)" key="drop-end" class="yy-book-drop-end" :class="{ active: overEndGroupId === group.id }">
                   <FolderInput :size="20" /><span>放到组末尾</span>
                 </div>
                 <button v-if="!group.id" key="add" type="button" class="yy-book-card add" @click="newBook"><Plus :size="20" />新建知识库</button>

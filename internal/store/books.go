@@ -106,6 +106,14 @@ func (s *Store) ReorderBooks(ctx context.Context, ids []int64) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := reorderBooks(ctx, tx, ids); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// Shared with grouped moves so membership and position commit together.
+func reorderBooks(ctx context.Context, tx *sql.Tx, ids []int64) error {
 	var live int
 	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM books WHERE deleted_at IS NULL`).Scan(&live); err != nil {
 		return err
@@ -127,7 +135,7 @@ func (s *Store) ReorderBooks(ctx context.Context, ids []int64) error {
 	if len(ids) != live {
 		return ErrInvalid
 	}
-	return tx.Commit()
+	return nil
 }
 
 // DeleteBook moves a knowledge base to the trash; its documents stay intact and return with it.

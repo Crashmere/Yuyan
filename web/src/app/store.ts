@@ -18,6 +18,7 @@ export const state = reactive({
   navigating: false,
 })
 let confirmedBookGroups: BookGroups = state.bookGroups
+let confirmedBooks: Book[] = state.books
 
 export async function loading<T>(work: Promise<T>): Promise<T> {
   state.loading++
@@ -37,6 +38,7 @@ export async function loadBooks(force = false): Promise<Book[]> {
   if (state.booksLoaded && !force) return state.books
   const [books, groups] = await Promise.all([api<Book[]>('books'), api<BookGroups>('book-groups')])
   state.books = books
+  confirmedBooks = books
   confirmedBookGroups = groups
   state.bookGroups = groups
   state.booksLoaded = true
@@ -51,16 +53,23 @@ export const bookSections = computed(() => {
   ]
 })
 
-export async function saveBookGroups(groups: BookGroup[]) {
+export async function saveBookGroups(groups: BookGroup[], books?: Book[]) {
   const previous = state.bookGroups
+  if (books) state.books = books
   state.bookGroups = { revision: previous.revision, groups }
   const pending = state.bookGroups
   try {
-    const saved = await api<BookGroups>('book-groups', { method: 'PUT', json: { groups, baseRevision: previous.revision } })
-    if (saved.revision > confirmedBookGroups.revision) confirmedBookGroups = saved
+    const saved = await api<BookGroups>('book-groups', { method: 'PUT', json: { groups, baseRevision: previous.revision, bookOrder: books?.map((b) => b.id) } })
+    if (saved.revision > confirmedBookGroups.revision) {
+      confirmedBookGroups = saved
+      if (books) confirmedBooks = books
+    }
     if (state.bookGroups === pending) state.bookGroups = saved
   } catch (e) {
-    if (state.bookGroups === pending) state.bookGroups = confirmedBookGroups
+    if (state.bookGroups === pending) {
+      state.bookGroups = confirmedBookGroups
+      if (books) state.books = confirmedBooks
+    }
     // Roll back to confirmed data, including overlapping failed moves while offline.
     const refreshed = await loadBooks(true).then(() => true, () => false)
     if (e instanceof ApiError && e.status === 409) throw new Error(`分组已在别处修改，${refreshed ? '已刷新列表，请重试' : '请刷新列表后重试'}`)
@@ -68,9 +77,22 @@ export async function saveBookGroups(groups: BookGroup[]) {
   }
 }
 
-export async function moveBookToGroup(bookId: number, groupId: string) {
+export interface BookDropTarget { bookId: number; side: 'before' | 'after' }
+
+export async function moveBookToGroup(bookId: number, groupId: string, target?: BookDropTarget) {
+  const section = bookSections.value.find((g) => g.id === groupId)
+  const moved = state.books.find((b) => b.id === bookId)
+  if (!section || !moved || (target && !section.books.some((b) => b.id === target.bookId))) throw new Error('知识库列表已变化，请刷新后重试')
+  if (target?.bookId === bookId) return
+  const books = state.books.filter((b) => b.id !== bookId)
+  const anchor = target?.bookId ?? section.books.filter((b) => b.id !== bookId).at(-1)?.id
+  // An empty destination has no relative position to set; otherwise use the indicated side or end.
+  const index = anchor === undefined ? state.books.indexOf(moved) : books.findIndex((b) => b.id === anchor) + (target?.side === 'before' ? 0 : 1)
+  books.splice(index, 0, moved)
+  const sameGroup = section.books.some((b) => b.id === bookId)
+  if (sameGroup && books.every((b, i) => b.id === state.books[i]?.id)) return
   const groups = state.bookGroups.groups.map((g) => ({ ...g, bookIds: [...g.bookIds.filter((id) => id !== bookId), ...(g.id === groupId ? [bookId] : [])] }))
-  await saveBookGroups(groups)
+  await saveBookGroups(groups, books.map((b, i) => ({ ...b, position: i + 1 })))
 }
 
 const staleTrees = new Set<number>()
@@ -198,12 +220,4 @@ export async function deleteBook(id: number) {
   await api(`books/${id}`, { method: 'DELETE' })
   delete state.trees[id]
   await loadBooks(true)
-}
-
-export async function reorderBooks(ids: number[]) {
-  try {
-    await api('books/order', { method: 'PUT', json: { ids } })
-  } finally {
-    await loadBooks(true)
-  }
 }

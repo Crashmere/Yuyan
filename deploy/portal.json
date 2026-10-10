@@ -90,7 +90,7 @@
     {
       "method": "PUT",
       "path": "/api/book-groups",
-      "description": "保存知识库分组，检测版本冲突"
+      "description": "保存知识库分组，可同时提交完整知识库顺序，检测版本冲突"
     },
     {
       "method": "GET",

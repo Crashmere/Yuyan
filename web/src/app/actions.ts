@@ -241,14 +241,14 @@ export function newBookGroup(bookId?: number) {
   }, '新建分组失败')
 }
 
-export function moveBookGroup(bookId: number, groupId: string) {
-  return attempt(() => store.moveBookToGroup(bookId, groupId), '移动分组失败')
+export function moveBookGroup(bookId: number, groupId: string, target?: store.BookDropTarget) {
+  return attempt(() => store.moveBookToGroup(bookId, groupId, target), '移动分组失败')
 }
 
 export function bookGroupChoices(bookId: number): MenuEntry[] {
   const current = store.state.bookGroups.groups.find((g) => g.bookIds.includes(bookId))?.id ?? ''
   return [
-    ...store.bookSections.value.map((g) => ({ label: g.name, checked: current === g.id, run: () => moveBookGroup(bookId, g.id) })),
+    ...store.bookSections.value.map((g) => ({ label: g.name, checked: current === g.id, run: () => current === g.id ? undefined : moveBookGroup(bookId, g.id) })),
     null,
     { label: '新建知识库分组', icon: FolderPlus, run: () => newBookGroup(bookId) },
   ]

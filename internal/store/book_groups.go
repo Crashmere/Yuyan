@@ -41,7 +41,7 @@ func (s *Store) BookGroups(ctx context.Context) (BookGroups, error) {
 	return readBookGroups(ctx, s.DB)
 }
 
-func (s *Store) SaveBookGroups(ctx context.Context, groups []BookGroup, revision int64) (BookGroups, error) {
+func (s *Store) SaveBookGroups(ctx context.Context, groups []BookGroup, revision int64, bookOrder []int64) (BookGroups, error) {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return BookGroups{}, err
@@ -85,6 +85,11 @@ func (s *Store) SaveBookGroups(ctx context.Context, groups []BookGroup, revision
 	}
 	if groups == nil {
 		groups = []BookGroup{}
+	}
+	if bookOrder != nil {
+		if err := reorderBooks(ctx, tx, bookOrder); err != nil {
+			return current, err
+		}
 	}
 	next := BookGroups{Revision: current.Revision + 1, Groups: groups}
 	data, err := json.Marshal(next)
