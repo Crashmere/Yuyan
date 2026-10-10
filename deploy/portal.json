@@ -100,7 +100,7 @@
     {
       "method": "POST",
       "path": "/api/books",
-      "description": "以项目 API 路由和 DESIGN.md 为准"
+      "description": "创建知识库，可用 groupId 在同一事务归入指定分组"
     },
     {
       "method": "PUT",

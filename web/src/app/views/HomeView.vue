@@ -27,7 +27,6 @@ const dragGroupId = ref<string | null>(null)
 const overId = ref<number | null>(null)
 const bookOrderSide = ref<'before' | 'after'>('before')
 const overGroupId = ref<string | null>(null)
-const overEndGroupId = ref<string | null>(null)
 const draggedGroupId = ref<string | null>(null)
 const groupOrderTarget = ref<string | null>(null)
 const groupOrderSide = ref<'before' | 'after'>('before')
@@ -40,7 +39,6 @@ function resetDrag() {
   dragMotion.clearPreview()
   dragId.value = overId.value = null
   dragGroupId.value = overGroupId.value = null
-  overEndGroupId.value = null
   draggedGroupId.value = groupOrderTarget.value = null
 }
 
@@ -92,7 +90,6 @@ function dragOver(event: DragEvent, groupId: string, bookId: number | null = nul
   overGroupId.value = groupId !== dragGroupId.value ? groupId : null
   overId.value = bookId
   if (bookId !== null) bookOrderSide.value = cardSide(event)
-  overEndGroupId.value = bookId === null ? groupId : null
 }
 
 function cardSide(event: DragEvent): 'before' | 'after' {
@@ -105,7 +102,6 @@ function leaveGroup(event: DragEvent, groupId: string) {
   // Moving between the heading, a card and its controls stays inside this drop target.
   if (event.relatedTarget instanceof Node && group.contains(event.relatedTarget)) return
   if (overGroupId.value === groupId) overGroupId.value = null
-  if (overEndGroupId.value === groupId) overEndGroupId.value = null
   if (groupOrderTarget.value === groupId) groupOrderTarget.value = null
   overId.value = null
 }
@@ -177,7 +173,7 @@ async function dropInGroup(groupId: string) {
         <h2>知识库</h2>
         <div class="yy-section-actions">
           <button type="button" class="yy-btn" @click="newBookGroup()"><FolderPlus :size="15" />新建分组</button>
-          <button type="button" class="yy-btn" @click="newBook"><Plus :size="15" />新建知识库</button>
+          <button type="button" class="yy-btn" @click="newBook()"><Plus :size="15" />新建知识库</button>
         </div>
       </div>
       <TransitionGroup tag="div" name="yy-book-groups" :css="!settlingDrop">
@@ -205,10 +201,7 @@ async function dropInGroup(groupId: string) {
                   </span>
                   <ActionMenu :items="bookMenu(b)"><IconButton small class="yy-book-card-menu" :label="b.name + '知识库操作'"><Ellipsis :size="16" /></IconButton></ActionMenu>
                 </div>
-                <div v-if="dragId !== null && (dragGroupId === group.id || overGroupId === group.id)" key="drop-end" class="yy-book-drop-end" :class="{ active: overEndGroupId === group.id }">
-                  <FolderInput :size="20" /><span>放到组末尾</span>
-                </div>
-                <button v-if="!group.id" key="add" type="button" class="yy-book-card add" @click="newBook"><Plus :size="20" />新建知识库</button>
+                <button v-if="!group.id" key="add" type="button" class="yy-book-card add" @click="newBook()"><Plus :size="20" />新建知识库</button>
                 <p v-else-if="!group.books.length" key="empty" class="yy-book-group-empty">拖动知识库到这里，或通过知识库菜单移入</p>
               </TransitionGroup>
             </div>

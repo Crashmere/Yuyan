@@ -1389,29 +1389,6 @@ a.yy-crumb:hover {
   border-color: var(--yy-primary);
   box-shadow: none;
 }
-.yy-book-drop-end {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 108px;
-  padding: 16px;
-  border: 1px dashed var(--yy-border-strong);
-  border-radius: var(--yy-radius-xl);
-  color: var(--yy-text-3);
-  font-size: 13px;
-  transition: border-color 140ms, background 140ms, color 140ms;
-}
-.yy-book-drop-end.active {
-  border-color: var(--yy-primary);
-  background: var(--yy-primary-soft);
-  color: var(--yy-primary);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yy-primary) 15%, transparent);
-}
-.yy-book-drop-end > svg { transition: transform 180ms cubic-bezier(.22, .8, .25, 1); }
-.yy-book-drop-end.active > svg { transform: translateY(-2px) scale(1.08); }
-.yy-book-drop-end.yy-book-list-leave-active { display: none; transition: none; }
 .yy-book-icon {
   display: inline-flex;
   align-items: center;
@@ -1536,8 +1513,8 @@ a.yy-crumb:hover {
 .yy-group-count { color: var(--yy-text-3); font-size: 12px; font-weight: 400; }
 .yy-book-group-empty { margin: 0; padding: 24px 16px; grid-column: 1 / -1; border: 1px dashed var(--yy-border); border-radius: var(--yy-radius); color: var(--yy-text-3); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) {
-  .yy-book-card, .yy-book-card::before, .yy-book-card::after, .yy-book-drop-end, .yy-book-drop-end > svg, .yy-book-group, .yy-book-group::before, .yy-book-group-content { transition: none; }
-  .yy-book-card.dragging, .yy-book-card.drop-before, .yy-book-card.drop-after, .yy-book-drag-preview, .yy-book-list-enter-from, .yy-book-group::before, .yy-book-drop-end.active > svg { transform: none; }
+  .yy-book-card, .yy-book-card::before, .yy-book-card::after, .yy-book-group, .yy-book-group::before, .yy-book-group-content { transition: none; }
+  .yy-book-card.dragging, .yy-book-card.drop-before, .yy-book-card.drop-after, .yy-book-drag-preview, .yy-book-list-enter-from, .yy-book-group::before { transform: none; }
   .yy-book-group-drop-hint { animation: none; }
 }
 @media (max-width: 640px) {

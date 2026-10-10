@@ -312,6 +312,7 @@ func (s *Server) apiMeta(w http.ResponseWriter, r *http.Request) error {
 type bookInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	GroupID     string `json:"groupId"`
 }
 
 func (s *Server) apiCreateBook(w http.ResponseWriter, r *http.Request) error {
@@ -319,7 +320,11 @@ func (s *Server) apiCreateBook(w http.ResponseWriter, r *http.Request) error {
 	if err := readJSON(w, r, &in); err != nil {
 		return err
 	}
-	b, err := s.store.CreateBook(r.Context(), in.Name, in.Description)
+	b, err := s.store.CreateBook(r.Context(), in.Name, in.Description, in.GroupID)
+	if in.GroupID != "" && errors.Is(err, store.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found", "message": "目标分组已不存在，请刷新后重试"})
+		return nil
+	}
 	if err != nil {
 		return err
 	}

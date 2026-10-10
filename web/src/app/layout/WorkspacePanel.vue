@@ -19,7 +19,7 @@ onMounted(() => void loadBooks())
     <div class="yy-section-head">
       <span>知识库</span>
       <IconButton small label="新建知识库分组" @click="newBookGroup()"><FolderPlus :size="15" /></IconButton>
-      <IconButton small label="新建知识库" @click="newBook"><Plus :size="15" /></IconButton>
+      <IconButton small label="新建知识库" @click="newBook()"><Plus :size="15" /></IconButton>
     </div>
     <nav v-for="group in bookSections" :key="group.id" class="yy-nav">
       <button v-if="state.bookGroups.groups.length" type="button" class="yy-book-group-toggle sidebar" :aria-expanded="!closedBookGroups.has(group.id)" @click="toggleBookGroup(group.id)">

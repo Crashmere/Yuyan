@@ -1,5 +1,5 @@
 import { shallowRef } from 'vue'
-import { ArrowDown, ArrowUp, ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2, PanelsTopLeft } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, BookPlus, ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2, PanelsTopLeft } from 'lucide-vue-next'
 import { api, base, errorMessage, type Book, type BookGroup, type TreeNode, type Doc } from '../shared/api'
 import { chooseTemplate, saveTemplate } from '../shared/templates'
 import { copyText } from '../shared/clipboard'
@@ -174,11 +174,12 @@ export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () 
   ]
 }
 
-export function newBook() {
+export function newBook(groupId = '') {
   return attempt(async () => {
-    const name = await prompt({ title: '新建知识库', placeholder: '知识库名称', confirmText: '新建' })
+    const group = store.state.bookGroups.groups.find((g) => g.id === groupId)
+    const name = await prompt({ title: '新建知识库', label: group ? `创建到“${group.name}”` : undefined, placeholder: '知识库名称', confirmText: '新建' })
     if (!name) return
-    const book = await store.createBook(name)
+    const book = await store.createBook(name, groupId)
     await router.push(`/books/${book.id}`)
   }, '新建知识库失败')
 }
@@ -268,6 +269,8 @@ export function bookGroupMenu(id: string): MenuEntry[] {
     await store.saveBookGroups(next)
   }, '分组排序失败')
   return [
+    { label: '新建知识库', icon: BookPlus, run: () => newBook(id) },
+    null,
     { label: '重命名分组', icon: PencilLine, run: () => renameBookGroup(group) },
     { label: '上移分组', icon: ArrowUp, disabled: index === 0, run: () => reorder(-1) },
     { label: '下移分组', icon: ArrowDown, disabled: index === groups.length - 1, run: () => reorder(1) },

@@ -205,9 +205,10 @@ export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 
   catch { return { ...result, refreshed: false } }
 }
 
-export async function createBook(name: string): Promise<Book> {
-  const book = await api<Book>('books', { method: 'POST', json: { name } })
-  await loadBooks(true)
+export async function createBook(name: string, groupId = ''): Promise<Book> {
+  const book = await api<Book>('books', { method: 'POST', json: { name, groupId } })
+  // Creation is already committed. A refresh failure must not invite a duplicate creation.
+  await loadBooks(true).catch(() => { state.booksLoaded = false })
   return book
 }
 

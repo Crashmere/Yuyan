@@ -92,12 +92,17 @@ func (s *Store) SaveBookGroups(ctx context.Context, groups []BookGroup, revision
 		}
 	}
 	next := BookGroups{Revision: current.Revision + 1, Groups: groups}
-	data, err := json.Marshal(next)
-	if err != nil {
-		return current, err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO meta(key, value) VALUES ('book_groups', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, string(data)); err != nil {
+	if err := writeBookGroups(ctx, tx, next); err != nil {
 		return current, err
 	}
 	return next, tx.Commit()
+}
+
+func writeBookGroups(ctx context.Context, tx *sql.Tx, groups BookGroups) error {
+	data, err := json.Marshal(groups)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO meta(key, value) VALUES ('book_groups', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, string(data))
+	return err
 }

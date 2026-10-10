@@ -52,19 +52,55 @@ FROM books WHERE id = ?`, id).
 	return b, err
 }
 
-func (s *Store) CreateBook(ctx context.Context, name, description string) (Book, error) {
+// CreateBook appends a knowledge base and, when requested, its group membership atomically.
+func (s *Store) CreateBook(ctx context.Context, name, description, groupID string) (Book, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Book{}, ErrInvalid
 	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return Book{}, err
+	}
+	defer tx.Rollback()
+	var groups BookGroups
+	groupIndex := -1
+	if groupID != "" {
+		groups, err = readBookGroups(ctx, tx)
+		if err != nil {
+			return Book{}, err
+		}
+		for i, group := range groups.Groups {
+			if group.ID == groupID {
+				groupIndex = i
+				break
+			}
+		}
+		if groupIndex < 0 {
+			return Book{}, ErrNotFound
+		}
+	}
 	now := s.stamp()
-	res, err := s.DB.ExecContext(ctx, `
+	res, err := tx.ExecContext(ctx, `
 INSERT INTO books(name, description, position, created_at, updated_at)
 VALUES (?, ?, (SELECT coalesce(max(position), 0) + 1 FROM books), ?, ?)`, name, description, now, now)
 	if err != nil {
 		return Book{}, err
 	}
-	id, _ := res.LastInsertId()
+	id, err := res.LastInsertId()
+	if err != nil {
+		return Book{}, err
+	}
+	if groupIndex >= 0 {
+		groups.Groups[groupIndex].BookIDs = append(groups.Groups[groupIndex].BookIDs, id)
+		groups.Revision++
+		if err := writeBookGroups(ctx, tx, groups); err != nil {
+			return Book{}, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return Book{}, err
+	}
 	return s.GetBook(ctx, id)
 }
 
