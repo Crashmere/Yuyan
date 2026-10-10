@@ -189,6 +189,11 @@
     },
     {
       "method": "POST",
+      "path": "/api/docs/{id}/dissolve",
+      "description": "解散目录分组：校验所在位置和子项顺序，原子上移子项并仅将空分组移入回收站"
+    },
+    {
+      "method": "POST",
       "path": "/api/docs/{id}/restore",
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },

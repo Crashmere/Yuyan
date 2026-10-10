@@ -191,6 +191,25 @@ function collectIds(n: TreeNode): number[] {
   return [n.id, ...(n.children ?? []).flatMap(collectIds)]
 }
 
+export async function dissolveGroup(bookId: number, node: TreeNode) {
+  try {
+    await api(`docs/${node.id}/dissolve`, { method: 'POST', json: { bookId, parentId: node.parentId, childIds: (node.children ?? []).map((child) => child.id) } })
+  } catch (e) {
+    await refresh(bookId).catch(() => {})
+    if (e instanceof ApiError && e.status === 409) throw new Error('目录已变化，请重新选择后重试')
+    throw e
+  }
+  const found = locate(bookId, node.id)
+  if (found) {
+    const children = (found.node.children ?? []).map((child) => ({ ...child, parentId: node.parentId }))
+    found.siblings.splice(found.siblings.indexOf(found.node), 1, ...children)
+  }
+  forgetViewed([node.id])
+  invalidateTree(bookId)
+  try { await refresh(bookId); return true }
+  catch { return false }
+}
+
 export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 'move' | 'trash', target?: { bookId: number; parentId: number | null }) {
   let result: { ids: number[] }
   try {
@@ -205,11 +224,11 @@ export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 
   catch { return { ...result, refreshed: false } }
 }
 
-export async function createBook(name: string, groupId = ''): Promise<Book> {
+export async function createBook(name: string, groupId = '') {
   const book = await api<Book>('books', { method: 'POST', json: { name, groupId } })
   // Creation is already committed. A refresh failure must not invite a duplicate creation.
-  await loadBooks(true).catch(() => { state.booksLoaded = false })
-  return book
+  const refreshed = await loadBooks(true).then(() => true, () => { state.booksLoaded = false; return false })
+  return { book, refreshed }
 }
 
 export async function updateBook(id: number, patch: { name?: string; description?: string }) {

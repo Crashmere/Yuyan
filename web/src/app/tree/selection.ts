@@ -39,11 +39,16 @@ export function useTreeSelection(nodes: () => TreeNode[], isOpen: (id: number) =
     else for (const n of all.value) selected.add(n.id)
     anchor = null
   }
+  function setItems(items: TreeNode[], checked: boolean, replace = false) {
+    if (replace) selected.clear()
+    for (const item of items) setSubtree(item, checked)
+    reconcileParents()
+  }
   function exit() { active.value = false; selected.clear(); anchor = null }
   watch(nodes, () => {
     const alive = new Set(all.value.map((n) => n.id))
     for (const id of selected) if (!alive.has(id)) selected.delete(id)
     reconcileParents()
   })
-  return { active, selected, selectedNodes, roots, allState, state, toggle, selectAll, exit }
+  return { active, selected, selectedNodes, roots, allState, state, toggle, selectAll, setItems, exit }
 }

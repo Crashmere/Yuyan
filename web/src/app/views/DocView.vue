@@ -49,6 +49,7 @@ useModeShortcut('e', '连按两次 E 键进入编辑模式', (e) => {
 // Search results open documents with ?hl=<query>, which is highlighted in the content.
 const highlight = computed(() => (typeof route.query.hl === 'string' ? route.query.hl : ''))
 const node = computed(() => locate(state.bookId, id)?.node)
+const children = computed(() => node.value ? node.value.children ?? [] : view.value?.children ?? [])
 const menu = computed(() => (view.value && node.value ? nodeMenu(view.value.doc.bookId, node.value, { history: true }) : []))
 const title = computed(() => node.value?.title ?? view.value?.doc.title ?? '')
 // A new document holds one empty paragraph; treat anything without text or visible blocks as empty.
@@ -110,8 +111,8 @@ onMounted(async () => {
         <span v-if="view.doc.kind === 'doc'">{{ view.chars.toLocaleString() }} 字</span>
       </div>
       <template v-if="view.doc.kind === 'group'">
-        <ul v-if="view.children.length" class="yy-child-list">
-          <li v-for="c in view.children" :key="c.id">
+        <ul v-if="children.length" class="yy-child-list">
+          <li v-for="c in children" :key="c.id">
             <RouterLink :to="`/docs/${c.id}`"><component :is="c.kind === 'group' ? Folder : FileText" :size="16" />{{ titleOf(c) }}</RouterLink>
           </li>
         </ul>

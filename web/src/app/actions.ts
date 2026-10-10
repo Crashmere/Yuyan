@@ -1,5 +1,5 @@
 import { shallowRef } from 'vue'
-import { ArrowDown, ArrowUp, BookPlus, ClipboardCopy, Download, FilePlus, FolderInput, FolderPlus, History, PencilLine, SquarePen, Trash2, PanelsTopLeft } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, BookPlus, ClipboardCopy, Download, FilePlus, FolderInput, FolderOutput, FolderPlus, History, PencilLine, SquarePen, Trash2, PanelsTopLeft } from 'lucide-vue-next'
 import { api, base, errorMessage, type Book, type BookGroup, type TreeNode, type Doc } from '../shared/api'
 import { chooseTemplate, saveTemplate } from '../shared/templates'
 import { copyText } from '../shared/clipboard'
@@ -101,6 +101,17 @@ export function copyDocLink(id: number) {
   }, '复制失败')
 }
 
+export function dissolveGroup(bookId: number, node: TreeNode) {
+  return attempt(async () => {
+    if (node.kind !== 'group') return
+    if (!await confirm({ title: `解散分组“${node.title}”？`, message: '组内文档和子分组会按原顺序移到该分组所在的位置，内部层级保留。只有这个分组移入回收站。', confirmText: '解散分组' })) return
+    const route = router.currentRoute.value
+    const refreshed = await store.dissolveGroup(bookId, node)
+    toast(`分组已解散，内容已移到同级${refreshed ? '' : '，请刷新页面以更新目录'}`, 'success')
+    if (store.state.docId === node.id && router.currentRoute.value === route) await router.replace(node.parentId ? `/docs/${node.parentId}` : `/books/${bookId}`)
+  }, '解散分组失败')
+}
+
 export interface MoveRequest {
   bookId: number
   node: TreeNode
@@ -111,6 +122,7 @@ export interface MoveRequest {
 }
 
 export const moveRequest = shallowRef<MoveRequest | null>(null)
+export const receiveDocsRequest = shallowRef<Book | null>(null)
 
 export function moveDocTo(bookId: number, node: TreeNode) {
   return attempt(async () => {
@@ -170,17 +182,20 @@ export function nodeMenu(bookId: number, node: TreeNode, options: { rename?: () 
     ...(options.history && node.kind === 'doc' ? [{ label: '历史版本', icon: History, run: () => void router.push(`/docs/${node.id}/history`) }] : []),
     { label: '导出', icon: Download, description: node.children?.length ? '含子文档' : undefined, run: () => exportDoc(bookId, node) },
     null,
+    ...(node.kind === 'group' ? [{ label: '解散分组', icon: FolderOutput, run: () => dissolveGroup(bookId, node) }] : []),
     { label: '删除', icon: Trash2, danger: true, run: () => deleteDoc(bookId, node) },
   ]
 }
 
 export function newBook(groupId = '') {
   return attempt(async () => {
+    const route = router.currentRoute.value
     const group = store.state.bookGroups.groups.find((g) => g.id === groupId)
     const name = await prompt({ title: '新建知识库', label: group ? `创建到“${group.name}”` : undefined, placeholder: '知识库名称', confirmText: '新建' })
     if (!name) return
-    const book = await store.createBook(name, groupId)
-    await router.push(`/books/${book.id}`)
+    const { book, refreshed } = await store.createBook(name, groupId)
+    toast(`知识库已创建${refreshed ? '' : '，请刷新页面以更新列表'}`, 'success')
+    if (route.path !== '/' && router.currentRoute.value === route) await router.push(`/books/${book.id}`)
   }, '新建知识库失败')
 }
 
@@ -215,11 +230,12 @@ export function copyBookLink(id: number) {
   }, '复制失败')
 }
 
-export function bookMenu(book: Book): MenuEntry[] {
+export function bookMenu(book: Book, options: { receive?: boolean } = {}): MenuEntry[] {
   return [
     { label: '新建文档', icon: FilePlus, run: () => newDoc(book.id, null) },
     { label: '从模板新建', icon: PanelsTopLeft, run: () => newFromTemplate(book.id, null) },
     { label: '新建目录分组', icon: FolderPlus, run: () => newGroup(book.id, null) },
+    ...(options.receive ? [{ label: '从其他知识库移入', icon: FolderInput, run: () => { receiveDocsRequest.value = book } }] : []),
     null,
     { label: '重命名', icon: PencilLine, run: () => renameBook(book) },
     { label: '编辑简介', icon: SquarePen, run: () => editBookDescription(book) },
