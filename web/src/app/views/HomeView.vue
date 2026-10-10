@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { BookOpen, ChevronRight, Ellipsis, FileText, FolderInput, FolderPlus, GripVertical, Plus } from 'lucide-vue-next'
 import { api, errorMessage, type DocSummary } from '../../shared/api'
@@ -9,6 +9,7 @@ import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
 import { closedBookGroups, toggleBookGroup } from '../bookGroups'
 import { bookColor } from '../bookColor'
+import { createBookDragMotion } from '../bookDragMotion'
 import { recentlyViewed } from '../prefs'
 import { setTitle } from '../router'
 import { bookSections, loadBooks, loading, saveBookGroups, setPage, state } from '../store'
@@ -31,8 +32,12 @@ const draggedGroupId = ref<string | null>(null)
 const groupOrderTarget = ref<string | null>(null)
 const groupOrderSide = ref<'before' | 'after'>('before')
 const settlingDrop = ref(false)
+const home = ref<HTMLElement | null>(null)
+const dragMotion = createBookDragMotion(() => home.value)
+onBeforeUnmount(() => dragMotion.dispose())
 
 function resetDrag() {
+  dragMotion.clearPreview()
   dragId.value = overId.value = null
   dragGroupId.value = overGroupId.value = null
   overEndGroupId.value = null
@@ -40,15 +45,18 @@ function resetDrag() {
 }
 
 function finishDrop() {
-  // Apply the drop in one paint, without enter effects or FLIP movement of the containing group.
+  const land = dragMotion.captureDrop(dragId.value)
+  // Commit immediately, then animate from the final layout without carrying the dropped card
+  // through its source group or the containing group's previous position.
   settlingDrop.value = true
   resetDrag()
-  void nextTick(() => { settlingDrop.value = false })
+  void nextTick(() => { land(); settlingDrop.value = false })
 }
 
 function startGroupDrag(event: DragEvent, groupId: string) {
   if (!groupId) { event.preventDefault(); return }
   resetDrag()
+  dragMotion.dispose()
   draggedGroupId.value = groupId
   if (event.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move'
@@ -58,6 +66,7 @@ function startGroupDrag(event: DragEvent, groupId: string) {
 
 function startDrag(event: DragEvent, bookId: number, groupId: string) {
   resetDrag()
+  dragMotion.start(event)
   dragId.value = bookId
   dragGroupId.value = groupId
   if (event.dataTransfer) {
@@ -162,7 +171,7 @@ async function dropInGroup(groupId: string) {
 </script>
 
 <template>
-  <main class="yy-page yy-home" :class="{ 'settling-drop': settlingDrop }">
+  <main ref="home" class="yy-page yy-home" :class="{ 'settling-drop': settlingDrop }">
     <section>
       <div class="yy-section-bar">
         <h2>知识库</h2>
@@ -184,7 +193,7 @@ async function dropInGroup(groupId: string) {
           <div class="yy-book-group-content" :class="{ collapsed: state.bookGroups.groups.length > 0 && closedBookGroups.has(group.id) }" :inert="state.bookGroups.groups.length > 0 && closedBookGroups.has(group.id)">
             <div class="yy-book-group-clip">
               <TransitionGroup tag="div" name="yy-book-list" class="yy-book-grid" :css="!settlingDrop">
-                <div v-for="b in group.books" :key="b.id" class="yy-book-card" :class="{ dragging: dragId === b.id, over: overId === b.id && dragId !== b.id, 'drop-before': overId === b.id && dragId !== b.id && bookOrderSide === 'before', 'drop-after': overId === b.id && dragId !== b.id && bookOrderSide === 'after' }" :style="bookColor(b.id)" draggable="true"
+                <div v-for="b in group.books" :key="b.id" :data-book-id="b.id" class="yy-book-card" :class="{ dragging: dragId === b.id, over: overId === b.id && dragId !== b.id, 'drop-before': overId === b.id && dragId !== b.id && bookOrderSide === 'before', 'drop-after': overId === b.id && dragId !== b.id && bookOrderSide === 'after' }" :style="bookColor(b.id)" draggable="true"
                   @dragstart="startDrag($event, b.id, group.id)" @dragenter.stop="dragOver($event, group.id, b.id)" @dragover.stop="dragOver($event, group.id, b.id)" @drop.prevent.stop="dropOn($event, b.id, group.id)" @dragend="resetDrag">
                   <RouterLink :to="`/books/${b.id}`" class="yy-book-card-link" :aria-label="b.name" draggable="false" />
                   <span class="yy-book-icon"><BookOpen :size="18" /></span>
@@ -209,7 +218,7 @@ async function dropInGroup(groupId: string) {
       <p v-if="stats" class="yy-home-stats">共 {{ stats.chars.toLocaleString('zh-CN') }} 字</p>
     </section>
 
-    <section>
+    <section data-book-recent>
       <div class="yy-tabs" role="tablist">
         <button type="button" role="tab" :aria-selected="tab === 'viewed'" :class="{ active: tab === 'viewed' }" @click="tab = 'viewed'">最近浏览</button>
         <button type="button" role="tab" :aria-selected="tab === 'edited'" :class="{ active: tab === 'edited' }" @click="tab = 'edited'">最近编辑</button>
