@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { BookOpen, ChevronDown, Ellipsis, Plus } from 'lucide-vue-next'
 import { api, ApiError, errorMessage, type Book, type TreeNode } from '../../shared/api'
@@ -21,6 +21,12 @@ const fetched = ref<Book | null>(null)
 // The list in the store stays current after renames; the fetched copy covers the first paint.
 const book = computed(() => bookOf(id) ?? fetched.value)
 const tree = computed(() => state.trees[id])
+// The destination is already known from the route. Switch the sidebar and breadcrumb in the
+// same render as the cached book page, without waiting for its details request.
+setPage(id)
+setTitle(book.value?.name ?? '知识库')
+let disposed = false
+onBeforeUnmount(() => { disposed = true })
 
 function latest(nodes: TreeNode[]): string {
   return nodes.reduce((max, n) => {
@@ -31,13 +37,14 @@ function latest(nodes: TreeNode[]): string {
 }
 const updated = computed(() => (tree.value ? latest(tree.value) : ''))
 
-onMounted(async () => {
+async function load() {
   try {
-    fetched.value = await loading(api<Book>(`books/${id}`))
-    setPage(id)
-    setTitle(fetched.value.name)
-    await Promise.all([loadBooks(), loadTree(id)])
+    const [detail] = await Promise.all([api<Book>(`books/${id}`), loadBooks(), loadTree(id)])
+    if (disposed) return
+    fetched.value = detail
+    setTitle(book.value?.name ?? detail.name)
   } catch (e) {
+    if (disposed) return
     if (e instanceof ApiError && e.status === 404) {
       missing.value = true
       setPage(null)
@@ -46,7 +53,8 @@ onMounted(async () => {
       failure.value = errorMessage(e)
     }
   }
-})
+}
+onMounted(() => loading(load()))
 </script>
 
 <template>

@@ -50,6 +50,8 @@ const switcher = computed<MenuEntry[]>(() => {
 })
 
 onMounted(() => {
+  // The book page loads both panels together and handles failures, including a missing book.
+  if (route.name === 'book') return
   void loadBooks()
   void loadTree(props.bookId)
 })
