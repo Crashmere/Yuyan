@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Ellipsis, FileText, Folder, PencilLine, ScanText, TableOfContents } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Ellipsis, FileDiff, FileText, Folder, PencilLine, TableOfContents, X } from 'lucide-vue-next'
 import { api, ApiError, errorMessage, type DocView, type RecentChanges } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
@@ -143,6 +143,9 @@ onMounted(async () => {
 <template>
   <Teleport defer to="#yy-topbar-actions">
     <template v-if="view">
+      <IconButton v-if="view.doc.kind === 'doc'" label="最近修改" :active="prefs.recentChanges" :aria-pressed="prefs.recentChanges" @click="prefs.recentChanges = !prefs.recentChanges">
+        <FileDiff :size="18" />
+      </IconButton>
       <RouterLink v-if="view.doc.kind === 'doc'" :to="`/docs/${id}/edit`" class="yy-btn primary" @mouseenter="prefetchEditor" @focus="prefetchEditor">
         <PencilLine :size="15" />编辑
       </RouterLink>
@@ -161,27 +164,6 @@ onMounted(async () => {
       <div class="yy-doc-meta">
         <span>更新于 {{ formatTime(view.doc.updatedAt) }}</span>
         <span v-if="view.doc.kind === 'doc'">{{ view.chars.toLocaleString() }} 字</span>
-        <button v-if="view.doc.kind === 'doc'" type="button" class="yy-recent-toggle" :class="{ active: prefs.recentChanges }" :aria-pressed="prefs.recentChanges" data-tip="标记最近一次修改，保留正文原有格式" @click="prefs.recentChanges = !prefs.recentChanges">
-          <ScanText :size="14" />最近修改
-        </button>
-      </div>
-      <div v-if="view.doc.kind === 'doc' && prefs.recentChanges" class="yy-recent-toolbar" aria-label="最近修改">
-        <div class="yy-recent-status" role="status">
-          <span v-if="changesLoading">正在查找最近修改…</span>
-          <template v-else-if="changesError"><span>{{ changesError }}</span><button type="button" class="yy-link-btn" @click="loadChanges">重试</button></template>
-          <span v-else-if="changes && !changes.baseline">没有可比较的历史版本（历史保留 30 天）</span>
-          <template v-else-if="changes?.baseline">
-            <span class="yy-recent-legend" aria-hidden="true"></span>
-            <span>{{ changeCount ? `${changeCount} 处修改 · 紫色双线与边标` : '当前正文没有可标记的修改' }}</span>
-            <RouterLink :to="`/versions/${changes.baseline.id}?compare=current`" class="yy-link-btn">查看完整差异</RouterLink>
-          </template>
-        </div>
-        <div v-if="changeCount" class="yy-recent-navigation">
-          <IconButton label="上一处修改" small @click="nextChange(-1)"><ArrowLeft :size="15" /></IconButton>
-          <span>{{ changeAt || '—' }} / {{ changeCount }}</span>
-          <IconButton label="下一处修改" small @click="nextChange(1)"><ArrowRight :size="15" /></IconButton>
-        </div>
-        <p v-if="!changesLoading && !changesError && changes?.summary" class="yy-recent-summary">{{ changeCount ? '删除内容可在完整差异中查看。' : changes.summary.labels.join(' · ') }}</p>
       </div>
       <template v-if="view.doc.kind === 'group'">
         <ul v-if="children.length" class="yy-child-list">
@@ -207,6 +189,23 @@ onMounted(async () => {
           <span class="yy-pager-label">下一篇<ArrowRight :size="14" /></span><span class="yy-pager-title">{{ titleOf(view.next) }}</span>
         </RouterLink>
       </nav>
+      <div v-if="view.doc.kind === 'doc' && prefs.recentChanges" class="yy-recent-dock">
+        <div class="yy-recent-bar" role="status" aria-label="最近修改">
+          <span class="yy-recent-swatch" aria-hidden="true"></span>
+          <span v-if="changesLoading">正在查找最近修改…</span>
+          <template v-else-if="changesError"><span>{{ changesError }}</span><button type="button" class="yy-link-btn" @click="loadChanges">重试</button></template>
+          <span v-else-if="changes && !changes.baseline">没有可比较的历史版本（历史保留 30 天）</span>
+          <span v-else-if="changes?.baseline && !changeCount">没有可标记的修改<template v-if="changes.summary?.labels.length"> · {{ changes.summary.labels.join(' · ') }}</template></span>
+          <template v-else-if="changeCount">
+            <span class="yy-recent-count">{{ changeAt ? `${changeAt} / ${changeCount}` : `${changeCount} 处修改` }}</span>
+            <IconButton label="上一处修改" small @click="nextChange(-1)"><ChevronUp :size="16" /></IconButton>
+            <IconButton label="下一处修改" small @click="nextChange(1)"><ChevronDown :size="16" /></IconButton>
+          </template>
+          <RouterLink v-if="changes?.baseline" :to="`/versions/${changes.baseline.id}?compare=current`" class="yy-link-btn" data-tip="与修改前的版本逐行对比，含删除的内容">完整差异</RouterLink>
+          <span class="yy-recent-sep" aria-hidden="true"></span>
+          <IconButton label="关闭最近修改" small @click="prefs.recentChanges = false"><X :size="15" /></IconButton>
+        </div>
+      </div>
     </article>
     <aside v-if="view.toc.length" class="yy-doc-aside" :class="{ 'is-peek': !prefs.readingOutline }">
       <Toc :items="view.toc" @navigate="tocOpen = false" />

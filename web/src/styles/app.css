@@ -1754,14 +1754,14 @@ a.yy-catalog-title:hover {
   font-size: 13px;
 }
 
-.yy-recent-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border: 1px solid var(--yy-border); border-radius: 6px; background: transparent; color: var(--yy-text-2); font: inherit; cursor: pointer; }
-.yy-recent-toggle:hover, .yy-recent-toggle.active { color: light-dark(#8034cb, #c59aff); border-color: light-dark(#c49de9, #765398); background: light-dark(#f8f2ff, #2b2038); }
-.yy-recent-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; position: sticky; top: 64px; z-index: 6; margin: -8px 0 24px; padding: 10px 12px; border: 1px solid light-dark(#dfc9f2, #62467e); border-radius: 8px; background: var(--yy-bg); box-shadow: 0 3px 12px #00000008; color: var(--yy-text-2); font-size: 12px; }
-.yy-recent-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; flex: 1; min-width: 180px; }
-.yy-recent-legend { width: 18px; height: 5px; border-block: 2px solid light-dark(#8b3fe0, #c59aff); }
-.yy-recent-navigation { display: flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
-.yy-recent-summary { margin: 0; width: 100%; color: var(--yy-text-3); line-height: 1.6; }
-@media print { .yy-recent-toggle, .yy-recent-toolbar { display: none; } }
+/* Stays at the bottom of the viewport while reading, and rests after the pager at the end. */
+.yy-recent-dock { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 15; display: flex; justify-content: center; margin-top: 28px; pointer-events: none; }
+.yy-recent-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; max-width: 100%; padding: 4px 6px 4px 12px; border: 1px solid var(--yy-border); border-radius: 999px; background: var(--yy-bg-elevated); box-shadow: var(--yy-shadow-popover); color: var(--yy-text-2); font-size: 13px; line-height: 20px; pointer-events: auto; }
+.yy-recent-swatch { width: 14px; height: 14px; margin-right: 2px; border: 1px dashed light-dark(#b593e6, #7d62ad); border-radius: 4px; background: light-dark(#f2eafd, #2e2444); }
+.yy-recent-count { min-width: 4.5em; color: var(--yy-text); font-variant-numeric: tabular-nums; }
+.yy-recent-bar .yy-link-btn { padding: 0 6px; }
+.yy-recent-sep { width: 1px; height: 16px; background: var(--yy-border); }
+@media print { .yy-recent-dock { display: none; } }
 
 .yy-child-list {
   list-style: none;
