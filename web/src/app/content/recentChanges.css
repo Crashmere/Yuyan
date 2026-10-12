@@ -1,0 +1,9 @@
+/* A separate, non-interactive layer: no background, color, font, border or
+   decoration on the document itself is replaced. No motion or flashing. */
+.yy-recent-layer { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; --recent-ink: light-dark(#8b3fe0, #c59aff); }
+.yy-recent-layer i { position: absolute; display: block; box-sizing: border-box; }
+.yy-recent-line { border-top: 2px solid var(--recent-ink); border-bottom: 1px solid var(--recent-ink); filter: drop-shadow(0 1px 2px light-dark(#a970ef60, #b27fff70)); }
+.yy-recent-rail { border-radius: 3px; background: var(--recent-ink); box-shadow: 0 0 0 2px light-dark(#a970ef18, #b27fff20); }
+.yy-recent-rail.is-current { box-shadow: 0 0 0 3px light-dark(#a970ef40, #b27fff50); }
+.yy-recent-frame { border: 1px dashed var(--recent-ink); border-radius: 4px; }
+@media print { .yy-recent-layer { display: none; } }

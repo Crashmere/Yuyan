@@ -11,6 +11,44 @@ import (
 
 var ErrVersionNotFound = fmt.Errorf("%w: 历史版本已过期或不存在", ErrNotFound)
 
+// RecentChangeBase finds the start of the latest editing/restoring session. Autosave
+// checkpoints inside that session must not hide its earlier edits. Older clients
+// without session boundaries fall back to the newest different snapshot.
+func (s *Store) RecentChangeBase(ctx context.Context, d Doc) (*Version, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, doc_id, revision, title, reason, created_at, content
+FROM doc_versions WHERE doc_id = ? AND revision <= ? ORDER BY id DESC`, d.ID, d.Revision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var fallback *Version
+	for rows.Next() {
+		var v Version
+		var content string
+		if err := rows.Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt, &content); err != nil {
+			return nil, err
+		}
+		v.Content, err = doc.Parse([]byte(content))
+		if err != nil {
+			return nil, err
+		}
+		if v.Reason == "before-edit" || v.Reason == "before-restore" {
+			return &v, nil
+		}
+		same := v.Title == d.Title && doc.SameContent(v.Content, d.Content)
+		if !same {
+			if fallback == nil {
+				copy := v
+				fallback = &copy
+			}
+			if v.Reason != "autosave" {
+				return &v, nil
+			}
+		}
+	}
+	return fallback, rows.Err()
+}
+
 type Version struct {
 	ID        int64    `json:"id"`
 	DocID     int64    `json:"docId"`

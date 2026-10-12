@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Ellipsis, FileText, Folder, PencilLine, TableOfContents } from 'lucide-vue-next'
-import { api, ApiError, errorMessage, type DocView } from '../../shared/api'
+import { ArrowLeft, ArrowRight, Ellipsis, FileText, Folder, PencilLine, ScanText, TableOfContents } from 'lucide-vue-next'
+import { api, ApiError, errorMessage, type DocView, type RecentChanges } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
 import { toast } from '../../ui/toast'
@@ -26,6 +26,58 @@ const view = ref<DocView | null>(null)
 const missing = ref(false)
 const failure = ref('')
 const tocOpen = ref(false)
+const content = ref<InstanceType<typeof DocContent> | null>(null)
+const titleElement = ref<HTMLElement | null>(null)
+const changes = ref<RecentChanges | null>(null)
+const changesLoading = ref(false)
+const changesError = ref('')
+const changeCount = ref(0)
+const changeAt = ref(0)
+let markers: ReturnType<typeof import('../content/recentChanges').showRecentChanges> | undefined
+let changeRequest = 0, markerRequest = 0
+
+function clearMarkers() {
+  markerRequest++
+  markers?.destroy(); markers = undefined
+  changeCount.value = 0; changeAt.value = 0
+}
+
+async function markChanges() {
+  clearMarkers()
+  if (!prefs.recentChanges || !changes.value?.baseline || !view.value) return
+  const request = markerRequest
+  const { showRecentChanges } = await import('../content/recentChanges')
+  await nextTick()
+  if (disposed || request !== markerRequest || !titleElement.value) return
+  const source = content.value?.source()
+  markers = showRecentChanges({
+    root: source?.root ?? titleElement.value.closest<HTMLElement>('.yy-article')!, elements: source?.elements ?? [],
+    html: view.value.html, beforeHTML: changes.value.baseline.html,
+    title: titleElement.value, titleText: title.value, beforeTitle: changes.value.baseline.title,
+  })
+  changeCount.value = markers.count
+}
+
+async function loadChanges() {
+  const request = ++changeRequest
+  clearMarkers(); changes.value = null; changesError.value = ''; changesLoading.value = false
+  if (!prefs.recentChanges || view.value?.doc.kind !== 'doc') return
+  changesLoading.value = true
+  try {
+    const result = await api<RecentChanges>(`docs/${id}/recent-changes?revision=${view.value.doc.revision}`)
+    if (disposed || request !== changeRequest) return
+    changes.value = result
+    await markChanges()
+  } catch (e) {
+    if (!disposed && request === changeRequest) { clearMarkers(); changesError.value = errorMessage(e) }
+  } finally {
+    if (!disposed && request === changeRequest) changesLoading.value = false
+  }
+}
+function contentReady() { void markChanges().catch(e => { changesError.value = errorMessage(e) }) }
+function nextChange(direction: number) { changeAt.value = markers?.go(direction) ?? 0 }
+watch(() => [prefs.recentChanges, view.value], () => { void loadChanges() })
+onBeforeUnmount(() => { changeRequest++; clearMarkers() })
 let disposed = false
 onBeforeUnmount(() => { disposed = true })
 // Up to this width (the breakpoint in app.css) the outline is a drawer opened from the top bar;
@@ -105,10 +157,31 @@ onMounted(async () => {
   <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
   <main v-else-if="view" class="yy-doc-page" :class="{ 'has-toc': view.toc.length > 0, 'toc-open': tocOpen }">
     <article class="yy-article">
-      <h1 class="yy-doc-title">{{ title }}</h1>
+      <h1 ref="titleElement" class="yy-doc-title">{{ title }}</h1>
       <div class="yy-doc-meta">
         <span>更新于 {{ formatTime(view.doc.updatedAt) }}</span>
         <span v-if="view.doc.kind === 'doc'">{{ view.chars.toLocaleString() }} 字</span>
+        <button v-if="view.doc.kind === 'doc'" type="button" class="yy-recent-toggle" :class="{ active: prefs.recentChanges }" :aria-pressed="prefs.recentChanges" data-tip="标记最近一次修改，保留正文原有格式" @click="prefs.recentChanges = !prefs.recentChanges">
+          <ScanText :size="14" />最近修改
+        </button>
+      </div>
+      <div v-if="view.doc.kind === 'doc' && prefs.recentChanges" class="yy-recent-toolbar" aria-label="最近修改">
+        <div class="yy-recent-status" role="status">
+          <span v-if="changesLoading">正在查找最近修改…</span>
+          <template v-else-if="changesError"><span>{{ changesError }}</span><button type="button" class="yy-link-btn" @click="loadChanges">重试</button></template>
+          <span v-else-if="changes && !changes.baseline">没有可比较的历史版本（历史保留 30 天）</span>
+          <template v-else-if="changes?.baseline">
+            <span class="yy-recent-legend" aria-hidden="true"></span>
+            <span>{{ changeCount ? `${changeCount} 处修改 · 紫色双线与边标` : '当前正文没有可标记的修改' }}</span>
+            <RouterLink :to="`/versions/${changes.baseline.id}?compare=current`" class="yy-link-btn">查看完整差异</RouterLink>
+          </template>
+        </div>
+        <div v-if="changeCount" class="yy-recent-navigation">
+          <IconButton label="上一处修改" small @click="nextChange(-1)"><ArrowLeft :size="15" /></IconButton>
+          <span>{{ changeAt || '—' }} / {{ changeCount }}</span>
+          <IconButton label="下一处修改" small @click="nextChange(1)"><ArrowRight :size="15" /></IconButton>
+        </div>
+        <p v-if="!changesLoading && !changesError && changes?.summary" class="yy-recent-summary">{{ changeCount ? '删除内容可在完整差异中查看。' : changes.summary.labels.join(' · ') }}</p>
       </div>
       <template v-if="view.doc.kind === 'group'">
         <ul v-if="children.length" class="yy-child-list">
@@ -124,7 +197,7 @@ onMounted(async () => {
       <div v-else-if="empty" class="yy-empty-inline">
         这篇文档还是空的。<RouterLink :to="`/docs/${id}/edit`" class="yy-link-btn">开始写作</RouterLink>
       </div>
-      <DocContent v-else :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" :highlight="highlight" :fold-key="String(view.doc.id)" :reading-position="readingPosition" />
+      <DocContent v-else ref="content" :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" :highlight="highlight" :fold-key="String(view.doc.id)" :reading-position="readingPosition" @ready="contentReady" />
       <Backlinks v-if="view.doc.kind === 'doc'" :doc-id="id" />
       <nav v-if="view.prev || view.next" class="yy-pager">
         <RouterLink v-if="view.prev" :to="`/docs/${view.prev.id}`" class="prev">

@@ -79,6 +79,12 @@ export interface ChangeSummary {
   sections: string[]
 }
 
+export interface RecentChanges {
+  revision: number
+  baseline: { id: number; revision: number; title: string; html: string } | null
+  summary?: ChangeSummary
+}
+
 export interface VersionMeta {
   id: number
   docId: number

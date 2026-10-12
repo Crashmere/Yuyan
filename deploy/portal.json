@@ -74,6 +74,11 @@
   "apis": [
     {
       "method": "GET",
+      "path": "/api/docs/{id}/recent-changes",
+      "description": "阅读模式最近修改基线与摘要；可用 revision 校验当前内容，只读且沿用历史保留期限"
+    },
+    {
+      "method": "GET",
       "path": "/healthz",
       "description": "健康状态"
     },

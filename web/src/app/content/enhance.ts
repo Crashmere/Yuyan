@@ -235,6 +235,8 @@ async function renderDiagrams(root: HTMLElement) {
       const box = document.createElement('div')
       box.className = 'yy-mermaid'
       box.innerHTML = await renderMermaid(code.textContent ?? '')
+      // Keep reading-only annotations attached when the source becomes a diagram.
+      pre.dispatchEvent(new CustomEvent('yy-content-replaced', { bubbles: true, detail: box }))
       pre.replaceWith(box)
     } catch (e) {
       const notice = document.createElement('p')

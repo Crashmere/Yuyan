@@ -12,6 +12,7 @@ interface Prefs {
   // buttons); unpinned, they show as lines that open on hover.
   editorOutline: boolean
   readingOutline: boolean
+  recentChanges: boolean
   // Editing without the sidebar.
   focusMode: boolean
 }
@@ -40,6 +41,7 @@ export const prefs = reactive<Prefs>({
   sidebarCollapsed: false,
   editorOutline: true,
   readingOutline: true,
+  recentChanges: false,
   focusMode: false,
   ...load(),
 })

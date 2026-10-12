@@ -22,6 +22,9 @@ const attachment = ref<PreviewAttachment | null>(null)
 const props = defineProps<{ html: string; math?: boolean; mermaid?: boolean; images?: ImageSizes; highlight?: string; foldKey?: string; readingPosition?: ReadingPosition }>()
 const router = useRouter()
 const root = ref<HTMLElement | null>(null)
+const emit = defineEmits<{ ready: [] }>()
+let sourceElements: Element[] = []
+defineExpose({ source: () => ({ root: root.value, elements: sourceElements }) })
 // Diagrams are drawn in the theme's colours; a theme change re-creates the content to redraw them.
 const generation = ref(0)
 let drawn: Promise<unknown> = Promise.resolve()
@@ -33,6 +36,7 @@ async function run() {
   initialPosition = undefined // Only on entry, not a later theme change or content redraw.
   await nextTick()
   if (!root.value) return
+  sourceElements = [...root.value.querySelectorAll('*')]
   prepareAttachmentCards(root.value)
   previewCleanup()
   previewCleanup = setupLinkPreviews(root.value)
@@ -40,6 +44,8 @@ async function run() {
   setupFolds(root.value, props.foldKey)
   if (location.hash) scrollTo(decodeURIComponent(location.hash.slice(1)))
   await mark()
+  await drawn
+  emit('ready')
   if (position) {
     await drawn
     if (root.value?.isConnected) restoreReadingPosition(root.value, position)
@@ -119,10 +125,15 @@ function onClick(e: MouseEvent) {
     void router.push(href.slice(base.length - 1))
   }
 }
+
+function onReplace(e: Event) {
+  const i = sourceElements.indexOf(e.target as Element)
+  if (i >= 0) sourceElements[i] = (e as CustomEvent<Element>).detail
+}
 </script>
 
 <template>
-  <div :key="generation" ref="root" class="yy-content" @click="onClick" v-html="html"></div>
+  <div :key="generation" ref="root" class="yy-content" @click="onClick" @yy-content-replaced="onReplace" v-html="html"></div>
   <Lightbox v-model:index="shown" :images="images" />
   <AttachmentPreviewDialog v-if="attachment" :attachment="attachment" @close="attachment = null" />
 </template>
