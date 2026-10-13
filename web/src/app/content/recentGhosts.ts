@@ -279,13 +279,17 @@ function build(ghost: Ghost): HTMLElement[] {
   return [box]
 }
 
+// What the page adds after a block, a long code block's expand button or a diagram's error, stays with it.
+const trailing = '.yy-code-fold, .yy-mermaid-error'
+const end = (el: Element) => { while (el.nextElementSibling?.matches(trailing)) el = el.nextElementSibling; return el }
+
 // prepare draws formulas, diagrams, tables and attachment cards in a copy, as on the page.
 export function showGhosts(ghosts: Ghost[], root: HTMLElement, prepare?: (node: HTMLElement) => void) {
   const tails = new Map<Element, Element>()
   for (const ghost of ghosts) {
     try { ghost.nodes = build(ghost) } catch (e) { console.warn('recent changes', e); continue }
     if (!ghost.after) ghost.anchor.before(...ghost.nodes)
-    else { (tails.get(ghost.anchor) ?? ghost.anchor).after(...ghost.nodes); tails.set(ghost.anchor, ghost.nodes[ghost.nodes.length - 1]) }
+    else { (tails.get(ghost.anchor) ?? end(ghost.anchor)).after(...ghost.nodes); tails.set(ghost.anchor, ghost.nodes[ghost.nodes.length - 1]) }
   }
   refreshFolds(root)
   if (prepare) for (const node of ghosts.flatMap(g => g.nodes)) prepare(node)
