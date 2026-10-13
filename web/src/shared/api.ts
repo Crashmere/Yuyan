@@ -181,6 +181,12 @@ const preloaded: Record<string, { status: number; body: { error?: string; messag
   }
 })()
 
+// A successful preloaded response without using it up, for what is shown before the page asks.
+export function peekPreloaded<T>(path: string): T | undefined {
+  const p = preloaded[path]
+  return p && p.status < 400 ? (p.body as T) : undefined
+}
+
 export async function api<T>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
   if ((init.method ?? 'GET') === 'GET' && path in preloaded) {
     const { status, body } = preloaded[path]

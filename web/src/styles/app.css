@@ -2316,6 +2316,51 @@ a.yy-catalog-title:hover {
 .yy-edit-page {
   padding: 0;
 }
+/* Stands in for the editor while its code loads (editor.css comes with it), in the same layout. */
+.yy-edit-placeholder::before {
+  content: '';
+  display: block;
+  height: 44px;
+  border-bottom: 1px solid var(--yy-border);
+}
+.yy-edit-placeholder-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--yy-content-width)) minmax(252px, 1fr);
+  padding: 32px 24px 0 40px;
+}
+.yy-edit-placeholder-body > * {
+  grid-column: 2;
+}
+.yy-edit-placeholder h1 {
+  margin: 0 0 16px;
+  color: var(--yy-text);
+  font: 700 30px/1.35 var(--yy-font);
+  overflow-wrap: anywhere;
+}
+.yy-edit-placeholder-line {
+  height: 14px;
+  margin: 10px 0 18px;
+  border-radius: 4px;
+  background: var(--yy-bg-muted);
+}
+.yy-edit-placeholder-line:last-child {
+  width: 60%;
+}
+@media (max-width: 1180px) {
+  .yy-edit-placeholder-body {
+    grid-template-columns: minmax(0, var(--yy-content-width));
+    justify-content: center;
+    padding: 32px 40px 0;
+  }
+  .yy-edit-placeholder-body > * {
+    grid-column: auto;
+  }
+}
+@media (max-width: 640px) {
+  .yy-edit-placeholder-body {
+    padding: 16px 16px 0;
+  }
+}
 .yy-save-status {
   display: inline-flex;
   align-items: center;

@@ -1,3 +1,4 @@
+import { shallowRef } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { base } from '../shared/api'
 import { isModuleLoadError, moduleLoadFailed, moduleReloadURL } from '../shared/moduleLoad'
@@ -38,15 +39,21 @@ export const router = createRouter({
   scrollBehavior: (to, _from, saved) => to.meta.readingPosition ? false : saved ?? (to.hash ? false : { top: 0 }),
 })
 
+// The edit page whose code is loading or failed to load. A page opened directly has nothing else
+// to show meanwhile, so the layout puts a placeholder in its place.
+export const editLoading = shallowRef<{ id: number; failed: boolean } | null>(null)
+
 // The progress bar also covers loading a page's code, such as the editor on first use.
 router.beforeEach((to, from) => {
   state.navigating = true
+  editLoading.value = to.name === 'edit' ? { id: Number(to.params.id), failed: false } : null
   if (from.name === 'doc' && to.name === 'edit' && from.params.id === to.params.id) {
     to.meta.readingPosition = captureReadingPosition()
   }
 })
 router.afterEach((_to, _from, failure) => {
   state.navigating = false
+  editLoading.value = null
   if (!failure) moduleReloadURL.value = null
 })
 
@@ -56,6 +63,9 @@ router.onError((error: Error, to) => {
   if (isModuleLoadError(error)) {
     moduleReloadURL.value = router.resolve(to).href
     moduleLoadFailed.value = true
+    if (editLoading.value) editLoading.value = { ...editLoading.value, failed: true }
+  } else {
+    editLoading.value = null
   }
 })
 

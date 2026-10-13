@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isNavigationFailure, NavigationFailureType, RouterView, useRoute, useRouter } from 'vue-router'
+import { peekPreloaded, type Doc } from '../../shared/api'
+import { editLoading } from '../router'
 import { prefs } from '../prefs'
 import { pageShortcutAllowed } from '../pageShortcut'
 import { openSearch, searchLoaded } from '../search/panel'
@@ -11,6 +13,9 @@ import { openShortcuts, shortcutsLoaded, shortcutsOpen } from '../shortcuts/pane
 import Sidebar from './Sidebar.vue'
 import TopBar from './TopBar.vue'
 import ModuleLoadNotice from './ModuleLoadNotice.vue'
+
+// The title of a directly opened edit page, from the data the server sent with it.
+const placeholderTitle = computed(() => editLoading.value && peekPreloaded<Doc>(`docs/${editLoading.value.id}`)?.title)
 
 const SearchPanel = defineAsyncComponent(() => import('../search/SearchPanel.vue'))
 const ShortcutsDialog = defineAsyncComponent(() => import('../shortcuts/ShortcutsDialog.vue'))
@@ -90,7 +95,14 @@ function resize(e: PointerEvent) {
       <ModuleLoadNotice />
       <div v-if="state.loading > 0 || state.navigating" class="yy-progress"></div>
       <RouterView v-slot="{ Component, route: r }">
-        <component :is="Component" :key="r.path" />
+        <component :is="Component" v-if="Component" :key="r.path" />
+        <main v-else-if="editLoading" class="yy-edit-page yy-edit-placeholder" :aria-busy="!editLoading.failed">
+          <div class="yy-edit-placeholder-body">
+            <h1 v-if="placeholderTitle">{{ placeholderTitle }}</h1>
+            <p v-if="editLoading.failed" class="yy-page-error">编辑器没有加载成功。</p>
+            <template v-else><span v-for="n in 5" :key="n" class="yy-edit-placeholder-line"></span></template>
+          </div>
+        </main>
       </RouterView>
     </div>
     <SearchPanel v-if="searchLoaded" />

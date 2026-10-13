@@ -42,7 +42,8 @@ const menu: MenuEntry[] = [
   { label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(id) },
 ]
 
-onMounted(async () => {
+async function load() {
+  failure.value = ''
   try {
     const d = await loading(api<Doc>(`docs/${id}`))
     if (d.kind === 'group') {
@@ -58,7 +59,8 @@ onMounted(async () => {
     if (e instanceof ApiError && e.status === 404) missing.value = true
     else failure.value = errorMessage(e)
   }
-})
+}
+onMounted(load)
 
 onBeforeUnmount(() => {
   if (moduleReloadGuard.value === saveBeforeReload) moduleReloadGuard.value = null
@@ -123,7 +125,7 @@ onBeforeRouteLeave(async (to) => {
     </template>
   </Teleport>
   <main v-if="missing" class="yy-page"><NotFoundState /></main>
-  <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }}</p></main>
+  <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }} <button type="button" class="yy-link-btn" @click="load">重试</button></p></main>
   <main v-else-if="doc" class="yy-edit-page">
     <EditorPane ref="pane" :doc="doc" :reading-position="readingPosition" @status="onStatus" @words="(n) => (words = n)" @saved="onSaved" />
   </main>
