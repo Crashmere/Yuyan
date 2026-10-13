@@ -49,7 +49,7 @@ Excalidraw 方案已确认并实现（2026-10-07）。首版包含文档内编�
 
 预览导出显式使用 `exportScale: 1`，不继承 Excalidraw 按 `devicePixelRatio` 推导的默认倍率，保证 Retina 等高分屏上的 SVG 宽高与 viewBox 一致。SVG 用 XMLSerializer 序列化，避免 outerHTML 把不换行空格变成 XML 不支持的 `&nbsp;`；序列化前将引擎误带 SVG 命名空间的 frame `clip-path` 还原为普通呈现属性。独立 SVG 下载复用该序列化流程。修改导出时同时覆盖 1/2/3 倍像素密度，窄窗口本身不能代表高分屏。
 
-引擎/字体资源随 Go 程序发布，无服务器 Node/浏览器运行时，无默认字体 CDN。依赖覆盖固定在 `web/package.json`；2026-10-07 锁文件审计为 0 项告警。第三方许可随 `web/licenses/excalidraw/` 打包；字体版权以具体字体/上游声明为准，不把引擎 MIT 套到全部字体。
+引擎/字体资源随 Go 程序发布，无服务器 Node/浏览器运行时，无默认字体 CDN。依赖覆盖固定在 `web/package.json`；2026-10-07 锁文件审计为 0 项告警。引擎自带的“Mermaid 转画板”（`@excalidraw/mermaid-to-excalidraw` 2.2.2）经覆盖改用根依赖 `mermaid`，与阅读页共用同一组分块；它声明的范围是 ^11，升级 Mermaid 或画板引擎时重新核对转换结果。2026-10-13 合并前后结果一致：时序图和不含子图的流程图生成可编辑图形，含子图的流程图、类图、ER 图、状态图和饼图回退为单张图片。第三方许可随 `web/licenses/excalidraw/` 打包；字体版权以具体字体/上游声明为准，不把引擎 MIT 套到全部字体。
 
 ## API 与生命周期
 
