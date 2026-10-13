@@ -53,14 +53,17 @@ func (s *Store) DocBody(ctx context.Context, id int64) (string, doc.Node, error)
 	return version, n, err
 }
 
-// LinkingDocs reads the live documents whose stored body contains any of texts, most recently
-// updated first. Finish the single SQLite query before callers perform other store operations.
-func (s *Store) LinkingDocs(ctx context.Context, texts ...string) ([]Doc, error) {
-	match, args := make([]string, len(texts)), make([]any, len(texts))
-	for i, t := range texts {
-		match[i], args[i] = "instr(d.content, ?) > 0", t
+// LinkingDocs reads the live documents whose stored body contains prefix followed by any of
+// endings, most recently updated first. Most bodies lack the prefix, so testing it first scans
+// them once rather than once per ending. Finish the single SQLite query before callers perform
+// other store operations.
+func (s *Store) LinkingDocs(ctx context.Context, prefix string, endings ...string) ([]Doc, error) {
+	match, args := make([]string, len(endings)), []any{prefix}
+	for i, ending := range endings {
+		match[i] = "instr(d.content, ?) > 0"
+		args = append(args, prefix+ending)
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT d.id, d.book_id, b.name, d.title, d.content `+liveLinkDocs+` AND (`+strings.Join(match, " OR ")+`) ORDER BY d.updated_at DESC, d.id DESC`, args...)
+	rows, err := s.DB.QueryContext(ctx, `SELECT d.id, d.book_id, b.name, d.title, d.content `+liveLinkDocs+` AND instr(d.content, ?) > 0 AND (`+strings.Join(match, " OR ")+`) ORDER BY d.updated_at DESC, d.id DESC`, args...)
 	if err != nil {
 		return nil, err
 	}
