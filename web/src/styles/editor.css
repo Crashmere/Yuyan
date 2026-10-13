@@ -84,6 +84,20 @@
   max-width: var(--yy-content-width);
   margin: 16px auto 0;
 }
+.yy-conflict-dialog {
+  top: 6vh;
+  display: flex;
+  flex-direction: column;
+  width: min(960px, calc(100vw - 32px));
+  max-height: 88vh;
+}
+.yy-conflict-diff {
+  min-height: 0;
+  overflow: auto;
+}
+.yy-conflict-dialog .yy-dialog-actions {
+  flex-wrap: wrap;
+}
 
 /* As on reading pages (app.css), the outline sits at the right edge and its column stays reserved
    while it is unpinned, so the text is centred and does not move. */

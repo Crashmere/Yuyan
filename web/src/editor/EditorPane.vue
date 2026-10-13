@@ -26,6 +26,7 @@ import TableGrid from './TableGrid.vue'
 import ImageToolbar from './ImageToolbar.vue'
 import HighlightBlockToolbar from './HighlightBlockToolbar.vue'
 import ImageToolsDialog from './ImageToolsDialog.vue'
+import ConflictDiff from './ConflictDiff.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
 import { cancelSelection } from './cancelSelection'
@@ -69,6 +70,8 @@ const findOpen = ref(false)
 const find = ref<InstanceType<typeof FindReplace> | null>(null)
 const tableGrid = shallowRef<Anchor | null>(null)
 const imageEdit = ref<{ mode: ImageEditMode; positions: number[] } | null>(null)
+// This page's content as it was when the conflict comparison opened.
+const conflictMine = shallowRef<{ title: string; content: JSONContent } | null>(null)
 
 const ui: EditorUi = {
   openTemplates: () => { if (editor.value) void openTemplates(editor.value) },
@@ -292,8 +295,19 @@ function overwrite() {
 }
 
 function reloadLatest() {
+  discarded = true
   localStorage.removeItem(draftKey)
   window.location.reload()
+}
+
+function compareConflict() {
+  if (editor.value) conflictMine.value = { title: title.value, content: editor.value.getJSON() }
+}
+
+function overwriteCompared(comparedRevision: number) {
+  conflictMine.value = null
+  serverRevision.value = comparedRevision
+  overwrite()
 }
 
 function restoreDraft() {
@@ -330,6 +344,7 @@ function autosizeTitle() {
 }
 
 function beforeUnload(e: BeforeUnloadEvent) {
+  if (discarded) return
   const uploading = !!editor.value && pendingUploads(editor.value) > 0
   if (uploading || ['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
     writeDraft()
@@ -432,6 +447,7 @@ onBeforeUnmount(() => {
     </div>
     <div v-if="status === 'conflict'" class="yy-banner danger yy-editor-banner">
       这篇文档已在别的标签页或设备上修改，自动保存已暂停，你的内容仍在当前页面。
+      <button type="button" class="yy-btn small" @click="compareConflict">查看差异</button>
       <button type="button" class="yy-btn small" @click="reloadLatest">载入最新版本（放弃这里的修改）</button>
       <button type="button" class="yy-btn small" @click="overwrite">用这里的内容覆盖</button>
     </div>
@@ -459,6 +475,7 @@ onBeforeUnmount(() => {
     </Teleport>
 
     <FindReplace v-if="findOpen" ref="find" @close="findOpen = false" />
+    <ConflictDiff v-if="conflictMine" :doc-id="props.doc.id" :mine="conflictMine" @close="conflictMine = null" @reload="reloadLatest" @overwrite="overwriteCompared" />
     <BubbleToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
     <LinkCard :hidden="!!linkEdit || !!mathTarget" />
     <LinkPopover v-if="linkEdit" v-bind="linkEdit" @close="linkEdit = null" />
