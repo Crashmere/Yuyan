@@ -215,5 +215,10 @@ export class CodeEditor {
   destroy() { this.destroyed = true; clearTimeout(this.feedbackTimer); this.stopDrag?.(); this.observer.disconnect(); this.view.destroy(); delete (this.host as CodeHost).codeEditor }
 }
 
-export type CodeHost = HTMLElement & { codeEditor?: CodeEditor }
-export function codeEditorIn(dom: Element) { return (dom.querySelector('.yy-code-editor-host') as CodeHost | null)?.codeEditor }
+// Code blocks in the editor mount CodeMirror as they come near the window (CodeBlockView.vue);
+// asking for a block's editor mounts it at once.
+export type CodeHost = HTMLElement & { codeEditor?: CodeEditor; mountCode?: () => CodeEditor | undefined }
+export function codeEditorIn(dom: Element) {
+  const host = dom.querySelector('.yy-code-editor-host') as CodeHost | null
+  return host?.codeEditor ?? host?.mountCode?.()
+}

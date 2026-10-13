@@ -822,7 +822,8 @@ body.yy-row-dragging * {
   gap: 8px;
 }
 .yy-codeblock-bar .yy-lang-trigger { margin-right: auto; }
-.yy-codeblock:not(.has-title) .cm-content { padding-top: 38px; }
+.yy-codeblock:not(.has-title) .cm-content,
+.yy-codeblock:not(.has-title) .yy-code-static > * { padding-top: 38px; }
 .yy-lang-trigger,
 .yy-codeblock-btn,
 .yy-callout-trigger {
@@ -862,6 +863,7 @@ body.yy-row-dragging * {
   position: relative;
 }
 .yy-codeblock-body > .yy-code-editor-host {
+  min-height: var(--yy-code-held, auto);
   border: 1px solid var(--yy-codeblock-border);
   border-radius: var(--yy-radius-lg);
   overflow: hidden;

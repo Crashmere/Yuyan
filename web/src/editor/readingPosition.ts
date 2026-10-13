@@ -43,9 +43,16 @@ export function restoreReadingPosition(editor: Editor, position: ReadingPosition
   const visible = block.getBoundingClientRect()
   const code = editor.state.doc.nodeAt(pos)?.type.name === 'codeBlock' ? codeEditorIn(block) : undefined
   if (code) {
-    const at = code.view.posAtCoords({ x: code.view.contentDOM.getBoundingClientRect().left + 8, y: Math.max(top, visible.top) + 8 }, false) ?? 0
-    editor.view.dispatch(editor.state.tr.setSelection(Selection.near(editor.state.doc.resolve(pos + 1 + at))))
-    code.setSelection(at, at, true)
+    // CodeMirror may have mounted just now; read the line once it has laid out the visible part.
+    const y = Math.max(top, visible.top) + 8, start = pos
+    code.view.requestMeasure({
+      read: view => view.posAtCoords({ x: view.contentDOM.getBoundingClientRect().left + 8, y }, false),
+      write: at => {
+        if (editor.isDestroyed || editor.state.doc.nodeAt(start)?.type.name !== 'codeBlock') return
+        editor.view.dispatch(editor.state.tr.setSelection(Selection.near(editor.state.doc.resolve(start + 1 + at))))
+        code.setSelection(at, at, true)
+      },
+    })
     return true
   }
   const caret = editor.view.posAtCoords({ left: visible.left + 8, top: Math.max(top, visible.top) + 8 })

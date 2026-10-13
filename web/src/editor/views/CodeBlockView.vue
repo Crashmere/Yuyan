@@ -1,3 +1,74 @@
+<script lang="ts">
+import type { Node as PMNode } from '@tiptap/pm/model'
+import type { EditorState } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
+import type { SearchState } from '../search'
+
+// CodeMirror mounts when a block comes within 1000px of the window, or when something needs its
+// editor (code/editor.ts codeEditorIn). Until then the block shows its code as plain text in the
+// same box (code/style.css).
+type Waiting = { observer: IntersectionObserver; pending: WeakMap<Element, (entry: IntersectionObserverEntry) => void> }
+const observers = new Map<string, Waiting>()
+function whenWithin(margin: string, el: Element, run: (entry: IntersectionObserverEntry) => void) {
+  let waiting = observers.get(margin)
+  if (!waiting) {
+    const pending = new WeakMap<Element, (entry: IntersectionObserverEntry) => void>()
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        observer.unobserve(entry.target)
+        const next = pending.get(entry.target)
+        pending.delete(entry.target)
+        next?.(entry)
+      }
+    }, { rootMargin: margin })
+    observers.set(margin, waiting = { observer, pending })
+  }
+  const { observer, pending } = waiting
+  pending.set(el, run)
+  observer.observe(el)
+  return () => { pending.delete(el); observer.unobserve(el) }
+}
+
+// Wrap and fold preferences belong to the n-th code block of the page (code/preferences.ts).
+const indexes = new WeakMap<PMNode, Map<number, number>>()
+function codeIndex(doc: PMNode, pos: number) {
+  let found = indexes.get(doc)
+  if (!found) {
+    const map = new Map<number, number>()
+    doc.descendants((node, at) => {
+      if (node.type.name === 'codeBlock') map.set(at, map.size)
+      return !node.isTextblock
+    })
+    indexes.set(doc, found = map)
+  }
+  return found.get(pos) ?? 0
+}
+
+// Found once for all blocks: the block holding the selection, and the one holding the current
+// find match. The others skip each transaction without looking up their position.
+const holders = new WeakMap<EditorState, Node | null>()
+function holding(view: EditorView, state: EditorState) {
+  let dom = holders.get(state)
+  if (dom === undefined) {
+    const { $from, $to } = state.selection
+    dom = $from.parent.type.name === 'codeBlock' && $from.sameParent($to) ? view.nodeDOM($from.before()) : null
+    holders.set(state, dom)
+  }
+  return dom
+}
+const matched = new WeakMap<SearchState, Node | null>()
+function matching(view: EditorView, state: EditorState, search: SearchState) {
+  let dom = matched.get(search)
+  if (dom === undefined) {
+    const match = search.matches[search.current], $at = match && state.doc.resolve(match.from)
+    dom = $at?.parent.type.name === 'codeBlock' ? view.nodeDOM($at.before()) : null
+    matched.set(search, dom)
+  }
+  return dom
+}
+</script>
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
@@ -11,7 +82,7 @@ import { setCollapsed } from '../codeBlocks'
 import LanguagePicker from './LanguagePicker.vue'
 import { CodeEditor } from '../../code/editor'
 import { codeActions, expandCode, type CodeAction } from '../../code/actions'
-import { codeKey } from '../../code/preferences'
+import { codeKey, readCodePreferences } from '../../code/preferences'
 import { searchState } from '../search'
 import { formatLanguage } from '../../code/formatLanguage'
 import { expandSelection } from '../expandSelection'
@@ -27,7 +98,7 @@ function setLanguage(value: string) {
 
 // Back into the code after choosing a language or naming the block.
 function refocus() {
-  code.value?.view.focus()
+  mount()?.view.focus()
 }
 
 // The title bar, as in Yuque (schema/codeBlock.ts): a title, and an arrow that collapses the code.
@@ -89,16 +160,34 @@ async function titleKey(event: KeyboardEvent) {
   if (event.key === 'Enter') { titleEntered(); return }
   if (collapsed.value) props.updateAttributes({ collapsed: false })
   await nextTick()
-  code.value?.setSelection(0, 0, true)
+  mount()?.setSelection(0, 0, true)
 }
 
 const codeHost = ref<HTMLElement | null>(null)
+const placeholder = ref<HTMLElement | null>(null)
 const actions = ref<HTMLElement | null>(null)
 const code = shallowRef<CodeEditor>()
 const wrapped = ref(false)
 function toggleWrap() {
-  code.value?.setWrapped(!wrapped.value)
+  mount()?.setWrapped(!wrapped.value)
 }
+
+// The plain text before CodeMirror mounts, line for line: a trailing newline still opens a line.
+const staticText = computed(() => {
+  const text = props.node.textContent
+  return text === '' || text.endsWith('\n') ? `${text} ` : text
+})
+const staticNumbers = computed(() => Array.from({ length: props.node.textContent.split('\n').length }, (_, i) => i + 1).join('\n'))
+function enterCode(event: MouseEvent) {
+  const cm = mount()
+  if (!cm) return
+  event.preventDefault()
+  const at = cm.view.posAtCoords({ x: event.clientX, y: event.clientY }, false)
+  cm.setSelection(at, at, true)
+}
+// A mouse press places the caret at once; a touch waits for the tap, as it may start a scroll.
+function pressCode(event: PointerEvent) { if (event.button === 0 && event.pointerType === 'mouse') enterCode(event) }
+function tapCode(event: MouseEvent) { if (event.button === 0 && !code.value) enterCode(event) }
 
 function leaveCode(unit: 'line' | 'char', direction: -1 | 1) {
   const cm = code.value?.view, pos = props.getPos()
@@ -115,7 +204,7 @@ function leaveCode(unit: 'line' | 'char', direction: -1 | 1) {
 let closeExpanded: (() => void) | undefined
 let removeActions: (() => void) | undefined
 async function action(action: CodeAction) {
-  const cm = code.value
+  const cm = mount()
   if (!cm) return
   if (collapsed.value) { props.updateAttributes({ collapsed: false }); await nextTick() }
   if (action === 'expand') {
@@ -133,13 +222,30 @@ async function action(action: CodeAction) {
 }
 watch(actions, el => { removeActions?.(); removeActions = el ? codeActions(el, a => { void action(a) }, true, () => !!formatLanguage(language.value)) : undefined })
 
+let preferenceKey = '', root: Element | null = null, stopWaiting: (() => void) | undefined
 onMounted(() => {
   const pos = props.getPos()
   if (!codeHost.value || typeof pos !== 'number') return
-  let index = 0
-  props.editor.state.doc.descendants((node, at) => { if (at < pos && node.type.name === 'codeBlock') index++ })
+  preferenceKey = codeKey(codeIndex(props.editor.state.doc, pos))
+  wrapped.value = readCodePreferences(preferenceKey).wrapped
+  root = codeHost.value.closest('.yy-codeblock')
+  Object.assign(codeHost.value, { mountCode: mount })
+  stopWaiting = whenWithin('1000px 0px', codeHost.value, entry => {
+    const host = codeHost.value, cm = mount()
+    if (!host || !cm) return
+    // Out of view, CodeMirror guesses the height of lines it has not drawn. Hold the placeholder's
+    // exact height until it has measured them, so long blocks do not shrink and grow back. The
+    // expand dialog sets the host's inline min-height itself, so this hold goes through a variable.
+    host.style.setProperty('--yy-code-held', `${entry.boundingClientRect.height}px`)
+    stopWaiting = whenWithin('0px', host, () => cm.view.requestMeasure({ read: () => null, write: () => host.style.removeProperty('--yy-code-held') }))
+  })
+})
+function mount() {
+  if (code.value || disposed || !preferenceKey || !codeHost.value) return code.value
+  stopWaiting?.()
+  placeholder.value?.remove()
   code.value = new CodeEditor(codeHost.value, {
-    doc: props.node.textContent, language: language.value, key: codeKey(index),
+    doc: props.node.textContent, language: language.value, key: preferenceKey,
     onPreferences: preferences => { wrapped.value = preferences.wrapped },
     onExpandSelection: () => {
       expandSelection(props.editor.view)
@@ -183,29 +289,35 @@ onMounted(() => {
     ],
   })
   wrapped.value = code.value.preferences.wrapped
-})
+  syncSelection()
+  return code.value
+}
 watch(() => props.node.textContent, text => code.value?.setText(text))
 watch(language, value => { void code.value?.setLanguage(value) })
-let disposed = false, syncing = false, highlightKey = ''
+let disposed = false, syncing = false, highlightKey = '', synced: SearchState | undefined
 function syncSelection() {
   if (syncing) return
   syncing = true
   queueMicrotask(() => {
   syncing = false
-  if (disposed || !code.value) return
-  const selection = props.editor.state.selection
-  const pos = props.getPos()
-  if (typeof pos !== 'number') return
-  code.value.setText(props.node.textContent)
-  if (selection.from > pos && selection.to < pos + props.node.nodeSize) code.value.setSelection(selection.anchor - pos - 1, selection.head - pos - 1)
-  const search = searchState(props.editor.state)
+  if (disposed || !root) return
+  const view = props.editor.view, state = props.editor.state, search = searchState(state)
+  const own = holding(view, state) === root
+  // Other blocks follow only new find results, and unmounted ones only the current match.
+  if (!own && search === synced) return
+  if (!own && !code.value && matching(view, state, search) !== root) return
+  const cm = mount(), pos = props.getPos()
+  if (!cm || typeof pos !== 'number') return
+  synced = search
+  cm.setText(props.node.textContent)
+  if (own) cm.setSelection(state.selection.anchor - pos - 1, state.selection.head - pos - 1)
   const matches = search.matches.flatMap((match, i) => match.from > pos && match.to < pos + props.node.nodeSize ? [{ from: match.from - pos - 1, to: match.to - pos - 1, current: i === search.current }] : [])
   const key = JSON.stringify(matches)
-  if (key !== highlightKey) { highlightKey = key; code.value.highlight(matches); if (matches.some(m => m.current)) code.value.revealSelection() }
+  if (key !== highlightKey) { highlightKey = key; cm.highlight(matches); if (matches.some(m => m.current)) cm.revealSelection() }
   })
 }
 props.editor.on('transaction', syncSelection)
-onBeforeUnmount(() => { disposed = true; props.editor.off('transaction', syncSelection); closeExpanded?.(); removeActions?.(); code.value?.destroy() })
+onBeforeUnmount(() => { disposed = true; stopWaiting?.(); props.editor.off('transaction', syncSelection); closeExpanded?.(); removeActions?.(); code.value?.destroy() })
 
 // The diagram previews beside the source; a syntax error keeps the last diagram that worked.
 const preview = ref('')
@@ -279,7 +391,12 @@ async function copy() {
       @click="titled ? hideTitle() : showTitle()"
     ></button>
     <div v-show="!collapsed" class="yy-codeblock-body">
-      <div ref="codeHost" contenteditable="false"></div>
+      <div ref="codeHost" class="yy-code-editor-host" contenteditable="false">
+        <div v-if="!code" ref="placeholder" class="yy-code-static" @pointerdown="pressCode" @click="tapCode">
+          <div class="yy-code-static-numbers" aria-hidden="true">{{ staticNumbers }}</div>
+          <div class="yy-code-static-text">{{ staticText }}</div>
+        </div>
+      </div>
       <div v-if="isMermaid" class="yy-mermaid-preview" contenteditable="false">
         <div v-if="preview" class="yy-mermaid-svg" :class="{ stale: !!error }" v-html="preview"></div>
         <p v-else-if="!error" class="yy-mermaid-empty">输入 Mermaid 代码后在这里预览</p>

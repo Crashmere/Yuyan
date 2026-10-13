@@ -28,16 +28,19 @@ function decorations(sections: HeadingSection[], positions: Set<number>, doc: im
         }
       })
     }
+    // The key leaves out the position, so edits above a heading keep its control. The control
+    // therefore finds its heading from where it is at the time of the click.
     out.push(Decoration.widget(section.pos + 1, view => {
       const control = headingControl(section.level, foldable ? folded : undefined)
       control.addEventListener('mousedown', event => event.preventDefault())
       if (foldable) control.addEventListener('click', event => {
         event.preventDefault()
-        const current = headingSections(view.state.doc).find(s => s.pos === section.pos)
+        const pos = view.posAtDOM(control, 0) - 1
+        const current = headingSections(view.state.doc).find(s => s.pos === pos)
         if (current) toggle(view, current)
       })
       return control
-    }, { side: -1, key: `heading:${section.pos}:${section.level}:${folded}:${foldable}`, ignoreSelection: true, stopEvent: () => true }))
+    }, { side: -1, key: `heading:${section.level}:${folded}:${foldable}`, ignoreSelection: true, stopEvent: () => true }))
   }
   return DecorationSet.create(doc, out)
 }

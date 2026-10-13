@@ -11,7 +11,7 @@ export interface Match {
   to: number
 }
 
-interface SearchState {
+export interface SearchState {
   term: string
   caseSensitive: boolean
   matches: Match[]

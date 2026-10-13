@@ -6,6 +6,12 @@
 .yy-code-editor-host .cm-gutters { border: 0; border-right: 1px solid var(--yy-codeblock-line); background: var(--yy-codeblock-bg); color: var(--yy-codeblock-muted); user-select: none; }
 .yy-code-editor-host .cm-lineNumbers .cm-gutterElement { min-width: 2.4em; padding: 0 6px; cursor: default; }
 .yy-code-editor-host .cm-foldGutter .cm-gutterElement { padding: 0 4px; width: 18px; }
+/* The code shown before CodeMirror mounts (editor/views/CodeBlockView.vue) keeps the sizes above,
+   with CodeMirror's line height 1.4, so mounting leaves the page where it was. */
+.yy-code-static { display: flex; overflow-x: auto; font: 13px/1.4 var(--yy-mono); background: var(--yy-codeblock-bg); color: var(--yy-codeblock-text); cursor: text; }
+.yy-code-static-numbers { flex: none; box-sizing: border-box; min-width: calc(2.4em + 19px); padding: 12px 24px 12px 6px; border-right: 1px solid var(--yy-codeblock-line); color: var(--yy-codeblock-muted); text-align: right; white-space: pre; user-select: none; }
+.yy-code-static-text { flex: 1 0 auto; padding: 12px 16px 12px 6px; white-space: pre; tab-size: 4; }
+.yy-codeblock.is-wrapped .yy-code-static-text { flex: 1 1 0; min-width: 0; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
 .yy-code-editor-host .cm-activeLine, .yy-code-editor-host .cm-activeLineGutter { background: #ffffff05; }
 .yy-code-editor-host .cm-focused { outline: none; }
 .yy-code-editor-host .tok-typeName { color: #56b6c2; }
