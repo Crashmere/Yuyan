@@ -1757,9 +1757,26 @@ a.yy-catalog-title:hover {
 /* Stays at the bottom of the viewport while reading, and rests after the pager at the end. */
 .yy-recent-dock { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 15; display: flex; justify-content: center; margin-top: 28px; pointer-events: none; }
 .yy-recent-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; max-width: 100%; padding: 4px 6px 4px 12px; border: 1px solid var(--yy-border); border-radius: 999px; background: var(--yy-bg-elevated); box-shadow: var(--yy-shadow-popover); color: var(--yy-text-2); font-size: 13px; line-height: 20px; pointer-events: auto; }
-.yy-recent-swatch { width: 14px; height: 14px; margin-right: 2px; border: 1px dashed light-dark(#b593e6, #7d62ad); border-radius: 4px; background: light-dark(#f2eafd, #2e2444); }
-.yy-recent-count { min-width: 4.5em; color: var(--yy-text); font-variant-numeric: tabular-nums; }
+.yy-recent-bar:has(> .yy-recent-chip) { padding-left: 4px; }
+.yy-recent-swatch { flex: none; width: 14px; height: 14px; margin-right: 2px; border: 1px dashed light-dark(#b593e6, #7d62ad); border-radius: 4px; background: light-dark(#f2eafd, #2e2444); }
+/* Deleted content is rose, as its copies on the page (content/recentChanges.css). */
+.yy-recent-chip.is-deletions .yy-recent-swatch { border-color: light-dark(#e3a3ae, #9b4a52); background: light-dark(#fdeef0, #3a2025); }
+.yy-recent-chip { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px 0 7px; border: 0; border-radius: 999px; background: none; color: var(--yy-text-3); font: inherit; cursor: pointer; }
+.yy-recent-chip .yy-recent-swatch { margin: 0; }
+.yy-recent-chip:hover { background: var(--yy-bg-hover); }
+.yy-recent-chip[aria-pressed='true'] { color: var(--yy-text); }
+.yy-recent-chip[aria-pressed='false'] .yy-recent-swatch { background: none; opacity: 0.6; }
+.yy-recent-chip[aria-disabled='true'] { background: none; cursor: default; }
+.yy-recent-chip-count { color: var(--yy-text-2); font-variant-numeric: tabular-nums; }
+.yy-recent-chip[aria-pressed='false'] .yy-recent-chip-count { color: inherit; }
+.yy-recent-count { padding: 0 2px; color: var(--yy-text); font-variant-numeric: tabular-nums; }
 .yy-recent-bar .yy-link-btn { padding: 0 6px; }
+.yy-recent-full { display: inline-flex; align-items: center; }
+.yy-recent-full svg { display: none; }
+@media (max-width: 520px) {
+  .yy-recent-full > span { display: none; }
+  .yy-recent-full svg { display: block; }
+}
 .yy-recent-sep { width: 1px; height: 16px; background: var(--yy-border); }
 @media print { .yy-recent-dock { display: none; } }
 

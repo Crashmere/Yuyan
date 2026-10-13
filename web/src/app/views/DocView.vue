@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Ellipsis, FileDiff, FileText, Folder, PencilLine, TableOfContents, X } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Ellipsis, FileDiff, FileText, Folder, GitCompareArrows, PencilLine, TableOfContents, X } from 'lucide-vue-next'
 import { api, ApiError, errorMessage, type DocView, type RecentChanges } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
@@ -31,6 +31,7 @@ const titleElement = ref<HTMLElement | null>(null)
 const changes = ref<RecentChanges | null>(null)
 const changesLoading = ref(false)
 const changesError = ref('')
+const changeCounts = ref({ edits: 0, deletions: 0 })
 const changeCount = ref(0)
 const changeAt = ref(0)
 let markers: ReturnType<typeof import('../content/recentChanges').showRecentChanges> | undefined
@@ -39,8 +40,32 @@ let changeRequest = 0, markerRequest = 0
 function clearMarkers() {
   markerRequest++
   markers?.destroy(); markers = undefined
-  changeCount.value = 0; changeAt.value = 0
+  changeCounts.value = { edits: 0, deletions: 0 }; changeCount.value = 0; changeAt.value = 0
 }
+
+// Edited and deleted content show separately. A kind this document lacks cannot be the only
+// one shown, so a choice that would show nothing here shows both.
+const shown = computed(() => {
+  const counts = changeCounts.value, edits = prefs.recentEdits && counts.edits > 0, deletions = prefs.recentDeletions && counts.deletions > 0
+  return edits || deletions ? { edits: prefs.recentEdits, deletions: prefs.recentDeletions } : { edits: true, deletions: true }
+})
+const both = computed(() => changeCounts.value.edits > 0 && changeCounts.value.deletions > 0)
+function toggleShown(kind: 'edits' | 'deletions') {
+  const next = { ...shown.value, [kind]: !shown.value[kind] }
+  if (!both.value || !next.edits && !next.deletions) return
+  prefs.recentEdits = next.edits; prefs.recentDeletions = next.deletions
+}
+function chipTip(kind: 'edits' | 'deletions') {
+  const name = kind === 'edits' ? '修改' : '删除'
+  if (!changeCounts.value[kind]) return `没有${name}的内容`
+  if (!both.value) return undefined
+  const other = kind === 'edits' ? 'deletions' : 'edits'
+  return !shown.value[kind] ? `显示${name}的内容` : shown.value[other] ? `隐藏${name}的内容` : '至少显示一种'
+}
+watch(shown, (show, old) => {
+  if (!markers || show.edits === old.edits && show.deletions === old.deletions) return
+  changeCount.value = markers.set(show); changeAt.value = 0
+})
 
 async function markChanges() {
   clearMarkers()
@@ -51,11 +76,12 @@ async function markChanges() {
   if (disposed || request !== markerRequest || !titleElement.value) return
   const source = content.value?.source()
   markers = showRecentChanges({
-    root: source?.root ?? titleElement.value.closest<HTMLElement>('.yy-article')!, elements: source?.elements ?? [],
+    root: source?.root ?? titleElement.value.closest<HTMLElement>('.yy-article')!, elements: source?.elements ?? [], prepare: source?.prepare,
     html: view.value.html, beforeHTML: changes.value.baseline.html,
     title: titleElement.value, titleText: title.value, beforeTitle: changes.value.baseline.title,
   })
-  changeCount.value = markers.count
+  changeCounts.value = markers.counts
+  changeCount.value = markers.set(shown.value)
 }
 
 async function loadChanges() {
@@ -191,17 +217,23 @@ onMounted(async () => {
       </nav>
       <div v-if="view.doc.kind === 'doc' && prefs.recentChanges" class="yy-recent-dock">
         <div class="yy-recent-bar" role="status" aria-label="最近修改">
-          <span class="yy-recent-swatch" aria-hidden="true"></span>
-          <span v-if="changesLoading">正在查找最近修改…</span>
-          <template v-else-if="changesError"><span>{{ changesError }}</span><button type="button" class="yy-link-btn" @click="loadChanges">重试</button></template>
-          <span v-else-if="changes && !changes.baseline">没有可比较的历史版本（历史保留 30 天）</span>
-          <span v-else-if="changes?.baseline && !changeCount">没有可标记的修改<template v-if="changes.summary?.labels.length"> · {{ changes.summary.labels.join(' · ') }}</template></span>
-          <template v-else-if="changeCount">
-            <span class="yy-recent-count">{{ changeAt ? `${changeAt} / ${changeCount}` : `${changeCount} 处修改` }}</span>
+          <template v-if="changeCount">
+            <button v-for="kind in (['edits', 'deletions'] as const)" :key="kind" type="button" class="yy-recent-chip" :class="`is-${kind}`"
+              :aria-pressed="shown[kind] && changeCounts[kind] > 0" :aria-disabled="!both" :data-tip="chipTip(kind)" @click="toggleShown(kind)">
+              <span class="yy-recent-swatch" aria-hidden="true"></span>{{ kind === 'edits' ? '修改' : '删除' }}<span class="yy-recent-chip-count">{{ changeCounts[kind] }}</span>
+            </button>
+            <span v-if="changeAt" class="yy-recent-count">{{ changeAt }} / {{ changeCount }}</span>
             <IconButton label="上一处修改" small @click="nextChange(-1)"><ChevronUp :size="16" /></IconButton>
             <IconButton label="下一处修改" small @click="nextChange(1)"><ChevronDown :size="16" /></IconButton>
           </template>
-          <RouterLink v-if="changes?.baseline" :to="`/versions/${changes.baseline.id}?compare=current`" class="yy-link-btn" data-tip="与修改前的版本逐行对比，含删除的内容">完整差异</RouterLink>
+          <template v-else>
+            <span class="yy-recent-swatch" aria-hidden="true"></span>
+            <span v-if="changesLoading">正在查找最近修改…</span>
+            <template v-else-if="changesError"><span>{{ changesError }}</span><button type="button" class="yy-link-btn" @click="loadChanges">重试</button></template>
+            <span v-else-if="changes && !changes.baseline">没有可比较的历史版本（历史保留 30 天）</span>
+            <span v-else-if="changes?.baseline">没有可标记的修改<template v-if="changes.summary?.labels.length"> · {{ changes.summary.labels.join(' · ') }}</template></span>
+          </template>
+          <RouterLink v-if="changes?.baseline" :to="`/versions/${changes.baseline.id}?compare=current`" class="yy-link-btn yy-recent-full" aria-label="完整差异" data-tip="与修改前的版本逐行对比"><span>完整差异</span><GitCompareArrows :size="15" aria-hidden="true" /></RouterLink>
           <span class="yy-recent-sep" aria-hidden="true"></span>
           <IconButton label="关闭最近修改" small @click="prefs.recentChanges = false"><X :size="15" /></IconButton>
         </div>

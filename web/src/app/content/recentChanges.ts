@@ -1,105 +1,9 @@
-import { diffArrays } from 'diff'
 import { reveal } from './folds'
+import { collect, compare, skipped, type Change } from './recentDiff'
+import { findGhosts, hideGhosts, keepPlace, showGhosts, type Ghost } from './recentGhosts'
 import './recentChanges.css'
 
-// Work against the original renderer output. Page controls, line numbers, search
-// markers and diagram rendering must never become edits. Live elements are kept by
-// DocContent before enhancement so no DOM paths depend on its generated wrappers.
-const units = 'p,h1,h2,h3,h4,h5,h6,pre,hr,img,.code-title,.callout-title,.yy-fold-title,[data-type="block-math"],.yy-drawing,[data-attachment],[data-image-board]'
-const atomic = 'pre,.yy-drawing,[data-attachment],[data-image-board],[data-type="block-math"]'
-const skipped = 'button,.code-lang,.yy-code-gutter,.yy-heading-tools,.yy-drawing-source,.yy-drawing-text'
-interface Unit { element: Element; index: number; key: string; kind: string; context: string; text: string; tokens: string[] }
-// order is the unit position in the current document: consecutive changes form one patch.
-// full means every character is new, so the patch alone marks it.
-interface Change { element: Element; spans: [number, number][]; text: string; whole: boolean; order: number; full: boolean }
-
-function attributes(el: Element): string {
-  return el.tagName + JSON.stringify([...el.attributes].filter(a => a.name !== 'id').map(a => [a.name, a.value]).sort())
-}
-
-function collect(html: string): Unit[] {
-  const template = document.createElement('template')
-  template.innerHTML = html
-  const all = [...template.content.querySelectorAll('*')]
-  return all.flatMap((element, index) => {
-    if (!element.matches(units) || element.parentElement?.closest(units)) return []
-    let context = ''
-    for (let p = element.parentElement; p; p = p.parentElement) context += attributes(p)
-    const tokens: string[] = []
-    let text = ''
-    const walk = (node: Node, style: string) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent
-        for (const c of node.textContent ?? '') tokens.push(c + '\0' + style)
-      } else if (node instanceof Element) {
-        if (node.matches(skipped)) return
-        if (node.tagName === 'BR') { text += '\n'; tokens.push('\n'); return }
-        node.childNodes.forEach(child => walk(child, element.tagName === 'PRE' ? '' : style + attributes(node)))
-      }
-    }
-    walk(element, '')
-    const clone = element.cloneNode(true) as Element
-    clone.removeAttribute('id')
-    clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'))
-    return [{ element, index, key: clone.outerHTML + context, context, kind: element.tagName + (element.matches(atomic) ? element.getAttribute('class') ?? '' : ''), text, tokens }]
-  })
-}
-
-// Exact blocks match before edited ones. This preserves unchanged repeated text
-// and avoids marking every subsequent paragraph when one is inserted above it.
-function compare(before: Unit[], after: Unit[], elements: Element[]): Change[] {
-  const matches = after.map(() => -1)
-  const used = new Set<number>()
-  const match = (key: (u: Unit) => string) => {
-    const queues = new Map<string, number[]>()
-    before.forEach((u, i) => { if (!used.has(i)) { const k = key(u); const q = queues.get(k) ?? []; q.push(i); queues.set(k, q) } })
-    after.forEach((u, j) => {
-      if (matches[j] >= 0) return
-      const i = queues.get(key(u))?.shift()
-      if (i !== undefined) { matches[j] = i; used.add(i) }
-    })
-  }
-  match(u => u.key)
-  match(u => u.kind + u.text)
-  // Pair similar edits before a wholly new paragraph can consume their baseline.
-  const pairingDeadline = Date.now() + 100
-  const pairs: { i: number; j: number; score: number }[] = []
-  after.forEach((u, j) => {
-    if (matches[j] >= 0 || !u.text || Date.now() >= pairingDeadline) return
-    before.forEach((v, i) => {
-      if (used.has(i) || v.kind !== u.kind || !v.text || Math.abs(i - j) > 12 || Date.now() >= pairingDeadline) return
-      const parts = diffArrays([...v.text], [...u.text], { timeout: 4, maxEditLength: 1200 })
-      if (!parts) return
-      const kept = parts.reduce((n, p) => n + (!p.added && !p.removed ? p.count : 0), 0)
-      const score = 2 * kept / ([...u.text].length + [...v.text].length)
-      if (score >= 0.5) pairs.push({ i, j, score })
-    })
-  })
-  pairs.sort((a, b) => b.score - a.score).forEach(({ i, j }) => {
-    if (!used.has(i) && matches[j] < 0) { used.add(i); matches[j] = i }
-  })
-  const moved = after.map(() => false)
-  let max = -1, min = before.length
-  matches.forEach((i, j) => { if (i >= 0) { moved[j] = i < max; max = Math.max(max, i) } })
-  for (let j = matches.length - 1; j >= 0; j--) { const i = matches[j]; if (i >= 0) { moved[j] ||= i > min; min = Math.min(min, i) } }
-  const deadline = Date.now() + 180
-  return after.flatMap((unit, j) => {
-    const old = before[matches[j]], element = elements[unit.index]
-    if (!element || (old?.key === unit.key && !moved[j])) return []
-    const spans: [number, number][] = []
-    let offset = 0
-    const diff = old && Date.now() < deadline ? diffArrays(old.tokens, unit.tokens, { timeout: Math.max(1, deadline - Date.now()), maxEditLength: 4000 }) : undefined
-    if (diff) for (const part of diff) {
-      if (part.removed) continue
-      const length = part.value.reduce((n, token) => n + token.split('\0')[0].length, 0)
-      if (part.added) spans.push([offset, offset + length])
-      offset += length
-    }
-    else if (unit.text) spans.push([0, unit.text.length])
-    const full = spans.length === 1 && spans[0][0] === 0 && spans[0][1] >= unit.text.replace(/\n$/, '').length
-    return [{ element, spans, text: unit.text, whole: element.matches(atomic) && element.tagName !== 'PRE' || !spans.length, order: j, full }]
-  })
-}
+export interface Shown { edits: boolean; deletions: boolean }
 
 // Map UTF-16 offsets back to the enhanced DOM without wrapping or replacing text.
 // Code enhancement removes literal newlines, so insert their offsets between rows.
@@ -158,9 +62,17 @@ function lineBoxes(rects: DOMRect[]): Box[] {
   return out
 }
 
-export function showRecentChanges(options: { root: HTMLElement; elements: Element[]; html: string; beforeHTML: string; title: HTMLElement; beforeTitle: string; titleText: string }) {
-  const changes = compare(collect(options.beforeHTML), collect(options.html), options.elements)
-  if (options.beforeTitle !== options.titleText) changes.unshift({ element: options.title, spans: [[0, options.titleText.length]], text: options.titleText, whole: false, order: -2, full: true })
+// A stop is what one press of the navigation buttons shows: an edit patch with the deleted
+// content beside it, or deleted content alone.
+interface Stop { patch: number; ghosts: Ghost[]; elements: Element[] }
+const documentOrder = (a: Element, b: Element) => a === b ? 0 : a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+
+// Nothing shows until set() chooses the kinds, which can depend on counts.
+export function showRecentChanges(options: { root: HTMLElement; elements: Element[]; prepare?: (node: HTMLElement) => void; html: string; beforeHTML: string; title: HTMLElement; beforeTitle: string; titleText: string }) {
+  const before = collect(options.beforeHTML), after = collect(options.html)
+  const { changes, matches } = compare(before, after, options.elements)
+  const titleChanged = options.beforeTitle !== options.titleText
+  if (titleChanged) changes.unshift({ element: options.title, spans: [[0, options.titleText.length]], text: options.titleText, whole: false, order: -2, full: true })
   // Adjacent changes in one lane are one patch for counting and navigation.
   const patchOf: number[] = []
   const patches: number[][] = []
@@ -174,6 +86,27 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
     patchOf[i] = patches.length - 1
     previous = { target, lane, order: change.order }
   })
+  const changeAt = new Map(changes.map((change, i) => [change.order, i]))
+  // Deleted content is extra: content it cannot place must not cost the edits.
+  let ghosts: Ghost[] = []
+  try {
+    ghosts = findGhosts({
+      before, after, matches, elements: options.elements, root: options.root, changeOf: order => changeAt.get(order) ?? -1,
+      title: titleChanged ? { element: options.title, before: options.beforeTitle, after: options.titleText } : undefined,
+    })
+  } catch (e) { console.warn('recent changes', e) }
+  // Deleted content counts with the patch made in its place, so a replacement is one change.
+  const groupOf = (ghost: Ghost, k: number) => ghost.attach >= 0 ? patchOf[ghost.attach] : -1 - k
+  let show: Shown = { edits: false, deletions: false }, stops: Stop[] = []
+  const buildStops = () => {
+    const list = new Map<number, Stop>()
+    if (show.edits) patches.forEach((members, p) => list.set(p, { patch: p, ghosts: [], elements: members.map(i => changes[i].element) }))
+    if (show.deletions) ghosts.forEach((ghost, k) => {
+      const key = groupOf(ghost, k), stop = list.get(key) ?? list.set(key, { patch: -1, ghosts: [], elements: [] }).get(key)!
+      stop.ghosts.push(ghost); stop.elements.push(...ghost.nodes)
+    })
+    stops = [...list.values()].filter(s => s.elements.length).map(s => (s.elements.sort(documentOrder), s)).sort((a, b) => documentOrder(a.elements[0], b.elements[0]))
+  }
   // Code blocks stay dark in both themes, so their marks blend separately.
   const layers = ['yy-recent-layer', 'yy-recent-layer is-code'].map(className => {
     const layer = Object.assign(document.createElement('div'), { className })
@@ -185,6 +118,10 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
   const paint = () => {
     frame = 0
     const fills = document.createDocumentFragment(), code = document.createDocumentFragment()
+    if (!show.edits) { layers.forEach(l => l.replaceChildren()); return }
+    // Copies of deleted content are real blocks: a patch stops at them instead of covering them.
+    const cuts = show.deletions ? ghosts.flatMap(g => g.nodes).map(n => n.getBoundingClientRect()).filter(r => r.height) : []
+    const across = (r: DOMRect, left: number, right: number) => r.left < right && r.right > left
     const root = options.root.getBoundingClientRect()
     const add = (parent: Node, className: string, clip: Box, left: number, top: number, width: number, height: number) => {
       const el = Object.assign(document.createElement('i'), { className })
@@ -220,7 +157,8 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
     const groups: Block[][] = []
     for (const block of blocks) {
       const group = groups.at(-1), last = group?.at(-1)
-      if (group && last && last.patch === block.patch && last.lane === block.lane && block.rect.top >= last.rect.bottom - 1) group.push(block)
+      const cut = !!last && cuts.some(r => r.top >= last.rect.bottom - 1 && r.bottom <= block.rect.top + 1 && across(r, Math.min(last.rect.left, block.rect.left), Math.max(last.rect.right, block.rect.right)))
+      if (group && last && !cut && last.patch === block.patch && last.lane === block.lane && block.rect.top >= last.rect.bottom - 1) group.push(block)
       else groups.push([block])
     }
 
@@ -237,11 +175,16 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
         left = Math.min(root.left, ...group.map(b => b.rect.left)) - padX
         right = Math.max(root.right, ...group.map(b => b.rect.right)) + padX
       }
+      for (const r of cuts) {
+        if (!across(r, left, right)) continue
+        if (r.bottom <= head.rect.top + 1 && r.bottom > top) top = r.bottom + 2
+        if (r.top >= tail.rect.bottom - 1 && r.top < bottom) bottom = r.top - 2
+      }
       top = Math.round(top); bottom = Math.round(bottom); left = Math.round(left); right = Math.round(right)
       const clip = clipOf(head.target, false)
       if (Math.min(clip.right, right) <= Math.max(clip.left, left) || Math.min(clip.bottom, bottom) <= Math.max(clip.top, top)) continue
       const box = clipped(fills, clip)
-      if (head.patch === active) box.classList.add('is-current')
+      if (head.patch === stops[active]?.patch) box.classList.add('is-current')
       // Fill the gaps between neighbouring blocks so a run of edits reads as one patch.
       group.forEach((block, k) => {
         const from = k ? Math.round((group[k - 1].rect.bottom + block.rect.top) / 2) : top
@@ -278,25 +221,35 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
   mutation.observe(options.root, { subtree: true, attributes: true, childList: true, characterData: true })
   window.addEventListener('scroll', schedule, true)
   window.addEventListener('resize', schedule)
-  schedule()
+  const set = (next: Shown) => {
+    if (next.deletions !== show.deletions) keepPlace(options.root, () => next.deletions ? showGhosts(ghosts, options.root, options.prepare) : hideGhosts(ghosts))
+    show = { ...next }
+    active = -1
+    buildStops()
+    schedule()
+    return stops.length
+  }
   return {
-    count: patches.length,
+    counts: { edits: patches.length, deletions: new Set(ghosts.map(groupOf)).size },
+    // Shows or hides each kind without comparing again; returns the number of stops.
+    set,
     go(direction: number) {
-      if (!patches.length) return 0
-      active = active < 0 ? (direction > 0 ? 0 : patches.length - 1) : (active + direction + patches.length) % patches.length
-      for (const i of patches[active]) {
-        const el = changes[i].element
-        reveal(el as HTMLElement)
+      if (!stops.length) return 0
+      active = active < 0 ? (direction > 0 ? 0 : stops.length - 1) : (active + direction + stops.length) % stops.length
+      const stop = stops[active]
+      for (const el of stop.elements) {
+        reveal(el)
         for (let p: Element | null = el; p; p = p.parentElement) {
           if (p.matches('.callout.is-collapsed,.code-block.is-collapsed')) p.classList.remove('is-collapsed')
         }
+        if (el.classList.contains('yy-recent-ghost')) continue
         el.querySelectorAll('.yy-line').forEach(line => line.dispatchEvent(new Event('yy-reveal-code', { bubbles: true })))
         const pre = el.matches('pre') ? el : el.querySelector('pre')
         if (pre?.classList.contains('is-folded')) (pre.closest('.code-block')?.nextElementSibling as HTMLElement | null)?.click()
       }
-      // Centre the whole patch; a tall one starts below the top bar.
-      const items = patches[active].map(i => changes[i].element)
-      const first = items[0] as HTMLElement, height = items[items.length - 1].getBoundingClientRect().bottom - first.getBoundingClientRect().top
+      for (const ghost of ghosts) for (const node of ghost.nodes) node.classList.toggle('is-current', stop.ghosts.includes(ghost))
+      // Centre the whole stop; a tall one starts below the top bar.
+      const first = stop.elements[0] as HTMLElement, height = stop.elements[stop.elements.length - 1].getBoundingClientRect().bottom - first.getBoundingClientRect().top
       first.style.scrollMarginTop = `${Math.max(88, (innerHeight - height) / 2)}px`
       first.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' })
       first.style.scrollMarginTop = ''
@@ -306,6 +259,7 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
     destroy() {
       destroyed = true; cancelAnimationFrame(frame); resize.disconnect(); mutation.disconnect()
       window.removeEventListener('scroll', schedule, true); window.removeEventListener('resize', schedule); layers.forEach(l => l.remove())
+      keepPlace(options.root, () => hideGhosts(ghosts))
     },
   }
 }

@@ -27,3 +27,99 @@
 .is-current > .yy-recent-fill.is-ring { background: none; border-color: var(--patch-current); }
 .is-current > .yy-recent-stitch { border-color: var(--patch-stitch-current); }
 @media print { .yy-recent-layer { display: none; } }
+
+/* Deleted content (recentGhosts.ts): copies of the earlier rendering, cut out in rose.
+   Whole copies keep their look in quieter ink; in an earlier version of an edited block
+   only the removed characters stand out. Copies are never selected or printed. */
+.yy-recent-ghost {
+  --ghost-bg: light-dark(#fdf4f5, rgba(248, 81, 73, 0.07));
+  --ghost-bg-current: light-dark(#fbe9ec, rgba(248, 81, 73, 0.13));
+  --ghost-border: light-dark(#ebbac2, rgba(248, 81, 73, 0.34));
+  --ghost-strong: light-dark(#d76479, #e0646a);
+  --ghost-label: light-dark(#bf3a51, #ff9b93);
+  --ghost-label-bg: light-dark(#fbe2e6, #432329);
+  --ghost-del: light-dark(rgba(220, 53, 79, 0.17), rgba(248, 81, 73, 0.3));
+  --ghost-del-line: light-dark(#c4314a, #ff7b72);
+  --yy-primary: light-dark(#a3959a, #8a7c82);
+  user-select: none;
+  -webkit-user-select: none;
+}
+div.yy-recent-ghost {
+  position: relative;
+  margin: 1.15em 0 10px;
+  padding: 9px 11px;
+  border: 1px dashed var(--ghost-border);
+  border-radius: 8px;
+  background: var(--ghost-bg);
+  color: var(--yy-text-2);
+}
+.yy-content > div.yy-recent-ghost, .yy-article > div.yy-recent-ghost { margin-inline: -12px; }
+div.yy-recent-ghost.is-before { color: var(--yy-text-3); }
+div.yy-recent-ghost > :nth-child(2) { margin-top: 0; }
+div.yy-recent-ghost > :last-child { margin-bottom: 0; }
+.yy-recent-ghost-label {
+  position: absolute;
+  top: -9px;
+  left: 9px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--ghost-label-bg);
+  color: var(--ghost-label);
+  font: 500 11px/17px var(--yy-font);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+.yy-recent-ghost del {
+  border-radius: 2px;
+  background: var(--ghost-del);
+  text-decoration-line: line-through;
+  text-decoration-color: var(--ghost-del-line);
+  text-decoration-thickness: 1.5px;
+}
+.yy-recent-ghost del.is-plain { color: var(--yy-text); }
+/* An image, attachment or formula the edited block no longer has. */
+.yy-recent-ghost .yy-recent-lost { border-radius: 3px; background: var(--ghost-del); box-shadow: 0 0 0 2px var(--ghost-del); }
+.yy-recent-ghost img.yy-recent-lost { outline: 2px solid var(--ghost-del-line); outline-offset: 2px; }
+.yy-recent-ghost img { opacity: 0.72; }
+.yy-recent-ghost input { pointer-events: none; }
+li.yy-recent-ghost, .yy-recent-ghost :is(td, th) { color: var(--yy-text-2); }
+/* The cut-out reaches over the list marker, which stays where the list draws it. */
+li.yy-recent-ghost { position: relative; isolation: isolate; }
+li.yy-recent-ghost::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -2px -8px -2px -1.45em;
+  border: 1px dashed var(--ghost-border);
+  border-radius: 6px;
+  background: var(--ghost-bg);
+  pointer-events: none;
+}
+.yy-content ul[data-type='taskList'] > li.yy-recent-ghost::after { left: -8px; }
+li.yy-recent-ghost.is-before { color: var(--yy-text-3); }
+li.yy-recent-ghost[data-marker] { display: block; }
+li.yy-recent-ghost[data-marker]::before {
+  content: attr(data-marker);
+  position: absolute;
+  right: 100%;
+  margin-right: 0.45em;
+  color: var(--yy-text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+tr.yy-recent-ghost > :is(td, th), :is(td, th).yy-recent-ghost { background: var(--ghost-bg); }
+tr.yy-recent-ghost > :first-child { box-shadow: inset 3px 0 var(--ghost-border); }
+:is(td, th).yy-recent-ghost { outline: 1px dashed var(--ghost-border); outline-offset: -3px; }
+.yy-recent-ghost.is-current { --ghost-bg: var(--ghost-bg-current); --ghost-border: var(--ghost-strong); }
+/* Only the lost lines of edited code, numbered as they were. */
+.yy-content pre.yy-recent-ghost-code { margin: 0; padding: 8px 0; font-size: 12.5px; }
+.yy-recent-ghost-line { position: relative; display: block; min-height: 1.65em; padding: 0 12px 0 3.4em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.yy-recent-ghost-line:not(.is-gap) { background: rgba(248, 81, 73, 0.13); }
+.yy-recent-ghost-line::before { content: attr(data-line); position: absolute; left: 0; width: 2.4em; color: var(--yy-codeblock-muted); text-align: right; }
+.yy-recent-ghost-line.is-gap::before { content: '⋯'; }
+/* Each highlighted token is marked on its own; square ends join them into one run. */
+.yy-recent-ghost-code del { border-radius: 0; background: rgba(248, 81, 73, 0.32); color: inherit; text-decoration-color: #ff7b72; }
+/* A closed fold or callout says that it holds deleted content. */
+details.yy-fold-block:not([open]):has(.yy-recent-ghost) { border-style: dashed; border-color: light-dark(#ebbac2, rgba(248, 81, 73, 0.4)); }
+.callout.is-collapsed:has(.yy-recent-ghost) { outline: 1px dashed light-dark(#ebbac2, rgba(248, 81, 73, 0.4)); outline-offset: 2px; }
+@media print { .yy-recent-ghost { display: none !important; } }

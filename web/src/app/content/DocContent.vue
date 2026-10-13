@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { base, type ImageSizes } from '../../shared/api'
 import { stopLoading } from '../../shared/images'
 import { prefs } from '../prefs'
-import { cleanupCode, enhance } from './enhance'
+import { cleanupCode, enhance, enhanceCopy } from './enhance'
 import { reveal, setupFolds } from './folds'
 import Lightbox, { type LightboxImage } from './Lightbox.vue'
 import { clearMatches, showMatches } from './matches'
@@ -24,7 +24,13 @@ const router = useRouter()
 const root = ref<HTMLElement | null>(null)
 const emit = defineEmits<{ ready: [] }>()
 let sourceElements: Element[] = []
-defineExpose({ source: () => ({ root: root.value, elements: sourceElements }) })
+// Copies of earlier content shown by recent changes (recentGhosts.ts) draw like the page. Passed
+// to it rather than imported, so its lazily loaded code does not split the page's own modules.
+function prepareCopy(node: HTMLElement) {
+  prepareAttachmentCards(node)
+  void enhanceCopy(node).catch((e: unknown) => console.warn('enhance', e))
+}
+defineExpose({ source: () => ({ root: root.value, elements: sourceElements, prepare: prepareCopy }) })
 // Diagrams are drawn in the theme's colours; a theme change re-creates the content to redraw them.
 const generation = ref(0)
 let drawn: Promise<unknown> = Promise.resolve()
@@ -97,14 +103,16 @@ function onClick(e: MouseEvent) {
     attachment.value = { src: file.dataset.src!, name: file.dataset.name!, download: download.href, size: file.querySelector('.yy-attachment-size')?.textContent ?? '' }
     return
   }
+  // Copies of deleted content (recentGhosts.ts) only show what was there.
+  const copy = !!target.closest('.yy-recent-ghost')
   const title = target.closest('.callout[data-callout-fold] > .callout-title, .code-block > .code-title')
-  if (title && !target.closest('.yy-copy, .yy-code-wrap-btn, .yy-code-actions')) {
+  if (title && !copy && !target.closest('.yy-copy, .yy-code-wrap-btn, .yy-code-actions')) {
     title.parentElement?.classList.toggle('is-collapsed')
     return
   }
   // Linked images keep following their link.
-  if (target instanceof HTMLImageElement && !target.closest('a') && root.value) {
-    const all = [...root.value.querySelectorAll<HTMLImageElement>('img')].filter((img) => !img.closest('a'))
+  if (target instanceof HTMLImageElement && !copy && !target.closest('a') && root.value) {
+    const all = [...root.value.querySelectorAll<HTMLImageElement>('img')].filter((img) => !img.closest('a, .yy-recent-ghost'))
     images.value = all.map((img) => ({
       src: img.currentSrc || img.src, alt: img.alt,
       crop: parseRect(img.getAttribute('data-crop'), true),

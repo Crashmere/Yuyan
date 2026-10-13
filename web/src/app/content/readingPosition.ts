@@ -8,7 +8,7 @@ export interface ReadingPosition {
 }
 
 const readingTop = () => (document.querySelector('.yy-topbar')?.getBoundingClientRect().bottom ?? 0) + 16
-const readingBlocks = (root: Element) => [...root.children].filter((el) => !el.matches('.yy-code-fold, .yy-mermaid-error'))
+const readingBlocks = (root: Element) => [...root.children].filter((el) => !el.matches('.yy-code-fold, .yy-mermaid-error, .yy-recent-ghost'))
 
 export function captureBlockPosition(blocks: (Element | null)[], top: number): ReadingPosition | undefined {
   if (window.scrollY === 0) return

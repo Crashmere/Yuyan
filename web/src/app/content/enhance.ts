@@ -23,6 +23,13 @@ export async function enhance(root: HTMLElement, options: { math: boolean; merma
   await Promise.all([codeReady, options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
 }
 
+// Copies of earlier content (recentGhosts.ts) draw like the page but keep their code static:
+// code enhancement keys the reader's saved code preferences by block position.
+export async function enhanceCopy(root: HTMLElement) {
+  frameTables(root)
+  await Promise.all([renderMath(root), renderDiagrams(root)])
+}
+
 // Wide tables scroll sideways in a frame (shared/tableFrame.ts).
 function frameTables(root: HTMLElement) {
   for (const table of root.querySelectorAll('table')) {

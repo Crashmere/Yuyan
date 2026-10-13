@@ -13,6 +13,9 @@ interface Prefs {
   editorOutline: boolean
   readingOutline: boolean
   recentChanges: boolean
+  // Which kinds of recent changes the reading page shows: edited content and deleted content.
+  recentEdits: boolean
+  recentDeletions: boolean
   // Editing without the sidebar.
   focusMode: boolean
 }
@@ -42,6 +45,8 @@ export const prefs = reactive<Prefs>({
   editorOutline: true,
   readingOutline: true,
   recentChanges: false,
+  recentEdits: true,
+  recentDeletions: true,
   focusMode: false,
   ...load(),
 })
