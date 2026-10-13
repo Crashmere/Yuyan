@@ -41,25 +41,21 @@ const padX = 12, padY = 6
 interface Box { left: number; top: number; right: number; bottom: number }
 interface Block { changes: number[]; patch: number; target: Element; rect: DOMRect; lane: Element | null; ring: boolean; code: boolean; folded: boolean }
 
-function clipOf(el: Element, self: boolean): Box {
-  const box = { left: 0, top: 0, right: innerWidth, bottom: innerHeight }
-  for (let p: Element | null = self ? el : el.parentElement; p && p !== document.body; p = p.parentElement) {
-    const style = getComputedStyle(p), r = p.getBoundingClientRect()
-    if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) { box.left = Math.max(box.left, r.left); box.right = Math.min(box.right, r.right) }
-    if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) { box.top = Math.max(box.top, r.top); box.bottom = Math.min(box.bottom, r.bottom) }
+// What the scroll containers around el leave visible of the page, or null when none clip it.
+// overflow caches each ancestor's computed overflow for one paint.
+const clips = /(auto|scroll|hidden|clip)/
+function clipOf(el: Element, page: Box, overflow: Map<Element, [boolean, boolean]>): Box | null {
+  let box: Box | null = null
+  for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    let axes = overflow.get(p)
+    if (!axes) { const s = getComputedStyle(p); axes = [clips.test(s.overflowX), clips.test(s.overflowY)]; overflow.set(p, axes) }
+    if (!axes[0] && !axes[1]) continue
+    const r = p.getBoundingClientRect()
+    box ??= { ...page }
+    if (axes[0]) { box.left = Math.max(box.left, r.left); box.right = Math.min(box.right, r.right) }
+    if (axes[1]) { box.top = Math.max(box.top, r.top); box.bottom = Math.min(box.bottom, r.bottom) }
   }
   return box
-}
-
-// Range rectangles repeat for nested inline elements; overlapping marks would darken.
-function lineBoxes(rects: DOMRect[]): Box[] {
-  const out: Box[] = []
-  for (const r of rects.filter(r => r.width && r.height).sort((a, b) => a.left - b.left)) {
-    const line = out.find(o => Math.min(o.bottom, r.bottom) - Math.max(o.top, r.top) > Math.min(r.height, o.bottom - o.top) / 2 && r.left <= o.right + 2)
-    if (line) Object.assign(line, { left: Math.min(line.left, r.left), right: Math.max(line.right, r.right), top: Math.min(line.top, r.top), bottom: Math.max(line.bottom, r.bottom) })
-    else out.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom })
-  }
-  return out
 }
 
 // A stop is what one press of the navigation buttons shows: an edit patch with the deleted
@@ -107,29 +103,41 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
     })
     stops = [...list.values()].filter(s => s.elements.length).map(s => (s.elements.sort(documentOrder), s)).sort((a, b) => documentOrder(a.elements[0], b.elements[0]))
   }
-  // Code blocks stay dark in both themes, so their marks blend separately.
-  const layers = ['yy-recent-layer', 'yy-recent-layer is-code'].map(className => {
-    const layer = Object.assign(document.createElement('div'), { className })
-    layer.setAttribute('aria-hidden', 'true')
-    document.body.append(layer)
-    return layer
-  })
+  // The layer lies on the page, so scrolling moves it with the text without redrawing. Changed
+  // characters are highlights the browser draws with the text; code stays dark in both themes,
+  // so its highlight has a colour of its own.
+  const layer = Object.assign(document.createElement('div'), { className: 'yy-recent-layer' })
+  layer.setAttribute('aria-hidden', 'true')
+  document.body.append(layer)
+  const highlight = (text: Range[], code: Range[]) => {
+    if (!('highlights' in CSS)) return
+    for (const [name, ranges] of [['yy-recent', text], ['yy-recent-code', code]] as const) {
+      if (ranges.length) CSS.highlights.set(name, new Highlight(...ranges))
+      else CSS.highlights.delete(name)
+    }
+  }
   let frame = 0, destroyed = false, active = -1
   const paint = () => {
     frame = 0
-    const fills = document.createDocumentFragment(), code = document.createDocumentFragment()
-    if (!show.edits) { layers.forEach(l => l.replaceChildren()); return }
+    if (!show.edits) { layer.replaceChildren(); layer.style.height = ''; highlight([], []); return }
+    const fills = document.createDocumentFragment(), text: Range[] = [], code: Range[] = []
+    // WebKit blends only within the layer's own box, so it reaches down to the lowest patch.
+    // That patch lies within the content, so the layer never makes the page taller.
+    let extent = 0
+    // Measured on screen, placed relative to the page.
+    const origin = layer.getBoundingClientRect(), html = document.documentElement
+    const page = { left: origin.left, top: origin.top, right: origin.left + html.scrollWidth, bottom: origin.top + html.scrollHeight }
+    const overflow = new Map<Element, [boolean, boolean]>()
     // Copies of deleted content are real blocks: a patch stops at them instead of covering them.
     const cuts = show.deletions ? ghosts.flatMap(g => g.nodes).map(n => n.getBoundingClientRect()).filter(r => r.height) : []
     const across = (r: DOMRect, left: number, right: number) => r.left < right && r.right > left
     const root = options.root.getBoundingClientRect()
-    const add = (parent: Node, className: string, clip: Box, left: number, top: number, width: number, height: number) => {
+    const add = (parent: Node, className: string, at: { left: number; top: number }, left: number, top: number, width: number, height: number) => {
       const el = Object.assign(document.createElement('i'), { className })
-      Object.assign(el.style, { left: `${left - clip.left}px`, top: `${top - clip.top}px`, width: `${width}px`, height: `${height}px` })
+      Object.assign(el.style, { left: `${left - at.left}px`, top: `${top - at.top}px`, width: `${width}px`, height: `${height}px` })
       parent.appendChild(el)
       return el
     }
-    const clipped = (parent: Node, clip: Box) => add(parent, 'yy-recent-clip', { left: 0, top: 0, right: 0, bottom: 0 }, clip.left, clip.top, clip.right - clip.left, clip.bottom - clip.top)
 
     const blocks: Block[] = []
     changes.forEach((change, i) => {
@@ -153,6 +161,10 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
         lane: lane && options.root.contains(lane) ? lane : null, ring: !!codeBlock || (!folded && change.element.matches(ringed)),
       })
     })
+    for (const block of blocks) {
+      if (block.folded) continue
+      for (const i of block.changes) if (!changes[i].whole && !changes[i].full) (block.code ? code : text).push(...ranges(changes[i]))
+    }
 
     const groups: Block[][] = []
     for (const block of blocks) {
@@ -181,45 +193,38 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
         if (r.top >= tail.rect.bottom - 1 && r.top < bottom) bottom = r.top - 2
       }
       top = Math.round(top); bottom = Math.round(bottom); left = Math.round(left); right = Math.round(right)
-      const clip = clipOf(head.target, false)
-      if (Math.min(clip.right, right) <= Math.max(clip.left, left) || Math.min(clip.bottom, bottom) <= Math.max(clip.top, top)) continue
-      const box = clipped(fills, clip)
+      // Inside a scroll container (a wide table) a patch is cut to what the container shows.
+      const clip = clipOf(head.target, page, overflow)
+      if (clip && (Math.min(clip.right, right) <= Math.max(clip.left, left) || Math.min(clip.bottom, bottom) <= Math.max(clip.top, top))) continue
+      const at = clip ?? origin
+      const box = add(fills, clip ? 'yy-recent-clip' : 'yy-recent-group', origin, at.left, at.top, clip ? clip.right - clip.left : 0, clip ? clip.bottom - clip.top : 0)
+      extent = Math.max(extent, Math.min(bottom, clip?.bottom ?? bottom) - origin.top)
       if (head.patch === stops[active]?.patch) box.classList.add('is-current')
       // Fill the gaps between neighbouring blocks so a run of edits reads as one patch.
       group.forEach((block, k) => {
         const from = k ? Math.round((group[k - 1].rect.bottom + block.rect.top) / 2) : top
         const to = k < group.length - 1 ? Math.round((block.rect.bottom + group[k + 1].rect.top) / 2) : bottom
-        const segment = add(box, 'yy-recent-fill' + (k ? '' : ' is-first') + (block === tail ? ' is-last' : ''), clip, left, from, right - left, to - from)
+        const segment = add(box, 'yy-recent-fill' + (k ? '' : ' is-first') + (block === tail ? ' is-last' : ''), at, left, from, right - left, to - from)
         if (block.ring) {
           const r = block.rect, w = (n: number) => `${Math.max(0, n)}px`
           segment.classList.add('is-ring')
           segment.style.borderWidth = [r.top - from, right - r.right, to - r.bottom, r.left - left].map(w).join(' ')
         }
       })
-      add(box, 'yy-recent-stitch', clip, left + 3, top + 3, right - left - 6, bottom - top - 6)
-
-      for (const block of group) {
-        if (block.folded) continue
-        for (const i of block.changes) {
-          const change = changes[i]
-          if (change.whole || change.full) continue
-          const lines = lineBoxes(ranges(change).flatMap(r => [...r.getClientRects()]))
-          if (!lines.length) continue
-          const markClip = block.code ? clipOf(change.element, true) : clip
-          const marks = block.code ? clipped(code, markClip) : box
-          for (const l of lines) add(marks, 'yy-recent-mark', markClip, l.left - 1, l.top, l.right - l.left + 2, l.bottom - l.top)
-        }
-      }
+      add(box, 'yy-recent-stitch', at, left + 3, top + 3, right - left - 6, bottom - top - 6)
     }
-    layers[0].replaceChildren(fills)
-    layers[1].replaceChildren(code)
+    layer.replaceChildren(fills)
+    layer.style.height = `${Math.ceil(extent)}px`
+    highlight(text, code)
   }
   const schedule = () => { if (!destroyed && !frame) frame = requestAnimationFrame(paint) }
   const resize = new ResizeObserver(schedule)
   resize.observe(options.root); resize.observe(document.documentElement)
   const mutation = new MutationObserver(schedule)
   mutation.observe(options.root, { subtree: true, attributes: true, childList: true, characterData: true })
-  window.addEventListener('scroll', schedule, true)
+  // Only a scroll container holding a change (a wide table) moves patches against the page.
+  const scrolled = (e: Event) => { const t = e.target; if (t instanceof Element && changes.some(c => t.contains(c.element))) schedule() }
+  window.addEventListener('scroll', scrolled, { capture: true, passive: true })
   window.addEventListener('resize', schedule)
   const set = (next: Shown) => {
     if (next.deletions !== show.deletions) keepPlace(options.root, () => next.deletions ? showGhosts(ghosts, options.root, options.prepare) : hideGhosts(ghosts))
@@ -258,7 +263,7 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
     },
     destroy() {
       destroyed = true; cancelAnimationFrame(frame); resize.disconnect(); mutation.disconnect()
-      window.removeEventListener('scroll', schedule, true); window.removeEventListener('resize', schedule); layers.forEach(l => l.remove())
+      window.removeEventListener('scroll', scrolled, { capture: true }); window.removeEventListener('resize', schedule); layer.remove(); highlight([], [])
       keepPlace(options.root, () => hideGhosts(ghosts))
     },
   }

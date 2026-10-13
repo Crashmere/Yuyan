@@ -1,18 +1,21 @@
 /* A separate, non-interactive layer: nothing on the document itself is replaced.
-   The layer multiplies over light pages and screens over dark ones (and over code,
-   which is dark in both themes), so text keeps its colour and contrast. No motion. */
+   The layer multiplies over light pages and screens over dark ones, so text keeps its
+   colour and contrast. It lies on the page from its top-left corner and scrolls with it;
+   the width keeps patches from widening the page, the height is set to the lowest patch.
+   No motion. */
 .yy-recent-layer {
-  position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; mix-blend-mode: multiply;
-  --patch: #f5effd; --patch-current: #efe5fc; --patch-mark: #e2d2f8; --patch-stitch: #c3a6ea; --patch-stitch-current: #9a6fd9;
+  position: absolute; top: 0; left: 0; width: 100%; height: 0; overflow-x: clip; overflow-y: visible;
+  pointer-events: none; z-index: 4; mix-blend-mode: multiply;
+  --patch: #f5effd; --patch-current: #efe5fc; --patch-stitch: #c3a6ea; --patch-stitch-current: #9a6fd9;
 }
-:root[data-theme='dark'] .yy-recent-layer, .yy-recent-layer.is-code {
+:root[data-theme='dark'] .yy-recent-layer {
   mix-blend-mode: screen;
-  --patch: #161126; --patch-current: #201836; --patch-mark: #33265a; --patch-stitch: #4f3d78; --patch-stitch-current: #8466c0;
+  --patch: #161126; --patch-current: #201836; --patch-stitch: #4f3d78; --patch-stitch-current: #8466c0;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .yy-recent-layer {
     mix-blend-mode: screen;
-    --patch: #161126; --patch-current: #201836; --patch-mark: #33265a; --patch-stitch: #4f3d78; --patch-stitch-current: #8466c0;
+    --patch: #161126; --patch-current: #201836; --patch-stitch: #4f3d78; --patch-stitch-current: #8466c0;
   }
 }
 .yy-recent-layer i { position: absolute; display: block; box-sizing: border-box; }
@@ -22,11 +25,21 @@
 .yy-recent-fill.is-first { border-top-left-radius: 7px; border-top-right-radius: 7px; }
 .yy-recent-fill.is-last { border-bottom-left-radius: 7px; border-bottom-right-radius: 7px; }
 .yy-recent-stitch { border: 1px dashed var(--patch-stitch); border-radius: 5px; }
-.yy-recent-mark { background: var(--patch-mark); border-radius: 3px; }
 .is-current > .yy-recent-fill { background: var(--patch-current); }
 .is-current > .yy-recent-fill.is-ring { background: none; border-color: var(--patch-current); }
 .is-current > .yy-recent-stitch { border-color: var(--patch-stitch-current); }
-@media print { .yy-recent-layer { display: none; } }
+/* Changed characters are highlights beneath the text; the patch tints over them. Code is dark
+   in both themes. */
+::highlight(yy-recent) { background-color: rgba(140, 90, 220, 0.15); }
+::highlight(yy-recent-code) { background-color: rgba(160, 120, 240, 0.32); }
+:root[data-theme='dark'] ::highlight(yy-recent) { background-color: rgba(150, 110, 230, 0.24); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) ::highlight(yy-recent) { background-color: rgba(150, 110, 230, 0.24); }
+}
+@media print {
+  .yy-recent-layer { display: none; }
+  ::highlight(yy-recent), ::highlight(yy-recent-code) { background-color: transparent; }
+}
 
 /* Deleted content (recentGhosts.ts): copies of the earlier rendering, cut out in rose.
    Whole copies keep their look in quieter ink; in an earlier version of an edited block
