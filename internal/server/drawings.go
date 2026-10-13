@@ -20,6 +20,9 @@ func (s *Server) apiDrawing(r *http.Request) (any, error) {
 }
 
 func (s *Server) apiPutDrawing(w http.ResponseWriter, r *http.Request) error {
+	if err := requireJSON(r); err != nil {
+		return err
+	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, drawing.MaxBytes))
 	if err != nil {
 		return fmt.Errorf("%w: 画板包最大 12 MiB", errBadRequest)

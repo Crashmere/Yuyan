@@ -1,6 +1,7 @@
 package doc
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -46,6 +47,12 @@ func encoded(v any) string {
 }
 
 func SameContent(a, b Node) bool { return encoded(canonical(a)) == encoded(canonical(b)) }
+
+// ContentKey is equal for two documents exactly when SameContent reports them equal.
+func ContentKey(n Node) string {
+	sum := sha256.Sum256([]byte(encoded(canonical(n))))
+	return string(sum[:])
+}
 
 type changeBlock struct {
 	node    Node

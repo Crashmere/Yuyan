@@ -11,44 +11,6 @@ import (
 
 var ErrVersionNotFound = fmt.Errorf("%w: 历史版本已过期或不存在", ErrNotFound)
 
-// RecentChangeBase finds the start of the latest editing/restoring session. Autosave
-// checkpoints inside that session must not hide its earlier edits. Older clients
-// without session boundaries fall back to the newest different snapshot.
-func (s *Store) RecentChangeBase(ctx context.Context, d Doc) (*Version, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, doc_id, revision, title, reason, created_at, content
-FROM doc_versions WHERE doc_id = ? AND revision <= ? ORDER BY id DESC`, d.ID, d.Revision)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var fallback *Version
-	for rows.Next() {
-		var v Version
-		var content string
-		if err := rows.Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt, &content); err != nil {
-			return nil, err
-		}
-		v.Content, err = doc.Parse([]byte(content))
-		if err != nil {
-			return nil, err
-		}
-		if v.Reason == "before-edit" || v.Reason == "before-restore" {
-			return &v, nil
-		}
-		same := v.Title == d.Title && doc.SameContent(v.Content, d.Content)
-		if !same {
-			if fallback == nil {
-				copy := v
-				fallback = &copy
-			}
-			if v.Reason != "autosave" {
-				return &v, nil
-			}
-		}
-	}
-	return fallback, rows.Err()
-}
-
 type Version struct {
 	ID        int64    `json:"id"`
 	DocID     int64    `json:"docId"`
@@ -59,9 +21,10 @@ type Version struct {
 	Content   doc.Node `json:"content,omitempty"`
 }
 
-func (s *Store) Versions(ctx context.Context, docID int64) ([]Version, error) {
+// VersionHeads lists a document's snapshots newest first, without their content.
+func (s *Store) VersionHeads(ctx context.Context, docID int64) ([]Version, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_versions WHERE doc_id = ? ORDER BY id DESC`, docID)
+SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE doc_id = ? ORDER BY id DESC`, docID)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +32,7 @@ SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_version
 	var out []Version
 	for rows.Next() {
 		var v Version
-		var content string
-		if err := rows.Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt, &content); err != nil {
-			return nil, err
-		}
-		v.Content, err = doc.Parse([]byte(content))
-		if err != nil {
+		if err := rows.Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -104,18 +62,27 @@ SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_version
 	return v, err
 }
 
-// PreviousVersion is the snapshot recorded just before v, or ErrNotFound when v is the oldest.
-func (s *Store) PreviousVersion(ctx context.Context, v Version) (Version, error) {
-	var p Version
-	var content string
+// VersionHead is a snapshot without its content.
+func (s *Store) VersionHead(ctx context.Context, id int64) (Version, error) {
+	var v Version
 	err := s.DB.QueryRowContext(ctx, `
-SELECT id, doc_id, revision, title, reason, created_at, content FROM doc_versions WHERE doc_id = ? AND id < ? ORDER BY id DESC LIMIT 1`, v.DocID, v.ID).
-		Scan(&p.ID, &p.DocID, &p.Revision, &p.Title, &p.Reason, &p.CreatedAt, &content)
+SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE id = ?`, id).
+		Scan(&v.ID, &v.DocID, &v.Revision, &v.Title, &v.Reason, &v.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return v, ErrVersionNotFound
+	}
+	return v, err
+}
+
+// PreviousVersionHead is the snapshot recorded just before v, without its content, or
+// ErrNotFound when v is the oldest.
+func (s *Store) PreviousVersionHead(ctx context.Context, v Version) (Version, error) {
+	var p Version
+	err := s.DB.QueryRowContext(ctx, `
+SELECT id, doc_id, revision, title, reason, created_at FROM doc_versions WHERE doc_id = ? AND id < ? ORDER BY id DESC LIMIT 1`, v.DocID, v.ID).
+		Scan(&p.ID, &p.DocID, &p.Revision, &p.Title, &p.Reason, &p.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNotFound
-	}
-	if err == nil {
-		p.Content, err = doc.Parse([]byte(content))
 	}
 	return p, err
 }

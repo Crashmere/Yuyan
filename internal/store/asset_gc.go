@@ -12,8 +12,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"github.com/Crashmere/Yuyan/internal/doc"
 )
 
 const AssetGracePeriod = time.Hour
@@ -81,6 +79,11 @@ func (s *Store) InspectAssets(ctx context.Context) (AssetGCResult, error) {
 
 func (s *Store) collectAssets(ctx context.Context, dryRun bool) (AssetGCResult, error) {
 	var result AssetGCResult
+	// Parse new bodies before taking any lock; the pass below re-reads only what
+	// changed in between.
+	if _, err := s.media.refresh(ctx, s.DB); err != nil {
+		return result, err
+	}
 	lock, err := s.lockAssets(ctx, !dryRun)
 	if err != nil {
 		return result, err
@@ -98,7 +101,7 @@ func (s *Store) collectAssets(ctx context.Context, dryRun bool) (AssetGCResult, 
 			return result, err
 		}
 	}
-	refs, err := storedMediaReferences(ctx, tx)
+	refs, err := s.media.refresh(ctx, tx)
 	if err != nil {
 		return result, err // Unreadable content must stop collection, not hide references.
 	}
@@ -207,29 +210,6 @@ func readAssetGCStates(ctx context.Context, tx *sql.Tx) (map[string]assetGCState
 		states[name] = state
 	}
 	return states, rows.Err()
-}
-
-func storedMediaReferences(ctx context.Context, tx *sql.Tx) (map[string]bool, error) {
-	rows, err := tx.QueryContext(ctx, `SELECT content FROM docs UNION ALL SELECT content FROM doc_versions UNION ALL SELECT json_extract(value, '$.content') FROM meta WHERE key GLOB 'template:*'`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	refs := map[string]bool{}
-	for rows.Next() {
-		var raw string
-		if err := rows.Scan(&raw); err != nil {
-			return nil, err
-		}
-		n, err := doc.Parse([]byte(raw))
-		if err != nil {
-			return nil, fmt.Errorf("scan asset references: %w", err)
-		}
-		for id := range mediaReferences(n) {
-			refs[id] = true
-		}
-	}
-	return refs, rows.Err()
 }
 
 func (s *Store) collectibleFiles(ctx context.Context, tx *sql.Tx) (map[string]int64, error) {

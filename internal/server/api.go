@@ -219,41 +219,32 @@ func infoOf(v store.Version) versionInfo {
 	return versionInfo{ID: v.ID, DocID: v.DocID, Revision: v.Revision, Title: v.Title, Reason: v.Reason, CreatedAt: v.CreatedAt}
 }
 
-func summarizeVersion(v store.Version, previous *store.Version, current store.Doc) versionInfo {
-	info := infoOf(v)
-	info.MatchesCurrent = v.Title == current.Title && doc.SameContent(v.Content, current.Content)
-	if previous == nil {
-		label := "保留的最早版本"
-		if v.Revision == 1 && v.Reason == "create" {
-			label = "初始内容"
-		}
-		info.Summary = doc.ChangeSummary{Labels: []string{label}, Sections: []string{}}
-	} else {
-		info.Summary = doc.SummarizeChanges(previous.Title, previous.Content, v.Title, v.Content)
-	}
-	return info
-}
-
 func (s *Server) versions(r *http.Request) (any, error) {
 	d, err := s.liveDoc(r)
 	if err != nil {
 		return nil, err
 	}
-	list, err := s.store.Versions(r.Context(), d.ID)
+	heads, err := s.store.VersionHeads(r.Context(), d.ID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]versionInfo, len(list))
-	for i, v := range list {
+	l := &snapshots{ctx: r.Context(), store: s.store}
+	out := make([]versionInfo, len(heads))
+	for i, v := range heads {
 		var previous *store.Version
-		if i+1 < len(list) {
-			previous = &list[i+1]
+		if i+1 < len(heads) {
+			previous = &heads[i+1]
 		}
-		out[i] = summarizeVersion(v, previous, d)
+		if out[i], err = s.describeVersion(v, previous, d, l); err != nil {
+			return nil, err
+		}
 	}
 	var pending *doc.ChangeSummary
-	if len(list) > 0 && !out[0].MatchesCurrent {
-		summary := doc.SummarizeChanges(list[0].Title, list[0].Content, d.Title, d.Content)
+	if len(heads) > 0 && !out[0].MatchesCurrent {
+		summary, err := s.summaryToCurrent(heads[0], d, l)
+		if err != nil {
+			return nil, err
+		}
 		pending = &summary
 	}
 	return map[string]any{"doc": d.Meta(), "versions": out, "pending": pending}, nil
@@ -264,7 +255,7 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	v, err := s.store.GetVersion(r.Context(), id)
+	v, err := s.store.VersionHead(r.Context(), id)
 	if err != nil {
 		return nil, err
 	}
@@ -276,20 +267,28 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 		return nil, store.ErrNotFound
 	}
 	var previous *versionInfo
-	var previousVersion *store.Version
-	if p, err := s.store.PreviousVersion(r.Context(), v); err == nil {
+	var previousHead *store.Version
+	if p, err := s.store.PreviousVersionHead(r.Context(), v); err == nil {
 		info := infoOf(p)
 		previous = &info
-		previousVersion = &p
+		previousHead = &p
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return nil, err
 	}
-	res := render.Render(v.Content, render.Options{BasePath: s.base})
-	images, err := s.imageSizes(r, v.Content)
+	l := &snapshots{ctx: r.Context(), store: s.store}
+	info, err := s.describeVersion(v, previousHead, d, l)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"version": summarizeVersion(v, previousVersion, d), "previous": previous, "doc": d.Meta(), "html": res.HTML, "hasMath": res.HasMath, "hasMermaid": res.HasMermaid, "images": images}, nil
+	page, err := s.versionPage(v, l)
+	if err != nil {
+		return nil, err
+	}
+	images, err := s.store.AssetSizes(r.Context(), page.images)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"version": info, "previous": previous, "doc": d.Meta(), "html": page.HTML, "hasMath": page.HasMath, "hasMermaid": page.HasMermaid, "images": images}, nil
 }
 
 func (s *Server) trash(r *http.Request) (any, error) {

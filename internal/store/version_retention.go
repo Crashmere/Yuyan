@@ -42,6 +42,11 @@ func (s *Store) pruneVersions(ctx context.Context, dryRun, onlyIfDue bool) (Vers
 	now := s.now().UTC()
 	slot := versionRetentionSlot(now)
 	result := VersionRetentionResult{Cutoff: now.Add(-VersionRetention).Truncate(time.Millisecond), NextRun: slot.AddDate(0, 0, 1)}
+	if onlyIfDue {
+		if due, err := versionRetentionDue(ctx, s.DB, slot); err != nil || !due {
+			return result, err
+		}
+	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return result, err
@@ -53,19 +58,8 @@ func (s *Store) pruneVersions(ctx context.Context, dryRun, onlyIfDue bool) (Vers
 		}
 	}
 	if onlyIfDue {
-		var raw string
-		err := tx.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = ?`, versionRetentionKey).Scan(&raw)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		if due, err := versionRetentionDue(ctx, tx, slot); err != nil || !due {
 			return result, err
-		}
-		if err == nil {
-			last, err := time.Parse(time.RFC3339Nano, raw)
-			if err != nil {
-				return result, fmt.Errorf("invalid version retention state: %w", err)
-			}
-			if !last.Before(slot) {
-				return result, nil
-			}
 		}
 	}
 	cutoff := result.Cutoff.Format("2006-01-02T15:04:05.000Z")
@@ -121,6 +115,22 @@ func (s *Store) pruneVersions(ctx context.Context, dryRun, onlyIfDue bool) (Vers
 	}
 	result.Ran = true
 	return result, nil
+}
+
+func versionRetentionDue(ctx context.Context, q queryer, slot time.Time) (bool, error) {
+	var raw string
+	err := q.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = ?`, versionRetentionKey).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	last, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		return false, fmt.Errorf("invalid version retention state: %w", err)
+	}
+	return last.Before(slot), nil
 }
 
 // SQLite INTEGER PRIMARY KEY can reuse IDs after pruning the newest rows. Keep

@@ -24,9 +24,10 @@ var (
 )
 
 type Store struct {
-	DB  *sql.DB
-	dir string
-	now func() time.Time
+	DB    *sql.DB
+	dir   string
+	now   func() time.Time
+	media mediaIndex
 }
 
 const schema = `

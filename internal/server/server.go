@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"regexp"
 	"strings"
@@ -29,8 +30,10 @@ type Server struct {
 	shell     *template.Template
 	chromaCSS string
 
-	mu    sync.Mutex
-	cache map[int64]cachedRender
+	origin  *http.CrossOriginProtection
+	mu      sync.Mutex
+	cache   map[int64]cachedRender
+	history history
 }
 
 type entry struct {
@@ -39,8 +42,9 @@ type entry struct {
 }
 
 type cachedRender struct {
-	revision int64
-	result   render.Result
+	revision  int64
+	updatedAt string
+	result    render.Result
 }
 
 // New prepares the server. static is the Vite build output (web/dist); base is the public prefix,
@@ -49,7 +53,10 @@ func New(st *store.Store, static fs.FS, base string) (*Server, error) {
 	if !strings.HasPrefix(base, "/") || !strings.HasSuffix(base, "/") {
 		return nil, fmt.Errorf("base path %q must start and end with /", base)
 	}
-	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedRender{}}
+	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedRender{}, origin: http.NewCrossOriginProtection()}
+	s.origin.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusForbidden, apiError{Error: "cross_origin", Message: "拒绝来自其他网站的修改请求"})
+	}))
 	var err error
 	if s.entries, err = readManifest(static); err != nil {
 		return nil, err
@@ -180,7 +187,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("GET /api/versions/{id}/view", s.get(s.versionView))
 	mux.Handle("POST /api/versions/{id}/restore", s.write(s.apiRestoreVersion))
 	mux.Handle("POST /api/assets", s.write(s.apiUploadAsset))
-	mux.Handle("POST /api/attachments", http.NewCrossOriginProtection().Handler(s.write(s.apiUploadAttachment)))
+	mux.Handle("POST /api/attachments", s.write(s.apiUploadAttachment))
 	mux.Handle("GET /api/attachments/{id}/preview", s.get(s.attachmentPreview))
 	mux.Handle("GET /api/search", s.read(s.apiSearch))
 	mux.Handle("GET /api/trash", s.get(s.trash))
@@ -254,10 +261,11 @@ func (s *Server) get(load func(*http.Request) (any, error)) http.Handler {
 	})
 }
 
-// write wraps every state-changing API call. It is the single place where login will be enforced
-// once HTTPS and authentication are added; until then access is open by the user's decision.
+// write wraps every state-changing API call. Device authentication happens in the shared Nginx;
+// this keeps browsers from sending changes from other sites. Command-line clients send neither
+// Origin nor Sec-Fetch-Site and pass.
 func (s *Server) write(h func(http.ResponseWriter, *http.Request) error) http.Handler {
-	return s.read(h)
+	return s.origin.Handler(s.read(h))
 }
 
 var assetName = regexp.MustCompile(`^[0-9a-f]{32}\.(png|jpg|gif|webp|bmp)$`)
@@ -331,7 +339,17 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 const maxJSONBytes = 16 << 20
 
+func requireJSON(r *http.Request) error {
+	if media, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); media != "application/json" {
+		return badRequest("请求需要 Content-Type: application/json")
+	}
+	return nil
+}
+
 func readJSON(w http.ResponseWriter, r *http.Request, v any) error {
+	if err := requireJSON(r); err != nil {
+		return err
+	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxJSONBytes))
 	if err := dec.Decode(v); err != nil {
 		var maxBytes *http.MaxBytesError

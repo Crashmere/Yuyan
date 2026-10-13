@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Crashmere/Yuyan/internal/doc"
-	"github.com/Crashmere/Yuyan/internal/render"
 	"github.com/Crashmere/Yuyan/internal/store"
 )
 
@@ -22,17 +20,27 @@ func (s *Server) recentChanges(r *http.Request) (any, error) {
 	if revision := r.URL.Query().Get("revision"); revision != "" && revision != strconv.FormatInt(d.Revision, 10) {
 		return nil, conflictError{revision: d.Revision}
 	}
-	p, err := s.store.RecentChangeBase(r.Context(), d)
+	heads, err := s.store.VersionHeads(r.Context(), d.ID)
+	if err != nil {
+		return nil, err
+	}
+	l := &snapshots{ctx: r.Context(), store: s.store}
+	p, err := s.recentChangeBase(heads, d, l)
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]any{"revision": d.Revision, "baseline": nil}
 	if p != nil {
-		out["baseline"] = map[string]any{
-			"id": p.ID, "revision": p.Revision, "title": p.Title,
-			"html": render.Render(p.Content, render.Options{BasePath: s.base}).HTML,
+		page, err := s.versionPage(*p, l)
+		if err != nil {
+			return nil, err
 		}
-		out["summary"] = doc.SummarizeChanges(p.Title, p.Content, d.Title, d.Content)
+		summary, err := s.summaryToCurrent(*p, d, l)
+		if err != nil {
+			return nil, err
+		}
+		out["baseline"] = map[string]any{"id": p.ID, "revision": p.Revision, "title": p.Title, "html": page.HTML}
+		out["summary"] = summary
 	}
 	return out, nil
 }

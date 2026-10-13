@@ -150,12 +150,13 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 	}
 }
 
-// rendered caches page HTML by document revision; saves invalidate through forget.
+// rendered caches page HTML by document revision; saves invalidate through forget. A purged
+// document's ID can be reused, so the update time is compared as well.
 func (s *Server) rendered(d store.Doc) render.Result {
 	s.mu.Lock()
 	c, ok := s.cache[d.ID]
 	s.mu.Unlock()
-	if ok && c.revision == d.Revision {
+	if ok && c.revision == d.Revision && c.updatedAt == d.UpdatedAt {
 		return c.result
 	}
 	res := render.Render(d.Content, render.Options{BasePath: s.base})
@@ -163,7 +164,7 @@ func (s *Server) rendered(d store.Doc) render.Result {
 	if len(s.cache) >= 256 {
 		clear(s.cache)
 	}
-	s.cache[d.ID] = cachedRender{revision: d.Revision, result: res}
+	s.cache[d.ID] = cachedRender{revision: d.Revision, updatedAt: d.UpdatedAt, result: res}
 	s.mu.Unlock()
 	return res
 }

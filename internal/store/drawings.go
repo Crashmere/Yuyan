@@ -123,19 +123,29 @@ func (s *Store) drawingReferences(ctx context.Context, tx *sql.Tx, refs map[stri
 	if err != nil {
 		return err
 	}
-	for _, id := range ids {
+	packages, err := s.media.drawingFiles(ids, func(id string) ([]string, error) {
 		p, err := s.getDrawing(ctx, tx, id)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		files := make([]string, 0, len(p.Files))
+		for _, file := range p.Files {
+			files = append(files, file.Src)
+		}
+		return files, nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
 		state, tracked := states[id+".bin"]
 		if !refs[id] && tracked && s.now().UTC().Sub(state.UnreferencedAt) >= AssetGracePeriod {
 			continue
 		}
-		for _, file := range p.Files {
-			m := drawing.ImageSource.FindStringSubmatch(file.Src)
+		for _, src := range packages[id] {
+			m := drawing.ImageSource.FindStringSubmatch(src)
 			a, err := getAsset(ctx, tx, m[1])
-			if err != nil || a.URL != file.Src {
+			if err != nil || a.URL != src {
 				return fmt.Errorf("missing dependency of drawing %s", id)
 			}
 			refs[a.ID] = true
