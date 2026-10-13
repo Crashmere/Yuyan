@@ -3,6 +3,7 @@
 - [DESIGN.md](DESIGN.md)：需求、已确认的决策、架构与实施阶段，是方案讨论的统一入口。
 - [WHITEBOARD.md](WHITEBOARD.md)：已实现的 Excalidraw 画板、包格式、文档集成、素材生命周期与 Agent 入口；既有资料重绘另行执行。
 - [OPERATIONS.md](OPERATIONS.md)：安装、发布与回退、正式导入、备份与恢复、诊断。
+- [VERIFICATION.md](VERIFICATION.md)：各批次的验证、实测数据与上线核对记录，按 DESIGN 章节编号归档；新的记录写在这里。
 - [yuyan-doc 同步维护](#yuyan-doc-同步维护)：平台能力变更时，个人文档操作技能的更新范围与完成条件。
 - [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md)：已停止的 Obsidian 方案讨论记录，其中第 3 节的笔记库调查仍作为导入依据。
 
@@ -24,7 +25,7 @@
 
 新建与选区快捷键见 DESIGN.md 第 22 节：阅读时 Option/Alt+N 在当前目录新建文档；编辑时 Option/Alt+L 从文字与内容块逐层扩到所属章节、上级章节和全文；标题左侧统一显示层级与折叠按钮，整节移动通过编辑大纲拖动完成。
 
-图片裁切、互补切分、可选参数及四种范围的批量应用、图片组合画板见 DESIGN.md 19.2–19.3；格式兼容与验证见 OPERATIONS.md。
+图片裁切、互补切分、可选参数及四种范围的批量应用、图片组合画板见 DESIGN.md 19.2–19.3；格式兼容见 OPERATIONS.md，验证记录见 VERIFICATION.md。
 
 Markdown 之外的格式扩展第一批见 DESIGN.md 第 23 节：文字颜色、图片说明、合并/拆分单元格、单元格底色与可选表头。分栏见 DESIGN.md 23.7；附件见 DESIGN 23.8：插入菜单、拖入或粘贴文件，正文文件卡片可重命名，阅读时点击预览、独立按钮下载，支持图片/PDF/文本/音视频与压缩包目录，附件不设上传大小上限；连续一小时未被正文、历史、回收站或模板引用的附件与图片自动清理，已有备份保留；导入导出、历史、模板与原生备份一并支持。通用画板已实现：从插入菜单打开，可编辑形状/文字/绑定连线，内置数据库模板，支持导出重导与本机 Agent 生成，见 WHITEBOARD.md。
 
