@@ -9,8 +9,12 @@
 <link rel="apple-touch-icon" sizes="180x180" href="{{static "apple-touch-icon.png"}}?v=bird">
 <script>try{var d=document.documentElement,t=localStorage.getItem('yuyan:theme');if(t==='light'||t==='dark')d.dataset.theme=t}catch(e){}</script>
 <link rel="stylesheet" href="{{static "chroma.css"}}">
-{{range .Entry.CSS}}<link rel="stylesheet" href="{{static .}}">
-{{end}}<script type="module" src="{{static .Entry.JS}}"></script>
+{{range .Assets.CSS}}<link rel="stylesheet" href="{{static .}}">
+{{end}}<script type="module" src="{{static .Assets.JS}}"></script>
+{{range .Assets.Preload}}<link rel="modulepreload" href="{{static .}}">
+{{end}}{{range .Assets.ViewPreload}}<link rel="modulepreload" fetchpriority="low" href="{{static .}}">
+{{end}}{{range .Assets.ViewCSS}}<link rel="preload" as="style" crossorigin fetchpriority="low" href="{{static .}}">
+{{end}}
 </head>
 <body>
 <div id="app"></div>

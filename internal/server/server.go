@@ -29,6 +29,7 @@ type Server struct {
 	base      string
 	static    fs.FS
 	entries   map[string]entry
+	pages     map[route]pageAssets
 	shell     *template.Template
 	chromaCSS string
 
@@ -42,6 +43,8 @@ type Server struct {
 type entry struct {
 	JS  string
 	CSS []string
+	// Imports are the chunks it imports statically, directly or not.
+	Imports []string
 }
 
 type cachedRender struct {
@@ -60,8 +63,12 @@ func New(st *store.Store, static fs.FS, base string) (*Server, error) {
 	s.origin.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, apiError{Error: "cross_origin", Message: "拒绝来自其他网站的修改请求"})
 	}))
-	var err error
-	if s.entries, err = readManifest(static); err != nil {
+	entries, views, err := readManifest(static)
+	if err != nil {
+		return nil, err
+	}
+	s.entries = entries
+	if s.pages, err = newPages(entries["app"], views); err != nil {
 		return nil, err
 	}
 	if s.shell, err = s.parseShell(); err != nil {
@@ -70,51 +77,63 @@ func New(st *store.Store, static fs.FS, base string) (*Server, error) {
 	return s, nil
 }
 
-func readManifest(static fs.FS) (map[string]entry, error) {
+// readManifest returns the build's entries by name, and the chunks loaded on demand by source
+// path, such as "src/app/views/EditView.vue".
+func readManifest(static fs.FS) (entries, dynamic map[string]entry, err error) {
 	data, err := fs.ReadFile(static, "manifest.json")
 	if err != nil {
-		return nil, fmt.Errorf("frontend build missing (run npm --prefix web run build): %w", err)
+		return nil, nil, fmt.Errorf("frontend build missing (run npm --prefix web run build): %w", err)
 	}
 	var raw map[string]struct {
-		File    string   `json:"file"`
-		CSS     []string `json:"css"`
-		Imports []string `json:"imports"`
-		IsEntry bool     `json:"isEntry"`
-		Name    string   `json:"name"`
+		File           string   `json:"file"`
+		CSS            []string `json:"css"`
+		Imports        []string `json:"imports"`
+		IsEntry        bool     `json:"isEntry"`
+		IsDynamicEntry bool     `json:"isDynamicEntry"`
+		Name           string   `json:"name"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	// An entry needs its own CSS plus the CSS of every chunk it imports statically.
-	var collect func(key string, seen map[string]bool, css *[]string)
-	collect = func(key string, seen map[string]bool, css *[]string) {
-		if seen[key] {
-			return
-		}
-		seen[key] = true
-		chunk := raw[key]
-		for _, imp := range chunk.Imports {
-			collect(imp, seen, css)
-		}
-		for _, c := range chunk.CSS {
-			if !seen["css:"+c] {
-				seen["css:"+c] = true
-				*css = append(*css, c)
+	// A chunk needs every chunk it imports statically, and the CSS of all of them before its own.
+	closure := func(key string) entry {
+		e := entry{JS: raw[key].File}
+		seen := map[string]bool{}
+		var walk func(k string)
+		walk = func(k string) {
+			if seen[k] {
+				return
+			}
+			seen[k] = true
+			for _, imp := range raw[k].Imports {
+				walk(imp)
+			}
+			if k != key {
+				e.Imports = append(e.Imports, raw[k].File)
+			}
+			for _, c := range raw[k].CSS {
+				if !seen["css:"+c] {
+					seen["css:"+c] = true
+					e.CSS = append(e.CSS, c)
+				}
 			}
 		}
+		walk(key)
+		return e
 	}
-	out := map[string]entry{}
+	entries, dynamic = map[string]entry{}, map[string]entry{}
 	for key, v := range raw {
 		if v.IsEntry {
-			var css []string
-			collect(key, map[string]bool{}, &css)
-			out[v.Name] = entry{JS: v.File, CSS: css}
+			entries[v.Name] = closure(key)
+		}
+		if v.IsDynamicEntry {
+			dynamic[key] = closure(key)
 		}
 	}
-	if _, ok := out["app"]; !ok {
-		return nil, errors.New(`frontend entry "app" missing from manifest`)
+	if _, ok := entries["app"]; !ok {
+		return nil, nil, errors.New(`frontend entry "app" missing from manifest`)
 	}
-	return out, nil
+	return entries, dynamic, nil
 }
 
 // Handler routes requests. withPrefix also accepts the public prefix directly, standing in for

@@ -26,7 +26,7 @@ Yuyan 平台能力新增、修改或删除时，必须在同一任务中同步�
 - 阅读页在 Go 渲染的正文上由前端补充的行为集中在 `web/src/app/content`：`enhance.ts`（代码、表格、公式、图表、图片占位；宽表格的框在 `web/src/shared/tableFrame.ts`，编辑器也用）、`folds.ts`（按标题折叠，展开用 `reveal()`）、`matches.ts`（搜索高亮）。滚动到正文中某处之前先调用 `reveal()`，否则目标可能在折叠的节里。
 - 搜索面板的拼音由服务端 `internal/server/pinyin.go` 用 go-pinyin 词典生成（随 `/api/titles`、`/api/books` 返回，含多音字），前端 `web/src/shared/searchMatch.ts` 只负责匹配；不要在前端再引入拼音字典或用排序规则推算。斜杠插入菜单通过 `editor/insertSearch.ts` 共用匹配器；固定项目的逐字拼音、英文关键词与 Markdown 别名随 `editor/commands.ts` 维护，空查询仍显示最近使用。
 - 按钮的提示写在 `data-tip` 上，由 `web/src/ui/tooltip.ts` 统一显示；不要用 `title` 或组件库的 Tooltip 做按钮提示。阅读页和编辑页的大纲共用 `web/src/app/content/OutlinePanel.vue`（外观、固定与折叠）和 `outline.ts`（当前节的判定）。
-- 首次加载的脚本预算见 DESIGN 12.3。再增加按需加载的 Vue 组件时，Rolldown 会把 Vue 等共用代码拆出主包（首次加载多 2–4 KB）；按需加载的部分尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`。改动后用构建清单核对首次加载的分块。
+- 首次加载的脚本预算见 DESIGN 12.3：只有阅读页随应用入口加载，其他页面按需加载，页面外壳按地址预载对应页面的分块；新增按需页面同步登记 `internal/server/app.go` 的 `routeViews`，否则服务启动报错。按需加载的功能尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`；改动后用构建清单核对首次加载的分块。
 - 编辑器界面（`web/src/editor`）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格变化后统一列宽和列默认对齐，保留表头与合并结构，改动它或其他编辑器配置后，对正式实例运行 `roundtrip`（只读）确认现有文档不受影响；上传占位是装饰，不写入文档。
 - 格式刷由 `editor/formatPainter.ts` 管理临时采样和单次/连续模式，使用 `selectionContent.ts` 的真实选区范围；只复制文字视觉标记和段落样式，保留目标链接、图片与代码内容，每次应用单独撤销。顶部格式刷和清除格式共用 `FormatIcon.vue` 的滚筒/橡皮擦图标，交互见 DESIGN 23.5。
 - 文档写入使用 revision 检测冲突，不能静默覆盖；图片按内容寻址且不可覆盖。历史快照保留 30 天，每天北京时间 03:00 清理，不保底保留；`store/version_retention.go` 负责补跑、事务清理及历史 ID 高水位。首次保存记录“编辑前”（最新快照已是相同状态的会话边界且距过期超过一周时沿用），恢复时同事务记录“恢复前”，均适用 30 天期限；正常离开编辑页等待正文和快照完成。历史最后引用移除后，附件重新计时一小时；当前正文、回收站正文和模板继续保护素材。诊断使用 `history-gc --dry-run`。摘要由 `internal/doc/changes.go` 比较相邻快照生成，展示规则见 DESIGN 13.2，不依赖外部模型或数据库迁移。

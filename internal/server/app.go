@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/Crashmere/Yuyan/internal/render"
@@ -25,6 +26,61 @@ const (
 	routeTrash
 	routeNotFound
 )
+
+// routeViews are the views the app loads on demand, by source path as in the build manifest. The
+// reading page is part of the app entry.
+var routeViews = map[route]string{
+	routeHome:     "src/app/views/HomeView.vue",
+	routeBook:     "src/app/views/BookView.vue",
+	routeEdit:     "src/app/views/EditView.vue",
+	routeHistory:  "src/app/views/HistoryView.vue",
+	routeVersion:  "src/app/views/VersionView.vue",
+	routeSearch:   "src/app/views/SearchView.vue",
+	routeTrash:    "src/app/views/TrashView.vue",
+	routeNotFound: "src/app/views/NotFoundView.vue",
+}
+
+// pageAssets are what a page needs from the start: the app with every chunk it imports, and the
+// view when that is loaded on demand. Listing them all lets the browser fetch them at once instead
+// of discovering them one import at a time. The view's files are fetched at low priority, so a
+// large view such as the editor does not hold back the app, which shows the page meanwhile.
+type pageAssets struct {
+	JS      string
+	CSS     []string
+	Preload []string
+	// The app applies ViewCSS when it loads the view; the page only fetches it early.
+	ViewCSS     []string
+	ViewPreload []string
+}
+
+func newPages(app entry, views map[string]entry) (map[route]pageAssets, error) {
+	pages := map[route]pageAssets{routeDoc: {JS: app.JS, CSS: app.CSS, Preload: app.Imports}}
+	for rt, key := range routeViews {
+		view, ok := views[key]
+		if !ok {
+			return nil, fmt.Errorf("frontend view %q is not loaded on demand in the build", key)
+		}
+		p := pageAssets{JS: app.JS, CSS: app.CSS, Preload: app.Imports}
+		have := map[string]bool{app.JS: true}
+		for _, f := range append(slices.Clone(app.Imports), app.CSS...) {
+			have[f] = true
+		}
+		for _, f := range append([]string{view.JS}, view.Imports...) {
+			if !have[f] {
+				have[f] = true
+				p.ViewPreload = append(p.ViewPreload, f)
+			}
+		}
+		for _, c := range view.CSS {
+			if !have[c] {
+				have[c] = true
+				p.ViewCSS = append(p.ViewCSS, c)
+			}
+		}
+		pages[rt] = p
+	}
+	return pages, nil
+}
 
 type preloaded struct {
 	Status int `json:"status"`
@@ -57,7 +113,7 @@ func withID(r *http.Request, id int64) *http.Request {
 type shellData struct {
 	Base    string
 	Title   string
-	Entry   entry
+	Assets  pageAssets
 	Initial template.JS
 }
 
@@ -145,7 +201,7 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 		// With every "<" escaped, the data can neither end the script element nor open a comment
 		// in it; ">" and "&" mean nothing there.
 		initial = bytes.ReplaceAll(initial, []byte("<"), []byte(`\u003c`))
-		data := shellData{Base: s.base, Title: title, Entry: s.entries["app"], Initial: template.JS(initial)}
+		data := shellData{Base: s.base, Title: title, Assets: s.pages[rt], Initial: template.JS(initial)}
 		if err := s.shell.Execute(w, data); err != nil {
 			slog.Error("render shell", "path", r.URL.Path, "error", err)
 		}
