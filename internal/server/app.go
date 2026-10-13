@@ -1,7 +1,7 @@
 package server
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -133,7 +133,7 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 		} else {
 			title += " - 语燕"
 		}
-		initial, err := json.Marshal(p)
+		initial, err := marshalJSON(p)
 		if err != nil {
 			slog.Error("preload", "path", r.URL.Path, "error", err)
 			http.Error(w, "服务器出错，请稍后重试", http.StatusInternalServerError)
@@ -142,7 +142,9 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.WriteHeader(status)
-		// json.Marshal escapes <, > and &, so the data cannot end the script element early.
+		// With every "<" escaped, the data can neither end the script element nor open a comment
+		// in it; ">" and "&" mean nothing there.
+		initial = bytes.ReplaceAll(initial, []byte("<"), []byte(`\u003c`))
 		data := shellData{Base: s.base, Title: title, Entry: s.entries["app"], Initial: template.JS(initial)}
 		if err := s.shell.Execute(w, data); err != nil {
 			slog.Error("render shell", "path", r.URL.Path, "error", err)

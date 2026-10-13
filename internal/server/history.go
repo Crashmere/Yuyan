@@ -51,10 +51,10 @@ func remember[K comparable, V any](mu *sync.Mutex, m *map[K]V, limit int, key K,
 	(*m)[key] = value
 }
 
-func recall[K comparable, V any](mu *sync.Mutex, m map[K]V, key K) (V, bool) {
+func recall[K comparable, V any](mu *sync.Mutex, m *map[K]V, key K) (V, bool) {
 	mu.Lock()
 	defer mu.Unlock()
-	v, ok := m[key]
+	v, ok := (*m)[key]
 	return v, ok
 }
 
@@ -84,7 +84,7 @@ func (l *snapshots) get(id int64) (store.Version, error) {
 }
 
 func (s *Server) snapshotKey(v store.Version, l *snapshots) (string, error) {
-	if key, ok := recall(&s.history.mu, s.history.keys, v.ID); ok {
+	if key, ok := recall(&s.history.mu, &s.history.keys, v.ID); ok {
 		return key, nil
 	}
 	full, err := l.get(v.ID)
@@ -97,7 +97,7 @@ func (s *Server) snapshotKey(v store.Version, l *snapshots) (string, error) {
 }
 
 func (s *Server) currentKey(d store.Doc) string {
-	if c, ok := recall(&s.history.mu, s.history.current, d.ID); ok && c.revision == d.Revision && c.updatedAt == d.UpdatedAt {
+	if c, ok := recall(&s.history.mu, &s.history.current, d.ID); ok && c.revision == d.Revision && c.updatedAt == d.UpdatedAt {
 		return c.key
 	}
 	key := doc.ContentKey(d.Content)
@@ -114,7 +114,7 @@ func (s *Server) matchesCurrent(v store.Version, d store.Doc, l *snapshots) (boo
 }
 
 func (s *Server) summary(key summaryKey, compute func() (doc.ChangeSummary, error)) (doc.ChangeSummary, error) {
-	if summary, ok := recall(&s.history.mu, s.history.summaries, key); ok {
+	if summary, ok := recall(&s.history.mu, &s.history.summaries, key); ok {
 		return summary, nil
 	}
 	summary, err := compute()
@@ -157,7 +157,7 @@ func (s *Server) describeVersion(v store.Version, previous *store.Version, d sto
 }
 
 func (s *Server) versionPage(v store.Version, l *snapshots) (versionPage, error) {
-	if page, ok := recall(&s.history.mu, s.history.pages, v.ID); ok {
+	if page, ok := recall(&s.history.mu, &s.history.pages, v.ID); ok {
 		return page, nil
 	}
 	full, err := l.get(v.ID)

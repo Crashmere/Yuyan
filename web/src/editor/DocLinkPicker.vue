@@ -1,3 +1,10 @@
+<script lang="ts">
+import type { LinkTarget as Target } from '../shared/internalLinks'
+
+// The previous list shows at once while the current one loads, usually a 304 from the server.
+let lastTargets: Target[] | undefined
+</script>
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronDown, FileText, Hash } from 'lucide-vue-next'
@@ -6,14 +13,14 @@ import { linkChoices, type LinkChoice, type LinkTarget } from '../shared/interna
 import { setupLinkPreviews } from '../shared/linkPreview'
 
 const props = defineProps<{ query: string; command: (choice: LinkChoice) => void }>()
-const docs = ref<LinkTarget[]>([]), failure = ref(''), busy = ref(true), selected = ref(0), expanded = ref<number | null>(null)
+const docs = ref<LinkTarget[]>(lastTargets ?? []), failure = ref(''), busy = ref(!lastTargets), selected = ref(0), expanded = ref<number | null>(null)
 const root = ref<HTMLElement | null>(null)
 const items = computed(() => linkChoices(docs.value, props.query, expanded.value))
 let cleanup = () => {}, alive = true
 onMounted(async () => {
   if (root.value) cleanup = setupLinkPreviews(root.value)
-  try { const result = await api<LinkTarget[]>('link-targets'); if (alive) docs.value = result }
-  catch (e) { if (alive) failure.value = errorMessage(e) }
+  try { const result = await api<LinkTarget[]>('link-targets'); lastTargets = result; if (alive) docs.value = result }
+  catch (e) { if (alive && !lastTargets) failure.value = errorMessage(e) }
   finally { busy.value = false }
 })
 onBeforeUnmount(() => { alive = false; cleanup() })

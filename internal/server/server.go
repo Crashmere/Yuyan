@@ -2,10 +2,12 @@
 package server
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/maphash"
 	"html/template"
 	"io/fs"
 	"log/slog"
@@ -30,10 +32,11 @@ type Server struct {
 	shell     *template.Template
 	chromaCSS string
 
-	origin  *http.CrossOriginProtection
-	mu      sync.Mutex
-	cache   map[int64]cachedRender
-	history history
+	origin   *http.CrossOriginProtection
+	mu       sync.Mutex
+	cache    map[int64]cachedRender
+	history  history
+	headings headingCache
 }
 
 type entry struct {
@@ -249,16 +252,43 @@ func (s *Server) read(h func(http.ResponseWriter, *http.Request) error) http.Han
 	})
 }
 
-// get serves a read that pages also preload (see app.go), so both return the same JSON.
+// get serves a read that pages also preload (see app.go), so both return the same JSON. The
+// browser keeps the response and revalidates it by its ETag, a hash of the body: an unchanged
+// response costs a 304 instead of the transfer.
 func (s *Server) get(load func(*http.Request) (any, error)) http.Handler {
 	return s.read(func(w http.ResponseWriter, r *http.Request) error {
 		v, err := load(r)
 		if err != nil {
 			return err
 		}
-		writeJSON(w, http.StatusOK, v)
+		body, err := marshalJSON(v)
+		if err != nil {
+			return err
+		}
+		tag := fmt.Sprintf(`"%016x"`, maphash.Bytes(etagSeed, body))
+		w.Header().Set("Cache-Control", "private, no-cache")
+		w.Header().Set("ETag", tag)
+		if etagMatches(r.Header.Get("If-None-Match"), tag) {
+			w.WriteHeader(http.StatusNotModified)
+			return nil
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_, _ = w.Write(body)
 		return nil
 	})
+}
+
+var etagSeed = maphash.MakeSeed()
+
+// etagMatches reports whether an If-None-Match header lists tag. Nginx weakens the tags of the
+// responses it compresses; they still name the same body.
+func etagMatches(header, tag string) bool {
+	for t := range strings.SplitSeq(header, ",") {
+		if t = strings.TrimSpace(t); t == "*" || strings.TrimPrefix(t, "W/") == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // write wraps every state-changing API call. Device authentication happens in the shared Nginx;
@@ -334,7 +364,19 @@ func badRequest(format string, args ...any) error {
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(v)
+}
+
+// marshalJSON encodes like json.Marshal but keeps <, > and & as they are. Responses are served as
+// JSON with nosniff, and escaping would grow rendered pages, mostly HTML, by about half.
+func marshalJSON(v any) ([]byte, error) {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	err := enc.Encode(v)
+	return b.Bytes(), err
 }
 
 const maxJSONBytes = 16 << 20

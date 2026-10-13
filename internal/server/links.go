@@ -1,10 +1,12 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Crashmere/Yuyan/internal/doc"
 	"github.com/Crashmere/Yuyan/internal/render"
@@ -31,6 +33,20 @@ type linkTarget struct {
 	Headings []linkHeading `json:"headings"`
 }
 
+// headingCache keeps each document's headings by body version (see store.LinkDoc), so listing
+// link targets parses only bodies written since the previous listing.
+type headingCache struct {
+	mu   sync.Mutex
+	rows map[int64]docHeadings
+}
+
+type docHeadings struct {
+	version string
+	list    []linkHeading
+}
+
+const headingDocs = 8192
+
 func (s *Server) linkTargets(r *http.Request) (any, error) {
 	docs, err := s.store.LiveLinkDocs(r.Context())
 	if err != nil {
@@ -38,13 +54,24 @@ func (s *Server) linkTargets(r *http.Request) (any, error) {
 	}
 	out := []linkTarget{}
 	for _, d := range docs {
-		t := linkTarget{ID: d.ID, Title: d.Title, BookName: d.BookName, Pinyin: pinyinOf(d.Title), Headings: []linkHeading{}}
-		for _, h := range render.Headings(d.Content) {
-			if h.Text != "" {
-				t.Headings = append(t.Headings, linkHeading{h, pinyinOf(h.Text)})
+		h, ok := recall(&s.headings.mu, &s.headings.rows, d.ID)
+		if !ok || h.version != d.Version {
+			version, content, err := s.store.DocBody(r.Context(), d.ID)
+			if errors.Is(err, store.ErrNotFound) {
+				continue
 			}
+			if err != nil {
+				return nil, err
+			}
+			h = docHeadings{version: version, list: []linkHeading{}}
+			for _, heading := range render.Headings(content) {
+				if heading.Text != "" {
+					h.list = append(h.list, linkHeading{heading, pinyinOf(heading.Text)})
+				}
+			}
+			remember(&s.headings.mu, &s.headings.rows, headingDocs, d.ID, h)
 		}
-		out = append(out, t)
+		out = append(out, linkTarget{ID: d.ID, Title: d.Title, BookName: d.BookName, Pinyin: pinyinOf(d.Title), Headings: h.list})
 	}
 	return out, nil
 }
@@ -142,7 +169,10 @@ func (s *Server) backlinks(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	docs, err := s.store.LiveLinkDocs(r.Context())
+	// The href of a link here ends its path with /docs/<id>, followed by the end of the string, a
+	// heading or a query; other bodies cannot hold one. The walk below checks each candidate.
+	path := "/docs/" + strconv.FormatInt(target.ID, 10)
+	docs, err := s.store.LinkingDocs(r.Context(), path+`"`, path+"#", path+"?")
 	if err != nil {
 		return nil, err
 	}

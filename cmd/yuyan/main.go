@@ -151,6 +151,10 @@ func serve(dir, listen, base string, withPrefix bool) error {
 	gcDone := make(chan struct{})
 	go func() {
 		defer close(gcDone)
+		// Counting every document now keeps the first pages after a restart from doing it.
+		if _, err := s.DocumentStats(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("count documents", "error", err)
+		}
 		s.RunAssetGC(ctx)
 	}()
 	defer func() {

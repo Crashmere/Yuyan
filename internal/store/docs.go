@@ -407,8 +407,7 @@ INSERT INTO doc_versions(id, doc_id, revision, title, content, schema_version, r
 // Tree returns the live document tree of a knowledge base in display order.
 func (s *Store) Tree(ctx context.Context, bookID int64) ([]*TreeNode, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT id, parent_id, kind, title, updated_at, plain_text,
-  (SELECT count(*) FROM json_tree(docs.content) WHERE key = 'type' AND value = 'image')
+SELECT id, parent_id, kind, title, updated_at, `+docVersion+`
 FROM docs WHERE book_id = ? AND deleted_at IS NULL ORDER BY position, id`, bookID)
 	if err != nil {
 		return nil, err
@@ -416,22 +415,30 @@ FROM docs WHERE book_id = ? AND deleted_at IS NULL ORDER BY position, id`, bookI
 	defer rows.Close()
 	var all []*TreeNode
 	byID := map[int64]*TreeNode{}
+	versions := map[int64]string{}
 	for rows.Next() {
 		n := &TreeNode{}
 		var parent sql.NullInt64
-		var plainText string
-		if err := rows.Scan(&n.ID, &parent, &n.Kind, &n.Title, &n.UpdatedAt, &plainText, &n.Images); err != nil {
+		var version string
+		if err := rows.Scan(&n.ID, &parent, &n.Kind, &n.Title, &n.UpdatedAt, &version); err != nil {
 			return nil, err
 		}
-		n.Chars = doc.CountChars(plainText)
 		if parent.Valid {
 			n.ParentID = &parent.Int64
 		}
 		all = append(all, n)
 		byID[n.ID] = n
+		versions[n.ID] = version
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	counts, err := s.counts(ctx, versions)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range all {
+		n.Chars, n.Images = counts[n.ID].chars, counts[n.ID].images
 	}
 	var roots []*TreeNode
 	for _, n := range all {
