@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Crashmere/Yuyan/internal/doc"
@@ -165,16 +166,18 @@ FROM docs d JOIN books b ON b.id = d.book_id WHERE d.id = ?`, id).
 // SaveDoc replaces title and content when baseRevision matches; otherwise it returns ErrConflict
 // together with the current revision so the editor can warn instead of overwriting.
 func (s *Store) SaveDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision int64) (int64, string, error) {
-	return s.saveDoc(ctx, id, title, content, baseRevision, false)
+	return s.saveDoc(ctx, id, title, content, baseRevision, 0)
 }
 
 // The first save of an editing session keeps a fresh baseline for cancellation,
-// including media whose older history may expire while the editor stays open.
+// including media whose older history may expire while the editor stays open. A recent
+// version of the same state can serve instead (sessionStartRecorded). sessionRevision is
+// the revision the editor opened.
 func (s *Store) SaveEditingDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision, sessionRevision int64) (int64, string, error) {
-	return s.saveDoc(ctx, id, title, content, baseRevision, sessionRevision > 0 && sessionRevision == baseRevision)
+	return s.saveDoc(ctx, id, title, content, baseRevision, sessionRevision)
 }
 
-func (s *Store) saveDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision int64, sessionStart bool) (int64, string, error) {
+func (s *Store) saveDoc(ctx context.Context, id int64, title string, content doc.Node, baseRevision, sessionRevision int64) (int64, string, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		title = "无标题文档"
@@ -205,9 +208,15 @@ func (s *Store) saveDoc(ctx context.Context, id int64, title string, content doc
 		return current, "", err
 	}
 	now := s.stamp()
-	if sessionStart {
-		if err := insertVersion(ctx, tx, id, current, beforeTitle, beforeContent, "before-edit", now); err != nil {
+	reused := false
+	if sessionRevision > 0 && sessionRevision == baseRevision {
+		if reused, err = sessionStartRecorded(ctx, tx, id, current, beforeTitle, beforeContent, now); err != nil {
 			return current, "", err
+		}
+		if !reused {
+			if err := insertVersion(ctx, tx, id, current, beforeTitle, beforeContent, "before-edit", now); err != nil {
+				return current, "", err
+			}
 		}
 	}
 	next := current + 1
@@ -220,12 +229,25 @@ UPDATE docs SET title = ?, content = ?, schema_version = ?, plain_text = ?, revi
 	if err := tx.QueryRowContext(ctx, `SELECT max(created_at) FROM doc_versions WHERE doc_id = ?`, id).Scan(&last); err != nil {
 		return 0, "", err
 	}
+	started, ok := now, reused
+	if !ok && sessionRevision > 0 {
+		started, ok = s.sessions.get(id, sessionRevision)
+	}
+	if ok && (!last.Valid || started > last.String) {
+		last = sql.NullString{String: started, Valid: true}
+	}
 	if !last.Valid || olderThan(last.String, now, autosaveSnapshotInterval) {
 		if err := insertVersion(ctx, tx, id, next, title, string(data), "autosave", now); err != nil {
 			return 0, "", err
 		}
 	}
-	return next, now, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return 0, "", err
+	}
+	if reused {
+		s.sessions.set(id, current, now)
+	}
+	return next, now, nil
 }
 
 // DiscardEdits undoes an editing session. The document gets back the title, content and update
@@ -388,6 +410,57 @@ func olderThan(stamp, now string, d time.Duration) bool {
 	a, err1 := time.Parse(time.RFC3339Nano, stamp)
 	b, err2 := time.Parse(time.RFC3339Nano, now)
 	return err1 != nil || err2 != nil || b.Sub(a) >= d
+}
+
+// A version older than this has less than a week left before retention removes it.
+const sessionStartReuse = VersionRetention - 7*24*time.Hour
+
+// sessionStartRecorded reports whether the newest version can stand for the state an editing
+// session starts from, so that no "before-edit" copy of it is needed: it holds exactly that state,
+// it marks where the previous session ended (recent changes look for that boundary) and it will
+// outlive the session, keeping the media that the session removes.
+func sessionStartRecorded(ctx context.Context, tx *sql.Tx, docID, revision int64, title, content, now string) (bool, error) {
+	var last int64
+	var reason, created string
+	var same bool
+	err := tx.QueryRowContext(ctx, `SELECT revision, reason, created_at, title = ? AND content = ? FROM doc_versions WHERE doc_id = ? ORDER BY id DESC LIMIT 1`, title, content, docID).Scan(&last, &reason, &created, &same)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	boundary := reason == "session" || reason == "restore" || reason == "create"
+	return same && last == revision && boundary && !olderThan(created, now, sessionStartReuse), nil
+}
+
+// sessionStarts remembers when the editing sessions that reuse a version began, by document and
+// the revision the session opened. Their first automatic snapshot still comes ten minutes in, as
+// after a "before-edit" copy; after a restart it may come at the next save instead.
+type sessionStarts struct {
+	mu sync.Mutex
+	at map[int64]sessionStart
+}
+
+type sessionStart struct {
+	revision int64
+	at       string
+}
+
+func (s *sessionStarts) set(docID, revision int64, at string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.at == nil {
+		s.at = map[int64]sessionStart{}
+	}
+	s.at[docID] = sessionStart{revision, at}
+}
+
+func (s *sessionStarts) get(docID, revision int64) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	start, ok := s.at[docID]
+	return start.at, ok && start.revision == revision
 }
 
 func insertVersion(ctx context.Context, tx *sql.Tx, docID, revision int64, title, content, reason, now string) error {
