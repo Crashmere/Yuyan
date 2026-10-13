@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { prefs } from '../app/prefs'
 import { topbarHeight, useOutlineTracking } from '../app/content/outline'
@@ -13,23 +13,41 @@ const emit = defineEmits<{ navigate: [] }>()
 
 // Reuse the section index already cached by the editor. Update positions immediately after an
 // edit/undo, so dragging never starts from an outline still showing the previous document.
+// Positions change on almost every keystroke but are not shown, so they are updated in place and
+// the panel only renders again when a heading itself changes.
 const { editor } = useEditorContext()
-const entries = ref<(OutlineEntry & { pos: number })[]>([])
+const entries = shallowRef<(OutlineEntry & { pos: number })[]>([])
 const panel = ref<InstanceType<typeof OutlinePanel>>()
 let collectedDoc: PMNode | undefined
 let stopDrag: (() => void) | undefined
 
-const { active, refresh, jumped } = useOutlineTracking(
-  () => entries.value.map((h) => (editor.value?.view.nodeDOM(h.pos) as Element | null) ?? null),
-  () => topbarHeight() + 44 + 24,
-)
+// Looking up a heading's element walks the document from its start, so the elements are kept
+// until the headings change or ProseMirror replaces one of them.
+let elements: (Element | null)[] = []
+function headingElements() {
+  if (elements.length !== entries.value.length || elements.some(el => !el?.isConnected)) {
+    const view = editor.value?.view
+    elements = entries.value.map(h => (view?.nodeDOM(h.pos) as Element | null) ?? null)
+  }
+  return elements
+}
+
+const { active, refresh, jumped } = useOutlineTracking(headingElements, () => topbarHeight() + 44 + 24)
 
 // Keys stay the same while text elsewhere changes, so folded entries stay folded.
 function collect() {
   const e = editor.value
   if (!e) return
   collectedDoc = e.state.doc
-  entries.value = headingSections(e.state.doc).map(section => ({ key: section.id, level: section.level, text: section.node.textContent.trim() || '（空标题）', pos: section.pos }))
+  const sections = headingSections(e.state.doc)
+  const next = sections.map(section => ({ key: section.id, level: section.level, text: section.node.textContent.trim() || '（空标题）', pos: section.pos }))
+  const old = entries.value
+  if (next.length === old.length && next.every((h, i) => h.key === old[i].key && h.level === old[i].level && h.text === old[i].text)) {
+    next.forEach((h, i) => { old[i].pos = h.pos })
+  } else {
+    entries.value = next
+    elements = []
+  }
   refresh()
 }
 
@@ -68,6 +86,7 @@ watch(
     old?.off('transaction', refresh)
     e?.on('update', collect)
     e?.on('transaction', refresh)
+    elements = []
     collect()
   },
   { immediate: true },

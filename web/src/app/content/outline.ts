@@ -21,14 +21,8 @@ export function useOutlineTracking(headings: () => (Element | null)[], line: () 
     const left = scrollable - scrollY
     const at = span > 0 && left < span ? base + room * (1 - left / span) : base
     const els = headings()
-    let current = els.length ? 0 : -1
-    for (let i = 0; i < els.length; i++) {
-      const el = els[i]
-      if (!el?.getClientRects().length) continue
-      if (el.getBoundingClientRect().top > at) break
-      current = i
-    }
-    active.value = current
+    const current = lastAbove(els, at)
+    active.value = current < 0 && els.length ? 0 : current
   }
 
   function refresh() {
@@ -70,6 +64,24 @@ export function useOutlineTracking(headings: () => (Element | null)[], line: () 
     clearTimeout(stillTimer)
   })
   return { active, refresh, jumped }
+}
+
+// The last heading with a box whose top is at or above `at`, or -1. Headings are in document
+// order, so their tops only grow and a long outline needs only a few measurements.
+function lastAbove(els: (Element | null)[], at: number): number {
+  let lo = 0
+  let hi = els.length - 1
+  let found = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    let i = mid
+    while (i <= hi && !els[i]?.getClientRects().length) i++
+    if (i <= hi && els[i]!.getBoundingClientRect().top <= at) {
+      found = i
+      lo = i + 1
+    } else hi = mid - 1
+  }
+  return found
 }
 
 // The height of the top bar, from tokens.css.

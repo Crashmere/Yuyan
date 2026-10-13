@@ -4,7 +4,7 @@ import { VueNodeViewRenderer } from '@tiptap/vue-3'
 import CodeBlock from '@tiptap/extension-code-block'
 import FileHandler from '@tiptap/extension-file-handler'
 import { BlockMath, InlineMath } from '@tiptap/extension-mathematics'
-import { CharacterCount, Dropcursor, Gapcursor, Placeholder, TrailingNode, UndoRedo } from '@tiptap/extensions'
+import { Dropcursor, Gapcursor, Placeholder, TrailingNode, UndoRedo } from '@tiptap/extensions'
 import { Callout } from '../schema/callout'
 import { withTitles } from '../schema/codeBlock'
 import { schemaExtensions, YuyanImage, YuyanTable } from '../schema/extensions'
@@ -96,8 +96,6 @@ export function editorExtensions(ui: EditorUi, foldKey?: string, drawingRevision
     Dropcursor.configure({ width: 2, color: '#00b96b' }),
     Gapcursor,
     TrailingNode,
-    // Count characters other than whitespace, as the reading view does.
-    CharacterCount.configure({ textCounter: (text) => Array.from(text.replace(/\s/g, '')).length }),
     Placeholder.configure({
       placeholder: ({ node }) => (node.type.name === 'heading' ? '标题' : '输入 / 插入内容，也可以直接用 Markdown 语法'),
     }),

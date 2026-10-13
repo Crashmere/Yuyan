@@ -15,6 +15,7 @@ import { editorKey, type EditorUi } from './context'
 import EditorOutline from './EditorOutline.vue'
 import EditorToolbar from './EditorToolbar.vue'
 import { editorExtensions, imageTypes } from './extensions'
+import { countCharacters } from './characters'
 import { imageSizes } from './images'
 import type { Anchor } from './floating'
 import FindReplace from './FindReplace.vue'
@@ -360,11 +361,6 @@ watch(title, () => {
   void nextTick(autosizeTitle)
 })
 
-function characters(e: Pick<Editor, 'state' | 'storage'>): number {
-  let count = e.storage.characterCount.characters()
-  e.state.doc.descendants(node => { if (node.type.name === 'drawing') count += Array.from((String(node.attrs.text) + String(node.attrs.caption)).replace(/\s/g, '')).length })
-  return count
-}
 let previewCleanup = () => {}
 onMounted(async () => {
   const d = props.doc
@@ -372,7 +368,7 @@ onMounted(async () => {
     extensions: editorExtensions(ui, String(d.id), () => revision.value),
     content: d.content,
     onUpdate: ({ editor: ed }) => {
-      emit('words', characters(ed))
+      emit('words', countCharacters(ed.state.doc))
       changed()
     },
     onTransaction: ({ transaction, appendedTransactions }) => {
@@ -387,7 +383,7 @@ onMounted(async () => {
   })
   editor.value = e
   previewCleanup = setupLinkPreviews(e.view.dom)
-  emit('words', characters(e))
+  emit('words', countCharacters(e.state.doc))
   const draft = readDraft()
   if (draft && (draft.title !== d.title || JSON.stringify(draft.content) !== JSON.stringify(d.content))) draftOffer.value = draft
   else if (draft) localStorage.removeItem(draftKey)
