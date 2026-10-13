@@ -54,11 +54,11 @@ onMounted(() => {
   <main class="yy-page yy-narrow">
     <form class="yy-search-box" role="search" @submit.prevent="run(q)">
       <Search :size="18" />
-      <input ref="input" v-model="q" type="search" placeholder="搜索全部文档的标题和正文" aria-label="搜索" />
+      <input ref="input" v-model="q" type="search" placeholder="搜索标题和正文，多个词用空格分开" aria-label="搜索" />
     </form>
     <p v-if="failure" class="yy-page-error">搜索失败：{{ failure }}</p>
     <template v-else-if="searched">
-      <p class="yy-page-sub">“{{ searched }}”共 {{ hits.length }} 条结果{{ hits.length === 50 ? '（只显示前 50 条）' : '' }}</p>
+      <p class="yy-page-sub">“{{ searched }}”{{ hits.length === 50 ? '仅显示前 50 条结果，可以加入更多词缩小范围' : `共 ${hits.length} 条结果` }}</p>
       <ul class="yy-results">
         <li v-for="h in hits" :key="h.id">
           <RouterLink :to="{ path: `/docs/${h.id}`, query: { hl: searched } }" class="yy-result-title">

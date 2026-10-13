@@ -1,6 +1,7 @@
+import { termPattern } from '../../shared/searchMatch'
 import { reveal } from './folds'
 
-// Highlights what was searched for in a document opened from search results, and brings the first
+// Highlights the words searched for in a document opened from search results, and brings the first
 // match into view, opening folded sections, collapsed callouts and code blocks, and folded code on
 // the way. The highlights use the CSS Custom Highlight API, which leaves the content untouched;
 // without it the page only scrolls.
@@ -14,8 +15,8 @@ const skipped = '[data-type="inline-math"], [data-type="block-math"], code.langu
 const limit = 500
 
 export function findMatches(root: HTMLElement, query: string): Range[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return []
+  const pattern = termPattern(query)
+  if (!pattern) return []
   let text = ''
   const pieces: { node: Text; start: number }[] = []
   let block: Element | null = null
@@ -31,12 +32,11 @@ export function findMatches(root: HTMLElement, query: string): Range[] {
     pieces.push({ node: n as Text, start: text.length })
     text += (n as Text).data
   }
-  // Lower-casing a few characters changes the length; match those texts as written.
-  const lower = text.toLowerCase().length === text.length ? text.toLowerCase() : text
   const ranges: Range[] = []
   let k = 0
-  for (let i = lower.indexOf(q); i >= 0 && ranges.length < limit; i = lower.indexOf(q, i + q.length)) {
-    const end = i + q.length
+  for (let match = pattern.exec(text); match && ranges.length < limit; match = pattern.exec(text)) {
+    const i = match.index
+    const end = i + match[0].length
     while (k + 1 < pieces.length && pieces[k + 1].start <= i) k++
     let m = k
     while (m + 1 < pieces.length && pieces[m + 1].start < end) m++

@@ -1,4 +1,4 @@
-// Pinyin matching shared by the search panel and insert menu. Spellings use units separated by spaces:
+// Matching by words and by pinyin, shared by search and the insert menu. Spellings use units separated by spaces:
 // one per Chinese character with its readings separated by "/", and one per run of letters and
 // digits, e.g. "01 zui/cuo duan lu/luo" for 01 最短路. Each character can be typed in full
 // (zuiduanlu), by its initial (zdl) or partly (zuidl), starting at any character.
@@ -36,13 +36,27 @@ export function pinyinMatch(spelled: Units, q: string): number {
   return -1
 }
 
-// How well a title or name matches what was typed, for ordering: containing the text beats
-// matching its pinyin, and starting with it beats matching further in. 0 is no match.
+// The distinct space-separated words of a query; full-text search requires every one of them.
+export function searchTerms(query: string): string[] {
+  return [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))]
+}
+
+// Finds any word of the query, case-insensitively and the longer first where two start together.
+export function termPattern(query: string): RegExp | null {
+  const terms = searchTerms(query).sort((a, b) => b.length - a.length)
+  return terms.length ? new RegExp(terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gi') : null
+}
+
+// How well a title or name matches what was typed, for ordering: containing the text, or each of
+// its words, beats matching its pinyin, and starting with it beats matching further in. 0 is no match.
 export function score(text: string, spelled: Units, query: string): number {
   const q = query.trim().toLowerCase()
   if (!q) return 0
-  const i = text.toLowerCase().indexOf(q)
+  const lower = text.toLowerCase()
+  const i = lower.indexOf(q)
   if (i >= 0) return i === 0 ? 4 : 3
+  const terms = searchTerms(q)
+  if (terms.length > 1 && terms.every((t) => lower.includes(t))) return 3
   const p = pinyinQuery(q)
   const j = p ? pinyinMatch(spelled, p) : -1
   return j < 0 ? 0 : j === 0 ? 2 : 1
