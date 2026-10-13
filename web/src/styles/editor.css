@@ -545,6 +545,7 @@ body.yy-row-dragging * {
 }
 .yy-selection-toolbar {
   z-index: 40;
+  width: max-content;
   max-width: calc(100vw - 16px);
   flex-wrap: wrap;
 }

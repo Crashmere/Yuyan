@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
 import type { EditorView } from '@tiptap/pm/view'
-import { NodeSelection } from '@tiptap/pm/state'
+import { NodeSelection, PluginKey } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { ChevronDown, Link, Layers } from 'lucide-vue-next'
@@ -26,11 +26,26 @@ import { formatPainterState } from './formatPainter'
 const props = defineProps<{ hidden: boolean }>()
 const { editor, tick, ui } = useEditorContext()
 const stylesOpen = ref(false)
+const pluginKey = new PluginKey('bubbleMenu')
 const options = {
   offset: () => editor.value?.state.selection instanceof CellSelection || editor.value?.state.selection.empty ? 40 : 8,
   flip: () => ({ padding: { top: (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 8, left: 8, right: 8, bottom: 8 } }),
   shift: { padding: 8 },
 }
+
+// The plugin positions before Vue renders the selection's buttons. Update again after that
+// render, comparing selection/doc identities so the positioning-only transaction cannot loop.
+watch(
+  [
+    () => { void tick.value; return editor.value?.state.selection },
+    () => { void tick.value; return editor.value?.state.doc },
+  ],
+  () => {
+    const e = editor.value
+    if (e && !e.isDestroyed) e.view.dispatch(e.state.tr.setMeta(pluginKey, 'updatePosition'))
+  },
+  { flush: 'post' },
+)
 
 // A click inside the bubble makes the plugin ignore the next blur, so a panel opened from it
 // has to hide the bubble explicitly.
@@ -38,7 +53,7 @@ watch(
   () => props.hidden,
   (hidden) => {
     const e = editor.value
-    if (hidden && e) e.view.dispatch(e.state.tr.setMeta('bubbleMenu', 'hide'))
+    if (hidden && e) e.view.dispatch(e.state.tr.setMeta(pluginKey, 'hide'))
   },
 )
 
@@ -123,7 +138,7 @@ function anchor() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor && state" :editor="editor" :update-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar" :class="{ 'has-images': state.images, 'is-mixed': state.images && state.text }" role="toolbar" aria-label="选中内容">
+  <BubbleMenu v-if="editor && state" :plugin-key="pluginKey" :editor="editor" :update-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar" :class="{ 'has-images': state.images, 'is-mixed': state.images && state.text }" role="toolbar" aria-label="选中内容">
     <div v-if="state.text" class="yy-selection-text-tools" role="group" aria-label="文字格式">
       <div class="yy-bubble-styles">
         <button type="button" class="yy-bubble-select" @mousedown.prevent @click="stylesOpen = !stylesOpen">{{ state.style }}<ChevronDown :size="13" /></button>
