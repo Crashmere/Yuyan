@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { Eye, EyeOff, GripVertical } from 'lucide-vue-next'
 import FoldAllButton from '../../ui/FoldAllButton.vue'
 import IconButton from '../../ui/IconButton.vue'
@@ -44,10 +44,39 @@ function toggleAll() {
   if (hasExpanded.value) props.items.forEach((h, i) => parents.value[i] && folded.add(h.key))
   else folded.clear()
 }
+
+// A long outline follows the page: when the highlighted entry leaves the outline's scrolled area
+// it is brought to the middle, showing the sections ahead. Never while the pointer is over the
+// outline, where the list would move under it. Unpinned, the panel keeps its layout while hidden,
+// so it opens with the entry in view.
+const nav = ref<HTMLElement>()
+let pointerInside = false
+function hover(inside: boolean) {
+  pointerInside = inside
+}
+function scroller(): HTMLElement | undefined {
+  const panel = nav.value?.querySelector<HTMLElement>('.yy-toc-panel')
+  if (panel && panel.scrollHeight > panel.clientHeight) return panel
+  const aside = nav.value?.closest<HTMLElement>('.yy-doc-aside')
+  return aside && aside.scrollHeight > aside.clientHeight ? aside : undefined
+}
+function reveal() {
+  const entry = nav.value?.querySelector<HTMLElement>('a.active'), box = scroller()
+  if (pointerInside || !entry || !box) return
+  const view = box.getBoundingClientRect(), item = entry.getBoundingClientRect()
+  // The sticky head covers the top of the scrolled area.
+  const top = view.top + (nav.value!.querySelector('.yy-toc-head')?.getBoundingClientRect().height ?? 0)
+  if (item.top < top || item.bottom > view.bottom) box.scrollTop += item.top + item.height / 2 - (top + view.bottom) / 2
+}
+watch([highlighted, () => props.pinned], reveal, { flush: 'post' })
+// Also when the outline appears, as the drawer on narrow screens, or changes size.
+const resized = new ResizeObserver(() => reveal())
+onMounted(() => resized.observe(nav.value!))
+onBeforeUnmount(() => resized.disconnect())
 </script>
 
 <template>
-  <nav class="yy-toc" :class="{ 'is-peek': !pinned, 'can-reorder': reorderable }" aria-label="大纲">
+  <nav ref="nav" class="yy-toc" :class="{ 'is-peek': !pinned, 'can-reorder': reorderable }" aria-label="大纲" @pointerenter="hover(true)" @pointerleave="hover(false)">
     <div v-if="!pinned && items.length" class="yy-toc-lines" tabindex="0" aria-label="大纲">
       <span v-for="(h, i) in items" :key="h.key" :class="{ active: i === active }" :style="{ '--level': h.level - minLevel }"></span>
     </div>
