@@ -26,11 +26,15 @@ export function scrollToElement(target: Element, block: 'start' | 'center' = 'st
   if (!indicateHeading || !target.matches('h1,h2,h3,h4,h5,h6')) return
   const background = style.getPropertyValue('--yy-primary-soft').trim()
   const radius = style.getPropertyValue('--yy-radius').trim()
-  const animation = target.animate([
-    { backgroundColor: background, borderRadius: radius },
-    { backgroundColor: background, borderRadius: radius, offset: 2000 / 2200 },
-    { backgroundColor: style.backgroundColor, borderRadius: style.borderRadius },
-  ], { duration: 2200, easing: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'steps(1, end)' : 'linear' })
+  const original = { backgroundColor: style.backgroundColor, borderRadius: style.borderRadius }
+  const highlight = { backgroundColor: background, borderRadius: radius }
+  const frames = matchMedia('(prefers-reduced-motion: reduce)').matches ? [highlight, highlight] : [
+    { ...original, easing: 'ease-in-out' },
+    { ...highlight, offset: 500 / 2200 },
+    { ...highlight, offset: 1700 / 2200, easing: 'ease-in-out' },
+    original,
+  ]
+  const animation = target.animate(frames, { duration: 2200 })
   headingCue = animation
   animation.onfinish = () => { if (headingCue === animation) headingCue = undefined }
 }
