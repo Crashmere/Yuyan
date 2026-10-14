@@ -1768,8 +1768,12 @@ a.yy-catalog-title:hover {
   font-size: 13px;
 }
 
-/* Stays at the bottom of the viewport while reading, and rests after the pager at the end. */
-.yy-recent-dock { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 15; display: flex; justify-content: center; margin-top: 28px; pointer-events: none; }
+/* Match the end spacing to the sticky inset so the bar stays at the same height at the end. */
+.yy-doc-page:has(.yy-recent-dock) {
+  --yy-recent-bottom: calc(16px + env(safe-area-inset-bottom));
+  padding-bottom: var(--yy-recent-bottom);
+}
+.yy-recent-dock { position: sticky; bottom: var(--yy-recent-bottom); z-index: 15; display: flex; justify-content: center; margin-top: 28px; pointer-events: none; }
 .yy-recent-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; max-width: 100%; padding: 4px 6px 4px 12px; border: 1px solid var(--yy-border); border-radius: 999px; background: var(--yy-bg-elevated); box-shadow: var(--yy-shadow-popover); color: var(--yy-text-2); font-size: 13px; line-height: 20px; pointer-events: auto; }
 .yy-recent-bar:has(> .yy-recent-chip) { padding-left: 4px; }
 .yy-recent-swatch { flex: none; width: 14px; height: 14px; margin-right: 2px; border: 1px dashed light-dark(#b593e6, #7d62ad); border-radius: 4px; background: light-dark(#f2eafd, #2e2444); }
