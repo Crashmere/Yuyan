@@ -141,12 +141,26 @@ func checkBookAlive(ctx context.Context, q interface {
 }
 
 func (s *Store) GetDoc(ctx context.Context, id int64) (Doc, error) {
+	return s.getDoc(ctx, id, true)
+}
+
+// GetDocMeta reads a document like GetDoc but leaves out its body, for readers that may already
+// have it rendered.
+func (s *Store) GetDocMeta(ctx context.Context, id int64) (Doc, error) {
+	return s.getDoc(ctx, id, false)
+}
+
+func (s *Store) getDoc(ctx context.Context, id int64, body bool) (Doc, error) {
 	var d Doc
 	var parent sql.NullInt64
 	var content string
 	var deleted sql.NullString
+	column := `''`
+	if body {
+		column = `d.content`
+	}
 	err := s.DB.QueryRowContext(ctx, `
-SELECT d.id, d.book_id, d.parent_id, d.kind, d.title, d.content, d.revision, d.created_at, d.updated_at, d.deleted_at, b.name
+SELECT d.id, d.book_id, d.parent_id, d.kind, d.title, `+column+`, d.revision, d.created_at, d.updated_at, d.deleted_at, b.name
 FROM docs d JOIN books b ON b.id = d.book_id WHERE d.id = ?`, id).
 		Scan(&d.ID, &d.BookID, &parent, &d.Kind, &d.Title, &content, &d.Revision, &d.CreatedAt, &d.UpdatedAt, &deleted, &d.BookName)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -159,7 +173,9 @@ FROM docs d JOIN books b ON b.id = d.book_id WHERE d.id = ?`, id).
 		d.ParentID = &parent.Int64
 	}
 	d.DeletedAt = deleted.String
-	d.Content, err = doc.Parse([]byte(content))
+	if body {
+		d.Content, err = doc.Parse([]byte(content))
+	}
 	return d, err
 }
 

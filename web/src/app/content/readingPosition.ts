@@ -1,14 +1,19 @@
-import { reveal } from './folds'
+import { reveal, virtualBlocks } from './folds'
 
 // The rendered top-level blocks have the same order as the editor's document nodes. Page-only
-// controls are siblings too; they must not count as document blocks.
+// controls are siblings too; they must not count as document blocks. A placeholder for blocks
+// not loaded yet counts as those blocks, none of which can be an anchor.
 export interface ReadingPosition {
   block: number
   offset: number
 }
 
-const readingTop = () => (document.querySelector('.yy-topbar')?.getBoundingClientRect().bottom ?? 0) + 16
-const readingBlocks = (root: Element) => [...root.children].filter((el) => !el.matches('.yy-code-fold, .yy-mermaid-error, .yy-recent-ghost'))
+export const readingTop = () => (document.querySelector('.yy-topbar')?.getBoundingClientRect().bottom ?? 0) + 16
+const readingBlocks = (root: Element) => [...root.children].flatMap((el): (Element | null)[] => {
+  const shape = virtualBlocks.get(el)
+  if (shape) return Array<null>(shape.count).fill(null)
+  return el.matches('.yy-code-fold, .yy-mermaid-error, .yy-recent-ghost') ? [] : [el]
+})
 
 export function captureBlockPosition(blocks: (Element | null)[], top: number): ReadingPosition | undefined {
   if (window.scrollY === 0) return

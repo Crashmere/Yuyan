@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Ellipsis, FileDiff, FileText, Folder, GitCompareArrows, PencilLine, TableOfContents, X } from 'lucide-vue-next'
-import { api, ApiError, errorMessage, type DocView, type RecentChanges } from '../../shared/api'
+import { api, ApiError, errorMessage, type DocView, type ImageSizes, type RecentChanges } from '../../shared/api'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
 import { toast } from '../../ui/toast'
@@ -10,6 +10,7 @@ import { useModeShortcut } from '../modeShortcut'
 import { pageShortcutAllowed } from '../pageShortcut'
 import { newDoc, nodeMenu } from '../actions'
 import DocContent from '../content/DocContent.vue'
+import type { SegmentSource } from '../content/placeholders'
 import Backlinks from '../content/Backlinks.vue'
 import Toc from '../content/Toc.vue'
 import { prefs, recordView } from '../prefs'
@@ -31,6 +32,8 @@ const titleElement = ref<HTMLElement | null>(null)
 const changes = ref<RecentChanges | null>(null)
 const changesLoading = ref(false)
 const changesError = ref('')
+// Marking needs the whole document; a long one read in segments waits until the reader loads it.
+const changesNeedAll = ref(false)
 const changeCounts = ref({ edits: 0, deletions: 0 })
 const changeCount = ref(0)
 const changeAt = ref(0)
@@ -77,7 +80,7 @@ async function markChanges() {
   const source = content.value?.source()
   markers = showRecentChanges({
     root: source?.root ?? titleElement.value.closest<HTMLElement>('.yy-article')!, elements: source?.elements ?? [], prepare: source?.prepare,
-    html: view.value.html, beforeHTML: changes.value.baseline.html,
+    html: source?.html ?? view.value.html, beforeHTML: changes.value.baseline.html,
     title: titleElement.value, titleText: title.value, beforeTitle: changes.value.baseline.title,
   })
   changeCounts.value = markers.counts
@@ -86,8 +89,9 @@ async function markChanges() {
 
 async function loadChanges() {
   const request = ++changeRequest
-  clearMarkers(); changes.value = null; changesError.value = ''; changesLoading.value = false
+  clearMarkers(); changes.value = null; changesError.value = ''; changesLoading.value = false; changesNeedAll.value = false
   if (!prefs.recentChanges || view.value?.doc.kind !== 'doc') return
+  if (view.value.segments && !content.value?.complete()) { changesNeedAll.value = true; return }
   changesLoading.value = true
   try {
     const result = await api<RecentChanges>(`docs/${id}/recent-changes?revision=${view.value.doc.revision}`)
@@ -99,6 +103,9 @@ async function loadChanges() {
   } finally {
     if (!disposed && request === changeRequest) changesLoading.value = false
   }
+}
+async function loadAllForChanges() {
+  if (await content.value?.loadAll()) void loadChanges()
 }
 function contentReady() { void markChanges().catch(e => { changesError.value = errorMessage(e) }) }
 function nextChange(direction: number) { changeAt.value = markers?.go(direction) ?? 0 }
@@ -131,6 +138,18 @@ const children = computed(() => node.value ? node.value.children ?? [] : view.va
 const menu = computed(() => (view.value && node.value ? nodeMenu(view.value.doc.bookId, node.value, { history: true }) : []))
 const title = computed(() => node.value?.title ?? view.value?.doc.title ?? '')
 // A new document holds one empty paragraph; treat anything without text or visible blocks as empty.
+// A long document's segments load through the server's segment API, pinned to this version.
+const segments = computed<SegmentSource | undefined>(() => {
+  const v = view.value
+  if (!v?.segments) return undefined
+  const version = encodeURIComponent(v.segments.version)
+  return {
+    ...v.segments, toc: v.toc,
+    load: (from, to) => api<{ html: string; images: ImageSizes }>(`docs/${id}/segments?version=${version}&from=${from}&to=${to}`),
+    matches: q => api<{ segments: number[] }>(`docs/${id}/segments/matches?version=${version}&q=${encodeURIComponent(q)}`).then(r => r.segments),
+  }
+})
+const showHeading = (heading: string) => content.value?.show(heading) ?? Promise.resolve(null)
 const empty = computed(() => !!view.value && view.value.chars === 0 && !/<(img|table|pre|hr|div)\b/.test(view.value.html))
 // Titles shown on this page follow the tree, which stays current after renames elsewhere.
 const titleOf = (n: { id: number; title: string }) => locate(state.bookId, n.id)?.node.title ?? n.title
@@ -144,9 +163,22 @@ function changeDoc(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', changeDoc))
 onBeforeUnmount(() => window.removeEventListener('keydown', changeDoc))
 
+// The document changed, or the server restarted, while a long one was being read in segments:
+// read it again, and the content returns to where the reader was.
+async function reload() {
+  try {
+    const v = await api<DocView>(`docs/${id}/view?segments=1`)
+    if (!disposed) view.value = v
+  } catch (e) {
+    if (disposed) return
+    if (e instanceof ApiError && e.status === 404) missing.value = true
+    else toast(`重新载入失败：${errorMessage(e)}`, 'error')
+  }
+}
+
 onMounted(async () => {
   try {
-    const v = await loading(api<DocView>(`docs/${id}/view`))
+    const v = await loading(api<DocView>(`docs/${id}/view?segments=1`))
     if (disposed) return
     view.value = v
     setPage(v.doc.bookId, v.doc.id)
@@ -205,7 +237,7 @@ onMounted(async () => {
       <div v-else-if="empty" class="yy-empty-inline">
         这篇文档还是空的。<RouterLink :to="`/docs/${id}/edit`" class="yy-link-btn">开始写作</RouterLink>
       </div>
-      <DocContent v-else ref="content" :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" :highlight="highlight" :fold-key="String(view.doc.id)" :reading-position="readingPosition" @ready="contentReady" />
+      <DocContent v-else ref="content" :html="view.html" :math="view.hasMath" :mermaid="view.hasMermaid" :images="view.images" :highlight="highlight" :fold-key="String(view.doc.id)" :reading-position="readingPosition" :segments="segments" @ready="contentReady" @stale="reload" />
       <Backlinks v-if="view.doc.kind === 'doc'" :doc-id="id" />
       <nav v-if="view.prev || view.next" class="yy-pager">
         <RouterLink v-if="view.prev" :to="`/docs/${view.prev.id}`" class="prev">
@@ -229,6 +261,7 @@ onMounted(async () => {
           <template v-else>
             <span class="yy-recent-swatch" aria-hidden="true"></span>
             <span v-if="changesLoading">正在查找最近修改…</span>
+            <template v-else-if="changesNeedAll"><span>文档较长，标记修改前需要载入全文</span><button type="button" class="yy-link-btn" @click="loadAllForChanges">载入全文后标记</button></template>
             <template v-else-if="changesError"><span>{{ changesError }}</span><button type="button" class="yy-link-btn" @click="loadChanges">重试</button></template>
             <span v-else-if="changes && !changes.baseline">没有可比较的历史版本（历史保留 30 天）</span>
             <span v-else-if="changes?.baseline">没有可标记的修改<template v-if="changes.summary?.labels.length"> · {{ changes.summary.labels.join(' · ') }}</template></span>
@@ -240,7 +273,7 @@ onMounted(async () => {
       </div>
     </article>
     <aside v-if="view.toc.length" class="yy-doc-aside" :class="{ 'is-peek': !prefs.readingOutline }">
-      <Toc :items="view.toc" @navigate="tocOpen = false" />
+      <Toc :items="view.toc" :locate="segments ? showHeading : undefined" @navigate="tocOpen = false" />
     </aside>
     <div v-if="tocOpen" class="yy-aside-mask" @click="tocOpen = false"></div>
   </main>

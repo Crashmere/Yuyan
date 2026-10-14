@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -112,11 +113,20 @@ func (s *Server) titles(r *http.Request) (any, error) {
 }
 
 func (s *Server) liveDoc(r *http.Request) (store.Doc, error) {
+	return s.live(r, s.store.GetDoc)
+}
+
+// liveDocMeta is liveDoc without the document's body.
+func (s *Server) liveDocMeta(r *http.Request) (store.Doc, error) {
+	return s.live(r, s.store.GetDocMeta)
+}
+
+func (s *Server) live(r *http.Request, get func(context.Context, int64) (store.Doc, error)) (store.Doc, error) {
 	id, err := pathID(r)
 	if err != nil {
 		return store.Doc{}, err
 	}
-	d, err := s.store.GetDoc(r.Context(), id)
+	d, err := get(r.Context(), id)
 	if err == nil && d.DeletedAt != "" {
 		err = store.ErrNotFound
 	}
@@ -162,14 +172,33 @@ type docView struct {
 	Next       *docLink          `json:"next"`
 	Children   []*store.TreeNode `json:"children"`
 	Images     map[string][2]int `json:"images"`
+	// Segments describes a long document read in segments; HTML and Images then cover the
+	// first of them only (segments.go).
+	Segments *segmentsView `json:"segments,omitempty"`
 }
 
 // docView is what the reading view shows: rendered content, its outline, the neighbours in
-// reading order, and for groups the documents under them.
+// reading order, and for groups the documents under them. The whole content unless the
+// reading page asks for segments.
 func (s *Server) docView(r *http.Request) (any, error) {
-	d, err := s.liveDoc(r)
+	return s.readView(r, r.URL.Query().Get("segments") == "1")
+}
+
+// readingView is docView as the reading page asks for it, which the page shell preloads.
+func (s *Server) readingView(r *http.Request) (any, error) {
+	return s.readView(r, true)
+}
+
+func (s *Server) readView(r *http.Request, segmented bool) (any, error) {
+	d, err := s.liveDocMeta(r)
 	if err != nil {
 		return nil, err
+	}
+	var p *page
+	if d.Kind == "doc" {
+		if p, d, err = s.pageFor(r.Context(), d); err != nil {
+			return nil, err
+		}
 	}
 	tree, err := s.store.Tree(r.Context(), d.BookID)
 	if err != nil {
@@ -193,11 +222,13 @@ func (s *Server) docView(r *http.Request) (any, error) {
 			}
 		}
 	}
-	if d.Kind == "doc" {
-		res := s.rendered(d)
-		v.HTML, v.TOC, v.HasMath, v.HasMermaid = res.HTML, nonNil(res.TOC), res.HasMath, res.HasMermaid
-		v.Chars = doc.CountChars(doc.PlainText(d.Content))
-		if v.Images, err = s.imageSizes(r, d.Content); err != nil {
+	if p != nil {
+		v.HTML, v.TOC, v.HasMath, v.HasMermaid, v.Chars = p.HTML, nonNil(p.TOC), p.HasMath, p.HasMermaid, p.chars
+		assets := p.assets
+		if segmented && p.segments != nil {
+			v.HTML, v.Segments, assets = p.HTML[:p.segments[0].end], p.manifest(), p.segments[0].assets
+		}
+		if v.Images, err = s.store.AssetSizes(r.Context(), assets); err != nil {
 			return nil, err
 		}
 	}

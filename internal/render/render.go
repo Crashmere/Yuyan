@@ -33,6 +33,18 @@ type Result struct {
 	TOC        []Heading
 	HasMath    bool
 	HasMermaid bool
+	Blocks     []Block
+}
+
+// Block is a top-level block of the rendered HTML. Long documents are read in segments cut
+// between blocks (DESIGN 26.2), which need where each block ends and how many outline entries
+// and code blocks the page has up to there; a top-level heading also gives its level and ID.
+type Block struct {
+	End      int
+	Headings int
+	Codes    int
+	Level    int
+	ID       string
 }
 
 // Headings uses the reading renderer's identifiers without rendering code or media.
@@ -44,11 +56,7 @@ func Headings(n doc.Node) []Heading {
 	walk = func(n doc.Node) {
 		if n.Type == "heading" {
 			text := strings.TrimSpace(doc.TextContent(n))
-			level := n.AttrInt("level", 1)
-			if level < 1 || level > 6 {
-				level = 1
-			}
-			out = append(out, Heading{Level: level, Text: text, ID: r.slug(text)})
+			out = append(out, Heading{Level: headingLevel(n), Text: text, ID: r.slug(text)})
 		}
 		for _, c := range n.Content {
 			walk(c)
@@ -59,10 +67,13 @@ func Headings(n doc.Node) []Heading {
 }
 
 type renderer struct {
-	opt Options
-	b   strings.Builder
-	res Result
-	ids map[string]int
+	opt   Options
+	b     strings.Builder
+	res   Result
+	ids   map[string]int
+	codes int
+	// heading is the ID given to the last heading rendered.
+	heading string
 }
 
 func Render(n doc.Node, opt Options) Result {
@@ -70,9 +81,25 @@ func Render(n doc.Node, opt Options) Result {
 		opt.BasePath = "/"
 	}
 	r := &renderer{opt: opt, ids: map[string]int{}}
-	r.children(n)
+	r.res.Blocks = make([]Block, 0, len(n.Content))
+	for _, c := range n.Content {
+		r.node(c)
+		b := Block{End: r.b.Len(), Headings: len(r.res.TOC), Codes: r.codes}
+		if c.Type == "heading" {
+			b.Level, b.ID = headingLevel(c), r.heading
+		}
+		r.res.Blocks = append(r.res.Blocks, b)
+	}
 	r.res.HTML = r.b.String()
 	return r.res
+}
+
+func headingLevel(n doc.Node) int {
+	level := n.AttrInt("level", 1)
+	if level < 1 || level > 6 {
+		level = 1
+	}
+	return level
 }
 
 func (r *renderer) children(n doc.Node) {
@@ -106,17 +133,16 @@ func (r *renderer) node(n doc.Node) {
 		}
 		r.wrap("p", attrs, n)
 	case "heading":
-		level := n.AttrInt("level", 1)
-		if level < 1 || level > 6 {
-			level = 1
-		}
+		level := headingLevel(n)
 		tag := "h" + strconv.Itoa(level)
 		var attrs [][2]string
+		r.heading = ""
 		if !r.opt.Parity {
 			text := strings.TrimSpace(doc.TextContent(n))
 			id := r.slug(text)
 			if !r.opt.NoHeadingIDs {
 				attrs = append(attrs, [2]string{"id", id})
+				r.heading = id
 			}
 			if level <= 4 && text != "" {
 				r.res.TOC = append(r.res.TOC, Heading{Level: level, Text: text, ID: id})
@@ -542,6 +568,7 @@ func (r *renderer) codeBlock(n doc.Node) {
 }
 
 func (r *renderer) code(n doc.Node) {
+	r.codes++
 	lang := NormalizeLanguage(n.Attr("language"))
 	code := doc.TextContent(n)
 	var codeAttrs [][2]string

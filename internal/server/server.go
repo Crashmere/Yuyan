@@ -33,11 +33,13 @@ type Server struct {
 	shell     *template.Template
 	chromaCSS string
 
-	origin   *http.CrossOriginProtection
-	mu       sync.Mutex
-	cache    map[int64]cachedRender
-	history  history
-	headings headingCache
+	origin *http.CrossOriginProtection
+	mu     sync.Mutex
+	cache  map[int64]cachedPage
+	// rendering holds a channel for each document being rendered, closed when it is done.
+	rendering map[int64]chan struct{}
+	history   history
+	headings  headingCache
 }
 
 type entry struct {
@@ -47,10 +49,10 @@ type entry struct {
 	Imports []string
 }
 
-type cachedRender struct {
+type cachedPage struct {
 	revision  int64
 	updatedAt string
-	result    render.Result
+	page      *page
 }
 
 // New prepares the server. static is the Vite build output (web/dist); base is the public prefix,
@@ -59,7 +61,7 @@ func New(st *store.Store, static fs.FS, base string) (*Server, error) {
 	if !strings.HasPrefix(base, "/") || !strings.HasSuffix(base, "/") {
 		return nil, fmt.Errorf("base path %q must start and end with /", base)
 	}
-	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedRender{}, origin: http.NewCrossOriginProtection()}
+	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedPage{}, rendering: map[int64]chan struct{}{}, origin: http.NewCrossOriginProtection()}
 	s.origin.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, apiError{Error: "cross_origin", Message: "拒绝来自其他网站的修改请求"})
 	}))
@@ -197,6 +199,8 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("PATCH /api/docs/{id}", s.write(s.apiRenameDoc))
 	mux.Handle("DELETE /api/docs/{id}", s.write(s.apiDeleteDoc))
 	mux.Handle("GET /api/docs/{id}/view", s.get(s.docView))
+	mux.Handle("GET /api/docs/{id}/segments", s.read(s.docSegments))
+	mux.Handle("GET /api/docs/{id}/segments/matches", s.get(s.docSegmentMatches))
 	mux.Handle("POST /api/docs/{id}/move", s.write(s.apiMoveDoc))
 	mux.Handle("POST /api/docs/{id}/dissolve", s.write(s.apiDissolveGroup))
 	mux.Handle("POST /api/docs/{id}/extract", s.write(s.apiExtractGroup))
@@ -361,6 +365,8 @@ func errorResponse(err error) (int, apiError) {
 		return http.StatusUnprocessableEntity, apiError{Error: "missing_asset", Message: err.Error()}
 	case errors.Is(err, store.ErrVersionNotFound):
 		return http.StatusNotFound, apiError{Error: "version_not_found", Message: "历史版本已过期或不存在"}
+	case errors.Is(err, errStale):
+		return http.StatusConflict, apiError{Error: "stale", Message: "文档已更新，需要重新载入"}
 	case errors.Is(err, store.ErrNotFound):
 		return http.StatusNotFound, apiError{Error: "not_found", Message: "内容不存在或已删除"}
 	case errors.Is(err, store.ErrUnsupported):

@@ -193,6 +193,16 @@
       "description": "以项目 API 路由和 DESIGN.md 为准"
     },
     {
+      "method": "GET",
+      "path": "/api/docs/{id}/segments",
+      "description": "超长文档分段阅读：按版本标记取连续几段渲染 HTML 与其中图片尺寸，只读"
+    },
+    {
+      "method": "GET",
+      "path": "/api/docs/{id}/segments/matches",
+      "description": "超长文档分段阅读：列出含搜索词的段号，只读"
+    },
+    {
       "method": "POST",
       "path": "/api/docs/{id}/move",
       "description": "以项目 API 路由和 DESIGN.md 为准"

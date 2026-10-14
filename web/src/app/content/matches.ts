@@ -11,7 +11,7 @@ const name = 'yy-search'
 const blocks = '.yy-drawing-text, p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .yy-fold-title, .code-title, .yy-line, pre'
 // Formulas and diagrams are redrawn from their source; buttons and language labels are not part of
 // the text, nor are copies of deleted content shown by recent changes.
-const skipped = '[data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang, .yy-recent-ghost'
+const skipped = '[data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang, .yy-recent-ghost, .yy-segment'
 const limit = 500
 
 export function findMatches(root: HTMLElement, query: string): Range[] {
@@ -70,6 +70,18 @@ export function showMatches(root: HTMLElement, query: string): number {
   ;(at.closest('.yy-drawing') ?? at).scrollIntoView({ block: 'center' })
   at.closest('.yy-drawing')?.classList.add('yy-drawing-match')
   return ranges.length
+}
+
+// Highlights matches in content that joined the page later, such as a segment of a long document.
+export function addMatches(nodes: Element[], query: string) {
+  const highlight = 'highlights' in CSS ? CSS.highlights.get(name) : undefined
+  if (!highlight) return
+  for (const node of nodes) {
+    for (const range of findMatches(node as HTMLElement, query)) {
+      if (highlight.size >= limit) return
+      highlight.add(range)
+    }
+  }
 }
 
 export function clearMatches() {

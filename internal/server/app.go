@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 
-	"github.com/Crashmere/Yuyan/internal/render"
 	"github.com/Crashmere/Yuyan/internal/store"
 )
 
@@ -150,7 +149,7 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 				tree(v.(store.Book).ID)
 			}
 		case routeDoc:
-			if v, ok := main("docs/"+id+"/view", s.docView); ok {
+			if v, ok := main("docs/"+id+"/view?segments=1", s.readingView); ok {
 				d := v.(docView).Doc
 				title = d.Title
 				tree(d.BookID)
@@ -208,25 +207,8 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 	}
 }
 
-// rendered caches page HTML by document revision; saves invalidate through forget. A purged
-// document's ID can be reused, so the update time is compared as well.
-func (s *Server) rendered(d store.Doc) render.Result {
-	s.mu.Lock()
-	c, ok := s.cache[d.ID]
-	s.mu.Unlock()
-	if ok && c.revision == d.Revision && c.updatedAt == d.UpdatedAt {
-		return c.result
-	}
-	res := render.Render(d.Content, render.Options{BasePath: s.base})
-	s.mu.Lock()
-	if len(s.cache) >= 256 {
-		clear(s.cache)
-	}
-	s.cache[d.ID] = cachedRender{revision: d.Revision, updatedAt: d.UpdatedAt, result: res}
-	s.mu.Unlock()
-	return res
-}
-
+// forget drops a document's cached page after a save; the cache also compares the revision and
+// update time, as a purged document's ID can be reused.
 func (s *Server) forget(id int64) {
 	s.mu.Lock()
 	delete(s.cache, id)

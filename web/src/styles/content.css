@@ -184,6 +184,43 @@ details.yy-fold-block[open] > .yy-fold-title::after { transform: rotate(90deg); 
 .yy-folded-away {
   display: none !important;
 }
+/* Segments of a long document not loaded yet (segments.ts): faint lines of text at the height the
+   segment is expected to take. */
+.yy-content > .yy-segment {
+  position: relative;
+  overflow: hidden;
+  margin: 0;
+  background: repeating-linear-gradient(to bottom, var(--yy-bg-muted) 0 0.9em, transparent 0.9em 1.75em);
+  background-clip: content-box;
+  padding: 0.4em 0;
+}
+.yy-segment-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.yy-content > .yy-segment.is-failed {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  background: none;
+  padding-top: 1em;
+}
+/* Printing from the browser's menu does not wait for a long document to load (DocContent.vue). */
+@media print {
+  .yy-content > .yy-segment {
+    height: auto !important;
+    padding: 0.5em 0;
+    background: none;
+    color: var(--yy-text-3);
+  }
+  .yy-content > .yy-segment::before {
+    content: '这里还有内容没有载入，载入全文后重新打印';
+  }
+}
 @media (hover: none) {
   .yy-heading-tools {
     opacity: 0.6;

@@ -72,6 +72,24 @@ export interface DocView {
   next: { id: number; title: string } | null
   children: TreeNode[]
   images: ImageSizes
+  // A long document read in segments (DESIGN 26.2): html and images cover the first one only.
+  segments?: Segments
+}
+
+export interface Segments {
+  version: string
+  items: SegmentInfo[]
+}
+
+// heads are the top-level headings: block within the segment, level, outline index or (for a
+// heading outside the outline) ID, and 1 if it can be folded.
+export interface SegmentInfo {
+  blocks: number
+  bytes: number
+  codes: number
+  toc: number
+  images: number
+  heads?: [number, number, number | string, 0 | 1][]
 }
 
 export interface ChangeSummary {

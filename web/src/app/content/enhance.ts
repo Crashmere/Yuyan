@@ -14,13 +14,15 @@ export function cleanupCode(root: HTMLElement) { cleanups.get(root)?.forEach(cle
 
 // What the server-rendered HTML leaves to the browser: space for images, code lines, folding and
 // copy buttons, formulas and diagrams. KaTeX and Mermaid load only for pages that contain them.
-// The returned promise settles once formulas and diagrams are drawn.
-export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }) {
-  cleanupCode(root)
-  if (options.images) reserveImageSpace(root, options.images)
-  const codeReady = enhanceCode(root)
-  frameTables(root)
-  await Promise.all([codeReady, options.math && renderMath(root), options.mermaid && renderDiagrams(root)])
+// The returned promise settles once formulas and diagrams are drawn. A segment of a long document
+// (segments.ts) is enhanced as scope, before it joins root; firstCode is the number of code blocks
+// before it in the document.
+export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }, scope = root, firstCode = 0) {
+  if (scope === root) cleanupCode(root)
+  if (options.images) reserveImageSpace(scope, options.images)
+  const codeReady = enhanceCode(root, scope, firstCode)
+  frameTables(scope)
+  await Promise.all([codeReady, options.math && renderMath(scope), options.mermaid && renderDiagrams(scope)])
 }
 
 // Copies of earlier content (recentGhosts.ts) draw like the page but keep their code static:
@@ -44,12 +46,12 @@ function frameTables(root: HTMLElement) {
 // Longer code blocks start folded to about this many lines.
 const foldLines = 30
 
-function enhanceCode(root: HTMLElement) {
-  const cleanup: (() => void)[] = []
+function enhanceCode(root: HTMLElement, scope: HTMLElement, first: number) {
+  const cleanup = cleanups.get(root) ?? []
   const restoring: Promise<unknown>[] = []
   cleanups.set(root, cleanup)
-  let index = 0
-  for (const pre of root.querySelectorAll<HTMLElement>('pre')) {
+  let index = first
+  for (const pre of scope.querySelectorAll<HTMLElement>('pre')) {
     const code = pre.querySelector('code')
     if (!code || pre.dataset.enhanced) continue
     pre.dataset.enhanced = '1'
