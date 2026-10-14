@@ -54,6 +54,8 @@ v2 备份保持不变，画板包与依赖图片均随已登记素材保存。�
 
 只读诊断 `yuyan images --data <数据目录>` 汇总已处理数、有版本数、各原因计数、版本占用的空间，以及有版本的图片在手机和 2 倍屏桌面上估计的传输量。原因：small（小于 128 KiB）、animated、palette、cmyk、hdr、orientation（PNG/WebP 自带方向）、profile（色彩配置异常）、large（超过解码限度）、decode、none（没有值得保留的版本）、error。日志 `display versions: backfill done` 记录一轮补齐的处理数与有版本数，单张失败记录 `display versions` 及原因。完全重建时停服务、删除 `data/derived/images` 后启动；运行中删除也安全，缺失的文件改为返回原图，打开页面时重新生成。
 
+补齐读写的图片会进入页缓存，`MemoryCurrent` 和 `MemoryPeak` 可以到达 384M 上限；判断内存压力看 `memory.stat` 的 anon、`memory.pressure` 和 `memory.events` 的 oom_kill。门户恢复包按目录复制数据根中原生快照以外的文件，目前会带上 `derived/`（正式实例约 170 MB）。
+
 ## 布局
 
 文档模板与内容片段存放于既有 `meta` 表的 `template:<id>`，包含独立 revision、正文 JSON 和格式版本，无数据库迁移。备份仍为整个 SQLite 快照和全部登记图片、附件，源文档删除后仍保留模板引用的图片，模板可独立复用；恢复模板库需走原生备份恢复，知识库 Markdown 导出不包含模板库。链接选择、预览与文末反向链接从存活正文推导，不新增索引文件或数据目录。接口及交互见 DESIGN 第 24 节，门户 API 声明同步维护。
