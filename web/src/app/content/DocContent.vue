@@ -10,6 +10,7 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import { useRouter } from 'vue-router'
 import { base, errorMessage, type ImageSizes } from '../../shared/api'
 import { knownSize, stopLoading } from '../../shared/images'
+import { scrollToElement } from '../../shared/scroll'
 import { toast } from '../../ui/toast'
 import { prefs } from '../prefs'
 import { cleanupCode, enhance, enhanceCopy } from './enhance'
@@ -58,6 +59,7 @@ let drawn: Promise<unknown> = Promise.resolve()
 let initialPosition = props.readingPosition
 let previewCleanup = () => {}
 let runs = 0
+let jumpSequence = 0
 const warn = (e: unknown) => console.warn('enhance', e)
 
 async function run() {
@@ -123,11 +125,10 @@ async function show(id: string): Promise<HTMLElement | null> {
 }
 
 async function scrollTo(id: string, smooth = false) {
+  const sequence = ++jumpSequence, run = runs
   const target = await show(id)
-  if (!target) return
-  // A smooth scroll far through a long document would pass placeholders and load them on the way.
-  const far = !!reader && Math.abs(target.getBoundingClientRect().top) > innerHeight * 2
-  target.scrollIntoView({ behavior: smooth && !far ? 'smooth' : 'auto' })
+  if (!target || sequence !== jumpSequence || run !== runs) return
+  scrollToElement(target, 'start', smooth)
 }
 
 async function loadAll(): Promise<boolean> {

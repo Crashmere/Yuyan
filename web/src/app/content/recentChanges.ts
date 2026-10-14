@@ -1,3 +1,4 @@
+import { scrollToElement } from '../../shared/scroll'
 import { reveal } from './folds'
 import { collect, compare, skipped, type Change } from './recentDiff'
 import { findGhosts, hideGhosts, keepPlace, showGhosts, type Ghost } from './recentGhosts'
@@ -256,7 +257,7 @@ export function showRecentChanges(options: { root: HTMLElement; elements: Elemen
       // Centre the whole stop; a tall one starts below the top bar.
       const first = stop.elements[0] as HTMLElement, height = stop.elements[stop.elements.length - 1].getBoundingClientRect().bottom - first.getBoundingClientRect().top
       first.style.scrollMarginTop = `${Math.max(88, (innerHeight - height) / 2)}px`
-      first.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' })
+      scrollToElement(first)
       first.style.scrollMarginTop = ''
       schedule()
       return active + 1

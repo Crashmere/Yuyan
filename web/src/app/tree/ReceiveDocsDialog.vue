@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { BookOpen, ChevronRight, FileText, Folder } from 'lucide-vue-next'
 import { errorMessage, type TreeNode } from '../../shared/api'
+import { scrollToPosition } from '../../shared/scroll'
 import { toast } from '../../ui/toast'
 import { receiveDocsRequest } from '../actions'
 import * as store from '../store'
@@ -40,7 +41,7 @@ async function showColumn(index: number) {
   const column = frame?.children[index] as HTMLElement | undefined
   if (!frame || !column) return
   const left = column.offsetLeft - (frame.firstElementChild as HTMLElement).offsetLeft
-  frame.scrollTo({ left: Math.max(0, left + column.offsetWidth - frame.clientWidth), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  scrollToPosition(frame, { left: Math.max(0, left + column.offsetWidth - frame.clientWidth) })
 }
 
 function chooseGroup(id: string) {

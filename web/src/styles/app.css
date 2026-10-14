@@ -1139,6 +1139,11 @@ a.yy-crumb:hover {
   border-right: 1px solid var(--yy-border);
   background: var(--yy-bg-sidebar);
 }
+.yy-move-book-group + .yy-move-book-group { margin-top: 8px; }
+.yy-move-book-group h3 { margin: 0; padding: 6px 12px; color: var(--yy-text-3); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.yy-move-book-group ul { list-style: none; margin: 0; padding: 0; }
+.yy-move-book-group button span { min-width: 0; overflow-wrap: anywhere; }
+.yy-move-book-group .lucide { flex-shrink: 0; }
 .yy-move-body button {
   display: flex;
   align-items: center;

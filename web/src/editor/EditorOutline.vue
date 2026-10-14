@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { scrollToElement } from '../shared/scroll'
 import { prefs } from '../app/prefs'
 import { topbarHeight, useOutlineTracking } from '../app/content/outline'
 import OutlinePanel, { type OutlineEntry } from '../app/content/OutlinePanel.vue'
@@ -59,7 +60,7 @@ function go(i: number) {
   if (!e || !h) return
   e.commands.setTextSelection(h.pos + 1)
   const dom = e.view.nodeDOM(h.pos)
-  if (dom instanceof HTMLElement) dom.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (dom instanceof HTMLElement) scrollToElement(dom)
   jumped(i)
   emit('navigate')
 }

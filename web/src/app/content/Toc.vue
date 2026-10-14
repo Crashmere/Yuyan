@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Heading } from '../../shared/api'
+import { scrollToElement } from '../../shared/scroll'
 import { prefs } from '../prefs'
 import { reveal } from './folds'
 import { topbarHeight, useOutlineTracking } from './outline'
@@ -13,6 +14,8 @@ import OutlinePanel from './OutlinePanel.vue'
 const props = defineProps<{ items: Heading[]; locate?: (id: string) => Promise<Element | null> }>()
 const emit = defineEmits<{ navigate: [] }>()
 const router = useRouter()
+let jumpSequence = 0
+onBeforeUnmount(() => { jumpSequence++ })
 const entries = computed(() => props.items.map((h) => ({ key: h.id, level: h.level, text: h.text, href: `#${h.id}` })))
 const { active, refresh, jumped } = useOutlineTracking(
   // Headings of a segment still being prepared inside its placeholder are not in place yet.
@@ -29,13 +32,15 @@ watch(
 )
 
 async function go(i: number) {
+  const sequence = ++jumpSequence
   const h = props.items[i]
   const el = props.locate ? await props.locate(h.id) : document.getElementById(h.id)
+  if (sequence !== jumpSequence) return
   if (el) reveal(el)
-  const far = !!props.locate && !!el && Math.abs(el.getBoundingClientRect().top) > innerHeight * 2
-  el?.scrollIntoView({ behavior: far ? 'auto' : 'smooth', block: 'start' })
   jumped(i)
-  void router.replace({ hash: `#${h.id}` })
+  // DocContent scrolls changed hashes. Repeated clicks need a jump here without a second animation.
+  if (router.currentRoute.value.hash !== `#${h.id}`) void router.replace({ hash: `#${h.id}` })
+  else if (el) scrollToElement(el)
   emit('navigate')
 }
 </script>

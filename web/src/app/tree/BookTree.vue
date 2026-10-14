@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, provide, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import { errorMessage, type TreeNode } from '../../shared/api'
+import { cancelScroll, scrollToPosition } from '../../shared/scroll'
 import { toast } from '../../ui/toast'
 import { nodeMenu } from '../actions'
 import { loadExpanded, saveExpanded } from '../prefs'
@@ -8,6 +9,7 @@ import * as store from '../store'
 import TreeItem from './TreeItem.vue'
 import { dropsIntoNode, treeKey, type DropPosition } from './context'
 import { useTreeSelection } from './selection'
+import { dragScroll } from './dragScroll'
 
 const props = defineProps<{ bookId: number; nodes: TreeNode[]; currentId: number | null; busy?: boolean }>()
 const root = ref<HTMLElement | null>(null)
@@ -19,6 +21,7 @@ const renaming = ref<number | null>(null)
 const drag = reactive({ id: null as number | null, overId: null as number | null, position: null as DropPosition | null })
 const dropAtEnd = ref(false)
 let expandTimer: ReturnType<typeof setTimeout> | undefined
+let stopDragScroll: (() => void) | undefined
 
 function toggle(id: number, open = !expanded.has(id)) {
   if (open) expanded.add(id)
@@ -61,7 +64,7 @@ async function locateCurrent(center = true) {
   const scroll = root.value?.closest('.yy-tree-scroll')
   if (!row || !(scroll instanceof HTMLElement)) return
   const box = row.getBoundingClientRect(), frame = scroll.getBoundingClientRect()
-  if (center) scroll.scrollTo({ top: scroll.scrollTop + box.top - frame.top - (scroll.clientHeight - box.height) / 2, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' })
+  if (center) scrollToPosition(scroll, { top: scroll.scrollTop + box.top - frame.top - (scroll.clientHeight - box.height) / 2 })
   else row.scrollIntoView({ block: 'nearest' })
 }
 function startSelecting() { renaming.value = null; reset(); selecting.value = true }
@@ -91,9 +94,9 @@ function dragged(): TreeNode | null {
   return drag.id == null ? null : (store.locate(props.bookId, drag.id)?.node ?? null)
 }
 
-function positionOf(e: DragEvent): DropPosition {
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const y = (e.clientY - rect.top) / rect.height
+function positionOf(row: Element, clientY: number): DropPosition {
+  const rect = row.getBoundingClientRect()
+  const y = (clientY - rect.top) / rect.height
   return y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'inside'
 }
 
@@ -105,12 +108,36 @@ function clearDrop() {
 }
 
 function reset() {
+  stopDragScroll?.()
+  stopDragScroll = undefined
   clearDrop()
   drag.id = null
 }
+onBeforeUnmount(reset)
 
 function leaveTree(e: DragEvent) {
   if (!(e.relatedTarget instanceof Node) || !(e.currentTarget as HTMLElement).contains(e.relatedTarget)) clearDrop()
+}
+
+function overNode(node: TreeNode, position: DropPosition) {
+  const d = dragged()
+  if (!d || store.contains(d, node.id)) { clearDrop(); return }
+  if (drag.overId === node.id && drag.position === position) return
+  clearDrop()
+  drag.overId = node.id
+  drag.position = position
+  if (position === 'inside' && node.children?.length && !expanded.has(node.id)) expandTimer = setTimeout(() => toggle(node.id, true), 700)
+}
+
+function locateDrop(x: number, y: number) {
+  const el = document.elementFromPoint(x, y)
+  const row = el?.closest<HTMLElement>('[data-tree-id]')
+  if (row && root.value?.contains(row)) {
+    const node = store.locate(props.bookId, Number(row.dataset.treeId))?.node
+    if (node) { overNode(node, positionOf(row, y)); return }
+  }
+  clearDrop()
+  if (el?.closest('.yy-tree-end') === root.value?.nextElementSibling) dropAtEnd.value = true
 }
 
 // target works out where a drop puts the dragged node; the index counts siblings without it.
@@ -175,23 +202,20 @@ provide(treeKey, {
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', node.title)
     }
+    const scroller = root.value?.closest<HTMLElement>('.yy-tree-scroll')
+    if (scroller) { cancelScroll(scroller); stopDragScroll = dragScroll(scroller, locateDrop) }
   },
   onDragOver(node, e) {
     const d = dragged()
     if (!d || store.contains(d, node.id)) { clearDrop(); return }
     e.preventDefault()
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
-    const position = positionOf(e)
-    if (drag.overId === node.id && drag.position === position) return
-    clearDrop()
-    drag.overId = node.id
-    drag.position = position
-    if (position === 'inside' && node.children?.length && !expanded.has(node.id)) expandTimer = setTimeout(() => toggle(node.id, true), 700)
+    overNode(node, positionOf(e.currentTarget as Element, e.clientY))
   },
   async onDrop(node, e) {
     e.preventDefault()
     const d = dragged()
-    const position = drag.position
+    const position = positionOf(e.currentTarget as Element, e.clientY)
     reset()
     if (!d || !position || store.contains(d, node.id)) return
     await move(d, target(node, position, d.id))

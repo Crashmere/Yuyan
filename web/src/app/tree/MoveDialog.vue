@@ -12,6 +12,7 @@ import * as store from '../store'
 const bookId = ref<number | null>(null)
 const parentId = ref<number | null>(null)
 const request = computed(() => moveRequest.value)
+const sections = computed(() => store.bookSections.value.filter((group) => group.books.length))
 const verb = computed(() => request.value?.action === 'copy' ? '复制' : '移动')
 const failure = ref('')
 const loading = ref(false)
@@ -74,11 +75,16 @@ function finish(ok: boolean) {
       <DialogContent v-if="request" class="yy-dialog yy-move-dialog" :aria-describedby="undefined">
         <DialogTitle class="yy-dialog-title">{{ verb }}{{ request.count ? ` ${request.count} 项到` : `“${request.node.title}”到` }}</DialogTitle>
         <div class="yy-move-body">
-          <ul class="yy-move-books">
-            <li v-for="b in store.state.books" :key="b.id">
-              <button type="button" :class="{ selected: b.id === bookId }" @click="chooseBook(b.id)"><BookOpen :size="15" />{{ b.name }}</button>
-            </li>
-          </ul>
+          <div class="yy-move-books" aria-label="知识库">
+            <section v-for="group in sections" :key="group.id" class="yy-move-book-group" :aria-label="group.name">
+              <h3 v-if="store.state.bookGroups.groups.length">{{ group.name }}</h3>
+              <ul>
+                <li v-for="b in group.books" :key="b.id">
+                  <button type="button" :class="{ selected: b.id === bookId }" @click="chooseBook(b.id)"><BookOpen :size="15" /><span>{{ b.name }}</span></button>
+                </li>
+              </ul>
+            </section>
+          </div>
           <ul class="yy-move-targets">
             <li>
               <button type="button" :class="{ selected: parentId === null }" @click="parentId = null">

@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { base } from '../shared/api'
+import { cancelScroll } from '../shared/scroll'
 import { isModuleLoadError, moduleLoadFailed, moduleReloadURL } from '../shared/moduleLoad'
 import { confirm } from '../ui/dialog'
 import { heavyToEdit, state } from './store'
@@ -62,10 +63,11 @@ router.beforeEach((to, from) => {
     to.meta.readingPosition = captureReadingPosition()
   }
 })
-router.afterEach((_to, _from, failure) => {
+router.afterEach((to, from, failure) => {
   state.navigating = false
   editLoading.value = null
   if (!failure) moduleReloadURL.value = null
+  if (!failure && to.path !== from.path) cancelScroll()
 })
 
 // A failed route import uses the same explicit, save-aware refresh as other lazy features.

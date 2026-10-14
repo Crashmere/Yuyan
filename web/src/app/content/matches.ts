@@ -1,4 +1,5 @@
 import { termPattern } from '../../shared/searchMatch'
+import { scrollToElement } from '../../shared/scroll'
 import { reveal } from './folds'
 
 // Highlights the words searched for in a document opened from search results, and brings the first
@@ -67,7 +68,7 @@ export function showMatches(root: HTMLElement, query: string): number {
     const fold = pre.closest('.code-block')?.nextElementSibling
     if (fold instanceof HTMLButtonElement && fold.classList.contains('yy-code-fold')) fold.click()
   }
-  ;(at.closest('.yy-drawing') ?? at).scrollIntoView({ block: 'center' })
+  scrollToElement(at.closest('.yy-drawing') ?? at, 'center')
   at.closest('.yy-drawing')?.classList.add('yy-drawing-match')
   return ranges.length
 }

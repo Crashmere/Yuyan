@@ -1,3 +1,5 @@
+import { scrollToPosition } from './scroll'
+
 // Wide tables, on reading pages (app/content/enhance.ts) and in the editor (editor/tables.ts). A
 // table starts in line with the text; its scroll area reaches right past the text column as far as
 // there is room before the outline, so a wide table shows more of itself, and left to the edge of
@@ -92,7 +94,7 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => voi
     if (e.target !== bar) return
     e.preventDefault()
     const r = thumb.getBoundingClientRect()
-    scroller.scrollBy({ left: (e.clientX < r.left ? -1 : 1) * scroller.clientWidth * 0.8, behavior: 'smooth' })
+    scrollToPosition(scroller, { left: scroller.scrollLeft + (e.clientX < r.left ? -1 : 1) * scroller.clientWidth * 0.8 })
   })
 
   function release() {
