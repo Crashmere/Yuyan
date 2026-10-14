@@ -47,14 +47,16 @@ func (d Doc) Meta() DocMeta {
 }
 
 type TreeNode struct {
-	ID        int64       `json:"id"`
-	ParentID  *int64      `json:"parentId"`
-	Kind      string      `json:"kind"`
-	Title     string      `json:"title"`
-	UpdatedAt string      `json:"updatedAt"`
-	Chars     int         `json:"chars"`
-	Images    int         `json:"images"`
-	Children  []*TreeNode `json:"children,omitempty"`
+	ID        int64  `json:"id"`
+	ParentID  *int64 `json:"parentId"`
+	Kind      string `json:"kind"`
+	Title     string `json:"title"`
+	UpdatedAt string `json:"updatedAt"`
+	Chars     int    `json:"chars"`
+	Images    int    `json:"images"`
+	// Heavy marks a document the editor opens slowly; the app asks before editing it.
+	Heavy    bool        `json:"heavy,omitempty"`
+	Children []*TreeNode `json:"children,omitempty"`
 }
 
 type CreateDocInput struct {
@@ -527,7 +529,8 @@ FROM docs WHERE book_id = ? AND deleted_at IS NULL ORDER BY position, id`, bookI
 		return nil, err
 	}
 	for _, n := range all {
-		n.Chars, n.Images = counts[n.ID].chars, counts[n.ID].images
+		c := counts[n.ID]
+		n.Chars, n.Images, n.Heavy = c.chars, c.images, c.heavy()
 	}
 	var roots []*TreeNode
 	for _, n := range all {

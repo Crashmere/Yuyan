@@ -163,6 +163,17 @@ function changeDoc(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', changeDoc))
 onBeforeUnmount(() => window.removeEventListener('keydown', changeDoc))
 
+// An edit address of a heavy document opened directly arrives here with ?edit (DESIGN 26.6): the
+// document shows first, and entering the editor goes through the router, which asks.
+async function editFromAddress(isDoc: boolean) {
+  const query = { ...route.query }
+  delete query.edit
+  await router.replace({ query, hash: route.hash })
+  if (!isDoc || disposed) return
+  prefetchEditor()
+  void router.push(`/docs/${id}/edit`)
+}
+
 // The document changed, or the server restarted, while a long one was being read in segments:
 // read it again, and the content returns to where the reader was.
 async function reload() {
@@ -185,6 +196,7 @@ onMounted(async () => {
     setTitle(v.doc.title)
     void loadTree(v.doc.bookId).catch(() => toast('目录更新失败，请刷新页面重试', 'error', { key: 'tree-refresh' }))
     if (v.doc.kind === 'doc') recordView({ id: v.doc.id, title: v.doc.title, bookId: v.doc.bookId, bookName: v.doc.bookName })
+    if (route.query.edit !== undefined) void editFromAddress(v.doc.kind === 'doc')
   } catch (e) {
     if (disposed) return
     if (e instanceof ApiError && e.status === 404) {

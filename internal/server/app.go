@@ -123,6 +123,15 @@ func (s *Server) parseShell() (*template.Template, error) {
 
 func (s *Server) appPage(rt route) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if rt == routeEdit {
+			// The reading page asks first, before the editor loads the whole document (DESIGN 26.6).
+			if id, err := strconv.ParseInt(r.PathValue("id"), 10, 64); err == nil {
+				if heavy, err := s.store.HeavyToEdit(r.Context(), id); err == nil && heavy {
+					http.Redirect(w, r, fmt.Sprintf("%sdocs/%d?edit=1", s.base, id), http.StatusFound)
+					return
+				}
+			}
+		}
 		p := preload{}
 		p.add("books", r, s.books)
 		p.add("book-groups", r, s.bookGroups)

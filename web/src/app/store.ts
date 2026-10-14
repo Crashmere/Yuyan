@@ -140,6 +140,19 @@ export function locate(bookId: number | null, id: number | null): Located | null
   return walk(roots, null, [])
 }
 
+// Whether the tree marks a document as slow to open in the editor. The tree is refreshed first, as
+// a save may have made the document heavy; without a tree to look in, the answer is no.
+export async function heavyToEdit(id: number): Promise<boolean> {
+  const bookId = Object.keys(state.trees).map(Number).find((b) => locate(b, id)) ?? state.bookId
+  if (bookId == null) return false
+  try {
+    await loadTree(bookId)
+  } catch {
+    return false
+  }
+  return !!locate(bookId, id)?.node.heavy
+}
+
 export function contains(node: TreeNode, id: number): boolean {
   return node.id === id || (node.children ?? []).some((c) => contains(c, id))
 }

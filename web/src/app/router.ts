@@ -2,7 +2,8 @@ import { shallowRef } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { base } from '../shared/api'
 import { isModuleLoadError, moduleLoadFailed, moduleReloadURL } from '../shared/moduleLoad'
-import { state } from './store'
+import { confirm } from '../ui/dialog'
+import { heavyToEdit, state } from './store'
 import DocView from './views/DocView.vue'
 import { captureReadingPosition, type ReadingPosition } from './content/readingPosition'
 
@@ -37,6 +38,21 @@ export const router = createRouter({
 // The edit page whose code is loading or failed to load. A page opened directly has nothing else
 // to show meanwhile, so the layout puts a placeholder in its place.
 export const editLoading = shallowRef<{ id: number; failed: boolean } | null>(null)
+
+// Opening a very large document in the editor takes seconds and much memory, so every way into it
+// asks first (DESIGN 26.6); the server sends such edit addresses opened directly to the reading
+// page, which comes back here. Before the progress guard, so no progress shows while asking.
+router.beforeEach(async (to, from) => {
+  if (to.name !== 'edit' || (from.name === 'edit' && from.params.id === to.params.id)) return
+  const id = Number(to.params.id)
+  if (!(await heavyToEdit(id))) return
+  const ok = await confirm({
+    title: '这篇文档很大',
+    message: '编辑器打开它可能需要数秒，手机上更久，编辑时也可能卡顿；阅读不受影响。拆分成几篇文档可以加快编辑。',
+    confirmText: '仍要编辑',
+  })
+  if (!ok) return from.matched.length ? false : `/docs/${id}`
+})
 
 // The progress bar also covers loading a page's code, such as the editor on first use.
 router.beforeEach((to, from) => {

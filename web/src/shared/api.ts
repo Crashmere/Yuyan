@@ -32,6 +32,8 @@ export interface TreeNode {
   updatedAt: string
   chars: number
   images: number
+  // The editor opens this document slowly; entering it asks first (DESIGN 26.6).
+  heavy?: boolean
   children?: TreeNode[]
 }
 
