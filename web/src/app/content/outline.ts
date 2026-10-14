@@ -29,8 +29,8 @@ export function useOutlineTracking(headings: () => (Element | null)[], line: () 
     if (!frame) frame = requestAnimationFrame(update)
   }
 
-  // After a jump from the outline the entry clicked stays highlighted: the smooth scroll passes
-  // other headings, and a heading near the end may never reach the line. Once the page has been
+  // After a jump from the outline the entry clicked stays highlighted: a heading near the end
+  // may never reach the tracking line. Once the page has been
   // still for a moment, the next scroll follows the page again.
   let jumping = false
   let still = false

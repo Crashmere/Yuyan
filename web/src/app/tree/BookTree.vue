@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import { errorMessage, type TreeNode } from '../../shared/api'
-import { cancelScroll, scrollToPosition } from '../../shared/scroll'
+import { scrollToPosition } from '../../shared/scroll'
 import { toast } from '../../ui/toast'
 import { nodeMenu } from '../actions'
 import { loadExpanded, saveExpanded } from '../prefs'
@@ -203,7 +203,7 @@ provide(treeKey, {
       e.dataTransfer.setData('text/plain', node.title)
     }
     const scroller = root.value?.closest<HTMLElement>('.yy-tree-scroll')
-    if (scroller) { cancelScroll(scroller); stopDragScroll = dragScroll(scroller, locateDrop) }
+    if (scroller) stopDragScroll = dragScroll(scroller, locateDrop)
   },
   onDragOver(node, e) {
     const d = dragged()

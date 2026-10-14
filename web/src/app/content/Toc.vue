@@ -10,7 +10,7 @@ import OutlinePanel from './OutlinePanel.vue'
 
 // The outline beside a document being read. Jumps put headings just below the top bar
 // (scroll-margin-top in content.css). A long document read in segments passes locate, which loads
-// the segment a heading is in; a jump far through it does not scroll smoothly past placeholders.
+// the segment a heading is in before jumping directly to it.
 const props = defineProps<{ items: Heading[]; locate?: (id: string) => Promise<Element | null> }>()
 const emit = defineEmits<{ navigate: [] }>()
 const router = useRouter()
@@ -38,9 +38,9 @@ async function go(i: number) {
   if (sequence !== jumpSequence) return
   if (el) reveal(el)
   jumped(i)
-  // DocContent scrolls changed hashes. Repeated clicks need a jump here without a second animation.
+  // DocContent handles changed hashes. Repeated clicks still locate and renew the heading cue.
   if (router.currentRoute.value.hash !== `#${h.id}`) void router.replace({ hash: `#${h.id}` })
-  else if (el) scrollToElement(el)
+  else if (el) scrollToElement(el, 'start', true)
   emit('navigate')
 }
 </script>

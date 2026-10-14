@@ -124,11 +124,11 @@ async function show(id: string): Promise<HTMLElement | null> {
   return target
 }
 
-async function scrollTo(id: string, smooth = false) {
+async function scrollTo(id: string) {
   const sequence = ++jumpSequence, run = runs
   const target = await show(id)
   if (!target || sequence !== jumpSequence || run !== runs) return
-  scrollToElement(target, 'start', smooth)
+  scrollToElement(target, 'start', true)
 }
 
 async function loadAll(): Promise<boolean> {
@@ -209,7 +209,7 @@ onBeforeUnmount(() => {
   clearMatches()
   if (root.value) { cleanupCode(root.value); stopLoading(root.value) }
 })
-watch(() => router.currentRoute.value.hash, hash => { if (hash) void scrollTo(decodeURIComponent(hash.slice(1)), true) })
+watch(() => router.currentRoute.value.hash, hash => { if (hash) void scrollTo(decodeURIComponent(hash.slice(1))) })
 watch(
   () => prefs.theme,
   () => {
@@ -261,7 +261,7 @@ function onClick(e: MouseEvent) {
   const href = a.getAttribute('href') ?? ''
   if (href.startsWith('#')) {
     e.preventDefault()
-    scrollTo(decodeURIComponent(href.slice(1)), true)
+    scrollTo(decodeURIComponent(href.slice(1)))
   } else if (href.startsWith(base)) {
     e.preventDefault()
     void router.push(href.slice(base.length - 1))

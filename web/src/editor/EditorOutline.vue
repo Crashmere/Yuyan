@@ -60,7 +60,7 @@ function go(i: number) {
   if (!e || !h) return
   e.commands.setTextSelection(h.pos + 1)
   const dom = e.view.nodeDOM(h.pos)
-  if (dom instanceof HTMLElement) scrollToElement(dom)
+  if (dom instanceof HTMLElement) scrollToElement(dom, 'start', true)
   jumped(i)
   emit('navigate')
 }
