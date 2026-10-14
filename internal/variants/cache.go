@@ -44,18 +44,50 @@ type Manifest struct {
 	Note     string    `json:"note,omitempty"`
 }
 
-// Variant is one stored version. File, such as "1280.jpg", is served as assets/<id>-<file>.
+// Variant is one stored version. File, such as "1280.jpg", is served as assets/<id>-<file>; a
+// JPEG only for screens of 2x and more is named like "1280.hidpi.jpg". For is "1x" or "2x" for a
+// version in one ladder only (generate.go).
 type Variant struct {
 	File   string `json:"file"`
 	Width  int    `json:"w"`
 	Height int    `json:"h"`
 	Bytes  int64  `json:"b"`
+	For    string `json:"for,omitempty"`
 }
 
 var (
 	manifestName = regexp.MustCompile(`^([0-9a-f]{32})\.json$`)
-	fileName     = regexp.MustCompile(`^[1-9][0-9]{0,4}\.(jpg|png)$`)
+	fileName     = regexp.MustCompile(`^[1-9][0-9]{0,4}\.(jpg|png|hidpi\.jpg)$`)
 )
+
+// Versions are the version files of an original as srcset candidates, narrowest first: Files for
+// screens below 2x, and Dense for screens of 2x and more when that ladder differs. The original is
+// the widest candidate of either unless a file is as wide.
+type Versions struct {
+	Files, Dense []string
+}
+
+func (v Versions) has(file string) bool {
+	return slices.Contains(v.Files, file) || slices.Contains(v.Dense, file)
+}
+
+func (m Manifest) versions() Versions {
+	var v Versions
+	split := false
+	for _, x := range m.Variants {
+		if x.For != forHigh {
+			v.Files = append(v.Files, x.File)
+		}
+		if x.For != forLow {
+			v.Dense = append(v.Dense, x.File)
+		}
+		split = split || x.For != ""
+	}
+	if !split {
+		v.Dense = nil
+	}
+	return v
+}
 
 const (
 	// The backfill starts this long after the service, which first serves the pages opened by
@@ -78,9 +110,8 @@ type Cache struct {
 	src Source
 
 	mu sync.Mutex
-	// files holds the version files of each processed original, narrowest first; empty when it
-	// has none.
-	files   map[string][]string
+	// files holds the versions of each processed original; empty when it has none.
+	files   map[string]Versions
 	queued  map[string]bool
 	urgent  []Asset
 	backlog []Asset
@@ -95,7 +126,7 @@ func Open(dir string, src Source) (*Cache, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
-	c := &Cache{dir: dir, src: src, files: map[string][]string{}, queued: map[string]bool{}, wake: make(chan struct{}, 1)}
+	c := &Cache{dir: dir, src: src, files: map[string]Versions{}, queued: map[string]bool{}, wake: make(chan struct{}, 1)}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -114,20 +145,18 @@ func Open(dir string, src Source) (*Cache, error) {
 		if err != nil || manifest.Version != Version {
 			continue
 		}
-		var files []string
 		complete := true
 		for _, v := range manifest.Variants {
 			complete = complete && fileName.MatchString(v.File) && present[m[1]+"-"+v.File]
-			files = append(files, v.File)
 		}
 		if !complete {
 			continue
 		}
 		keep[e.Name()] = true
-		for _, f := range files {
-			keep[m[1]+"-"+f] = true
+		for _, v := range manifest.Variants {
+			keep[m[1]+"-"+v.File] = true
 		}
-		c.files[m[1]] = files
+		c.files[m[1]] = manifest.versions()
 	}
 	for name := range present {
 		if !keep[name] {
@@ -158,22 +187,22 @@ func candidate(a Asset) bool {
 	return false
 }
 
-// Files returns the version files of an original, narrowest first, and whether it has been
-// processed. A nil Cache has none.
-func (c *Cache) Files(id string) (files []string, known bool) {
+// Versions returns the versions of an original, and whether it has been processed. A nil Cache
+// has none.
+func (c *Cache) Versions(id string) (v Versions, known bool) {
 	if c == nil {
-		return nil, true
+		return v, true
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	files, known = c.files[id]
-	return files, known
+	v, known = c.files[id]
+	return v, known
 }
 
 // Path locates a version file for serving.
 func (c *Cache) Path(id, file string) (string, bool) {
-	files, _ := c.Files(id)
-	if !slices.Contains(files, file) {
+	v, _ := c.Versions(id)
+	if !v.has(file) {
 		return "", false
 	}
 	return filepath.Join(c.dir, id+"-"+file), true
@@ -330,11 +359,11 @@ func (c *Cache) refresh(ctx context.Context) {
 // remove deletes the manifest first: a crash in between leaves unlisted files, which Open removes.
 func (c *Cache) remove(id string) {
 	c.mu.Lock()
-	files := c.files[id]
+	v := c.files[id]
 	delete(c.files, id)
 	c.mu.Unlock()
 	os.Remove(filepath.Join(c.dir, id+".json"))
-	for _, f := range files {
+	for _, f := range slices.Concat(v.Files, v.Dense) {
 		os.Remove(filepath.Join(c.dir, id+"-"+f))
 	}
 }
@@ -342,7 +371,7 @@ func (c *Cache) remove(id string) {
 // process makes and stores the versions of one original. It returns how many pixels it decoded
 // and whether the original now has versions.
 func (c *Cache) process(a Asset) (pixels int, kept bool) {
-	var files []string
+	var versions Versions
 	read := false
 	defer func() {
 		c.mu.Lock()
@@ -350,7 +379,7 @@ func (c *Cache) process(a Asset) (pixels int, kept bool) {
 		// After a failed write the page shows the original until the next start, rather than
 		// queueing the work again on every view.
 		if read {
-			c.files[a.ID] = files
+			c.files[a.ID] = versions
 		}
 		c.mu.Unlock()
 	}()
@@ -374,16 +403,17 @@ func (c *Cache) process(a Asset) (pixels int, kept bool) {
 		return pixels, false
 	}
 	m := Manifest{Version: Version, Source: int64(len(data)), Width: res.Width, Height: res.Height, Note: res.Note}
-	var written []string
 	for i := len(res.Outputs) - 1; i >= 0; i-- {
 		o := res.Outputs[i]
 		file := fmt.Sprintf("%d.%s", o.Width, res.Type)
+		if o.For == forHigh {
+			file = fmt.Sprintf("%d.hidpi.jpg", o.Width)
+		}
 		if err := writeFile(filepath.Join(c.dir, a.ID+"-"+file), o.Data); err != nil {
 			slog.Error("display versions: write", "asset", a.ID, "error", err)
 			return pixels, false
 		}
-		written = append(written, file)
-		m.Variants = append(m.Variants, Variant{File: file, Width: o.Width, Height: o.Height, Bytes: int64(len(o.Data))})
+		m.Variants = append(m.Variants, Variant{File: file, Width: o.Width, Height: o.Height, Bytes: int64(len(o.Data)), For: o.For})
 	}
 	data, err = json.Marshal(m)
 	if err == nil {
@@ -393,8 +423,8 @@ func (c *Cache) process(a Asset) (pixels int, kept bool) {
 		slog.Error("display versions: write manifest", "asset", a.ID, "error", err)
 		return pixels, false
 	}
-	files = written
-	return pixels, len(files) > 0
+	versions = m.versions()
+	return pixels, len(m.Variants) > 0
 }
 
 func writeFile(path string, data []byte) error {
@@ -417,12 +447,14 @@ func writeFile(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// Summary describes the stored versions, for diagnostics. The byte counts compare, for the
-// originals that have versions, what a page showing each at full column width loaded before and
-// loads now on a phone (about 1280 pixels) and on a 2x desktop screen (about 2200).
+// Summary describes the stored versions, for diagnostics. Dense counts the originals with a ladder
+// of their own for screens of 2x and more. The byte counts compare, for the originals that have
+// versions, what a page showing each at full column width loaded before and loads now on a 3x
+// phone (about 1280 pixels) and on a 2x desktop screen (about 2200).
 type Summary struct {
 	Processed    int            `json:"processed"`
 	WithVersions int            `json:"withVersions"`
+	Dense        int            `json:"dense"`
 	Notes        map[string]int `json:"notes"`
 	SourceBytes  int64          `json:"sourceBytes"`
 	PhoneBytes   int64          `json:"phoneBytes"`
@@ -454,6 +486,9 @@ func Summarize(dir string) (Summary, error) {
 			continue
 		}
 		s.WithVersions++
+		if m.versions().Dense != nil {
+			s.Dense++
+		}
 		s.SourceBytes += m.Source
 		s.PhoneBytes += m.loads(1280)
 		s.DesktopBytes += m.loads(2200)
@@ -464,12 +499,12 @@ func Summarize(dir string) (Summary, error) {
 	return s, nil
 }
 
-// loads is what a browser needing the given width fetches: the narrowest candidate that is wide
-// enough, or the widest there is.
+// loads is what a browser on a screen of 2x or more needing the given width fetches: the
+// narrowest candidate of that ladder that is wide enough, or the original.
 func (m Manifest) loads(width int) int64 {
 	width = min(width, m.Width)
 	for _, v := range m.Variants {
-		if v.Width >= width {
+		if v.For != forLow && v.Width >= width {
 			return v.Bytes
 		}
 	}

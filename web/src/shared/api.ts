@@ -48,8 +48,9 @@ export interface DocMeta {
 }
 
 // What the server knows of an uploaded image: its pixel size, then any display versions, such as
-// "1280.jpg", narrowest first (internal/variants).
-export type ImageSize = [width: number, height: number, files?: string[]]
+// "1280.jpg", narrowest first (internal/variants), and the versions for screens of 2x and more
+// when they differ.
+export type ImageSize = [width: number, height: number, files?: string[], dense?: string[]]
 
 // The uploaded images of a document, keyed by asset id.
 export type ImageSizes = Record<string, ImageSize>

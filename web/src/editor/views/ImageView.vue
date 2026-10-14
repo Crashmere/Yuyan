@@ -4,7 +4,7 @@ import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { NodeSelection } from '@tiptap/pm/state'
 import { assetURL } from '../../shared/api'
 import { assetId, displayVersions, reservedSize } from '../../shared/images'
-import { blockWidth, imageSizes } from '../images'
+import { blockWidth, denseImages, imageSizes } from '../images'
 import { alignment } from '../../schema/alignment'
 import { selectImage } from '../imageSelection'
 import ImageSurface from '../ImageSurface.vue'
@@ -24,7 +24,7 @@ const size = computed(() => {
 // Display only: the stored size keeps the image's space before it loads, and narrower versions may
 // be shown; the document is unchanged.
 const reserved = computed(() => reservedSize(size.value, props.node.attrs.width as number | null, props.node.attrs.height as number | null))
-const versions = computed(() => displayVersions(src.value, size.value, props.node.attrs.width as number | null, false))
+const versions = computed(() => displayVersions(src.value, size.value, props.node.attrs.width as number | null, false, denseImages.value))
 const width = computed(() => live.value ?? (props.node.attrs.width as number | null) ?? reserved.value.width)
 const height = computed(() => (live.value === null ? ((props.node.attrs.height as number | null) ?? undefined) : undefined))
 

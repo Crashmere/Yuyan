@@ -15,18 +15,25 @@ import (
 
 // imageSize is what a page learns about an uploaded image: its pixel size, to keep its space before
 // it loads, and the display versions browsers may choose from (internal/variants). It is sent as
-// [width, height] or [width, height, files]; a file such as "1280.jpg" is served as
-// assets/<id>-1280.jpg.
+// [width, height], [width, height, files], or [width, height, files, dense] when screens of 2x and
+// more have their own list; a file such as "1280.jpg" is served as assets/<id>-1280.jpg.
 type imageSize struct {
 	width, height int
-	files         []string
+	versions      variants.Versions
 }
 
 func (v imageSize) MarshalJSON() ([]byte, error) {
-	if len(v.files) == 0 {
-		return json.Marshal([2]int{v.width, v.height})
+	files := v.versions.Files
+	switch {
+	case v.versions.Dense != nil:
+		if files == nil {
+			files = []string{}
+		}
+		return json.Marshal([]any{v.width, v.height, files, v.versions.Dense})
+	case len(files) > 0:
+		return json.Marshal([]any{v.width, v.height, files})
 	}
-	return json.Marshal([]any{v.width, v.height, v.files})
+	return json.Marshal([2]int{v.width, v.height})
 }
 
 // images describes the given uploaded images, keyed by asset id. Images still without display
@@ -38,11 +45,11 @@ func (s *Server) images(ctx context.Context, ids []string) (map[string]imageSize
 	}
 	sizes := make(map[string]imageSize, len(assets))
 	for id, a := range assets {
-		files, known := s.variants.Files(id)
+		versions, known := s.variants.Versions(id)
 		if !known {
 			s.variants.Request(variants.Asset{ID: id, Ext: a.Ext, Size: a.Size})
 		}
-		sizes[id] = imageSize{a.Width, a.Height, files}
+		sizes[id] = imageSize{a.Width, a.Height, versions}
 	}
 	return sizes, nil
 }
@@ -69,7 +76,7 @@ func (v variantSource) ImageAssets(ctx context.Context) ([]variants.Asset, error
 	return assets, err
 }
 
-var variantName = regexp.MustCompile(`^([0-9a-f]{32})-([1-9][0-9]{0,4}\.(?:jpg|png))$`)
+var variantName = regexp.MustCompile(`^([0-9a-f]{32})-([1-9][0-9]{0,4}\.(?:jpg|png|hidpi\.jpg))$`)
 
 // variantFile serves a display version. The versions are a cache that may lack a file at any
 // time, after a restore for example; the browser is then sent to the original.

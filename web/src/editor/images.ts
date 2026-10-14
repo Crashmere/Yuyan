@@ -1,5 +1,7 @@
 import { Extension, type Editor } from '@tiptap/core'
+import { ref } from 'vue'
 import type { ImageSizes } from '../shared/api'
+import { denseScreen, onDensityChange } from '../shared/images'
 
 // The pixel sizes of the document's uploaded images, from the server and from uploads made while
 // editing; image node views use them to keep their space before the images load.
@@ -11,6 +13,11 @@ export const ImageSizeStore = Extension.create<unknown, { sizes: ImageSizes }>({
 export function imageSizes(editor: Editor): ImageSizes {
   return (editor.storage as unknown as { imageSizes: { sizes: ImageSizes } }).imageSizes.sizes
 }
+
+// Which display versions image views offer (shared/images.ts); views switch when the window moves
+// to a screen of the other kind.
+export const denseImages = ref(denseScreen())
+onDensityChange(() => (denseImages.value = denseScreen()))
 
 // The width an image can take in the block holding it, without the block's padding.
 export function blockWidth(el: HTMLElement): number {

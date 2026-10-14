@@ -1,6 +1,7 @@
-// Package variants makes and keeps the display versions of uploaded images: narrower copies, and
-// JPEG copies of photo-like lossless originals, offered to browsers through srcset. Originals stay
-// unchanged and remain what exports, backups and "view original" use.
+// Package variants makes and keeps the display versions of uploaded images: narrower copies, JPEG
+// copies of photo-like lossless originals, and JPEG copies of screenshots for screens of 2x and
+// more, offered to browsers through srcset. Originals stay unchanged and remain what exports,
+// backups and "view original" use.
 package variants
 
 import (
@@ -19,7 +20,7 @@ import (
 
 // Version changes whenever the policy below would produce different files; manifests of an older
 // version are discarded and their images processed again.
-const Version = 1
+const Version = 2
 
 // Widths are the narrower versions offered below an image's own width. A full-width image needs
 // about 1100–1300 pixels on a phone and up to 2200 in a 1100 px column on a 2x screen.
@@ -35,26 +36,35 @@ const (
 	// images keep only the original. The service has 384 MiB in all.
 	maxPixels  = 64 << 20
 	maxDecoded = 40 << 20
-	// A JPEG replaces a lossless original only when at most this share of its size, and a narrower
-	// version is kept only when at most keepShare of the next wider candidate.
+	// A JPEG replaces a lossless original or version only when at most this share of its size, and
+	// a narrower version is kept only when at most keepShare of the next wider candidate.
 	lossyShare = 0.6
 	keepShare  = 0.8
 	// The JPEG must also stay close to the original (quality.go): on average, and in its worst 1%
 	// of windows, where text and sharp edges show compression first. Most screenshots fail this
-	// at any width and keep lossless versions.
+	// and keep lossless versions; one that passes once each 2×2 block is averaged, as a 2x screen
+	// shows it, also gets JPEG versions for such screens.
 	minSSIM      = 0.97
 	minWorstSSIM = 0.85
 )
 
-// Output is one encoded version.
+// Output is one encoded version. For limits the screens it is offered to.
 type Output struct {
 	Width, Height int
 	Data          []byte
+	For           string
 }
 
-// Result is what to keep for an original: the file type its versions share and the versions,
-// widest first. Note says why there are none. Width and Height are the upright size of the decoded
-// original, and Pixels how many were decoded.
+// Pages offer two ladders of versions: one to screens below 2x and one to screens of 2x and more,
+// which may hold JPEGs that pass only at half size. For marks a version in one ladder only.
+const (
+	forLow  = "1x"
+	forHigh = "2x"
+)
+
+// Result is what to keep for an original: the file type its versions share, apart from the JPEGs
+// only for screens of 2x and more, and the versions, widest first. Note says why there are none.
+// Width and Height are the upright size of the decoded original, and Pixels how many were decoded.
 type Result struct {
 	Type          string
 	Outputs       []Output
@@ -118,7 +128,11 @@ func Generate(data []byte, ext string) (Result, error) {
 		}
 		lossless = min(lossless, len(fullPNG))
 	}
+	// A JPEG that fails pixel for pixel may still pass at half size; fullDense is such a JPEG at
+	// full width.
+	var fullDense []byte
 	if !m.lossy && opaque && !m.gammaOnly {
+		var half *image.RGBA
 		for _, q := range jpegQualities {
 			e.quality = q
 			full, err := e.encode("jpg", src)
@@ -128,18 +142,28 @@ func Generate(data []byte, ext string) (Result, error) {
 			if float64(len(full)) > lossyShare*float64(lossless) {
 				break
 			}
-			_, mean, worst, err := fidelity(src, full)
+			decoded, err := jpeg.Decode(bytes.NewReader(full))
 			if err != nil {
 				return Result{}, err
 			}
-			if mean >= minSSIM && worst >= minWorstSSIM {
+			if compare(src, decoded).passes() {
 				res.Type, next = "jpg", len(full)
-				res.Outputs = append(res.Outputs, Output{w0, h0, full})
+				res.Outputs = append(res.Outputs, Output{w0, h0, full, ""})
 				break
+			}
+			if fullDense == nil {
+				if half == nil {
+					half = halve(src)
+				}
+				if compare(half, halve(decoded)).passes() {
+					fullDense = full
+				}
 			}
 		}
 		if res.Type == "" {
 			e.quality = 0
+		} else {
+			fullDense = nil
 		}
 	}
 	if res.Type == "" {
@@ -150,8 +174,21 @@ func Generate(data []byte, ext string) (Result, error) {
 		// Uncompressed BMP gains even from a lossless full-width copy.
 		if fullPNG != nil && float64(len(fullPNG)) <= lossyShare*float64(len(data)) {
 			next = len(fullPNG)
-			res.Outputs = append(res.Outputs, Output{w0, h0, fullPNG})
+			res.Outputs = append(res.Outputs, Output{w0, h0, fullPNG, ""})
 		}
+	}
+	// The ladder for screens of 2x and more takes at each width the smaller of such a JPEG and the
+	// version for every screen, so those screens never load more than others would. Narrower text
+	// shows compression sooner, so each width is checked as shown. denseNext is the size of its
+	// last candidate, as next is for the other ladder.
+	dense := res.Type == "png" && !m.lossy && opaque && !m.gammaOnly
+	denseNext := next
+	if fullDense != nil {
+		if len(res.Outputs) > 0 {
+			res.Outputs[0].For = forLow
+		}
+		res.Outputs = append(res.Outputs, Output{w0, h0, fullDense, forHigh})
+		denseNext = len(fullDense)
 	}
 	// Each width is scaled from the next wider one: cheaper than from the original each time, and
 	// no step reduces by more than about half once the first is done.
@@ -168,9 +205,36 @@ func Generate(data []byte, ext string) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
+		plain := -1
 		if float64(len(out)) <= keepShare*float64(next) {
 			next = len(out)
-			res.Outputs = append(res.Outputs, Output{w, h, out})
+			plain = len(res.Outputs)
+			res.Outputs = append(res.Outputs, Output{w, h, out, ""})
+		}
+		if !dense {
+			continue
+		}
+		// A JPEG replaces the version at this width when at most lossyShare of it, and must
+		// shrink like any narrower version to be stored.
+		limit := keepShare * float64(denseNext)
+		if plain >= 0 {
+			limit = min(limit, lossyShare*float64(len(out)))
+		}
+		jpg, err := e.denseJPEG(scaled, limit)
+		if err != nil {
+			return Result{}, err
+		}
+		switch {
+		case jpg != nil:
+			if plain >= 0 {
+				res.Outputs[plain].For = forLow
+			}
+			res.Outputs = append(res.Outputs, Output{w, h, jpg, forHigh})
+			denseNext = len(jpg)
+		case plain >= 0 && len(out) < denseNext:
+			denseNext = len(out)
+		case plain >= 0:
+			res.Outputs[plain].For = forLow
 		}
 	}
 	if len(res.Outputs) == 0 {
@@ -204,6 +268,33 @@ func (e encoder) encode(typ string, img image.Image) ([]byte, error) {
 		return nil, err
 	}
 	return withPNGChunks(b.Bytes(), e.pngChunks), nil
+}
+
+// denseJPEG returns a JPEG of img for screens of 2x and more, at the first quality that passes as
+// they show it, or nil when none does within limit bytes.
+func (e encoder) denseJPEG(img image.Image, limit float64) ([]byte, error) {
+	var half *image.RGBA
+	for _, q := range jpegQualities {
+		e.quality = q
+		out, err := e.encode("jpg", img)
+		if err != nil {
+			return nil, err
+		}
+		if float64(len(out)) > limit {
+			return nil, nil
+		}
+		decoded, err := jpeg.Decode(bytes.NewReader(out))
+		if err != nil {
+			return nil, err
+		}
+		if half == nil {
+			half = halve(img)
+		}
+		if compare(half, halve(decoded)).passes() {
+			return out, nil
+		}
+	}
+	return nil, nil
 }
 
 // decodedBytes estimates the memory a decode and the conversions after it need.
