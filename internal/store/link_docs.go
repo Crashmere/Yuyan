@@ -39,6 +39,16 @@ func (s *Store) LiveLinkDocs(ctx context.Context) ([]LinkDoc, error) {
 	return out, rows.Err()
 }
 
+// LiveLinkDoc reads one live document as LiveLinkDocs lists it, without its body.
+func (s *Store) LiveLinkDoc(ctx context.Context, id int64) (LinkDoc, error) {
+	var d LinkDoc
+	err := s.DB.QueryRowContext(ctx, `SELECT d.id, b.name, d.title, d.revision || '/' || d.created_at `+liveLinkDocs+` AND d.id = ?`, id).Scan(&d.ID, &d.BookName, &d.Title, &d.Version)
+	if errors.Is(err, sql.ErrNoRows) {
+		return d, ErrNotFound
+	}
+	return d, err
+}
+
 // DocBody reads a document's body with its version.
 func (s *Store) DocBody(ctx context.Context, id int64) (string, doc.Node, error) {
 	var version, data string

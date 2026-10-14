@@ -165,7 +165,11 @@ type backlink struct {
 }
 
 func (s *Server) backlinks(r *http.Request) (any, error) {
-	target, err := s.linkDoc(r)
+	id, err := pathID(r)
+	if err != nil {
+		return nil, err
+	}
+	target, err := s.store.LiveLinkDoc(r.Context(), id)
 	if err != nil {
 		return nil, err
 	}
