@@ -48,11 +48,17 @@ v2 备份保持不变，画板包与依赖图片均随已登记素材保存。�
 
 高分屏 SVG 保存修复：Excalidraw 的默认导出倍率取自屏幕像素密度，2/3 倍屏幕会使 SVG 宽高与 viewBox 不一致，连空白画板新画一个矩形也被拒绝。预览现固定 `exportScale: 1`，同时使用 XMLSerializer 处理不换行空格并规范化画框裁切属性；服务端安全校验保持不变。此前仅调整视口的检查没有覆盖屏幕倍率，后续导出修改必须显式设置 deviceScaleFactor。旧标签页先下载可编辑文件保留未应用内容，再刷新并恢复草稿或导入；本机 Agent 缓存用 preview-setup 更新。
 
+## 图片显示版本
+
+阅读页和编辑器按显示宽度与屏幕像素密度加载较窄的显示版本，规则与接口见 DESIGN 26.3。版本在 `data/derived/images/`（每张原图一个 `<id>.json` 清单和若干 `<id>-<宽>.<jpg|png>`，由服务写入），是可以整体删除的派生缓存：不进原生备份，恢复、迁移或删除后由服务自动补齐。新上传和正在阅读的图片优先，其余在启动 1 分钟后从新到旧逐张处理，最多占用半个 CPU。原图、导出、备份和 yuyan-doc 不受影响；无数据库迁移、权限或 Nginx 变更，版本文件沿用 `/yuyan/assets/` 路由与设备认证。
+
+只读诊断 `yuyan images --data <数据目录>` 汇总已处理数、有版本数、各原因计数、版本占用的空间，以及有版本的图片在手机和 2 倍屏桌面上估计的传输量。原因：small（小于 128 KiB）、animated、palette、cmyk、hdr、orientation（PNG/WebP 自带方向）、profile（色彩配置异常）、large（超过解码限度）、decode、none（没有值得保留的版本）、error。日志 `display versions: backfill done` 记录一轮补齐的处理数与有版本数，单张失败记录 `display versions` 及原因。完全重建时停服务、删除 `data/derived/images` 后启动；运行中删除也安全，缺失的文件改为返回原图，打开页面时重新生成。
+
 ## 布局
 
 文档模板与内容片段存放于既有 `meta` 表的 `template:<id>`，包含独立 revision、正文 JSON 和格式版本，无数据库迁移。备份仍为整个 SQLite 快照和全部登记图片、附件，源文档删除后仍保留模板引用的图片，模板可独立复用；恢复模板库需走原生备份恢复，知识库 Markdown 导出不包含模板库。链接选择、预览与文末反向链接从存活正文推导，不新增索引文件或数据目录。接口及交互见 DESIGN 第 24 节，门户 API 声明同步维护。
 
-`/opt/yuyan/bin/yuyan` 为内嵌前端的 Linux amd64 程序。config 放本项目的 unit 与 Nginx location，data 放 `yuyan.db` 与 `assets/`（按内容寻址的图片与附件，非图片附件扩展名为 `.bin`），backups 放快照，docs 与 AGENTS.md 是受控文档副本，releases 留发布历史，current-commit 为程序来源。知识库分组保存在数据库现有 `meta` 表的 `book_groups` JSON 中，随一致性备份保留；旧库无需迁移，未配置时所有知识库均未分组。分组 API 与门户声明保持同步，分组不新增数据目录。
+`/opt/yuyan/bin/yuyan` 为内嵌前端的 Linux amd64 程序。config 放本项目的 unit 与 Nginx location，data 放 `yuyan.db`、`assets/`（按内容寻址的图片与附件，非图片附件扩展名为 `.bin`）与 `derived/images/`（图片显示版本，可删除、不备份），backups 放快照，docs 与 AGENTS.md 是受控文档副本，releases 留发布历史，current-commit 为程序来源。知识库分组保存在数据库现有 `meta` 表的 `book_groups` JSON 中，随一致性备份保留；旧库无需迁移，未配置时所有知识库均未分组。分组 API 与门户声明保持同步，分组不新增数据目录。
 
 运行身份 yuyan，发布身份 yuyan-deploy；data/backups 为 0700，程序与配置由 root 管理。服务监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问，不增加公网端口。systemd 只允许写 data，内存上限 384 MiB（`GOMEMLIMIT=320MiB`），CPU 100%。图片由程序返回并带一年 `immutable` 缓存，Nginx 不直接读取 data，因此 data 保持 0700。
 
@@ -229,6 +235,7 @@ curl --fail http://127.0.0.1:18084/healthz
 curl --fail http://127.0.0.1/yuyan/healthz
 systemctl show yuyan -p MemoryCurrent -p MemoryPeak -p NRestarts
 du -sh /opt/yuyan/data /opt/yuyan/backups
+runuser -u yuyan -- /opt/yuyan/bin/yuyan images --data /opt/yuyan/data
 ```
 
 `MemoryCurrent` 包含页缓存：正式导入后程序本身约 30 MiB，另有约 320 MiB 可回收的文件缓存。判断内存问题时看 `/sys/fs/cgroup/system.slice/yuyan.service/memory.stat` 的 anon 与 `memory.events` 的 oom_kill，不能只看接近上限。

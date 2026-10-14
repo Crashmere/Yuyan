@@ -223,10 +223,64 @@ func writeFileAtomic(path string, data []byte) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// AssetSizes returns the stored pixel size of the given images, keyed by asset id. Images whose
-// size could not be read when they were uploaded are left out.
-func (s *Store) AssetSizes(ctx context.Context, ids []string) (map[string][2]int, error) {
-	sizes := map[string][2]int{}
+// ImageAsset describes a stored image: its file type, bytes and pixel size.
+type ImageAsset struct {
+	ID            string
+	Ext           string
+	Size          int64
+	Width, Height int
+}
+
+// AssetSizes describes the given images, keyed by asset id. Images whose pixel size could not be
+// read when they were uploaded are left out.
+func (s *Store) AssetSizes(ctx context.Context, ids []string) (map[string]ImageAsset, error) {
+	sizes := map[string]ImageAsset{}
+	err := s.eachAsset(ctx, ids, `SELECT id, ext, size, width, height FROM assets WHERE width IS NOT NULL AND height IS NOT NULL AND id IN `, func(rows *sql.Rows) error {
+		var a ImageAsset
+		if err := rows.Scan(&a.ID, &a.Ext, &a.Size, &a.Width, &a.Height); err != nil {
+			return err
+		}
+		sizes[a.ID] = a
+		return nil
+	})
+	return sizes, err
+}
+
+// ExistingAssets reports which of the given assets are stored.
+func (s *Store) ExistingAssets(ctx context.Context, ids []string) (map[string]bool, error) {
+	exists := map[string]bool{}
+	err := s.eachAsset(ctx, ids, `SELECT id FROM assets WHERE id IN `, func(rows *sql.Rows) error {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		exists[id] = true
+		return nil
+	})
+	return exists, err
+}
+
+// ImageAssets lists the stored images, newest first.
+func (s *Store) ImageAssets(ctx context.Context) ([]ImageAsset, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, ext, size, COALESCE(width, 0), COALESCE(height, 0) FROM assets WHERE ext <> 'bin' ORDER BY created_at DESC, id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []ImageAsset
+	for rows.Next() {
+		var a ImageAsset
+		if err := rows.Scan(&a.ID, &a.Ext, &a.Size, &a.Width, &a.Height); err != nil {
+			return nil, err
+		}
+		list = append(list, a)
+	}
+	return list, rows.Err()
+}
+
+// eachAsset runs query, which ends in "id IN ", for the distinct ids in batches: SQLite limits the
+// number of bound parameters in one statement.
+func (s *Store) eachAsset(ctx context.Context, ids []string, query string, scan func(*sql.Rows) error) error {
 	seen := map[string]bool{}
 	var unique []any
 	for _, id := range ids {
@@ -235,29 +289,25 @@ func (s *Store) AssetSizes(ctx context.Context, ids []string) (map[string][2]int
 			unique = append(unique, id)
 		}
 	}
-	// SQLite limits the number of bound parameters in one statement.
 	for start := 0; start < len(unique); start += 500 {
 		batch := unique[start:min(start+500, len(unique))]
-		rows, err := s.DB.QueryContext(ctx, `SELECT id, width, height FROM assets WHERE width IS NOT NULL AND height IS NOT NULL AND id IN (?`+strings.Repeat(",?", len(batch)-1)+`)`, batch...)
+		rows, err := s.DB.QueryContext(ctx, query+`(?`+strings.Repeat(",?", len(batch)-1)+`)`, batch...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for rows.Next() {
-			var id string
-			var w, h int
-			if err := rows.Scan(&id, &w, &h); err != nil {
+			if err := scan(rows); err != nil {
 				rows.Close()
-				return nil, err
+				return err
 			}
-			sizes[id] = [2]int{w, h}
 		}
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return sizes, nil
+	return nil
 }
 
 func (s *Store) GetAsset(ctx context.Context, id string) (Asset, error) {

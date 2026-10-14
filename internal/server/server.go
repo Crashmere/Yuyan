@@ -19,6 +19,7 @@ import (
 
 	"github.com/Crashmere/Yuyan/internal/render"
 	"github.com/Crashmere/Yuyan/internal/store"
+	"github.com/Crashmere/Yuyan/internal/variants"
 )
 
 //go:embed templates/*.html
@@ -40,6 +41,8 @@ type Server struct {
 	rendering map[int64]chan struct{}
 	history   history
 	headings  headingCache
+	// variants keeps the display versions of images; nil serves originals only.
+	variants *variants.Cache
 }
 
 type entry struct {
@@ -327,9 +330,14 @@ var assetTypes = map[string]string{
 	"png": "image/png", "jpg": "image/jpeg", "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
 }
 
-// assetFile serves images during local use; in production Nginx reads the files directly.
+// assetFile serves uploaded images and their display versions; the data directory stays closed to
+// Nginx.
 func (s *Server) assetFile(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("file")
+	if m := variantName.FindStringSubmatch(name); m != nil {
+		s.variantFile(w, r, m[1], m[2])
+		return
+	}
 	if !assetName.MatchString(name) {
 		http.NotFound(w, r)
 		return

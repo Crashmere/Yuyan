@@ -209,8 +209,8 @@ func (s *Server) segmentedPage(r *http.Request) (*page, error) {
 }
 
 type segmentsBody struct {
-	HTML   string            `json:"html"`
-	Images map[string][2]int `json:"images"`
+	HTML   string               `json:"html"`
+	Images map[string]imageSize `json:"images"`
 }
 
 // docSegments serves segments from to to-1 joined, with the sizes of their images. The version
@@ -230,7 +230,7 @@ func (s *Server) docSegments(w http.ResponseWriter, r *http.Request) error {
 	for _, sg := range p.segments[from:to] {
 		assets = append(assets, sg.assets...)
 	}
-	images, err := s.store.AssetSizes(r.Context(), assets)
+	images, err := s.images(r.Context(), assets)
 	if err != nil {
 		return err
 	}

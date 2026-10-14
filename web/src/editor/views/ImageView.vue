@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { NodeViewWrapper, nodeViewProps } from '@tiptap/vue-3'
 import { NodeSelection } from '@tiptap/pm/state'
 import { assetURL } from '../../shared/api'
-import { assetId, reservedSize } from '../../shared/images'
+import { assetId, displayVersions, reservedSize } from '../../shared/images'
 import { blockWidth, imageSizes } from '../images'
 import { alignment } from '../../schema/alignment'
 import { selectImage } from '../imageSelection'
@@ -17,11 +17,14 @@ const content = ref<HTMLElement | null>(null)
 const live = ref<number | null>(null)
 const src = computed(() => assetURL(String(props.node.attrs.src ?? '')))
 const align = computed(() => alignment(props.node.attrs.blockAlign))
-// Display only: the stored size keeps the image's space before it loads; the document is unchanged.
-const reserved = computed(() => {
+const size = computed(() => {
   const id = assetId(src.value)
-  return reservedSize(id ? imageSizes(props.editor)[id] : undefined, props.node.attrs.width as number | null, props.node.attrs.height as number | null)
+  return id ? imageSizes(props.editor)[id] : undefined
 })
+// Display only: the stored size keeps the image's space before it loads, and narrower versions may
+// be shown; the document is unchanged.
+const reserved = computed(() => reservedSize(size.value, props.node.attrs.width as number | null, props.node.attrs.height as number | null))
+const versions = computed(() => displayVersions(src.value, size.value, props.node.attrs.width as number | null, false))
 const width = computed(() => live.value ?? (props.node.attrs.width as number | null) ?? reserved.value.width)
 const height = computed(() => (live.value === null ? ((props.node.attrs.height as number | null) ?? undefined) : undefined))
 
@@ -78,11 +81,14 @@ function startResize(e: PointerEvent, direction: 1 | -1) {
   <node-view-wrapper as="span" class="yy-image" :class="{ resizing: live !== null, 'is-aligned': !!align, 'ProseMirror-selectednode': selected }" :style="align ? { textAlign: align } : undefined" @mousedown="pick" @click="pickSingle">
     <span class="yy-image-figure">
     <span ref="content" class="yy-image-content">
-      <ImageSurface v-if="node.attrs.crop" :attrs="{ ...node.attrs, width: live ?? node.attrs.width, height: live === null ? node.attrs.height : null }" />
+      <ImageSurface v-if="node.attrs.crop" :attrs="{ ...node.attrs, width: live ?? node.attrs.width, height: live === null ? node.attrs.height : null }" :size="size" />
       <img
         v-else
         ref="img"
+        :loading="versions ? 'lazy' : undefined"
         :src="src"
+        :srcset="versions?.srcset"
+        :sizes="versions?.sizes"
         :alt="node.attrs.alt ?? ''"
         :title="node.attrs.title ?? undefined"
         :width="width"

@@ -79,11 +79,13 @@ export function editorExtensions(ui: EditorUi, foldKey?: string, drawingRevision
           return [fixColumnWidths, followColumnBorder, rowResizing(), tableControls(), ...(this.parent?.() ?? []).map(withResizeDelay)]
         },
       }).configure({ resizable: true, handleWidth: resizeHitWidth, View: FramedTableView }),
+      // Until <EditorContent> mounts, Tiptap's Vue node views return nothing and the document is
+      // first rendered, detached, from toDOM; lazy images there never start downloading originals.
       image: YuyanImage.extend({
         addNodeView() {
           return VueNodeViewRenderer(ImageView)
         },
-      }).configure({ resolveSrc: assetURL, unresolveSrc: unassetURL }),
+      }).configure({ resolveSrc: assetURL, unresolveSrc: unassetURL, HTMLAttributes: { loading: 'lazy' } }),
       inlineMath: InlineMath.configure({ katexOptions: { throwOnError: false }, onClick: onMathClick }),
       blockMath: BlockMath.configure({ katexOptions: { throwOnError: false }, onClick: onMathClick }),
       callout: Callout.extend({

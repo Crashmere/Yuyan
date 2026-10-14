@@ -47,8 +47,12 @@ export interface DocMeta {
   bookName: string
 }
 
-// Pixel sizes of a document's uploaded images, keyed by asset id.
-export type ImageSizes = Record<string, [number, number]>
+// What the server knows of an uploaded image: its pixel size, then any display versions, such as
+// "1280.jpg", narrowest first (internal/variants).
+export type ImageSize = [width: number, height: number, files?: string[]]
+
+// The uploaded images of a document, keyed by asset id.
+export type ImageSizes = Record<string, ImageSize>
 
 export interface Doc extends DocMeta {
   content: JSONContent

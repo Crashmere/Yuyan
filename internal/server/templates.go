@@ -45,8 +45,8 @@ func (s *Server) template(r *http.Request) (any, error) {
 	}
 	return struct {
 		store.Template
-		HTML   string            `json:"html"`
-		Images map[string][2]int `json:"images"`
+		HTML   string               `json:"html"`
+		Images map[string]imageSize `json:"images"`
 	}{t, res.HTML, images}, nil
 }
 

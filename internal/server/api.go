@@ -12,6 +12,7 @@ import (
 	"github.com/Crashmere/Yuyan/internal/doc"
 	"github.com/Crashmere/Yuyan/internal/render"
 	"github.com/Crashmere/Yuyan/internal/store"
+	"github.com/Crashmere/Yuyan/internal/variants"
 )
 
 func pathID(r *http.Request) (int64, error) {
@@ -133,15 +134,9 @@ func (s *Server) live(r *http.Request, get func(context.Context, int64) (store.D
 	return d, err
 }
 
-// imageSizes gives the pixel size of a document's uploaded images, keyed by asset id, so pages can
-// reserve their space before the images load.
-func (s *Server) imageSizes(r *http.Request, n doc.Node) (map[string][2]int, error) {
-	return s.store.AssetSizes(r.Context(), doc.AssetIDs(n))
-}
-
 type docWithImages struct {
 	store.Doc
-	Images map[string][2]int `json:"images"`
+	Images map[string]imageSize `json:"images"`
 }
 
 func (s *Server) fullDoc(r *http.Request) (any, error) {
@@ -162,16 +157,16 @@ type docLink struct {
 }
 
 type docView struct {
-	Doc        store.DocMeta     `json:"doc"`
-	HTML       string            `json:"html"`
-	TOC        []render.Heading  `json:"toc"`
-	HasMath    bool              `json:"hasMath"`
-	HasMermaid bool              `json:"hasMermaid"`
-	Chars      int               `json:"chars"`
-	Prev       *docLink          `json:"prev"`
-	Next       *docLink          `json:"next"`
-	Children   []*store.TreeNode `json:"children"`
-	Images     map[string][2]int `json:"images"`
+	Doc        store.DocMeta        `json:"doc"`
+	HTML       string               `json:"html"`
+	TOC        []render.Heading     `json:"toc"`
+	HasMath    bool                 `json:"hasMath"`
+	HasMermaid bool                 `json:"hasMermaid"`
+	Chars      int                  `json:"chars"`
+	Prev       *docLink             `json:"prev"`
+	Next       *docLink             `json:"next"`
+	Children   []*store.TreeNode    `json:"children"`
+	Images     map[string]imageSize `json:"images"`
 	// Segments describes a long document read in segments; HTML and Images then cover the
 	// first of them only (segments.go).
 	Segments *segmentsView `json:"segments,omitempty"`
@@ -204,7 +199,7 @@ func (s *Server) readView(r *http.Request, segmented bool) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := docView{Doc: d.Meta(), TOC: []render.Heading{}, Children: []*store.TreeNode{}, Images: map[string][2]int{}}
+	v := docView{Doc: d.Meta(), TOC: []render.Heading{}, Children: []*store.TreeNode{}, Images: map[string]imageSize{}}
 	flat := store.Flatten(tree)
 	for i, n := range flat {
 		if n.ID != d.ID {
@@ -228,7 +223,7 @@ func (s *Server) readView(r *http.Request, segmented bool) (any, error) {
 		if segmented && p.segments != nil {
 			v.HTML, v.Segments, assets = p.HTML[:p.segments[0].end], p.manifest(), p.segments[0].assets
 		}
-		if v.Images, err = s.store.AssetSizes(r.Context(), assets); err != nil {
+		if v.Images, err = s.images(r.Context(), assets); err != nil {
 			return nil, err
 		}
 	}
@@ -315,7 +310,7 @@ func (s *Server) versionView(r *http.Request) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	images, err := s.store.AssetSizes(r.Context(), page.images)
+	images, err := s.images(r.Context(), page.images)
 	if err != nil {
 		return nil, err
 	}
@@ -671,6 +666,7 @@ func (s *Server) apiUploadAsset(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	s.variants.Request(variants.Asset{ID: a.ID, Ext: a.Ext, Size: a.Size})
 	writeJSON(w, http.StatusCreated, a)
 	return nil
 }

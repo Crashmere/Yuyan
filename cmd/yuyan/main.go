@@ -18,6 +18,7 @@ import (
 
 	"github.com/Crashmere/Yuyan/internal/server"
 	"github.com/Crashmere/Yuyan/internal/store"
+	"github.com/Crashmere/Yuyan/internal/variants"
 	"github.com/Crashmere/Yuyan/web"
 )
 
@@ -29,7 +30,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("usage: yuyan init|check|serve|backup|daily|restore|migrate|gc|history-gc [flags]")
+		return errors.New("usage: yuyan init|check|serve|backup|daily|restore|migrate|gc|history-gc|images [flags]")
 	}
 	cmd := os.Args[1]
 	flags := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -45,6 +46,12 @@ func run() error {
 	}
 	ctx := context.Background()
 	switch cmd {
+	case "images":
+		summary, err := variants.Summarize(variants.Dir(*dir))
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(summary)
 	case "history-gc":
 		s, err := store.Open(*dir)
 		if err != nil {
@@ -156,6 +163,11 @@ func serve(dir, listen, base string, withPrefix bool) error {
 	if err != nil {
 		return err
 	}
+	images, err := variants.Open(variants.Dir(dir), server.VariantSource(s))
+	if err != nil {
+		return err
+	}
+	srv.UseVariants(images)
 	httpServer := &http.Server{
 		Addr:              listen,
 		Handler:           srv.Handler(withPrefix),
@@ -175,9 +187,15 @@ func serve(dir, listen, base string, withPrefix bool) error {
 		}
 		s.RunAssetGC(ctx)
 	}()
+	imagesDone := make(chan struct{})
+	go func() {
+		defer close(imagesDone)
+		images.Run(ctx)
+	}()
 	defer func() {
 		stop()
 		<-gcDone
+		<-imagesDone
 	}()
 	errc := make(chan error, 1)
 	go func() { errc <- httpServer.ListenAndServe() }()

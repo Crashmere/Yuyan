@@ -6,10 +6,16 @@ import { closeHistory } from '@tiptap/pm/history'
 import { AlignHorizontalSpaceAround, AlignVerticalSpaceAround, Captions, CopyCheck, Crop, Grid2X2, Scissors, Trash2, Ungroup } from 'lucide-vue-next'
 import { clamp, imageDimensions, positive, rect, round, type ImageRect } from '../../schema/imageGeometry'
 import { gridLayout, type ImageEditMode } from '../imageOperations'
+import { imageSizes } from '../images'
+import { assetId } from '../../shared/images'
 import ImageSurface from '../ImageSurface.vue'
 import ImageCaptionForm from '../ImageCaptionForm.vue'
 import type { EditorUi } from '../context'
 const props = defineProps(nodeViewProps)
+function stored(a: Record<string, any>) {
+  const id = assetId(String(a.src ?? ''))
+  return id ? imageSizes(props.editor)[id] : undefined
+}
 const ui = props.extension.options.ui as EditorUi
 const plane = ref<HTMLElement | null>(null)
 const picked = reactive(new Set<number>())
@@ -224,7 +230,7 @@ function keyboard(e: KeyboardEvent) {
     <div class="yy-board-frame" :style="{ width: `${size.width}px`, marginLeft: node.attrs.blockAlign === 'center' || node.attrs.blockAlign === 'right' ? 'auto' : '0', marginRight: node.attrs.blockAlign === 'right' ? '0' : 'auto' }">
       <div ref="plane" data-board-plane class="yy-board-plane" tabindex="0" aria-label="图片画板，点击选择图片，Shift 多选，拖动空白框选" :style="{ aspectRatio: `${size.width} / ${size.height}` }" @pointerdown.self="beginMarquee" @dragstart.prevent>
         <div v-for="(a, i) in items" :key="i" class="yy-board-item" :class="{ picked: picked.has(i) && props.selected }" :style="cssRect(placement(i))" :data-board-index="i" @pointerdown="drag($event, i)">
-          <ImageSurface :attrs="{ ...a, placement: null, width: placement(i).width * size.width, height: placement(i).height * size.height }" />
+          <ImageSurface :attrs="{ ...a, placement: null, width: placement(i).width * size.width, height: placement(i).height * size.height }" :size="stored(a)" />
           <span v-if="a.caption" class="yy-image-caption">{{ a.caption }}</span>
           <span v-if="picked.has(i) && props.selected" class="yy-board-item-handle" @pointerdown.stop="drag($event, i, true)"></span>
         </div>

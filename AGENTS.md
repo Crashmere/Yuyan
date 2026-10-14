@@ -50,6 +50,7 @@ Yuyan 平台能力新增、修改或删除时，必须在同一任务中同步�
 - **历史版本**（13.2）：快照保留 30 天，每天北京时间 03:00 清理，不保底保留；`store/version_retention.go` 负责补跑、事务清理及历史 ID 高水位。首次保存记录“编辑前”，恢复时同事务记录“恢复前”，均适用 30 天期限；正常离开编辑页等待正文和快照完成。历史最后引用移除后，附件重新计时一小时；当前正文、回收站正文和模板继续保护素材。诊断使用 `history-gc --dry-run`。摘要由 `internal/doc/changes.go` 比较相邻快照生成，不依赖外部模型或数据库迁移。
 - **数据库布局与迁移**（26.1）：`internal/store/migrate.go` 按顺序执行布局步骤，`meta.layout`/`min_layout` 与正文格式版本 `meta.schema` 分开；`store.go` 的建表常量同时供 `init` 和迁移使用，大字段放在最后。每步一个事务，外键检查通过才提交；表重建按列名复制，不能丢列。兼容旧程序的步骤不提高 `min_layout`，因此 SQL 必须写明列名。`Open`（serve/check/restore）会迁移，备份用 `OpenAsIs` 保持原布局；发布时由新程序在备份之后的 `check` 中迁移，耗时较长的步骤先在正式备份副本上计时。
 - **知识库分组**（12.5）：用现有 `meta.book_groups` 保存，GET/PUT `/api/book-groups` 带 revision 冲突检查；分组显示共用 `bookSections`，彻底删除知识库时同步清理归属。
+- **图片显示版本**（7、26.3）：规则在 `internal/variants/generate.go`（画质检查 `quality.go`、缩放 `resize.go`），派生目录与后台工作者在 `cache.go`；尺寸表查询和 `/assets/<id>-<文件>` 在 `internal/server/images.go`，前端用 `shared/images.ts` 的 `displayVersions`。原图不变，导出、备份、查看原图和 yuyan-doc 只用原图；`data/derived/images` 可删除、不备份，改动规则时提高 `variants.Version`。缩放不要换回 `draw.CatmullRom.Scale`，它按新宽度缓存整幅高度的 float64，服务只有 384 MiB。尺寸表第三项是版本文件列表，需要原图尺寸时查尺寸表，不读 `naturalWidth`。编辑器图片节点的 `toDOM` 带 `loading="lazy"`，节点视图挂载前的首次渲染才不会下载原图。
 
 ## 门户资源同步
 

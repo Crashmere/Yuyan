@@ -2,7 +2,7 @@
 import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { base, errorMessage, type ImageSizes } from '../../shared/api'
-import { stopLoading } from '../../shared/images'
+import { knownSize, stopLoading } from '../../shared/images'
 import { toast } from '../../ui/toast'
 import { prefs } from '../prefs'
 import { cleanupCode, enhance, enhanceCopy } from './enhance'
@@ -233,12 +233,16 @@ function onClick(e: MouseEvent) {
   // Linked images keep following their link.
   if (target instanceof HTMLImageElement && !copy && !target.closest('a') && root.value) {
     const all = [...root.value.querySelectorAll<HTMLImageElement>('img')].filter((img) => !img.closest('a, .yy-recent-ghost'))
-    images.value = all.map((img) => ({
-      src: img.currentSrc || img.src, alt: img.alt,
-      crop: parseRect(img.getAttribute('data-crop'), true),
-      sourceWidth: Number(img.getAttribute('data-source-width')) || img.naturalWidth,
-      sourceHeight: Number(img.getAttribute('data-source-height')) || img.naturalHeight,
-    }))
+    images.value = all.map((img) => {
+      const size = knownSize(img)
+      // The viewer shows the original rather than the display version loaded on the page.
+      return {
+        src: img.src, alt: img.alt,
+        crop: parseRect(img.getAttribute('data-crop'), true),
+        sourceWidth: Number(img.getAttribute('data-source-width')) || size?.[0] || img.naturalWidth,
+        sourceHeight: Number(img.getAttribute('data-source-height')) || size?.[1] || img.naturalHeight,
+      }
+    })
     shown.value = all.indexOf(target)
     return
   }
