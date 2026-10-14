@@ -9,7 +9,7 @@ import DocLinkPicker from './DocLinkPicker.vue'
 import type { LinkChoice } from '../shared/internalLinks'
 
 // Adds or edits a link. With nothing selected it asks for the text as well and inserts a new link.
-const props = defineProps<{ from: number; to: number; href: string; withText: boolean }>()
+const props = defineProps<{ from: number; to: number; href: string; withText: boolean; tab?: 'url' | 'document' }>()
 const emit = defineEmits<{ close: [] }>()
 const { editor } = useEditorContext()
 const selected = editor.value ? selectionContent(editor.value.state) : null
@@ -17,7 +17,7 @@ const mixedSelection = editor.value && selected?.images.length && selected.text.
 
 const text = ref('')
 const url = ref(props.href)
-const internal = ref(false)
+const internal = ref(props.tab === 'document')
 const query = ref('')
 const picker = ref<InstanceType<typeof DocLinkPicker> | null>(null)
 
@@ -109,7 +109,7 @@ onBeforeUnmount(() => {
       <button type="button" :class="{ active: internal }" @click="internal = true">文档与章节</button>
     </div>
     <template v-if="internal">
-      <input v-model="query" class="yy-input" placeholder="搜索文档或章节" aria-label="搜索文档或章节" />
+      <input ref="first" v-model="query" class="yy-input" placeholder="搜索文档或章节" aria-label="搜索文档或章节" />
       <DocLinkPicker ref="picker" :query="query" :command="chooseLink" />
     </template>
     <template v-else>

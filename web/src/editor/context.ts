@@ -13,7 +13,7 @@ export interface EditorContext {
 export interface EditorUi {
   pickImage: () => void
   pickAttachment: () => void
-  openLink: () => void
+  openLink: (tab?: 'url' | 'document') => void
   openTemplates: () => void
   saveSnippet: () => void
   openMath: (pos: number, fresh?: boolean) => void

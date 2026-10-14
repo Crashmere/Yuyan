@@ -418,6 +418,7 @@ body.yy-row-dragging * {
 
 .yy-link-panel {
   width: 380px;
+  max-width: calc(100vw - 16px);
 }
 
 .yy-math-panel {

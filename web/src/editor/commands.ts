@@ -2,7 +2,7 @@ import { openDrawing } from '../drawing/open'
 import type { Component } from 'vue'
 import type { Editor } from '@tiptap/core'
 import {
-  Bold, Code, Columns2, Paperclip, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
+  Bold, Code, Columns2, FileText, Paperclip, Heading1, Heading2, Heading3, Heading4, Heading5, Heading6, Highlighter, Image, Italic, Link, List, ListOrdered,
   ListTodo, MessageSquareText, Minus, Pilcrow, Quote, Radical, Sigma, SquareCode, Strikethrough, Table, Underline, Workflow, PanelTopClose, Square, PanelsTopLeft,
 } from 'lucide-vue-next'
 import type { EditorUi } from './context'
@@ -132,6 +132,7 @@ export const insertItems: InsertItem[] = [
   { id: 'drawing', label: '画板', description: '绘制图形、连线与技术示意图', icon: Workflow, group: '插入', pinyin: 'hua ban', keywords: 'hb drawing whiteboard excalidraw', run: e => { void openDrawing(e) } },
   { id: 'image', label: '图片', description: '上传图片，也可以直接粘贴或拖入', icon: Image, group: '插入', syntax: ['![]()'], pinyin: 'tu pian', keywords: 'tp image picture', run: (_e, ui) => ui.pickImage() },
   { id: 'link', label: '链接', description: '网址或本站文档的链接', icon: Link, group: '插入', syntax: ['[]()'], pinyin: 'lian jie', keywords: 'lj link url', run: (_e, ui) => ui.openLink() },
+  { id: 'document', label: '文档', description: '插入其他文档或章节的链接', icon: FileText, group: '插入', syntax: ['[['], pinyin: 'wen dang', keywords: 'wd document doc', run: (_e, ui) => ui.openLink('document') },
   { id: 'hr', label: '分割线', description: '分隔上下内容', icon: Minus, group: '插入', markdown: '---', syntax: ['***', '___'], pinyin: 'fen ge xian', keywords: 'fgx hr divider', run: (e) => e.chain().focus().setHorizontalRule().run() },
   { id: 'blockMath', label: '公式块', description: '独占一行的 LaTeX 公式', icon: Sigma, group: '插入', markdown: '$$', pinyin: 'gong shi kuai', keywords: 'gsk math formula latex', run: (e, ui) => insertMath(e, ui, 'blockMath') },
   { id: 'inlineMath', label: '行内公式', description: '嵌在文字中的公式', icon: Radical, group: '插入', markdown: '$…$', pinyin: 'hang/xing nei gong shi', keywords: 'hngs inline math', run: (e, ui) => insertMath(e, ui, 'inlineMath') },

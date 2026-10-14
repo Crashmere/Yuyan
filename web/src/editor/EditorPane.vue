@@ -64,7 +64,7 @@ const titleInput = ref<HTMLTextAreaElement | null>(null)
 const outlineOpen = ref(false)
 
 // Panels over the editor.
-const linkEdit = ref<{ from: number; to: number; href: string; withText: boolean } | null>(null)
+const linkEdit = ref<{ from: number; to: number; href: string; withText: boolean; tab: 'url' | 'document' } | null>(null)
 const mathTarget = ref<{ pos: number; fresh: boolean } | null>(null)
 const findOpen = ref(false)
 const find = ref<InstanceType<typeof FindReplace> | null>(null)
@@ -84,16 +84,16 @@ const ui: EditorUi = {
   },
   pickImage: () => fileInput.value?.click(),
   pickAttachment: () => attachmentInput.value?.click(),
-  openLink() {
+  openLink(tab = 'url') {
     const e = editor.value
     if (!e || e.isActive('codeBlock')) return
     const { from, to, empty } = e.state.selection
     const href = String(e.getAttributes('link').href ?? '')
     if (empty && e.isActive('link')) {
       const range = getMarkRange(e.state.doc.resolve(from), e.schema.marks.link)
-      linkEdit.value = { from: range?.from ?? from, to: range?.to ?? to, href, withText: false }
+      linkEdit.value = { from: range?.from ?? from, to: range?.to ?? to, href, withText: false, tab }
     } else {
-      linkEdit.value = { from, to, href: e.isActive('link') ? href : '', withText: empty }
+      linkEdit.value = { from, to, href: e.isActive('link') ? href : '', withText: empty, tab }
     }
   },
   openMath: (pos, fresh = false) => {
