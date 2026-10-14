@@ -79,15 +79,32 @@ function onSaved(title: string) {
   setTitle(`编辑：${title}`)
 }
 
-// 取消 drops what this session changed, after asking when there is something to drop.
+const abandonAfterConflict = {
+  title: '文档已在别处修改',
+  message: '取消会丢弃这里还没保存的修改，然后打开最新版本。这次编辑已经保存的内容不会撤回，别处的修改是在它之上进行的。',
+  confirmText: '放弃未保存的修改',
+  danger: true,
+}
+
+// 取消 drops what this session changed, after asking when there is something to drop. After a
+// conflict only the unsaved part can be dropped; the newer revision on the server stays.
 async function cancel() {
   const p = pane.value
   if (!p || !doc.value) return
-  const ask = p.touched()
-  if (ask && !(await confirm({ title: '放弃这次编辑？', message: '这次打开编辑后所做的修改都会丢弃，历史版本里也不会留下记录。', confirmText: '放弃修改', danger: true }))) return
-  if (!(await p.discard())) return
+  let result: 'done' | 'conflict' | 'failed' = 'conflict'
+  if (status.value !== 'conflict' || !p.savedChanges()) {
+    const ask = p.touched()
+    if (ask && !(await confirm({ title: '放弃这次编辑？', message: '这次打开编辑后所做的修改都会丢弃，历史版本里也不会留下记录。', confirmText: '放弃修改', danger: true }))) return
+    result = await p.discard()
+  }
+  if (result === 'failed') return
+  if (result === 'conflict') {
+    if (!(await confirm(abandonAfterConflict))) return
+    p.abandon()
+  } else {
+    setNodeTitle(doc.value.bookId, id, doc.value.title)
+  }
   invalidateTree(doc.value.bookId)
-  setNodeTitle(doc.value.bookId, id, doc.value.title)
   await router.push(`/docs/${id}`)
 }
 

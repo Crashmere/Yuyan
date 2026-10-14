@@ -237,29 +237,51 @@ function touched(): boolean {
   return revision.value !== props.doc.revision || status.value !== 'saved' || (!!editor.value && pendingUploads(editor.value) > 0)
 }
 
+// Whether this session has saved anything that cancelling would have to take back.
+function savedChanges(): boolean {
+  return revision.value !== props.doc.revision
+}
+
 // Cancelling puts the document back as it was when the editor opened, and drops the versions saved
 // since, so the session leaves nothing in the history (store.DiscardEdits). Nothing more is saved
-// afterwards, and leaving records no version.
-async function discard(): Promise<boolean> {
+// afterwards, and leaving records no version. Once someone else has saved on top of this session,
+// putting it back would drop their edits too: the server refuses, and the caller may abandon instead.
+async function discard(): Promise<'done' | 'conflict' | 'failed'> {
   discarded = true
   clearTimeout(saveTimer)
   clearTimeout(retryTimer)
   while (inFlight) await new Promise((r) => setTimeout(r, 50))
+  if (savedChanges()) {
+    const d = props.doc
+    try {
+      await api(`docs/${d.id}/discard`, {
+        method: 'POST',
+        json: { title: d.title, content: d.content, updatedAt: d.updatedAt, since: d.revision, baseRevision: revision.value },
+      })
+    } catch (e) {
+      discarded = false
+      if (e instanceof ApiError && e.status === 409) {
+        status.value = 'conflict'
+        serverRevision.value = e.revision ?? 0
+        return 'conflict'
+      }
+      if (status.value === 'dirty') saveTimer = setTimeout(save, 1200)
+      toast(`取消失败：${errorMessage(e)}`, 'error')
+      return 'failed'
+    }
+  }
+  abandon()
+  return 'done'
+}
+
+// Leaves without saving or taking anything back: what this session saved stays in the document,
+// and only the changes not yet saved here are dropped.
+function abandon() {
+  discarded = true
+  clearTimeout(saveTimer)
+  clearTimeout(retryTimer)
   savedThisSession = false
   localStorage.removeItem(draftKey)
-  if (revision.value === props.doc.revision) return true
-  const d = props.doc
-  try {
-    await api(`docs/${d.id}/discard`, {
-      method: 'POST',
-      json: { title: d.title, content: d.content, updatedAt: d.updatedAt, since: d.revision, baseRevision: revision.value },
-    })
-    return true
-  } catch (e) {
-    discarded = false
-    toast(`取消失败：${errorMessage(e)}`, 'error')
-    return false
-  }
 }
 
 function capturePosition() {
@@ -285,7 +307,7 @@ async function finish(): Promise<boolean> {
   }
 }
 
-defineExpose({ flush, finish, setTitle, touched, discard, capturePosition, cancelSelection: (event: KeyboardEvent) => !!editor.value && cancelSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
+defineExpose({ flush, finish, setTitle, touched, savedChanges, discard, abandon, capturePosition, cancelSelection: (event: KeyboardEvent) => !!editor.value && cancelSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {
