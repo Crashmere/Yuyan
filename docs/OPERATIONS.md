@@ -54,7 +54,7 @@ v2 备份保持不变，画板包与依赖图片均随已登记素材保存。�
 
 只读诊断 `yuyan images --data <数据目录>` 汇总已处理数、有版本数、各原因计数、版本占用的空间，以及有版本的图片在手机和 2 倍屏桌面上估计的传输量。原因：small（小于 128 KiB）、animated、palette、cmyk、hdr、orientation（PNG/WebP 自带方向）、profile（色彩配置异常）、large（超过解码限度）、decode、none（没有值得保留的版本）、error。日志 `display versions: backfill done` 记录一轮补齐的处理数与有版本数，单张失败记录 `display versions` 及原因。完全重建时停服务、删除 `data/derived/images` 后启动；运行中删除也安全，缺失的文件改为返回原图，打开页面时重新生成。
 
-补齐读写的图片会进入页缓存，`MemoryCurrent` 和 `MemoryPeak` 可以到达 384M 上限；判断内存压力看 `memory.stat` 的 anon、`memory.pressure` 和 `memory.events` 的 oom_kill。门户恢复包按目录复制数据根中原生快照以外的文件，目前会带上 `derived/`（正式实例约 170 MB）。
+补齐读写的图片会进入页缓存，`MemoryCurrent` 和 `MemoryPeak` 可以到达 384M 上限；判断内存压力看 `memory.stat` 的 anon、`memory.pressure` 和 `memory.events` 的 oom_kill。`derived/` 在门户声明中登记为 cache（派生缓存），门户备份包在任何范围都不收集，门户存储页单独显示其占用。
 
 ## 布局
 
