@@ -172,15 +172,12 @@ func (s *Server) backlinks(r *http.Request) (any, error) {
 	// The href of a link here ends its path with /docs/<id>, followed by the end of the string, a
 	// heading or a query; other bodies cannot hold one. The walk below checks each candidate.
 	path := "/docs/" + strconv.FormatInt(target.ID, 10)
-	docs, err := s.store.LinkingDocs(r.Context(), path, `"`, "#", "?")
+	docs, err := s.store.LinkingDocs(r.Context(), target.ID, path, `"`, "#", "?")
 	if err != nil {
 		return nil, err
 	}
 	out := []backlink{}
 	for _, d := range docs {
-		if d.ID == target.ID {
-			continue
-		}
 		headings, index, current, found := render.Headings(d.Content), 0, "", false
 		var walk func(doc.Node, string)
 		walk = func(n doc.Node, context string) {
