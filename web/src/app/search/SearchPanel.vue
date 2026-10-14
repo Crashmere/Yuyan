@@ -81,7 +81,7 @@ watch(query, (q) => {
     } catch (e) {
       failure.value = errorMessage(e)
     }
-  }, 200)
+  }, 120)
 })
 
 // The best matches first; among equals, the shorter name.

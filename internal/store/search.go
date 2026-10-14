@@ -1,11 +1,10 @@
 package store
 
 import (
+	"cmp"
 	"context"
 	"slices"
-	"strconv"
 	"strings"
-	"unicode/utf8"
 )
 
 type SearchHit struct {
@@ -21,42 +20,46 @@ const maxSearchTerms = 10
 
 // Search does a case-insensitive substring match over titles and text for each space-separated
 // word of q: a document matches when every word is in its title or its text. Documents with more
-// of the words in the title come first. The corpus is only a few MiB, so a scan is fast and needs
-// no Chinese word segmentation.
+// of the words in the title come first, then the most recently updated. Substring matching needs
+// no Chinese word segmentation; the text is scanned in memory (searchIndex).
 func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchHit, error) {
 	terms := searchTerms(q)
 	if len(terms) == 0 {
 		return nil, nil
 	}
-	titled, matched := make([]string, len(terms)), make([]string, len(terms))
-	args := make([]any, 0, len(terms)+1)
-	for i, term := range terms {
-		n := strconv.Itoa(i + 1)
-		titled[i] = "(instr(lower(d.title), ?" + n + ") > 0)"
-		matched[i] = "(instr(lower(d.title), ?" + n + ") > 0 OR instr(lower(d.plain_text), ?" + n + ") > 0)"
-		args = append(args, term)
-	}
-	rows, err := s.DB.QueryContext(ctx, `
-SELECT d.id, d.book_id, b.name, d.title, d.plain_text
-FROM docs d JOIN books b ON b.id = d.book_id
-WHERE d.deleted_at IS NULL AND b.deleted_at IS NULL AND d.kind = 'doc'
-  AND `+strings.Join(matched, " AND ")+`
-ORDER BY `+strings.Join(titled, " + ")+` DESC, d.updated_at DESC LIMIT ?`+strconv.Itoa(len(terms)+1), append(args, limit)...)
+	s.search.mu.Lock()
+	defer s.search.mu.Unlock()
+	docs, err := s.search.refresh(ctx, s.DB)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []SearchHit
-	for rows.Next() {
-		var h SearchHit
-		var text string
-		if err := rows.Scan(&h.ID, &h.BookID, &h.BookName, &h.Title, &text); err != nil {
-			return nil, err
-		}
-		h.Snippet = snippet(text, terms, 60)
-		out = append(out, h)
+	type match struct {
+		searchDoc
+		titled int
 	}
-	return out, rows.Err()
+	var found []match
+	for _, d := range docs {
+		title, titled := foldASCII(d.title), 0
+		for _, term := range terms {
+			if strings.Contains(title, term) {
+				titled++
+			} else if !strings.Contains(d.text.folded, term) {
+				titled = -1
+				break
+			}
+		}
+		if titled >= 0 {
+			found = append(found, match{d, titled})
+		}
+	}
+	slices.SortFunc(found, func(a, b match) int {
+		return cmp.Or(cmp.Compare(b.titled, a.titled), strings.Compare(b.updatedAt, a.updatedAt), cmp.Compare(b.id, a.id))
+	})
+	out := make([]SearchHit, 0, min(len(found), limit))
+	for _, m := range found[:min(len(found), limit)] {
+		out = append(out, SearchHit{ID: m.id, BookID: m.bookID, BookName: m.bookName, Title: m.title, Snippet: m.text.snippet(terms, 60)})
+	}
+	return out, nil
 }
 
 // searchTerms splits q at spaces into its distinct words, folded as the search compares them.
@@ -80,45 +83,4 @@ func foldASCII(s string) string {
 		}
 	}
 	return string(b)
-}
-
-// snippet returns the text around the first place any of terms appears in it.
-func snippet(text string, terms []string, radius int) string {
-	folded := foldASCII(text)
-	i, n := -1, 0
-	for _, term := range terms {
-		if j := strings.Index(folded, term); j >= 0 && (i < 0 || j < i) {
-			i, n = j, len(term)
-		}
-	}
-	if i < 0 {
-		return truncateRunes(text, radius*2)
-	}
-	start := i
-	for k := 0; start > 0 && k < radius; k++ {
-		_, size := utf8.DecodeLastRuneInString(text[:start])
-		start -= size
-	}
-	end := i + n
-	for k := 0; end < len(text) && k < radius; k++ {
-		_, size := utf8.DecodeRuneInString(text[end:])
-		end += size
-	}
-	out := strings.Join(strings.Fields(text[start:end]), " ")
-	if start > 0 {
-		out = "…" + out
-	}
-	if end < len(text) {
-		out += "…"
-	}
-	return out
-}
-
-func truncateRunes(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if utf8.RuneCountInString(s) <= n {
-		return s
-	}
-	r := []rune(s)
-	return string(r[:n]) + "…"
 }

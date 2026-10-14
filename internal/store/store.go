@@ -29,6 +29,7 @@ type Store struct {
 	now       func() time.Time
 	media     mediaIndex
 	docCounts docCounts
+	search    searchIndex
 	sessions  sessionStarts
 }
 

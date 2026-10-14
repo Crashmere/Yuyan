@@ -181,9 +181,18 @@ func serve(dir, listen, base string, withPrefix bool) error {
 	gcDone := make(chan struct{})
 	go func() {
 		defer close(gcDone)
-		// Counting every document now keeps the first pages after a restart from doing it.
+		// Counting and indexing every document now keeps the first pages and searches after a
+		// restart from doing it.
 		if _, err := s.DocumentStats(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("count documents", "error", err)
+		}
+		started := time.Now()
+		if docs, bytes, err := s.WarmSearch(ctx); err != nil {
+			if ctx.Err() == nil {
+				slog.Error("index documents for search", "error", err)
+			}
+		} else {
+			slog.Info("search index ready", "docs", docs, "bytes", bytes, "took", time.Since(started).Round(time.Millisecond))
 		}
 		s.RunAssetGC(ctx)
 	}()
