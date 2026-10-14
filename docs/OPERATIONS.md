@@ -77,6 +77,17 @@ bash deploy/setup-deploy.sh /path/to/yuyan-deploy.pub
 
 install 拒绝覆盖现有目录或身份，显式初始化正式空库，开启服务与备份 timer，并通过 unit 取得首份备份。setup-deploy 建立只能执行 `deploy`、`portal-check` 和 `portal` 三种固定的 commit/SHA-256 命令 的 yuyan-deploy，sudo 仅允许 root 管理的发布脚本。安装后核对五个应用的直连、代理与深链接。
 
+## 数据库布局迁移
+
+表的列顺序有独立的布局版本（`meta.layout`，缺省为 1），设计见 DESIGN 26.1。新程序打开旧布局时自动迁移，`serve`、`check`、`restore` 都会触发；`backup`、`daily` 只原样复制，不迁移。发布时脚本停服，先用旧程序备份，再由新程序 `check` 完成迁移；失败时放回旧程序，数据库停在迁移前或迁移后的兼容布局，不需要恢复备份。
+
+```sh
+yuyan migrate --dry-run --data /path/to/data   # 报告当前布局与待执行步骤
+yuyan migrate --data /path/to/data             # 执行并报告耗时
+```
+
+第 2 步（`docs`、`doc_versions` 大字段后置）于 2026-10-14 随发布执行，此前的程序仍可在新布局上运行，回退不受影响。迁移后文件约增加被重建表的大小，这些空闲页由后续写入复用，备份不包含它们，不需要手工 VACUUM。以后新增步骤时，先在最新 before-deploy 备份的服务器副本上以 yuyan 身份计时，必须在发布检查的 60 秒时限内完成；副本用完即删。`min_layout` 高于某个程序支持的布局时，该程序拒绝打开数据库，回退前用 `migrate --dry-run` 或报错信息确认。
+
 ## 发布与回退
 
 日常更新、声明同步和程序回退统一使用 [本机发布说明](DEPLOYMENT.md)。

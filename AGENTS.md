@@ -47,6 +47,7 @@ Yuyan 平台能力新增、修改或删除时，必须在同一任务中同步�
 - **搜索与斜杠菜单**（13.1、14、12.6）：拼音由服务端 `internal/server/pinyin.go` 用 go-pinyin 词典生成（随 `/api/titles`、`/api/books` 返回，含多音字），前端 `web/src/shared/searchMatch.ts` 只负责匹配；不要在前端再引入拼音字典或用排序规则推算。斜杠插入菜单通过 `editor/insertSearch.ts` 共用匹配器；固定项目的逐字拼音、英文关键词与 Markdown 别名随 `editor/commands.ts` 维护，空查询仍显示最近使用。
 - **编辑器界面与大纲**（12.6、17）：`EditorPane.vue` 通过 `context.ts` 向工具栏、浮层和节点视图提供编辑器实例与界面回调；`tables.ts` 在表格变化后统一列宽和列默认对齐，保留表头与合并结构。阅读页和编辑页的大纲共用 `web/src/app/content/OutlinePanel.vue`（外观、固定与折叠）和 `outline.ts`（当前节的判定）。
 - **历史版本**（13.2）：快照保留 30 天，每天北京时间 03:00 清理，不保底保留；`store/version_retention.go` 负责补跑、事务清理及历史 ID 高水位。首次保存记录“编辑前”，恢复时同事务记录“恢复前”，均适用 30 天期限；正常离开编辑页等待正文和快照完成。历史最后引用移除后，附件重新计时一小时；当前正文、回收站正文和模板继续保护素材。诊断使用 `history-gc --dry-run`。摘要由 `internal/doc/changes.go` 比较相邻快照生成，不依赖外部模型或数据库迁移。
+- **数据库布局与迁移**（26.1）：`internal/store/migrate.go` 按顺序执行布局步骤，`meta.layout`/`min_layout` 与正文格式版本 `meta.schema` 分开；`store.go` 的建表常量同时供 `init` 和迁移使用，大字段放在最后。每步一个事务，外键检查通过才提交；表重建按列名复制，不能丢列。兼容旧程序的步骤不提高 `min_layout`，因此 SQL 必须写明列名。`Open`（serve/check/restore）会迁移，备份用 `OpenAsIs` 保持原布局；发布时由新程序在备份之后的 `check` 中迁移，耗时较长的步骤先在正式备份副本上计时。
 - **知识库分组**（12.5）：用现有 `meta.book_groups` 保存，GET/PUT `/api/book-groups` 带 revision 冲突检查；分组显示共用 `bookSections`，彻底删除知识库时同步清理归属。
 
 ## 门户资源同步

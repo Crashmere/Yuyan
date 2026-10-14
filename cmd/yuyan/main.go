@@ -29,7 +29,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("usage: yuyan init|check|serve|backup|daily|restore|gc|history-gc [flags]")
+		return errors.New("usage: yuyan init|check|serve|backup|daily|restore|migrate|gc|history-gc [flags]")
 	}
 	cmd := os.Args[1]
 	flags := flag.NewFlagSet(cmd, flag.ContinueOnError)
@@ -39,7 +39,7 @@ func run() error {
 	withPrefix := flags.Bool("with-prefix", false, "also accept the public prefix directly (local testing without Nginx)")
 	out := flags.String("out", "", "backup: new backup directory; daily: directory holding daily backups")
 	from := flags.String("from", "", "restore: backup directory to restore from")
-	dryRun := flags.Bool("dry-run", false, "gc/history-gc: report cleanup candidates without changing data")
+	dryRun := flags.Bool("dry-run", false, "gc/history-gc/migrate: report what would change without changing data")
 	if err := flags.Parse(os.Args[2:]); err != nil {
 		return err
 	}
@@ -72,11 +72,29 @@ func run() error {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(result)
+	case "migrate":
+		plan, err := store.PlanMigrations(*dir)
+		if err != nil {
+			return err
+		}
+		if *dryRun || len(plan.Steps) == 0 {
+			return json.NewEncoder(os.Stdout).Encode(plan)
+		}
+		start := time.Now()
+		s, err := store.Open(*dir)
+		if err != nil {
+			return err
+		}
+		s.Close()
+		return json.NewEncoder(os.Stdout).Encode(struct {
+			store.MigrationPlan
+			Seconds float64 `json:"seconds"`
+		}{plan, time.Since(start).Seconds()})
 	case "backup", "daily":
 		if *out == "" {
 			return errors.New("--out required")
 		}
-		s, err := store.Open(*dir)
+		s, err := store.OpenAsIs(*dir)
 		if err != nil {
 			return err
 		}

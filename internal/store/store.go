@@ -32,6 +32,46 @@ type Store struct {
 	sessions  sessionStarts
 }
 
+// Columns holding whole documents come last. SQLite stores a row's columns in order and continues a
+// long row on overflow pages, so reading any column after a large one walks through all of it;
+// listing, counting and filtering need only the small columns. plain_text precedes content because
+// search scans it on every query, while only backlinks scan content. Init creates these definitions
+// and migrations rebuild older tables into them, so both always agree (migrate.go).
+const docsTable = `CREATE TABLE docs (
+  id INTEGER PRIMARY KEY,
+  book_id INTEGER NOT NULL REFERENCES books(id),
+  parent_id INTEGER REFERENCES docs(id),
+  position INTEGER NOT NULL DEFAULT 0,
+  kind TEXT NOT NULL CHECK (kind IN ('doc', 'group')),
+  title TEXT NOT NULL,
+  schema_version INTEGER NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1,
+  source_path TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  deleted_at TEXT,
+  plain_text TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL
+)`
+
+const docsIndexes = `
+CREATE INDEX docs_tree ON docs(book_id, parent_id, position);
+CREATE UNIQUE INDEX docs_source ON docs(source_path) WHERE source_path IS NOT NULL;`
+
+const docVersionsTable = `CREATE TABLE doc_versions (
+  id INTEGER PRIMARY KEY,
+  doc_id INTEGER NOT NULL REFERENCES docs(id),
+  revision INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  schema_version INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  content TEXT NOT NULL
+)`
+
+const docVersionsIndexes = `
+CREATE INDEX doc_versions_doc ON doc_versions(doc_id, id);`
+
 const schema = `
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE books (
@@ -43,35 +83,8 @@ CREATE TABLE books (
   updated_at TEXT NOT NULL,
   deleted_at TEXT
 );
-CREATE TABLE docs (
-  id INTEGER PRIMARY KEY,
-  book_id INTEGER NOT NULL REFERENCES books(id),
-  parent_id INTEGER REFERENCES docs(id),
-  position INTEGER NOT NULL DEFAULT 0,
-  kind TEXT NOT NULL CHECK (kind IN ('doc', 'group')),
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  schema_version INTEGER NOT NULL,
-  plain_text TEXT NOT NULL DEFAULT '',
-  revision INTEGER NOT NULL DEFAULT 1,
-  source_path TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  deleted_at TEXT
-);
-CREATE INDEX docs_tree ON docs(book_id, parent_id, position);
-CREATE UNIQUE INDEX docs_source ON docs(source_path) WHERE source_path IS NOT NULL;
-CREATE TABLE doc_versions (
-  id INTEGER PRIMARY KEY,
-  doc_id INTEGER NOT NULL REFERENCES docs(id),
-  revision INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  schema_version INTEGER NOT NULL,
-  reason TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-CREATE INDEX doc_versions_doc ON doc_versions(doc_id, id);
+` + docsTable + `;` + docsIndexes + `
+` + docVersionsTable + `;` + docVersionsIndexes + `
 CREATE TABLE assets (
   id TEXT PRIMARY KEY,
   sha256 TEXT NOT NULL UNIQUE,
@@ -112,11 +125,21 @@ func Init(dir string) error {
 	if _, err := tx.Exec(`INSERT INTO meta(key, value) VALUES ('schema', ?)`, strconv.Itoa(doc.SchemaVersion)); err != nil {
 		return err
 	}
+	if err := setLayout(context.Background(), tx, currentLayout); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 
 // Open requires a database created by Init; a missing database is an error, never an implicit init.
-func Open(dir string) (*Store, error) {
+// An older table layout is brought up to date first (migrate.go).
+func Open(dir string) (*Store, error) { return open(dir, true) }
+
+// OpenAsIs opens a database this program can use without migrating it, for copying it exactly as it
+// is: a backup taken before an upgrade must hold the layout from before.
+func OpenAsIs(dir string) (*Store, error) { return open(dir, false) }
+
+func open(dir string, migrateLayout bool) (*Store, error) {
 	dbPath := filepath.Join(dir, dbFile)
 	if _, err := os.Stat(dbPath); err != nil {
 		return nil, fmt.Errorf("database %s missing; run `yuyan init --data %s` for a new instance: %w", dbPath, dir, err)
@@ -125,16 +148,34 @@ func Open(dir string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	var v string
-	if err := db.QueryRow(`SELECT value FROM meta WHERE key = 'schema'`).Scan(&v); err != nil {
+	if err := prepare(db, migrateLayout); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("read schema version: %w", err)
-	}
-	if v != strconv.Itoa(doc.SchemaVersion) {
-		db.Close()
-		return nil, fmt.Errorf("database schema %s, program expects %d", v, doc.SchemaVersion)
+		return nil, err
 	}
 	return &Store{DB: db, dir: dir, now: time.Now}, nil
+}
+
+// prepare checks the document format and table layout of db, migrating an older layout when asked.
+func prepare(db *sql.DB, migrateLayout bool) error {
+	ctx := context.Background()
+	var v string
+	if err := db.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = 'schema'`).Scan(&v); err != nil {
+		return fmt.Errorf("read schema version: %w", err)
+	}
+	if v != strconv.Itoa(doc.SchemaVersion) {
+		return fmt.Errorf("database schema %s, program expects %d", v, doc.SchemaVersion)
+	}
+	layout, minLayout, err := readLayout(ctx, db)
+	if err != nil {
+		return err
+	}
+	if minLayout > currentLayout {
+		return fmt.Errorf("database layout %d needs a program that supports layout %d or later, this one supports %d; use a newer program or the backup from before the upgrade", layout, minLayout, currentLayout)
+	}
+	if migrateLayout && layout < currentLayout {
+		return migrate(ctx, db, layout)
+	}
+	return nil
 }
 
 func openDB(path string) (*sql.DB, error) {
