@@ -50,7 +50,6 @@
   --yy-scroll-thumb-active: light-dark(rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.5));
 
   --yy-shadow-popover: 0 1px 2px light-dark(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.3)), 0 8px 24px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45));
-  --yy-shadow-jump: 0 3px 14px 2px light-dark(rgb(30 55 42 / 20%), rgb(145 185 165 / 25%));
   --yy-shadow-dialog: 0 16px 48px light-dark(rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.55));
   --yy-overlay: light-dark(rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.55));
 
