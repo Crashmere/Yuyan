@@ -30,8 +30,8 @@ export function scrollToElement(target: Element, block: 'start' | 'center' = 'st
   const highlight = { backgroundColor: background, borderRadius: radius }
   const frames = matchMedia('(prefers-reduced-motion: reduce)').matches ? [highlight, highlight] : [
     { ...original, easing: 'ease-in-out' },
-    { ...highlight, offset: 500 / 2200 },
-    { ...highlight, offset: 1700 / 2200, easing: 'ease-in-out' },
+    { ...highlight, offset: 700 / 2200 },
+    { ...highlight, offset: 1500 / 2200, easing: 'ease-in-out' },
     original,
   ]
   const animation = target.animate(frames, { duration: 2200 })
