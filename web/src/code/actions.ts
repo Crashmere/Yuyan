@@ -1,6 +1,6 @@
 import type { CodeEditor } from './editor'
 import { copyText } from '../shared/clipboard'
-import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom'
+import { floatingUI } from '../shared/floating'
 import { containMenuWheel } from '../ui/menuWheel'
 
 export type CodeAction = 'expand' | 'find' | 'format' | 'fold' | 'unfold' | 'shortcuts'
@@ -17,14 +17,20 @@ export function codeActions(parent: HTMLElement, run: (action: CodeAction) => vo
   const more = button('代码块更多操作', 'M5 11v2m7-2v2m7-2v2')
   expand.onclick = () => run('expand')
   let menu: HTMLElement | undefined
+  let opening = false
   let stopPosition: (() => void) | undefined
   let closeShortcuts: (() => void) | undefined
   const close = () => { stopPosition?.(); stopPosition = undefined; menu?.remove(); menu = undefined; more.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', key) }
   const outside = (e: Event) => { if (!menu?.contains(e.target as Node) && !more.contains(e.target as Node)) close() }
   const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); close(); more.focus() } }
   more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false')
-  more.onclick = () => {
+  more.onclick = async () => {
     if (menu) { close(); return }
+    if (opening) return
+    opening = true
+    const floating = await floatingUI.load().catch(() => null).finally(() => { opening = false })
+    if (!floating || !more.isConnected) return
+    const { autoUpdate, computePosition, flip, offset, shift, size } = floating
     menu = document.createElement('div'); menu.className = 'yy-code-menu'; menu.setAttribute('role', 'menu')
     const items: [CodeAction, string][] = [['find', '在代码块中查找'], ['fold', '折叠所有代码区域'], ['unfold', '展开所有代码区域'], ['shortcuts', '代码块快捷键']]
     if (editable) items.splice(1, 0, ['format', '格式化代码'])

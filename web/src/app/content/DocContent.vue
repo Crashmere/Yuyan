@@ -1,5 +1,12 @@
+<script lang="ts">
+import { deferred } from '../../shared/deferred'
+
+// The image viewer loads on first use or when the browser is idle (DESIGN 26.5).
+const lightbox = deferred(() => import('./Lightbox.vue'))
+</script>
+
 <script setup lang="ts">
-import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { base, errorMessage, type ImageSizes } from '../../shared/api'
 import { knownSize, stopLoading } from '../../shared/images'
@@ -7,7 +14,7 @@ import { toast } from '../../ui/toast'
 import { prefs } from '../prefs'
 import { cleanupCode, enhance, enhanceCopy } from './enhance'
 import { reveal, setupFolds } from './folds'
-import Lightbox, { type LightboxImage } from './Lightbox.vue'
+import type { LightboxImage } from './Lightbox.vue'
 import { addMatches, clearMatches, showMatches } from './matches'
 import { placeSegments, type SegmentSource } from './placeholders'
 import { captureReadingPosition, restoreReadingPosition, type ReadingPosition } from './readingPosition'
@@ -213,6 +220,7 @@ watch(
 
 const images = ref<LightboxImage[]>([])
 const shown = ref<number | null>(null)
+const Lightbox = computed(() => lightbox.module.value?.default)
 
 function onClick(e: MouseEvent) {
   const target = e.target as HTMLElement
@@ -244,6 +252,7 @@ function onClick(e: MouseEvent) {
       }
     })
     shown.value = all.indexOf(target)
+    lightbox.load().catch(() => (shown.value = null))
     return
   }
   const a = target.closest<HTMLAnchorElement>('a[href]')
@@ -268,6 +277,6 @@ function onReplace(e: Event) {
 
 <template>
   <div :key="generation" ref="root" class="yy-content" @click="onClick" @yy-content-replaced="onReplace" v-html="html"></div>
-  <Lightbox v-model:index="shown" :images="images" />
+  <component :is="Lightbox" v-if="Lightbox" v-model:index="shown" :images="images" />
   <AttachmentPreviewDialog v-if="attachment" :attachment="attachment" @close="attachment = null" />
 </template>

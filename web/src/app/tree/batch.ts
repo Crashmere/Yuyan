@@ -2,7 +2,7 @@ import { base, type TreeNode } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
 import { confirm } from '../../ui/dialog'
 import { toast } from '../../ui/toast'
-import { moveRequest, runExport } from '../actions'
+import { chooseDestination, runExport } from '../actions'
 import { router } from '../router'
 import * as store from '../store'
 
@@ -13,7 +13,7 @@ export async function runBatch(action: BatchAction, bookId: number, nodes: TreeN
   const ids = nodes.map((n) => n.id)
   let target: { bookId: number; parentId: number | null } | null = null
   if (action === 'move' || action === 'copy') {
-    target = await new Promise((resolve) => { moveRequest.value = { bookId, node: roots[0], nodes: roots, count: nodes.length, action, resolve } })
+    target = await chooseDestination({ bookId, node: roots[0], nodes: roots, count: nodes.length, action })
     if (!target) return false
   }
   if (action === 'trash' && !await confirm({ title: `将所选 ${nodes.length} 项移到回收站？`,

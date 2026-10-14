@@ -1,7 +1,8 @@
 import { shallowRef } from 'vue'
+import { deferred } from '../shared/deferred'
 
 // In-app replacements for window.confirm and window.prompt. Requests queue up, so a dialog opened
-// while another is showing waits for its turn.
+// while another is showing waits for its turn. DialogHost shows them once loaded (DESIGN 26.5).
 
 export interface ConfirmOptions {
   title: string
@@ -26,11 +27,20 @@ export type DialogRequest =
   | { kind: 'prompt'; options: PromptOptions; resolve: (value: string | null) => void }
 
 export const currentDialog = shallowRef<DialogRequest | null>(null)
+export const dialogHost = deferred(() => import('./DialogHost.vue'))
 const queue: DialogRequest[] = []
 
 function open(request: DialogRequest) {
   if (currentDialog.value) queue.push(request)
   else currentDialog.value = request
+  // Without the dialog nobody can answer, so the waiting requests count as cancelled.
+  dialogHost.load().catch(() => {
+    for (const r of [currentDialog.value, ...queue.splice(0)]) {
+      if (r?.kind === 'confirm') r.resolve(false)
+      else r?.resolve(null)
+    }
+    currentDialog.value = null
+  })
 }
 
 export function closeDialog() {

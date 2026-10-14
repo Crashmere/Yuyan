@@ -13,7 +13,7 @@ Yuyan 平台能力新增、修改或删除时，必须在同一任务中同步�
 - Yuyan（语燕）是用户一人使用的网页知识库，功能参照语雀网页版中适合单人使用的部分：知识库与文档树、所见即所得编辑、阅读页。
 - Go 内嵌 Vue + Tiptap 前端 + SQLite。正文以 Tiptap 文档 JSON 保存并记录格式版本号；Markdown 只用于导入和导出。启动缺库必须报错，只有 `init` 会建库。
 - 前端是单页应用：Go 对所有页面地址返回 `internal/server/templates/shell.html`，由 `internal/server/app.go` 预加载首屏数据，预加载的键必须与前端请求的 API 路径完全一致；正文 HTML 仍由 Go 渲染。前端代码在 `web/src/app`（路由、布局、目录、页面）、`web/src/ui`（通用组件）、`web/src/editor`（编辑器，按需加载）。
-- 首次加载的脚本预算见 DESIGN 12.3：只有阅读页随应用入口加载，其他页面按需加载，页面外壳按地址预载对应页面的分块；新增按需页面同步登记 `internal/server/app.go` 的 `routeViews`，否则服务启动报错。按需加载的功能尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`；改动后用构建清单核对首次加载的分块。
+- 首次加载的脚本预算见 DESIGN 12.3：只有阅读页随应用入口加载，其他页面按需加载，页面外壳按地址预载对应页面的分块；新增按需页面同步登记 `internal/server/app.go` 的 `routeViews`，否则服务启动报错。按需加载的功能尽量只放不依赖 Vue 的逻辑，如版本对比的 `web/src/app/versions/compare.ts`；改动后用构建清单核对首次加载的分块。入口代码不要静态引用 reka-ui 或 floating-ui：菜单与对话框用 `ActionMenu`、`ContextActions`、`confirm`/`prompt`，阅读页随时会用的其他模块经 `shared/deferred.ts` 登记，在首次使用时下载、空闲时预取（DESIGN 26.5）。
 - ali 上位于 `/opt/yuyan`，`yuyan.service` 监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问；安装、发布、导入导出、备份与诊断见 [docs/OPERATIONS.md](docs/OPERATIONS.md)。
 
 ## 通用约束

@@ -37,7 +37,7 @@ watch(request, (r) => {
   bookId.value = r.bookId
   parentId.value = r.nodes ? null : store.locate(r.bookId, r.node.id)?.parent?.id ?? null
   void loadDestination(r.bookId)
-})
+}, { immediate: true })
 
 const rows = computed(() => {
   const r = request.value

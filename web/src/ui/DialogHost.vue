@@ -13,7 +13,7 @@ watch(request, async (r) => {
   await nextTick()
   input.value?.focus()
   input.value?.select()
-})
+}, { immediate: true })
 
 const canSubmit = computed(() => request.value?.kind !== 'prompt' || request.value.options.allowEmpty || value.value.trim() !== '')
 

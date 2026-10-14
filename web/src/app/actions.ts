@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, BookPlus, ClipboardCopy, Download, FilePlus, Folder
 import { api, base, errorMessage, type Book, type BookGroup, type TreeNode, type Doc } from '../shared/api'
 import { chooseTemplate, saveTemplate } from '../shared/templates'
 import { copyText } from '../shared/clipboard'
+import { deferred } from '../shared/deferred'
 import { confirm, prompt } from '../ui/dialog'
 import type { MenuEntry } from '../ui/menu'
 import { toast } from '../ui/toast'
@@ -146,6 +147,20 @@ export interface MoveRequest {
 }
 
 export const moveRequest = shallowRef<MoveRequest | null>(null)
+export const moveDialog = deferred(() => import('./tree/MoveDialog.vue'))
+
+// Asks where to move or copy documents (MoveDialog); null when cancelled.
+export function chooseDestination(request: Omit<MoveRequest, 'resolve'>) {
+  return new Promise<{ bookId: number; parentId: number | null } | null>((resolve) => {
+    moveRequest.value = { ...request, resolve }
+    moveDialog.load().catch(() => {
+      if (moveRequest.value?.resolve !== resolve) return
+      moveRequest.value = null
+      resolve(null)
+    })
+  })
+}
+
 export const receiveDocsRequest = shallowRef<Book | null>(null)
 export const bookToGroupRequest = shallowRef<{ book: Book; resolve: (input: store.BookToGroupInput | null) => void } | null>(null)
 const convertingBooks = new Set<number>()
@@ -176,9 +191,7 @@ export function bookToGroup(book: Book) {
 
 export function moveDocTo(bookId: number, node: TreeNode) {
   return attempt(async () => {
-    const target = await new Promise<{ bookId: number; parentId: number | null } | null>((resolve) => {
-      moveRequest.value = { bookId, node, resolve }
-    })
+    const target = await chooseDestination({ bookId, node })
     if (!target) return
     await store.moveDoc(node.id, bookId, { ...target, index: Number.MAX_SAFE_INTEGER })
     toast('已移动', 'success')

@@ -715,6 +715,15 @@ a.yy-crumb:hover {
   box-shadow: var(--yy-shadow-popover);
   animation: yy-pop 0.12s ease-out;
 }
+/* The empty trigger of the shared right-click menu (ContextMenuHost). */
+.yy-context-anchor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
 .yy-menu-item {
   display: flex;
   align-items: center;

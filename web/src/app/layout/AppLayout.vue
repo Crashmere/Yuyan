@@ -5,7 +5,7 @@ import { peekPreloaded, type Doc } from '../../shared/api'
 import { editLoading } from '../router'
 import { prefs } from '../prefs'
 import { pageShortcutAllowed } from '../pageShortcut'
-import { openSearch, searchLoaded } from '../search/panel'
+import { openSearch, searchLoaded, searchPanel } from '../search/panel'
 import { locate, state } from '../store'
 import { newDoc } from '../actions'
 import { altLetter } from '../../shared/keyboard'
@@ -17,7 +17,7 @@ import ModuleLoadNotice from './ModuleLoadNotice.vue'
 // The title of a directly opened edit page, from the data the server sent with it.
 const placeholderTitle = computed(() => editLoading.value && peekPreloaded<Doc>(`docs/${editLoading.value.id}`)?.title)
 
-const SearchPanel = defineAsyncComponent(() => import('../search/SearchPanel.vue'))
+const SearchPanel = computed(() => searchPanel.module.value?.default)
 const ShortcutsDialog = defineAsyncComponent(() => import('../shortcuts/ShortcutsDialog.vue'))
 
 const route = useRoute()
@@ -105,7 +105,7 @@ function resize(e: PointerEvent) {
         </main>
       </RouterView>
     </div>
-    <SearchPanel v-if="searchLoaded" />
+    <component :is="SearchPanel" v-if="searchLoaded && SearchPanel" />
     <ShortcutsDialog v-if="shortcutsLoaded" v-model:open="shortcutsOpen" />
   </div>
 </template>

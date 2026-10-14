@@ -1,4 +1,4 @@
-import { computePosition, flip, offset, shift } from '@floating-ui/dom'
+import { floatingUI } from './floating'
 import { internalTarget, previewLink } from './internalLinks'
 
 // Delegation also covers newly inserted editor links. Keep the preview outside ProseMirror's
@@ -18,9 +18,9 @@ export function setupLinkPreviews(root: HTMLElement): () => void {
     clear(); target = el
     const version = generation
     timer = setTimeout(async () => {
-      let preview
-      try { preview = await previewLink(href) } catch { preview = null }
-      if (version !== generation || !el.isConnected) return
+      const loaded = await Promise.all([previewLink(href).catch(() => null), floatingUI.load()]).catch(() => null)
+      if (!loaded || version !== generation || !el.isConnected) return
+      const [preview, { computePosition, flip, offset, shift }] = loaded
       card = document.createElement('div'); card.className = 'yy-link-preview'; card.setAttribute('role', 'tooltip')
       const title = document.createElement('strong'), detail = document.createElement('small'), body = document.createElement('p')
       title.textContent = preview?.heading || preview?.title || '链接目标不存在'

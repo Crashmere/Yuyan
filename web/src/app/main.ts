@@ -7,6 +7,7 @@ import { applyPrefs } from './prefs'
 import { router } from './router'
 import { installTooltips } from '../ui/tooltip'
 import { installModuleLoadRecovery } from '../shared/moduleLoad'
+import { prefetchDeferred } from '../shared/deferred'
 import { installTabPolicy } from '../shared/tabKey'
 
 installTabPolicy()
@@ -14,3 +15,4 @@ installModuleLoadRecovery()
 applyPrefs()
 installTooltips()
 createApp(App).use(router).mount('#app')
+void router.isReady().then(prefetchDeferred)
