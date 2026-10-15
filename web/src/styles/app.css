@@ -430,27 +430,38 @@ kbd {
 }
 
 .yy-tree-row {
+  --tree-row-bg: transparent;
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   height: 32px;
   padding: 0 4px 0 calc(4px + var(--depth, 0) * var(--tree-indent));
-  border-radius: var(--yy-radius);
   color: var(--yy-text);
   cursor: pointer;
   user-select: none;
 }
+/* Round only the paint: rounding the row cuts holes in its pointer hit area at every corner. */
+.yy-tree-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--yy-radius);
+  background: var(--tree-row-bg);
+  pointer-events: none;
+}
 .yy-tree-row:hover,
 .yy-tree-row.active {
-  background: var(--yy-bg-hover);
+  --tree-row-bg: var(--yy-bg-hover);
 }
 .yy-tree-row.current {
-  background: var(--yy-bg-active);
+  --tree-row-bg: var(--yy-bg-active);
   font-weight: 500;
 }
-.yy-tree-row.selecting.current { background: none; }
-.yy-tree-row.selecting:hover { background: var(--yy-bg-hover); }
-.yy-tree-row.selecting.checked { background: var(--yy-primary-soft); }
+.yy-tree-row.selecting.current { --tree-row-bg: transparent; }
+.yy-tree-row.selecting:hover { --tree-row-bg: var(--yy-bg-hover); }
+.yy-tree-row.selecting.checked { --tree-row-bg: var(--yy-primary-soft); }
 .yy-tree-check {
   flex: none;
   width: 15px;
@@ -524,10 +535,12 @@ kbd {
   opacity: 0.45;
 }
 .yy-tree-row.drop-inside {
-  background: var(--yy-primary-soft);
+  --tree-row-bg: var(--yy-primary-soft);
+}
+.yy-tree-row.drop-inside::before {
   box-shadow: inset 0 0 0 1px var(--yy-primary);
 }
-.yy-tree-row.drop-before::before,
+.yy-tree-row.drop-before::after,
 .yy-tree-row.drop-after::after,
 .yy-tree-end.drop-end::before {
   content: '';
@@ -538,8 +551,9 @@ kbd {
   height: 2px;
   border-radius: 1px;
   background: var(--yy-primary);
+  pointer-events: none;
 }
-.yy-tree-row.drop-before::before,
+.yy-tree-row.drop-before::after,
 .yy-tree-end.drop-end::before {
   top: -1px;
 }
@@ -576,6 +590,7 @@ button.yy-tree-caret:hover {
 .yy-tree-title {
   flex: 1;
   min-width: 0;
+  cursor: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
