@@ -438,7 +438,7 @@ kbd {
   height: 32px;
   padding: 0 4px 0 calc(4px + var(--depth, 0) * var(--tree-indent));
   color: var(--yy-text);
-  cursor: pointer;
+  cursor: default;
   user-select: none;
 }
 /* Round only the paint: rounding the row cuts holes in its pointer hit area at every corner. */
@@ -468,7 +468,7 @@ kbd {
   height: 15px;
   margin: 0 9px 0 0;
   accent-color: var(--yy-primary);
-  cursor: pointer;
+  cursor: inherit;
 }
 .yy-tree-check:disabled { cursor: wait; }
 .yy-batch-mode { overflow: hidden; }
@@ -574,7 +574,7 @@ kbd {
   border-radius: var(--yy-radius-sm);
   background: none;
   color: var(--yy-text-3);
-  cursor: pointer;
+  cursor: inherit;
 }
 button.yy-tree-caret:hover {
   background: var(--yy-bg-active);
@@ -602,6 +602,7 @@ button.yy-tree-caret:hover {
   gap: 1px;
   margin-left: 4px;
 }
+.yy-tree-actions .yy-icon-btn:not(:disabled) { cursor: inherit; }
 .yy-tree-row:hover .yy-tree-actions,
 .yy-tree-row.active .yy-tree-actions {
   display: flex;
