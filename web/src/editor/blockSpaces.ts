@@ -3,6 +3,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
 import { NodeSelection, Plugin, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
+import { scrollToPosition } from '../shared/scroll'
 
 interface PendingSpace { pos: number; node: PMNode }
 const spacesKey = new PluginKey<PendingSpace[]>('blockSpaces')
@@ -46,6 +47,52 @@ function needsSpace(node: PMNode): boolean {
 function elementAt(view: EditorView, pos: number): HTMLElement | null {
   const dom = view.nodeDOM(pos)
   return dom instanceof HTMLElement ? dom : null
+}
+
+function canClickSpace(view: EditorView, event: MouseEvent): boolean {
+  return view.editable && !view.composing && !event.defaultPrevented && event.button === 0 && event.detail <= 1
+    && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey
+}
+
+function enterSpace(view: EditorView, event: MouseEvent, pos: number, empty: number | null): boolean {
+  let tr = view.state.tr
+  if (empty === null) tr = closeHistory(tr.insert(pos, view.state.schema.nodes.paragraph.create()).setMeta(spacesKey, { add: pos }))
+  tr.setSelection(TextSelection.create(tr.doc, empty ?? pos + 1))
+  event.preventDefault()
+  view.dispatch(tr.scrollIntoView())
+  view.focus()
+  return true
+}
+
+function clickDocumentEnd(view: EditorView, event: MouseEvent): boolean {
+  if (!canClickSpace(view, event)) return false
+  // Short documents leave space inside ProseMirror; the page's bottom padding belongs to
+  // the surrounding main column. Only these blank surfaces should append to the document.
+  const target = event.target
+  if (target !== view.dom && target !== view.dom.parentElement && target !== view.dom.closest('.yy-editor-main')) return false
+  const box = view.dom.getBoundingClientRect()
+  if (event.clientX < box.left || event.clientX > box.right) return false
+  let last = view.dom.lastElementChild
+  while (last && !last.getClientRects().length) last = last.previousElementSibling
+  if (!last || event.clientY <= last.getBoundingClientRect().bottom) return false
+  const { doc, schema } = view.state
+  const end = doc.content.size
+  const node = doc.lastChild
+  const empty = node?.type.name === 'paragraph' && !node.content.size ? end - node.nodeSize + 1 : null
+  if (empty === null && !doc.canReplaceWith(doc.childCount, doc.childCount, schema.nodes.paragraph)) return false
+  enterSpace(view, event, end, empty)
+  // A padding click can start with focus in the title and the new caret offscreen.
+  // ProseMirror's scroll request then has no DOM selection yet; check after focus,
+  // also keeping the caret below the sticky toolbar rather than behind it.
+  const caret = view.coordsAtPos(view.state.selection.head)
+  const owner = view.dom.ownerDocument
+  const scroller = owner.scrollingElement as HTMLElement | null
+  const toolbar = view.dom.closest('.yy-editor-pane')?.querySelector('.yy-toolbar')
+  const top = Math.max(0, toolbar?.getBoundingClientRect().bottom ?? 0) + 16
+  const bottom = owner.documentElement.clientHeight - 16
+  const offset = caret.top < top ? caret.top - top : caret.bottom > bottom ? caret.bottom - bottom : 0
+  if (scroller && offset) scrollToPosition(scroller, { top: scroller.scrollTop + offset })
+  return true
 }
 
 // Use the actual gaps between sibling blocks, including inside lists/callouts/cells. No hidden
@@ -97,6 +144,10 @@ export const BlockSpaces = Extension.create({
           }, 30)
         }
         const doc = view.dom.ownerDocument
+        // EditorContent attaches the view after plugin creation, so resolve its column
+        // at click time rather than keeping an ancestor from the initial detached DOM.
+        const onEndClick = (event: MouseEvent) => clickDocumentEnd(view, event)
+        doc.addEventListener('mousedown', onEndClick)
         doc.addEventListener('focusin', schedule)
         doc.addEventListener('pointerup', schedule)
         view.dom.addEventListener('blur', schedule, true)
@@ -104,6 +155,7 @@ export const BlockSpaces = Extension.create({
         return { destroy() {
           editorView = undefined
           clearTimeout(timer)
+          doc.removeEventListener('mousedown', onEndClick)
           doc.removeEventListener('focusin', schedule); doc.removeEventListener('pointerup', schedule)
           view.dom.removeEventListener('blur', schedule, true)
           view.dom.removeEventListener('compositionend', schedule)
@@ -112,7 +164,8 @@ export const BlockSpaces = Extension.create({
       props: {
         handleDOMEvents: {
           mousedown(view, event) {
-            if (!view.editable || view.composing || event.defaultPrevented || event.button !== 0 || event.detail > 1 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return false
+            if (!canClickSpace(view, event)) return false
+            if (clickDocumentEnd(view, event)) return true
             const target = event.target instanceof Element ? event.target : null
             if (target?.closest('button, input, textarea, .yy-table-bar, .yy-image-handle')) return false
             const rule = target?.closest('hr')
@@ -155,14 +208,7 @@ export const BlockSpaces = Extension.create({
             })
             if (!found) return false
             const { pos, empty } = found as Space
-            let tr = view.state.tr
-            const insertAt = pos
-            if (empty === null) tr = closeHistory(tr.insert(insertAt, view.state.schema.nodes.paragraph.create()).setMeta(spacesKey, { add: insertAt }))
-            tr.setSelection(TextSelection.create(tr.doc, empty ?? insertAt + 1))
-            event.preventDefault()
-            view.dispatch(tr.scrollIntoView())
-            view.focus()
-            return true
+            return enterSpace(view, event, pos, empty)
           },
         },
       },
