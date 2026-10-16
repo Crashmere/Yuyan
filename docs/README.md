@@ -1,58 +1,60 @@
-# Yuyan 文档
+# Yuyan Documentation
 
-- [DESIGN.md](DESIGN.md)：需求、已确认的决策、架构与实施阶段，是方案讨论的统一入口。
-- [WHITEBOARD.md](WHITEBOARD.md)：已实现的 Excalidraw 画板、包格式、文档集成、素材生命周期与 Agent 入口；既有资料重绘另行执行。
-- [OPERATIONS.md](OPERATIONS.md)：安装、发布与回退、正式导入、备份与恢复、诊断。
-- [VERIFICATION.md](VERIFICATION.md)：各批次的验证、实测数据与上线核对记录，按 DESIGN 章节编号归档；新的记录写在这里。
-- [yuyan-doc 同步维护](#yuyan-doc-同步维护)：平台能力变更时，个人文档操作技能的更新范围与完成条件。
-- [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md)：已停止的 Obsidian 方案讨论记录，其中第 3 节的笔记库调查仍作为导入依据。
+- [DESIGN.md](DESIGN.md): requirements, confirmed decisions, architecture, and implementation phases; the central entry point for design discussions.
+- [WHITEBOARD.md](WHITEBOARD.md): the implemented Excalidraw whiteboard, package format, document integration, asset lifecycle, and Agent entry points; redrawing existing materials is performed separately.
+- [OPERATIONS.md](OPERATIONS.md): installation, release and rollback, production import, backup and restore, and diagnostics.
+- [VERIFICATION.md](VERIFICATION.md): verification, measured data, and release-check records for each batch, archived under DESIGN section numbers; write new records here.
+- [yuyan-doc synchronization maintenance](#yuyan-doc-synchronization-maintenance): the update scope and completion criteria for the personal document-operation skill when platform capabilities change.
+- [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md): discontinued Obsidian design discussion; the note-library survey in section 3 remains an import reference.
 
-已部署到 ali 并正式导入全部笔记（阶段 C，见 DESIGN.md 11.2），用户已在电脑和手机上确认可以正常使用。界面与编辑体验改版（阶段 D，DESIGN.md 第 12 节）已全部发布，用户已验收。阶段 E 第一批（搜索面板、版本对比、图片预留尺寸）已发布，结果见 DESIGN.md 13.6，用户已验收。第二批小功能（搜索知识库与全拼、从搜索结果定位、大纲隐藏、菜单滚动提示）已发布，见 DESIGN.md 第 14 节；第三批反馈修复与阅读改进见第 15 节；第四批语雀式代码块与 `[!code]` 迁移见第 16 节；第五批大纲按语雀方式收起见第 17 节；第六批（统一按钮提示、取消编辑、表格宽高等十项）见第 18 节；图片、段落与表格对齐见第 19 节；统一选区移除见第 20 节；代码块增强第一批（代码输入、JetBrains 快捷键、格式化、语法折叠、行选择、放大、块内查找）见第 21 节。快捷键与文档层级（双 Esc 保存、全局快捷键面板、标题批量升降、多层列表标记）见第 22 节。
+All notes have been formally imported and deployed on ali (Phase C; see DESIGN.md 11.2), and the user has confirmed normal operation on both computer and phone. The UI and editing-experience redesign (Phase D, DESIGN.md section 12) has been fully released and accepted by the user. The first Phase E batch (search panel, version comparison, and reserved image dimensions) has been released; see DESIGN.md 13.6 for results, accepted by the user. The second batch of small features (searching knowledge bases and full pinyin, navigating from search results, hiding the outline, and menu-scroll hints) has been released; see DESIGN.md section 14. See section 15 for the third batch of feedback fixes and reading improvements; section 16 for the fourth batch, Yuque-style code blocks and `[!code]` migration; section 17 for the fifth batch, collapsing the outline in the Yuque style; section 18 for the sixth batch (ten items including unified button hints, cancel editing, and table width and height); section 19 for image, paragraph, and table alignment; section 20 for unified selection removal; and section 21 for the first batch of code-block enhancements (code input, JetBrains shortcuts, formatting, syntax folding, line selection, enlargement, and in-block search). See section 22 for shortcuts and document hierarchy (double-Esc save, the global shortcuts panel, bulk heading promotion/demotion, and multilevel list markers).
 
-日常发布与验证按 [本机发布说明](DEPLOYMENT.md) 执行；GitHub 只作源码备份。
+Follow the [local release instructions](DEPLOYMENT.md) for routine release and verification; GitHub is only a source-code backup.
 
-从首页进入知识库时，正文、左侧栏与面包屑同步切换；详情和目录加载期间保留进度提示，已离开页面的旧请求不会覆盖当前导航与标题，见 DESIGN.md 12.3。
+When entering a knowledge base from the home page, the document body, left sidebar, and breadcrumb switch together. Progress remains visible while details and the tree load, and stale requests from a page already left do not overwrite the current navigation and title; see DESIGN.md 12.3.
 
-移动/复制文档弹窗的知识库列表按首页分组显示；侧栏拖拽文档到上下边缘可连续滚动目录，支持一次拖到较远位置。大纲、锚点、搜索与修改定位均直接跳到目标，不再播放滑动动画；大纲和标题链接的目标标题整行显示柔和的 Yuyan 绿色圆角背景，以 0.5 秒淡入、保持 1.2 秒、0.5 秒淡出的节奏显示，总时长 2.2 秒。规则见 DESIGN.md 12.4–12.5。
+The knowledge-base list in the move/copy document dialog is grouped in the same way as on the home page. Dragging a document to the top or bottom edge of the sidebar continuously scrolls the tree, allowing a single drag to a distant position. The outline, anchors, search, and change-location navigation all jump directly to the target instead of playing a scrolling animation. For outline and heading-link targets, the complete target heading row displays a soft Yuyan-green rounded background, fading in over 0.5 seconds, remaining for 1.2 seconds, and fading out over 0.5 seconds, for a total duration of 2.2 seconds. See DESIGN.md 12.4–12.5 for the rules.
 
-首页知识库卡片菜单支持“从其他知识库移入”，分栏浏览与多选后移到该库根目录；首页新建知识库后停留原处。文档目录分组可“解散分组”，将子项提升到该分组原来的同级位置；也可“提取为知识库”，原子新建同名知识库并将子项移到新库根层，继承来源知识库的首页分组。两种操作均保留内容与内部层级，仅将原空分组移入回收站。知识库菜单还可“转为分组…”，选择另一个知识库，将全部内容放到目标根目录下的同名分组，原空库进入回收站。首页菜单移除三个文档创建入口，知识库移组菜单统一称为“移动到”，见 DESIGN.md 12.5。
+The home-page knowledge-base card menu supports `“从其他知识库移入”` (move in from another knowledge base): browse by columns, select multiple documents, and move them to that knowledge base's root. After creating a knowledge base on the home page, the page remains in place. A group in the document tree may use `“解散分组”` (dissolve group) to promote its children to the group's former peer position, or `“提取为知识库”` (extract as knowledge base) to atomically create a same-named knowledge base, move the children to its root, and inherit the source knowledge base's home-page group. Both operations preserve content and internal hierarchy and move only the now-empty original group to the trash. The knowledge-base menu may also use `“转为分组…”` (convert to group...) to select another knowledge base, place all content under a same-named group at the target root, and move the now-empty original knowledge base to the trash. The home-page menu removes three document-creation entries, and the knowledge-base group-move menu uses the unified label `“移动到”` (move to); see DESIGN.md 12.5.
 
-首页知识库列表右下角显示所有存活文档的正文总字数，各知识库卡片右下角显示该库字数，空库显示 0 字。统计口径与阅读页一致，排除空白及回收站；`GET /api/stats` 返回全站 `chars` 与按知识库 ID 索引的 `bookChars`，见 DESIGN.md 12.5。
+The lower-right corner of the home-page knowledge-base list displays the total character count across all live documents, and the lower-right corner of each knowledge-base card displays that knowledge base's character count; an empty knowledge base displays `0 字`. The counting rules match the reading page and exclude whitespace and the trash. `GET /api/stats` returns the site-wide `chars` and `bookChars` indexed by knowledge-base ID; see DESIGN.md 12.5.
 
-历史版本保留 30 天，每天北京时间 03:00 清理且不保底保留；当前正文独立保存。停机后启动补跑，历史最后引用移除后附件重新开始一小时回收计时。编辑前与恢复前快照、空历史交互见 DESIGN.md 13.2，诊断及备份恢复注意事项见 OPERATIONS.md。
+Version history is retained for 30 days and cleaned daily at 03:00 Beijing time, with no guaranteed minimum retained snapshot; the current document body is stored independently. Startup catches up after downtime. When history removes the final reference to an attachment, its one-hour garbage-collection timer restarts. See DESIGN.md 13.2 for before-edit and before-restore snapshots and empty-history interactions, and OPERATIONS.md for diagnostics and backup/restore cautions.
 
-阅读页顶部栏的“最近修改”开关以浅紫底色加虚线针脚的“补丁”标记最近一次编辑的变化，相邻修改合并为一块，补丁内改动的字加深底色，图片与代码以环形包围，保留正文原有配色与格式。删除的内容以玫红虚线框中的旧内容副本放回原处：整块删除标“已删除”，部分删除在新版前显示标“修改前”的旧版并划去删掉的字，代码只列出失去的行；副本不可选中，也不参与搜索、折叠与大纲。开启后正文底部悬浮胶囊栏，“修改”“删除”两个开关可单独或同时显示，可上一处/下一处定位、展开隐藏内容、查看完整差异或关闭；选择记在浏览器中，默认关闭。基线与显示边界见 DESIGN.md 13.2。
+The `“最近修改”` (recent changes) toggle in the reading-page top bar marks the latest edit with light-purple `“补丁”` (patch) markers with dashed stitch borders. Adjacent changes merge into one patch; changed characters inside a patch have a darker background, while images and code receive a ring. Existing document colors and formatting remain intact. Deleted content is placed back at its original position as a copy inside a rose dashed border: a whole-block deletion is labeled `“已删除”`, while a partial deletion displays the old version before the new version, labeled `“修改前”`, with removed characters struck through; code lists only the lost lines. Copies cannot be selected and do not participate in search, folding, or the outline. When enabled, a floating capsule bar appears at the bottom of the document body. Its `“修改”` and `“删除”` toggles can be shown independently or together; it can navigate to the previous/next location, reveal hidden content, show the full diff, or close. The choice is stored in the browser and is off by default. See DESIGN.md 13.2 for the baseline and display boundaries.
 
-文档/章节链接与内容复用见 DESIGN.md 第 24 节：`[[` 及链接浮层支持拼音选文档或章节、鼠标悬停摘要；文末反向链接默认收起。文档可保存为模板，选区可保存为内容片段；从新建菜单、顶部插入及 `/` 复用，模板库可预览、重命名和删除。
+See DESIGN.md section 24 for document/section links and content reuse: `[[` and the link popover support finding documents or sections by pinyin and show a summary on hover; backlinks at the end of a document are collapsed by default. A document can be saved as a template, and a selection can be saved as a content snippet. Reuse them from the new-document menu, the top insertion control, or `/`; the template library supports preview, rename, and delete.
 
-新建与选区快捷键见 DESIGN.md 第 22 节：阅读时 Option/Alt+N 在当前目录新建文档；编辑时 Option/Alt+L 从文字与内容块逐层扩到所属章节、上级章节和全文；标题左侧统一显示层级与折叠按钮，整节移动通过编辑大纲拖动完成。
+See DESIGN.md section 22 for new-document and selection shortcuts: while reading, Option/Alt+N creates a document in the current directory. While editing, Option/Alt+L expands from text and content blocks to the containing section, parent sections, and the full document. To the left of a heading, always display the level and fold control; move an entire section by dragging it in the editing outline.
 
-图片裁切、互补切分、可选参数及四种范围的批量应用、图片组合画板见 DESIGN.md 19.2–19.3；格式兼容见 OPERATIONS.md，验证记录见 VERIFICATION.md。
+See DESIGN.md 19.2–19.3 for image cropping, complementary splitting, optional parameters and batch application at four scopes, and image composition boards; see OPERATIONS.md for format compatibility and VERIFICATION.md for verification records.
 
-Markdown 之外的格式扩展第一批见 DESIGN.md 第 23 节：文字颜色、图片说明、合并/拆分单元格、单元格底色与可选表头。分栏见 DESIGN.md 23.7；附件见 DESIGN 23.8：插入菜单、拖入或粘贴文件，正文文件卡片可重命名，阅读时点击预览、独立按钮下载，支持图片/PDF/文本/音视频与压缩包目录，附件不设上传大小上限；连续一小时未被正文、历史、回收站或模板引用的附件与图片自动清理，已有备份保留；导入导出、历史、模板与原生备份一并支持。通用画板已实现：从插入菜单打开，可编辑形状/文字/绑定连线，内置数据库模板，支持导出重导与本机 Agent 生成，见 WHITEBOARD.md。
+See DESIGN.md section 23 for the first batch of format extensions beyond Markdown: text colors, image captions, cell merging/splitting, cell background colors, and optional table headers. See DESIGN.md 23.7 for columns and DESIGN 23.8 for attachments: insert-menu, drag, or paste insertion; renamable document file cards; click-to-preview and a separate download button while reading; support for images, PDFs, text, audio/video, and archive directories; and no attachment upload-size limit. Attachments and images that remain unreferenced by document bodies, history, trash, or templates for one continuous hour are removed automatically; existing backups remain. Import/export, history, templates, and native backup all support them. The general-purpose whiteboard is implemented: open it from the insertion menu, edit shapes/text/bound connectors, use the built-in database templates, export and reimport it, or generate it with a local Agent; see WHITEBOARD.md.
 
-表格“按内容适配列宽”见 DESIGN.md 第 18 节：点击表格内，在悬浮工具栏使用双向箭头；选择跨表格正文时可一次适配选区涉及的所有表格。保留手动换行与合并结构，整次操作支持撤销，宽表格继续横向滚动。
+See DESIGN.md section 18 for the table `“按内容适配列宽”` (fit column widths to content) action: click inside a table and use the two-headed arrow in the floating toolbar. When a selection spans body content containing multiple tables, one action can fit every table involved. Manual line breaks and merged structure are preserved, the entire operation is undoable, and wide tables continue to scroll horizontally.
 
-点击块间或文末空白可插入空段落并直接输入，已有空行会复用；未使用的临时空段落在离开时清理，既有空行和已编辑段落保留（DESIGN.md 12.6）。分栏在阅读与编辑中共用细边框与栏间虚线，空栏仍可见；编辑时通过边框上的加号在指定位置插栏，保持内容及已有宽度比例（23.7）。
+Clicking between blocks or in empty space after the document inserts an empty paragraph and starts input, reusing an existing blank line where possible. An unused temporary empty paragraph is removed when leaving; existing blank lines and edited paragraphs remain (DESIGN.md 12.6). In reading and editing, columns share thin borders and dashed separators, and empty columns remain visible. While editing, use the plus on the border to insert a column at that position while preserving content and existing width proportions (23.7).
 
-颜色工具与顶部栏正文对齐见 DESIGN.md 23.4：悬停箭头展开色板，选区栏合并文字/背景色，顶部提供完整纯色色板、文字渐变、最近自定义颜色与更多颜色。
+See DESIGN.md 23.4 for the color controls and top-bar body alignment: hovering over the arrow expands the palette; the selection bar combines text and background color; the top bar provides the full solid-color palette, text gradients, recently used custom colors, and additional colors.
 
-格式刷见 DESIGN.md 23.5：单次与连续复制文字/段落格式，支持精确选区和独立撤销，Cmd/Ctrl + Shift + S 开关格式刷；顶部按绿色加号插入入口、撤销、重做、格式刷、清除格式排列。
+See DESIGN.md 23.5 for the format painter: one-shot and continuous copying of text/paragraph formatting, with exact selections and independent undo. Cmd/Ctrl + Shift + S toggles the format painter. The top-bar order is: insert (green plus), undo, redo, format painter, and clear formatting.
 
-斜杠插入菜单搜索见 DESIGN.md 12.6：与 Cmd/Ctrl + K 共用拼音匹配，支持全拼、首字母、混输、部分名称及 Markdown 语法别名。“文档”直接打开文档与章节链接选择器并聚焦搜索框，原有“链接”保持默认打开网址输入；顶部插入菜单共用这两个入口。
+See DESIGN.md 12.6 for slash insertion-menu search: it shares pinyin matching with Cmd/Ctrl + K and supports full pinyin, initials, mixed input, partial names, and Markdown syntax aliases. `“文档”` opens the document-and-section link selector directly and focuses its search box; the existing `“链接”` continues to open URL input by default. The top insertion menu shares these two entries.
 
-折叠块与高亮块见 DESIGN.md 23.6：无底色的可折叠标题/正文卡片，以及可选 10 种柔和底色的内容块；编辑、阅读与 HTML 导入导出共用格式。
+See DESIGN.md 23.6 for foldable blocks and highlight blocks: collapsible heading/body cards without a background color, and content blocks with a choice of 10 soft background colors. Editing, reading, and HTML import/export share the format.
 
-## yuyan-doc 同步维护
+<a id="yuyan-doc-同步维护"></a>
 
-Agent 操作 Yuyan 的入口是个人技能仓库中的 [yuyan-doc](https://github.com/Crashmere/agent-config/blob/main/skills/yuyan-doc/SKILL.md)，本地通常位于 `~/agent-config/skills/yuyan-doc/`。平台能力新增、修改或删除时，使用 personal-skill-management，在同一任务中同步更新受影响的技能说明和脚本，作为本次能力变更的完成条件；不能因 `schemaVersion` 未变化而跳过。
+## yuyan-doc Synchronization Maintenance
 
-| 平台变化 | 技能中需要核对和更新的内容 |
+The Agent entry point for operating Yuyan is [yuyan-doc](https://github.com/Crashmere/agent-config/blob/main/skills/yuyan-doc/SKILL.md) in the personal skill repository, usually at `~/agent-config/skills/yuyan-doc/` locally. When a platform capability is added, changed, or removed, use personal-skill-management to update the affected skill instructions and scripts in the same task as a completion criterion for the capability change; do not skip this because `schemaVersion` is unchanged.
+
+| Platform change | Skill content to review and update |
 | --- | --- |
-| 正文节点、marks、属性、默认值、结构约束或 Markdown/HTML 导入导出 | `references/format.md`、`references/editing.md`，以及 `scripts/document.mjs` 的校验和转换调用、读写与导出流程 |
-| API 路由、参数、响应、错误语义、连接方式或鉴权 | `references/api.md`、`SKILL.md` 的连接说明，以及 `scripts/runtime.mjs`、`scripts/yuyan-doc.mjs` 中受影响的请求、允许列表和流程 |
-| 文档与目录操作、模板/片段、链接、媒体、历史或 revision 规则及能力边界 | `SKILL.md` 和对应参考中的操作步骤、示例、限制及失败处理，以及受影响的脚本行为；删除已失效的能力说明 |
+| Document-body nodes, marks, attributes, defaults, structural constraints, or Markdown/HTML import and export | `references/format.md`, `references/editing.md`, validation and converter calls in `scripts/document.mjs`, and read/write/export flows |
+| API routes, parameters, responses, error semantics, connection methods, or authentication | Connection instructions in `references/api.md` and `SKILL.md`, plus affected requests, allowlists, and flows in `scripts/runtime.mjs` and `scripts/yuyan-doc.mjs` |
+| Document and tree operations, templates/snippets, links, media, history or revision rules, and capability boundaries | Procedures, examples, limits, and failure handling in `SKILL.md` and the corresponding references, plus affected script behavior; remove obsolete capability descriptions |
 
-所有技能脚本、参考资料和技能专用验证材料都放在个人技能仓库；继续只读复用 Yuyan 现有 schema 与转换器，不复制第二套格式定义。新增可供 agent 使用的能力时，补齐使用方式与示例；仅改变视觉或快捷键、且不影响技能操作的改动，核对后在交付中说明无须修改技能即可。
+Keep all skill scripts, references, and skill-specific verification materials in the personal skill repository. Continue to reuse Yuyan's existing schema and converters read-only; do not copy a second format definition. When adding a capability that an agent can use, include usage instructions and examples. For a change that affects only visuals or shortcuts and does not affect skill operations, review it and state in the delivery that no skill change is needed.
 
-只验证受影响的流程：涉及脚本、格式或写入行为时，在隔离实例用合成文档检查相关读写、格式保留和冲突处理，生产只读验证；不要求全量回归或新增永久测试。纯说明变更检查链接、内容一致性和 diff。收尾按 personal-skill-management 提交、推送个人技能仓库，并按 server-operations 同步本项目服务器文档；交付时说明技能更新或不受影响的结论，未完成的适配须明确列出。
+Verify only affected flows. When scripts, formats, or write behavior are involved, use synthetic documents in an isolated instance to check relevant reads and writes, format preservation, and conflict handling; production verification is read-only. Full regression and new permanent tests are not required. For documentation-only changes, check links, content consistency, and the diff. At completion, use personal-skill-management to commit and push the personal skill repository and server-operations to synchronize this project's server documentation. In the delivery, state either the skill update or the conclusion that it was unaffected, and explicitly list any unfinished adaptation.

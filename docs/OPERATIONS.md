@@ -1,81 +1,81 @@
-# 安装与运行
+# Installation and Operation
 
-公网入口使用可信 IP 证书的 HTTPS，原有 /yuyan/ 路径保持。公网 HTTP 返回 308；API 客户端直接使用 HTTPS。Nginx 覆盖 `X-Forwarded-Proto`，公网入口统一校验设备凭据。证书、续期、回退和整机验收见 [共享 HTTPS 运维](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/https.md)（服务器副本 /opt/server-context/references/https.md）。本项目的后端与发布检查保留本机 HTTP，127.0.0.1:80 的代理检查入口不能从公网访问。公网已接入 ServerPortal 统一设备认证：先在 /portal/login 输入口令授权设备，随后使用同源 Secure/HttpOnly Cookie 访问；未授权 API 返回 401。本机发布检查与服务间调用保留。
+The public entry point uses HTTPS with a trusted IP certificate, while retaining the existing `/yuyan/` path. Public HTTP returns 308; API clients must use HTTPS directly. Nginx overrides `X-Forwarded-Proto`, and the public entry point uniformly validates device credentials. For certificates, renewal, rollback, and whole-machine acceptance, see [Shared HTTPS Operations](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/https.md) (server copy: `/opt/server-context/references/https.md`). This project's backend and deployment checks retain local HTTP, and the proxy-check entry point at `127.0.0.1:80` must not be publicly accessible. The public endpoint has been integrated with ServerPortal's unified device authentication: first enter the passphrase at `/portal/login` to authorize the device, then access the site with a same-origin Secure/HttpOnly cookie; unauthorized API requests return 401. Local deployment checks and service-to-service calls remain available.
 
-操作 ali 前加载 server-operations 并显式读取 `/opt/AGENTS.md`。公开仓库不写正式公网地址；通过受信 SSH 别名取得现场信息。
+Before operating on `ali`, load server-operations and explicitly read `/opt/AGENTS.md`. Do not record the production public address in the public repository; obtain live environment information through the trusted SSH alias.
 
-图片/附件上传与大文档保存共同经过设备认证：附件接口不设上传大小上限并采用流式接收；图片接口仍限制单张 25 MiB，JSON 上限 16 MiB，其他业务请求的 Nginx 上限为 26 MiB。内部认证子请求不另设 body 上限；大请求在进入程序前返回 500 时，见[统一认证误拦大请求](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求)。
+Image/attachment uploads and large-document saves all pass through device authentication: the attachment endpoint has no upload-size limit and receives data as a stream; the image endpoint remains limited to 25 MiB per image, JSON is limited to 16 MiB, and the Nginx limit for other application requests is 26 MiB. Internal authentication subrequests do not impose another body-size limit; if a large request returns 500 before reaching the application, see [Unified Authentication Incorrectly Blocking Large Requests](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求).
 
-## 历史版本保留
+## Version History Retention
 
-阅读模式的“最近修改”按需调用只读 `/api/docs/{id}/recent-changes`，沿用保留历史寻找最近编辑/恢复前基线。没有历史时显示不可比较，不补写快照；无数据库迁移、素材生命周期或备份契约变化。接口与显示契约见 DESIGN.md 13.2，资源声明随同程序发布。
+In reading mode, “最近修改” calls the read-only `/api/docs/{id}/recent-changes` endpoint on demand and uses retained history to find the baseline before the most recent edit or restore. When no history exists, the UI shows that comparison is unavailable and does not write a snapshot; there are no database-migration, asset-lifecycle, or backup-contract changes. See DESIGN.md 13.2 for the API and display contract. The resource declaration is released with the application.
 
-所有文档历史（含回收站文档的历史）保留 30×24 小时，每天北京时间 03:00 删除达到期限的快照，不保留最低版本数。当前正文、回收站正文、模板与片段不变；历史可以完全清空。任务由应用现有每分钟维护循环执行，先清理历史，再扫描附件；成功时间存于 meta 的 version_retention:last_run，服务停机后启动补跑，同一时段重启不重复，失败在下一轮重试。无需 cron、额外 unit 或数据库迁移。
+All document history, including history for documents in the trash, is retained for 30×24 hours. Snapshots that reach the limit are deleted every day at 03:00 Asia/Shanghai, with no minimum version count retained. Current content, trashed content, templates, and snippets are unchanged; history may become completely empty. The job runs in the application's existing once-per-minute maintenance loop, cleaning history before scanning attachments. The successful run time is stored in `meta` as `version_retention:last_run`; after downtime, startup catches up, restarts during the same period do not rerun it, and failures are retried on the next loop. No cron job, additional unit, or database migration is required.
 
-`yuyan history-gc --dry-run --data <数据目录>` 只读返回 cutoff、nextRun、eligible、deleted、ran，不删除记录或写入调度状态；不带 --dry-run 则立即按同一 30 天规则清理并记录本次成功时间。正式诊断使用只读形式。日志 version retention 记录删除数和下一次执行时间；只删除数据库行，不自动 VACUUM，释放的页由后续写入复用。
+`yuyan history-gc --dry-run --data <数据目录>` is read-only and returns `cutoff`, `nextRun`, `eligible`, `deleted`, and `ran` without deleting records or writing scheduling state. Without `--dry-run`, it immediately cleans according to the same 30-day rule and records the successful run time. Use the read-only form for production diagnostics. The `version retention` log records the deletion count and next run time. Only database rows are deleted; VACUUM is not run automatically, and later writes reuse the freed pages.
 
-清理前解析候选快照，历史删除、媒体宽限期重置及调度成功标记同事务提交，解析或 SQL 失败全部回滚。历史最后引用的图片/附件从引用消失后重新开始一小时计时，旧上传日期不触发立即删除。现存正文、回收站、模板或其他历史仍引用的文件继续保留。
+Candidate snapshots are parsed before cleanup. History deletion, media grace-period resets, and the successful scheduling marker are committed in the same transaction; any parse or SQL failure rolls everything back. Images/attachments whose last reference was in history begin a new one-hour timer when that reference disappears; an old upload date does not cause immediate deletion. Files still referenced by current content, trash, templates, or other history remain protected.
 
-编辑器首次保存携带 sessionRevision，在同一事务记录新“编辑前”快照，保护取消编辑的正文与媒体；最新快照已是相同状态的会话边界且距过期超过一周时沿用它（DESIGN.md 13.2）。取消时移除本会话快照。恢复版本同事务记录“恢复前”、校验 revision、更新正文及记录结果。两类保护快照同样保留 30 天。meta 的 version_sequence 保存 ID 高水位，历史清理、取消与彻底删除后不重用旧版本链接；缺失版本返回 404 / version_not_found。
+The editor's first save carries `sessionRevision` and records a new “编辑前” snapshot in the same transaction, protecting the content and media that existed before an editing session that is later canceled. If the latest snapshot already marks a session boundary with identical state and is more than one week from expiration, that snapshot is reused (DESIGN.md 13.2). Canceling removes the current session snapshot. Restoring a version records “恢复前” in the same transaction, checks the revision, updates the content, and records the result. Both kinds of protective snapshots use the same 30-day retention period. `version_sequence` in `meta` stores the ID high-water mark, so old version links are not reused after history cleanup, cancellation, or permanent deletion; a missing version returns 404 / `version_not_found`.
 
-原生备份继续保存完整 SQLite（含保留历史与调度状态）和登记素材；已有备份不受历史清理影响，daily/发布前/手工备份仍按各自策略保留。恢复备份后，下次服务启动会按当前时间补做过期清理；需要提取更早的历史时，先在隔离恢复目录用只读工具查看，不启动服务。程序回退不会恢复已清理的记录或文件，且旧版写入不维护历史 ID 高水位；回退需选择理解本策略的版本，真实恢复仍按原生备份流程确认时点。
+Native backups continue to preserve the complete SQLite database, including retained history and scheduling state, plus registered assets. Existing backups are unaffected by history cleanup; daily, before-deploy, and manual backups continue to follow their respective retention policies. After a backup is restored, the next service startup catches up on expired-history cleanup according to the current time. To extract older history, first inspect it with read-only tools in an isolated restore directory without starting the service. Rolling back the program does not restore records or files that have already been cleaned, and older versions do not maintain the history ID high-water mark; rollback must use a version that understands this policy, while a real restore must still select and confirm the desired point in time through the native-backup process.
 
-## 附件与备份兼容
+## Attachment and Backup Compatibility
 
-附件上传不设文件大小上限。仅 /yuyan/api/attachments 的 Nginx 子 location 设置 client_max_body_size 0 和 proxy_request_buffering off，继承现有设备认证、Host/来源转发与空闲超时；其他请求保留 26 MiB 限制。应用流式接收至 data/assets/.upload-*、增量计算 SHA-256，完整表单与文件成功后发布并登记；不使用 /tmp 缓存整文件、不整文件读入内存。仅附件接收改用两分钟读空闲超时，持续上传不受普通请求的两分钟总期限影响。复用 assets 表与目录，无数据库迁移或权限变化。附件下载走 /attachments/{id}，强制作为文件下载并支持 Range；不在图片路由开放 .bin。原始文件不可覆盖。未引用图片与附件按下述一小时规则自动回收，原生备份包含快照时仍登记的所有素材。
+Attachment uploads have no file-size limit. Only the Nginx child location `/yuyan/api/attachments` sets `client_max_body_size 0` and `proxy_request_buffering off`, while inheriting existing device authentication, Host/origin forwarding, and idle timeouts; other requests retain the 26 MiB limit. The application streams data into `data/assets/.upload-*`, incrementally computes SHA-256, and publishes and registers the file only after the complete form and file succeed. It does not cache the entire file in `/tmp` or read the entire file into memory. Only attachment intake uses a two-minute read-idle timeout, so an upload that continues transferring is not constrained by the two-minute total limit for ordinary requests. It reuses the `assets` table and directory, with no database migration or permission changes. Attachment downloads use `/attachments/{id}`, are always forced to download as files, and support Range; `.bin` is not exposed through the image route. Original files are immutable. Unreferenced images and attachments are automatically collected according to the one-hour rule below, while native backups include every asset still registered when the snapshot is taken.
 
-服务启动和每分钟扫描全部正文（包括回收站和已删除知识库下的文档）、历史版本、模板/片段，以及其中的图片、附件和媒体链接。启动后首轮解析全部内容，之后只解析上次扫描以来新增或修改的行；解析在取得回收锁前完成，扫描期间保存与其他请求不必等待。首次确认无引用后，连续一小时仍无引用才删除 assets 记录和文件；新上传从成功登记开始计时，重新引用或重复上传同一文件重置计时。已有无引用文件首次扫描时开始计时，不按旧上传日期立即删除。上传成功后放弃编辑、彻底删除文档/知识库或模板，只有在所有引用均消失后才进入回收；单纯删除卡片但历史仍引用时保留。嵌套容器和组合画板同样计入引用。
+At service startup and once per minute, the application scans all current content, including documents in the trash and documents under deleted knowledge bases, history versions, templates/snippets, and all image, attachment, and media links within them. The first scan after startup parses all content; subsequent scans parse only rows added or modified since the preceding scan. Parsing completes before the collection lock is acquired, so saves and other requests do not need to wait during scanning. An `assets` record and file are deleted only after they have remained unreferenced continuously for one hour following the first confirmation that no references exist. New uploads begin timing when registration succeeds; referencing the file again or uploading the same file again resets the timer. Existing unreferenced files begin timing on their first scan and are not deleted immediately based on an old upload date. Abandoning an edit after a successful upload or permanently deleting a document, knowledge base, or template starts collection only after every reference has disappeared; removing a card alone does not if history still references the asset. Nested containers and composite image boards also count as references.
 
-回收状态保存在既有 meta 的 asset_gc:*，重启不丢计时，无数据库迁移。删除决策在同一写事务中重新核对全部引用；解析或事务失败时不删除文件。先提交登记删除及重试标记，再 unlink，异常退出后继续完成；重新保存已回收附件返回明确的重新上传提示，正文不被覆盖。登记失败留下的完整孤立文件也先观察一小时。正常取消/失败清理未完成上传；异常退出留下的 .upload-* 超过一小时且没有上传进程持锁后清理，长时间持续上传不会被误删。
+Collection state is stored in the existing `meta` keys under `asset_gc:*`, so timing survives restarts and requires no database migration. The deletion decision rechecks all references inside the same write transaction; parse or transaction failures do not delete files. The registered deletion and retry marker are committed before `unlink`, so work resumes after an abnormal exit. Attempting to save a collected attachment returns an explicit re-upload prompt without overwriting document content. Complete orphan files left by registration failures are also observed for one hour first. Normal cancellation or failure cleans unfinished uploads; `.upload-*` files left by an abnormal exit are removed after one hour only when no upload process holds the lock, so long-running active uploads are not removed by mistake.
 
-原生备份和上传发布持 assets 目录的跨进程共享锁，回收持排他锁，保证快照登记和文件硬链接一致；已有备份中的文件不会随源文件清理而丢失，实际释放空间仍取决于这些备份何时按自身策略轮换。诊断只读运行 `yuyan gc --dry-run --data <数据目录>`，返回 referenced、pending、eligible 及可回收字节数，不写计时、不删文件；`gc` 不带该参数执行同样的一小时规则，没有绕过宽限期的选项。服务日志记录任务启动、回收数量/字节和失败原因。
+Native backup and upload publication hold a cross-process shared lock on the `assets` directory, while collection holds the exclusive lock, ensuring that snapshot registration and file hard links remain consistent. Files in existing backups are not lost when source files are collected; actual space reclamation still depends on when those backups rotate according to their own policies. For read-only diagnostics, run `yuyan gc --dry-run --data <数据目录>`; it returns `referenced`, `pending`, `eligible`, and reclaimable bytes without writing timers or deleting files. `gc` without that option applies the same one-hour rule; there is no option to bypass the grace period. Service logs record job startup, collected counts/bytes, and failure reasons.
 
-阅读卡片点击打开预览，只有独立下载按钮触发下载。只读元信息/文本/目录接口为 `/api/attachments/{id}/preview`，位图、PDF 与音视频内容走 `/attachments/{id}/content`，均受现有认证保护；内容接口按文件签名限制类型，HTML/SVG 只能以文本预览或下载。压缩包只列目录，不解压落盘或读取其他分卷；支持格式与读取限制见 DESIGN 23.8。PDF.js 及字体、CMap、解码资源在本机随前端构建，版本化资源位于 `static/assets/pdfjs-<版本>/`，打开 PDF 后才加载，不向第三方传送文件。无服务器新运行时、持久化目录或备份格式变更。
+Clicking an attachment card opens a preview; only the separate download button initiates a download. The read-only metadata/text/directory endpoint is `/api/attachments/{id}/preview`; bitmap, PDF, audio, and video content uses `/attachments/{id}/content`. Both remain protected by existing authentication. The content endpoint restricts types by file signature; HTML/SVG can only be previewed as text or downloaded. Archives expose directory listings only and are not extracted to disk or allowed to read other volumes; see DESIGN 23.8 for supported formats and read limits. PDF.js and its fonts, CMaps, and decoder resources are bundled locally with the frontend under versioned `static/assets/pdfjs-<版本>/` paths. They load only when a PDF is opened, and files are not sent to third parties. This adds no server runtime or persistent directory and does not change the backup format.
 
-附件下载与媒体预览内容输出采用两分钟写空闲超时，不再因总下载时间超过普通响应期限而中断；Range 保持。
+Attachment downloads and media-preview content output use a two-minute write-idle timeout, so they no longer terminate merely because total download time exceeds the ordinary response deadline. Range support is retained.
 
-原生备份清单版本为 2，覆盖所有登记图片及 .bin 附件并核对 SHA-256；恢复同时接受旧版本 1 的图片备份。门户 media 备份沿用原生快照中的整个 assets 目录，无需修改共享收集器。使用附件之后，程序回退必须选择支持 attachment 节点与 .bin 备份的版本，旧程序无法安全保存此类文档或完成备份。保存过大于 25 MiB 的附件后，回退还必须选择已取消附件正文大小校验的版本。启用回收后，备份必须使用带目录共享锁的新程序；不能让不识别锁的旧备份进程与回收并行。整体回退到旧程序会停止自动回收，但不会恢复已回收文件；恢复文件需选择保留该文件的原生备份并按恢复流程操作。文件名及资源路径的导入导出规则见 DESIGN 23.8。
+The native backup manifest is version 2. It covers all registered images and `.bin` attachments and verifies SHA-256; restore also accepts old version 1 image backups. Portal `media` backup continues to use the entire `assets` directory from the native snapshot, with no shared collector changes. After attachments are used, program rollback must select a version that supports the `attachment` node and `.bin` backups; older programs cannot safely save such documents or complete a backup. After saving an attachment larger than 25 MiB, rollback must also select a version that has removed the attachment content-size check. Once collection is enabled, backups must use the new program with the directory shared lock; an old backup process that does not recognize the lock must not run concurrently with collection. Rolling the entire application back to an old program stops automatic collection but does not restore files already collected; restoring a file requires selecting a native backup that still contains it and following the restore process. See DESIGN 23.8 for filename and asset-path import/export rules.
 
-## 可编辑画板
+## Editable Whiteboards
 
-画板格式、API 与编辑契约见 [WHITEBOARD.md](WHITEBOARD.md)。包与图片都在 `data/assets/`，包 MIME 为 `application/vnd.yuyan.drawing+json`、扩展名 `.bin`；无数据库表、数据目录、权限或服务器运行时变更。上传包限 12 MiB，沿用普通代理限制；不套用不限大小的附件 location。引擎和字体随本机前端构建内嵌，许可证在版本化字体目录的 `licenses/`。
+See [WHITEBOARD.md](WHITEBOARD.md) for the whiteboard format, API, and editing contract. Packages and images both reside in `data/assets/`; package MIME is `application/vnd.yuyan.drawing+json` and the extension is `.bin`. There are no database-table, data-directory, permission, or server-runtime changes. Package uploads are limited to 12 MiB and use the ordinary proxy limit; they do not use the unlimited attachment location. The engine and fonts are bundled by the local frontend build, and licenses are stored in the versioned font directory's `licenses/` subdirectory.
 
-保存含画板的文档要求 `X-Yuyan-Features: drawing-v1`；旧标签页提示刷新，新网页与 yuyan-doc 自动携带。回退必须选支持 drawing 的程序。未知引擎/包禁止编辑，预览经独立校验后仍可读、原文件可下载；GC 遇到未知/损坏包停止该轮清理，不猜测图片引用。
+Saving a document containing a whiteboard requires `X-Yuyan-Features: drawing-v1`; old tabs prompt the user to refresh, while new web pages and yuyan-doc send it automatically. Rollback must select a program that supports `drawing`. Unknown engines/packages cannot be edited, but a separately validated preview remains readable and the original file remains downloadable. If GC encounters an unknown or corrupt package, it stops that collection pass rather than guessing image references.
 
-v2 备份保持不变，画板包与依赖图片均随已登记素材保存。包在未引用宽限期内继续保护图片；包回收后图片才开始自身一小时计时。历史/模板引用保留，备份硬链接不受源文件回收影响。隔离生命周期检查覆盖去重、包宽限期、正文/历史/模板保护、缺包拒绝保存、v2 备份恢复，以及先回收包后回收图片。
+The v2 backup format is unchanged; whiteboard packages and dependent images are preserved with all registered assets. A package continues to protect its images while the package is in its unreferenced grace period; each image's own one-hour timer begins only after the package has been collected. History/template references remain protective, and backup hard links are unaffected by source-file collection. Isolated lifecycle checks cover deduplication, the package grace period, protection from current content/history/templates, refusal to save when a package is missing, v2 backup restore, and collection of the package before collection of its images.
 
-导出目录保留 `<ID>.yuyan.json`、对应 SVG/PNG 及原图片；重导必须保留同目录图片，缺包或哈希不符即失败。项目导入仅面向空实例，先 dry-run；不能向真实非空库重导覆盖。画板下载按钮可临时生成独立 `.excalidraw`、SVG、PNG。
+The export directory retains `<ID>.yuyan.json`, the corresponding SVG/PNG, and the original images. Re-exporting must preserve images in the same directory; it fails if a package is missing or a hash does not match. Project import targets an empty instance only and must be dry-run first; it must not be repeated against a real nonempty database to overwrite data. The whiteboard download button can temporarily generate standalone `.excalidraw`, SVG, and PNG files.
 
-高分屏 SVG 保存修复：Excalidraw 的默认导出倍率取自屏幕像素密度，2/3 倍屏幕会使 SVG 宽高与 viewBox 不一致，连空白画板新画一个矩形也被拒绝。预览现固定 `exportScale: 1`，同时使用 XMLSerializer 处理不换行空格并规范化画框裁切属性；服务端安全校验保持不变。此前仅调整视口的检查没有覆盖屏幕倍率，后续导出修改必须显式设置 deviceScaleFactor。旧标签页先下载可编辑文件保留未应用内容，再刷新并恢复草稿或导入；本机 Agent 缓存用 preview-setup 更新。
+High-density SVG save fix: Excalidraw's default export scale comes from the screen's pixel density, so 2×/3× displays can make the SVG width and height disagree with its viewBox, causing even a single newly drawn rectangle on an empty whiteboard to be rejected. Preview generation now fixes `exportScale: 1`, uses XMLSerializer to handle nonbreaking spaces, and normalizes frame clipping attributes; server-side safety validation is unchanged. The previous check adjusted only the viewport and did not cover display scale, so future export changes must explicitly set `deviceScaleFactor`. In old tabs, first download the editable file to preserve unapplied content, then refresh and recover the draft or import the file. Update the local Agent cache with `preview-setup`.
 
-## 图片显示版本
+## Image Display Variants
 
-阅读页和编辑器按显示宽度与屏幕像素密度加载较窄的显示版本，2 倍及以上的屏幕另有一套档位，截图可改用 JPEG；规则与接口见 DESIGN 26.3。版本在 `data/derived/images/`（每张原图一个 `<id>.json` 清单和若干 `<id>-<宽>.<jpg|png>`，只给高密度屏的为 `<id>-<宽>.hidpi.jpg`，由服务写入），是可以整体删除的派生缓存：不进原生备份，恢复、迁移或删除后由服务自动补齐。新上传和正在阅读的图片优先，其余在启动 1 分钟后从新到旧逐张处理，最多占用半个 CPU。原图、导出、备份和 yuyan-doc 不受影响；无数据库迁移、权限或 Nginx 变更，版本文件沿用 `/yuyan/assets/` 路由与设备认证。
+The reading page and editor load narrower display variants according to rendered width and screen pixel density. Screens at 2× or higher have a separate tier, and screenshots may use JPEG; see DESIGN 26.3 for rules and endpoints. Variants are stored in `data/derived/images/`—one `<id>.json` manifest and several `<id>-<宽>.<jpg|png>` files per original image, with high-density-only files named `<id>-<宽>.hidpi.jpg`, all written by the service. This derived cache may be deleted in its entirety: it is excluded from native backups and is automatically replenished by the service after restore, migration, or deletion. Newly uploaded and currently viewed images take priority; all others are processed one at a time from newest to oldest beginning 1 minute after startup, using at most half of one CPU. Original images, export, backup, and yuyan-doc are unaffected. There are no database-migration, permission, or Nginx changes, and variant files use the existing `/yuyan/assets/` route and device authentication.
 
-只读诊断 `yuyan images --data <数据目录>` 汇总已处理数、有版本数、有高密度屏档位的数量（dense）、各原因计数、版本占用的空间，以及有版本的图片在 3 倍屏手机和 2 倍屏桌面上估计的传输量。原因：small（小于 128 KiB）、animated、palette、cmyk、hdr、orientation（PNG/WebP 自带方向）、profile（色彩配置异常）、large（超过解码限度）、decode、none（没有值得保留的版本）、error。日志 `display versions: backfill done` 记录一轮补齐的处理数与有版本数，单张失败记录 `display versions` 及原因。完全重建时停服务、删除 `data/derived/images` 后启动；运行中删除也安全，缺失的文件改为返回原图，打开页面时重新生成。
+The read-only diagnostic `yuyan images --data <数据目录>` summarizes the processed count, count with variants, count with a high-density tier (`dense`), per-reason counts, space used by variants, and estimated transfer volume for images with variants on a 3× phone and 2× desktop. Reasons are: `small` (under 128 KiB), `animated`, `palette`, `cmyk`, `hdr`, `orientation` (PNG/WebP carries orientation), `profile` (abnormal color profile), `large` (over the decode limit), `decode`, `none` (no variant worth retaining), and `error`. The `display versions: backfill done` log records processed and variant counts for a completed pass; an individual failure records `display versions` and the reason. For a full rebuild, stop the service, delete `data/derived/images`, and restart. Deleting it while the service runs is also safe: missing files fall back to the original and regenerate when the page is opened.
 
-补齐读写的图片会进入页缓存，`MemoryCurrent` 和 `MemoryPeak` 可以到达 384M 上限；判断内存压力看 `memory.stat` 的 anon、`memory.pressure` 和 `memory.events` 的 oom_kill。`derived/` 在门户声明中登记为 cache（派生缓存），门户备份包在任何范围都不收集，门户存储页单独显示其占用。
+Images read and written during backfill enter the page cache, so `MemoryCurrent` and `MemoryPeak` can reach the 384M limit. Evaluate memory pressure through `anon` in `memory.stat`, `memory.pressure`, and `oom_kill` in `memory.events`. `derived/` is registered as `cache` (derived cache) in the portal declaration; portal backup packages never collect it at any scope, and the portal's storage page reports its usage separately.
 
-## 布局
+## Layout
 
-文档模板与内容片段存放于既有 `meta` 表的 `template:<id>`，包含独立 revision、正文 JSON 和格式版本，无数据库迁移。备份仍为整个 SQLite 快照和全部登记图片、附件，源文档删除后仍保留模板引用的图片，模板可独立复用；恢复模板库需走原生备份恢复，知识库 Markdown 导出不包含模板库。链接选择、预览与文末反向链接从存活正文推导，不新增索引文件或数据目录。接口及交互见 DESIGN 第 24 节，门户 API 声明同步维护。
+Document templates and content snippets are stored in the existing `meta` table under `template:<id>`, with independent revision, document JSON, and format version; there is no database migration. Backups remain a complete SQLite snapshot plus all registered images and attachments. Images referenced by templates remain protected after the source document is deleted, and templates remain reusable independently. Restoring the template library requires native backup restore; knowledge-base Markdown exports do not include the template library. Link selection, previews, and end-of-document backlinks are derived from live document content, with no new index files or data directories. See DESIGN section 24 for APIs and interactions; keep the portal API declaration synchronized.
 
-`/opt/yuyan/bin/yuyan` 为内嵌前端的 Linux amd64 程序。config 放本项目的 unit 与 Nginx location，data 放 `yuyan.db`、`assets/`（按内容寻址的图片与附件，非图片附件扩展名为 `.bin`）与 `derived/images/`（图片显示版本，可删除、不备份），backups 放快照，docs 与 AGENTS.md 是受控文档副本，releases 留发布历史，current-commit 为程序来源。知识库分组保存在数据库现有 `meta` 表的 `book_groups` JSON 中，随一致性备份保留；旧库无需迁移，未配置时所有知识库均未分组。分组 API 与门户声明保持同步，分组不新增数据目录。
+`/opt/yuyan/bin/yuyan` is the Linux amd64 program with the frontend embedded. `config` contains this project's unit and Nginx location; `data` contains `yuyan.db`, `assets/` (content-addressed images and attachments, with non-image attachments using the `.bin` extension), and `derived/images/` (deletable, unbacked-up image display variants); `backups` contains snapshots; `docs` and `AGENTS.md` are controlled documentation copies; `releases` retains release history; and `current-commit` records the program source. Knowledge-base groups are stored in the existing database `meta` table as `book_groups` JSON and are preserved by consistent backups. Old databases require no migration; when no configuration exists, all knowledge bases are ungrouped. Group APIs and the portal declaration must remain synchronized; groups add no data directory.
 
-运行身份 yuyan，发布身份 yuyan-deploy；data/backups 为 0700，程序与配置由 root 管理。服务监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问，不增加公网端口。systemd 只允许写 data，内存上限 384 MiB（`GOMEMLIMIT=320MiB`），CPU 100%。图片由程序返回并带一年 `immutable` 缓存，Nginx 不直接读取 data，因此 data 保持 0700。
+The runtime identity is `yuyan`, and the deployment identity is `yuyan-deploy`; `data` and `backups` are mode 0700, while the program and configuration are managed by root. The service listens on `127.0.0.1:18084` and is exposed through shared Nginx at `/yuyan/`, with no new public port. systemd permits writes only to `data`, limits memory to 384 MiB (`GOMEMLIMIT=320MiB`), and limits CPU to 100%. Images are served by the application with one-year `immutable` caching. Nginx does not read `data` directly, so `data` remains mode 0700.
 
-Nginx location 对 HTML、JSON、JS、CSS 开启 gzip：服务器下行只有约 0.5 MB/s，最长的文档页面约 970 KB，压缩后约 300 KB。Go 把 `.js` 返回为 `text/javascript`，`gzip_types` 必须列出它，见共享的 [Go 程序返回的 JavaScript 没有被 Nginx 压缩](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#go-程序返回的-javascript-没有被-nginx-压缩)。附件上传路由单独取消大小上限并关闭请求体缓冲，其他请求上限 26 MiB（程序单张图片上限 25 MiB）。修改此文件后需将同提交 deploy/nginx-location.conf 同步到 /opt/yuyan/config/nginx-location.conf，nginx -t 通过后平滑 reload；make deploy 不自动同步 Nginx 配置。
+The Nginx location enables gzip for HTML, JSON, JS, and CSS: server downstream bandwidth is only about 0.5 MB/s, and the longest document page is about 970 KB, or about 300 KB after compression. Go serves `.js` as `text/javascript`, which must be included in `gzip_types`; see the shared [JavaScript Returned by Go Is Not Compressed by Nginx](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#go-程序返回的-javascript-没有被-nginx-压缩). The attachment-upload route separately removes the size limit and disables request-body buffering; other requests remain limited to 26 MiB (the application limit is 25 MiB per image). After changing this file, synchronize `deploy/nginx-location.conf` from the same commit to `/opt/yuyan/config/nginx-location.conf`, then perform a graceful reload after `nginx -t` passes. `make deploy` does not synchronize Nginx configuration automatically.
 
-当前公网使用 HTTPS 与统一设备认证，授权设备可以查看和修改内容；版本历史、回收站和每日备份用于恢复。
+The current public endpoint uses HTTPS and unified device authentication. Authorized devices can view and modify content; version history, the trash, and daily backups provide recovery.
 
-发布后旧标签页的动态模块 404 排查见共享 [发布后旧标签页的动态模块加载失败](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#发布后旧标签页的动态模块加载失败)。本应用的构建清单位于 `/static/manifest.json`，页面外壳使用 `no-cache`，带哈希的脚本长期缓存。界面提供全局刷新入口；编辑时先保存，保存冲突或失败不会刷新。浏览器回归通过实际拦截 Mermaid 核心分块、图表类型分块和编辑页分块的 404，核对桌面与 375 px 提示、源码和预览保留、保存期间继续输入以及冲突草稿。
+For diagnosing dynamic-module 404s in old tabs after a release, see the shared [Dynamic Module Loading Fails in Old Tabs After a Release](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#发布后旧标签页的动态模块加载失败). This application's build manifest is at `/static/manifest.json`; page shells use `no-cache`, while hashed scripts are cached long-term. The UI provides a global refresh entry point; while editing, it saves first and does not refresh if saving conflicts or fails. Browser regression checks must actually intercept 404s for the Mermaid core chunk, chart-type chunk, and editing-page chunk, then verify the desktop and 375 px prompts, preservation of source and preview, continued input while saving, and the conflict draft.
 
-## 首次安装
+## Initial Installation
 
-先核对端口、身份、目录与现有全部服务健康。服务器不需要新的系统软件。
+First verify the port, identities, directories, and health of all existing services. The server requires no new system software.
 
 ```sh
-# 本机 make release 后取 .local/releases/<commit>/program，核对 manifest，再上传安装材料。
+# After running make release locally, take .local/releases/<commit>/program, verify the manifest, then upload the installation materials.
 bash deploy/install.sh /path/to/yuyan-linux-amd64
 ln -s /opt/yuyan/config/nginx-location.conf /etc/nginx/app-locations/yuyan.conf
 nginx -t
@@ -83,132 +83,132 @@ systemctl reload nginx
 bash deploy/setup-deploy.sh /path/to/yuyan-deploy.pub
 ```
 
-install 拒绝覆盖现有目录或身份，显式初始化正式空库，开启服务与备份 timer，并通过 unit 取得首份备份。setup-deploy 建立只能执行 `deploy`、`portal-check` 和 `portal` 三种固定的 commit/SHA-256 命令 的 yuyan-deploy，sudo 仅允许 root 管理的发布脚本。安装后核对五个应用的直连、代理与深链接。
+`install` refuses to overwrite an existing directory or identity, explicitly initializes an empty production database, enables the service and backup timer, and obtains the first backup through the unit. `setup-deploy` creates the `yuyan-deploy` identity, which can execute only the three fixed commit/SHA-256 commands `deploy`, `portal-check`, and `portal`; sudo permits only the root-managed deployment script. After installation, verify direct access, proxy access, and deep links for all five applications.
 
-## 数据库布局迁移
+## Database Layout Migration
 
-表的列顺序有独立的布局版本（`meta.layout`，缺省为 1），设计见 DESIGN 26.1。新程序打开旧布局时自动迁移，`serve`、`check`、`restore` 都会触发；`backup`、`daily` 只原样复制，不迁移。发布时脚本停服，先用旧程序备份，再由新程序 `check` 完成迁移；失败时放回旧程序，数据库停在迁移前或迁移后的兼容布局，不需要恢复备份。
+Table column order has an independent layout version (`meta.layout`, default 1); see DESIGN 26.1. A new program automatically migrates an old layout when opening it; `serve`, `check`, and `restore` trigger migration, while `backup` and `daily` only copy the layout as-is. During deployment, the script stops the service, backs up with the old program first, then uses the new program's `check` to complete migration. On failure it restores the old program; the database remains in either the pre-migration layout or a compatible migrated layout, so restoring the backup is unnecessary.
 
 ```sh
-yuyan migrate --dry-run --data /path/to/data   # 报告当前布局与待执行步骤
-yuyan migrate --data /path/to/data             # 执行并报告耗时
+yuyan migrate --dry-run --data /path/to/data   # Report the current layout and pending steps
+yuyan migrate --data /path/to/data             # Execute and report elapsed time
 ```
 
-第 2 步（`docs`、`doc_versions` 大字段后置）于 2026-10-14 随发布执行，此前的程序仍可在新布局上运行，回退不受影响。迁移后文件约增加被重建表的大小，这些空闲页由后续写入复用，备份不包含它们，不需要手工 VACUUM。以后新增步骤时，先在最新 before-deploy 备份的服务器副本上以 yuyan 身份计时，必须在发布检查的 60 秒时限内完成；副本用完即删。`min_layout` 高于某个程序支持的布局时，该程序拒绝打开数据库，回退前用 `migrate --dry-run` 或报错信息确认。
+Step 2, which moves large fields to the end of `docs` and `doc_versions`, ran with the 2026-10-14 release. Earlier programs can still run against the new layout, so rollback is unaffected. After migration, the file grows by roughly the size of the rebuilt tables. Later writes reuse those free pages, backups do not include them, and no manual VACUUM is needed. For each future step, first time it as `yuyan` against a server copy of the latest before-deploy backup; it must finish within the deployment check's 60-second limit. Delete the copy after use. If `min_layout` exceeds the layout supported by a program, that program refuses to open the database; before rollback, confirm with `migrate --dry-run` or the error message.
 
-## 发布与回退
+## Deployment and Rollback
 
-日常更新、声明同步和程序回退统一使用 [本机发布说明](DEPLOYMENT.md)。
+Use the [Local Deployment Guide](DEPLOYMENT.md) for routine updates, declaration synchronization, and program rollback.
 
-## 本地开发
+## Local Development
 
-先运行 `npm --prefix web ci` 安装锁定依赖。
+First run `npm --prefix web ci` to install locked dependencies.
 
 ```sh
 make build
-# 首次使用新的隔离目录时才初始化，不覆盖现有目录。
+# Initialize only when using a new isolated directory for the first time; do not overwrite an existing directory.
 bin/yuyan init --data .local/dev-data
 bin/yuyan serve --data .local/dev-data --with-prefix
 ```
 
-在隔离实例验证本次功能；编辑器/文档格式变化按需使用 roundtrip 检查。没有全量回归或永久测试要求。导入、导出和 roundtrip 工具见后续章节。服务器只运行内嵌前端的 Go 程序。
+Verify the current feature in an isolated instance; use the roundtrip check as appropriate for editor/document-format changes. There is no requirement for a full regression run or permanent tests. The import, export, and roundtrip tools are described in later sections. The server runs only the Go program with its embedded frontend.
 
-折叠块与高亮块新增正文节点 `foldBlock`、`foldTitle`、`foldContent`、`highlightBlock`（DESIGN.md 23.6），沿用现有 JSON、revision 和一致性备份，不迁移数据库、不增加 API 或存储目录。导出以 HTML 保存容器、折叠状态和底色，导入可读回；启用新块后，程序回退版本必须能识别这些节点。验证使用合成嵌套内容覆盖折叠、改色、弹窗、撤销、保存重开与格式往返，并对正式实例执行只读 roundtrip。
+Fold and highlight blocks add the document nodes `foldBlock`, `foldTitle`, `foldContent`, and `highlightBlock` (DESIGN.md 23.6), using the existing JSON, revision, and consistent backups with no database migration, API, or storage-directory additions. Export preserves the containers, folded state, and background color as HTML, and import reads them back. After these blocks are used, rollback must select a program that recognizes the nodes. Verification uses synthetic nested content to cover folding, recoloring, dialogs, undo, save/reopen, and format roundtrips, plus a read-only roundtrip against production.
 
-分栏新增 `columns(widths)` 与 `column` 正文节点（DESIGN.md 23.7），无数据库迁移、新 API、媒体目录或备份格式变化。HTML 导出保留栏宽与内容顺序；写入分栏后，回退版本必须支持这些节点，不能用旧编辑器静默展开或丢弃布局。验证使用隔离合成文档覆盖减少栏数、取消分栏、跨栏拖动、撤销、窄屏及导入导出，正式实例仅执行只读 roundtrip。
+Columns add the `columns(widths)` and `column` document nodes (DESIGN.md 23.7), with no database migration or new API, media directory, or backup-format change. HTML export preserves column widths and content order. After columns are written, rollback must support these nodes; an old editor must not silently flatten or discard the layout. Verification uses isolated synthetic documents to cover reducing the column count, removing columns, cross-column dragging, undo, narrow screens, and import/export. Production receives only a read-only roundtrip.
 
-代码块标题显隐使用 `codeBlock.titleHidden`，`title` 保留原文字，隐藏后保存重开、HTML 复制粘贴和 Markdown 导入导出均可恢复标题（DESIGN.md 第 16 节）。属性默认 false，旧文档保持原样，无数据库迁移、API、媒体或备份格式变化；旧程序不识别此属性，回退后可能重新显示隐藏的标题。此前被旧“隐藏标题栏”操作清空的标题不会凭空恢复，原文字可从已有历史版本查看，本次不改写真实文档。
+Code-block title visibility uses `codeBlock.titleHidden`; `title` retains the original text. After the title is hidden, save/reopen, HTML copy/paste, and Markdown import/export all restore it (DESIGN.md section 16). The property defaults to false, so old documents remain unchanged. There are no database-migration, API, media, or backup-format changes. Old programs do not recognize the property and may redisplay hidden titles after rollback. Titles previously cleared by the old “隐藏标题栏” operation do not reappear automatically; the original text can be viewed in existing history versions, and this change does not rewrite real documents.
 
-目录批量操作通过 `POST /api/docs/batch` 完成复制、移动与移入回收站，参数和交互见 DESIGN.md 12.5，门户声明包含该接口。使用现有表、文档格式、历史快照和图片存储，无数据库迁移；真实文档由用户在界面选择后操作。维护时在隔离合成实例检查父子选择、目录变化冲突、跨库移动、复制层级/内链/历史，以及中途失败的事务回滚；不在正式文档上试删或试复制。
+Directory batch operations use `POST /api/docs/batch` for copy, move, and move-to-trash; see DESIGN.md 12.5 for parameters and interactions, and include the endpoint in the portal declaration. They use existing tables, document formats, history snapshots, and image storage, with no database migration. Real documents are operated on only after the user selects them in the UI. During maintenance, use an isolated synthetic instance to check parent/child selection, directory-change conflicts, cross-knowledge-base moves, copied hierarchy/internal links/history, and transactional rollback on mid-operation failures; do not test deletion or copying against production documents.
 
-图片工具扩展使用正文内的裁切参数与 `imageBoard` 节点，不改数据库表或图片存储，不生成破坏性裁切文件，复制、资源计数、备份继续使用原图片。新增节点在 Go 与编辑器同时启用，Markdown 导出以 HTML 保留裁切和画板布局。已写入组合的文档不兼容不认识 `imageBoard` 的旧程序，程序回退需先核对内容格式；不自动删除或降级正文。
+The image-tool extensions use crop parameters in document content and the `imageBoard` node. They do not change database tables or image storage, do not generate destructive cropped files, and continue using original images for copy, resource counting, and backup. New nodes are enabled in both Go and the editor. Markdown export uses HTML to preserve cropping and board layout. Documents containing composites are incompatible with old programs that do not recognize `imageBoard`; check content-format compatibility before program rollback, and do not automatically delete or downgrade content.
 
-Markdown 之外的格式第一批（DESIGN 第 23 节）增加 `textColor`、`image.caption` 与单元格 `backgroundColor`，表头和合并使用已有节点及跨度属性。没有数据库迁移、新 API、媒体目录或备份格式变化，门户资源声明沿用；不改写既有文档。Markdown 无法表示的格式连同所在列表/引用等容器导出为 HTML 并读回。使用文字颜色后，旧程序可能拒绝新标记；图片说明与底色也可能被旧编辑器丢弃，回退前必须确认内容兼容，不自动降级正文。验证记录见 [VERIFICATION.md](VERIFICATION.md) 第 23 节。
+The first set of formats beyond Markdown (DESIGN section 23) adds `textColor`, `image.caption`, and the cell property `backgroundColor`; headers and merged cells use existing nodes and span properties. There is no database migration or new API, media directory, or backup-format change, and the portal resource declaration remains unchanged. Existing documents are not rewritten. Formats that Markdown cannot represent are exported as HTML together with their enclosing list, quote, or other container and read back. After text colors are used, old programs may reject the new mark; old editors may also discard image captions and background colors. Before rollback, confirm content compatibility; do not downgrade content automatically. See [VERIFICATION.md](VERIFICATION.md) section 23 for the verification record.
 
-颜色工具优化（DESIGN 23.4）以 `highlight.color` 保存文字背景色，以 `textColor.gradient` 保存固定渐变名并保留纯色回退值；默认高亮格式不变。彩色高亮与渐变随 HTML 导出读回，旧编辑器可能丢弃新增属性。最近自定义颜色和上次使用颜色只存于浏览器的 `yuyan:colors`，清除浏览器数据会重置偏好，不影响已保存的文档。此改动不涉及数据迁移或门户声明。
+Color-tool improvements (DESIGN 23.4) store text background color in `highlight.color` and a fixed gradient name in `textColor.gradient`, retaining a solid-color fallback value; the default highlight format is unchanged. Colored highlights and gradients roundtrip through HTML export, while old editors may discard the new properties. Recent custom colors and the last-used color are stored only in the browser under `yuyan:colors`; clearing browser data resets those preferences without affecting saved documents. This change requires no data migration or portal-declaration update.
 
-格式刷（DESIGN 23.5）复用已有文字标记、标题和段落对齐；采样及连续模式仅为编辑器临时状态，不写入正文或浏览器存储。单次应用沿用正文 revision 检测、自动保存与独立撤销，无 schema、数据库、API、媒体或门户声明变化。
+Format Painter (DESIGN 23.5) reuses existing text marks, headings, and paragraph alignment. Sampling and continuous mode are temporary editor state only and are not written to document content or browser storage. Each application uses existing document revision checks and autosave and creates an independent undo step. There are no schema, database, API, media, or portal-declaration changes.
 
-裁切放大预览与拖动切分线使用现有几何参数，无格式或数据库迁移。
+The enlarged crop preview and draggable split lines use existing geometry parameters and require no format or database migration.
 
-弹窗曾触发代码块清空：Vue 节点视图把脱离页面的 `contentDOM` 交给 ProseMirror，弹窗隐藏背景无障碍内容时，祖先 DOM 重解析误读为空正文，随后裁切因文档已变而中止。代码块与图片画板现使用统一托管视图，内容只通过文档事务更新。已保存的受损内容从历史版本定位恢复；恢复真实文档另行确认，并按 revision 检测避免覆盖新的编辑。
+Dialogs once caused code blocks to be emptied: Vue node views gave ProseMirror a detached `contentDOM`; when a dialog hid background accessibility content, ancestor DOM reparsing read it as empty document content, after which cropping aborted because the document had already changed. Code blocks and image boards now use the shared managed view, and content is updated only through document transactions. Locate and restore already-saved damaged content from version history; obtain separate confirmation before restoring real documents, and use revision checks to avoid overwriting newer edits.
 
-## 正式导入
+## Production Import
 
-导入只做一次，目标必须是空实例；工具在开发电脑上运行。公网已要求设备 Cookie，现有命令行工具使用受信 SSH 隧道：先在另一个终端运行 `ssh -N -L 127.0.0.1:18199:127.0.0.1:18084 ali`，确认本地端口空闲。直接后端没有 /yuyan/ 前缀；通过隧道的导入仍需单独确认真实数据写入。
+Import is a one-time operation, and the target must be an empty instance. The tool runs on the development computer. The public endpoint now requires a device cookie, so existing command-line tools use a trusted SSH tunnel: first run `ssh -N -L 127.0.0.1:18199:127.0.0.1:18084 ali` in another terminal, after confirming that the local port is free. The direct backend has no `/yuyan/` prefix. Import through the tunnel still requires separate confirmation before writing real data.
 
 ```sh
 npm --prefix web run import -- --source <笔记仓库副本> --server http://127.0.0.1:18199/ \
   --overrides .local/import-overrides.json --report .local/import-prod.md --dry
-# 去掉 --dry 正式导入，完成后检查每篇文档都能被编辑器原样接受：
+# Remove --dry for the production import; afterward, check that the editor accepts every document unchanged:
 npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
 ```
 
-`roundtrip` 只读取服务器。它检查每篇文档能被编辑器 schema 原样接受，并且编辑表格时不会调整现有列宽或列默认对齐；表头与合并结构原样保留（见 DESIGN.md 第 23 节）。修改编辑器配置后，发布前对线上实例运行一次。
+`roundtrip` only reads from the server. It checks that every document is accepted unchanged by the editor schema and that editing tables does not adjust existing column widths or default column alignment; header and merged-cell structures remain unchanged (see DESIGN.md section 23). Run it against the production instance before deployment after modifying editor configuration.
 
-overrides 文件记录需要人工选择的项（同名不同图），不入库。2026-09-26 的正式导入只有一项：`{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`；本地文件已删除，重新导入空实例时按此重建。
+The overrides file records choices that require human judgment, such as different images with the same name, and is not stored in the database. The 2026-09-26 production import had only one entry: `{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`; the local file has been deleted, so use this entry to reconstruct it when importing into an empty instance again.
 
-## 代码 Callout 迁移
+## Code Callout Migration
 
-`migrate-code` 把 `[!code]` Callout 改回带标题栏的代码块（规则见 DESIGN.md 第 16 节）。它在开发电脑上运行，通过 SSH 隧道写入正式实例；需要先发布认识代码块标题的程序。正式实例的程序本身不带 `/yuyan/` 前缀（由 Nginx 去掉），所以隧道地址写到端口为止。它会改写真实文档，所以先做一次手动备份：
+`migrate-code` converts `[!code]` Callouts back into code blocks with title bars (see DESIGN.md section 16 for the rules). It runs on the development computer and writes to production through an SSH tunnel; first deploy a program that understands code-block titles. The production program itself has no `/yuyan/` prefix because Nginx removes it, so the tunnel URL stops at the port. This rewrites real documents, so create a manual backup first:
 
 ```sh
 ssh ali 'runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-$(date -u +%Y%m%dT%H%M%SZ)-before-code-migration'
-ssh -N -L 18199:127.0.0.1:18084 ali &                                    # 隧道，完成后结束
-npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/ --dry   # 只报告
+ssh -N -L 18199:127.0.0.1:18084 ali &                                    # Tunnel; terminate it when finished
+npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/ --dry   # Report only
 npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/
 npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
 ```
 
-每篇改动的文档先保存一个版本再写入，写入时核对 revision；重复运行不会再改动。单篇文档要撤回时，在它的历史里恢复迁移前的版本。2026-09-27 已对正式实例运行，62 篇文档中的 313 个全部转换（结果见 VERIFICATION.md 第 16 节），以后不需要再运行：Markdown 导入会直接把 `[!code]` 转为代码块。
+Each changed document receives a version snapshot before it is written, and the write checks the revision; rerunning the migration makes no further changes. To revert one document, restore its pre-migration version from history. The migration was run against production on 2026-09-27 and converted all 313 occurrences across 62 documents (see VERIFICATION.md section 16); it does not need to run again. Markdown import now converts `[!code]` directly into code blocks.
 
-## 存量加粗修复
+## Existing Bold-Mark Repair
 
-先区分来源：中文标点紧邻加粗已由共享转换器兼容；标记内空白、缺失结束标记、公式中的未转义乘号仍可能成为普通文字。保存成功或原生 JSON 回读一致只能证明存储完整，不能证明 Markdown 的格式意图被识别。
+First distinguish the source: bold adjacent to Chinese punctuation is already supported by the shared converter, but whitespace inside markers, missing closing markers, and unescaped multiplication signs in formulas can still become plain text. A successful save or lossless native-JSON readback proves storage integrity, not that Markdown formatting intent was recognized.
 
-新导入通过 `markdownToDoc` 的 `issue` 回调取得未解析 `**` 的源文件行列；yuyan-doc 的 `validate/create --format markdown` 会在写入前报 `conversion_error`。先核对原文，在工作副本修正界定符；字面星号使用转义或代码。不要全局删除星号、自动补齐不明确的闭合范围，或将原样内容转成 JSON 绕过诊断。代码/公式/HTML 和已转义的字面内容保持原义。
+New imports receive source-file line and column locations for unparsed `**` through the `issue` callback from `markdownToDoc`; yuyan-doc's `validate/create --format markdown` reports `conversion_error` before writing. Check the original text first and correct delimiters in a working copy; use escaping or code for literal asterisks. Do not globally delete asterisks, automatically close ambiguous ranges, or convert unchanged content to JSON to bypass diagnostics. Preserve the meaning of code, formulas, HTML, and already escaped literals.
 
-已经通过 yuyan-doc 导入的文档，用该技能 `read --out` 保存最新快照，按原始导入资料定位后对段落制作 `replace` 补丁，保留其他 marks、链接、媒体及块属性；先 `edit --dry-run`，再保存并检查 `verified:true`。缺闭合或与乘号混淆的段落需根据原文明确加粗范围。修复后的导出 Markdown 已包含转义，不能作为恢复原格式意图的证据。批量修复先在隔离实例验证局部内容保留、历史和 revision 冲突保护。
+For documents already imported through yuyan-doc, save the latest snapshot with the skill's `read --out`, locate each paragraph from the original import material, and create `replace` patches while preserving all other marks, links, media, and block attributes. Run `edit --dry-run` first, then save and check `verified:true`. For paragraphs with missing closing markers or ambiguity with multiplication signs, determine the intended bold range from the original source. The repaired Markdown export already contains escaping and therefore cannot serve as evidence of the original formatting intent. Before batch repair, use an isolated instance to verify preservation of local content, history, and revision-conflict protection.
 
-`migrate-strong` 修复原始 Markdown 中因标点边界而漏识别或配对错位的加粗。它不重新导入整篇文档，也不在阅读或编辑时扫描星号。必须取得当初导入提交的 Markdown，并按数据库只读查询得到的 `docs.source_path` 对应到文档 ID，放入私有目录，文件名为 `<id>.md`；不要使用修复后从 Yuyan 导出的 Markdown 作为原始来源。正文、预览报告和原始笔记只放 `.local` 或其他不受 Git 跟踪的位置。
+`migrate-strong` repairs bold that the original Markdown failed to recognize or paired incorrectly because of punctuation boundaries. It does not reimport entire documents and does not scan for asterisks while reading or editing. You must obtain the Markdown from the original import commit, map it to document IDs using the read-only database value `docs.source_path`, and place it in a private directory with filenames `<id>.md`. Do not use Markdown exported from Yuyan after the fix as the original source. Content, preview reports, and original notes must remain in `.local` or another untracked location.
 
-该迁移工具只对比严格 CommonMark 与中文标点兼容规则，不负责修正源文件中的空白、未闭合或公式歧义；两种解析都失败时应按上述局部补丁流程处理，不能重复运行旧迁移来解决。
+This migration tool only compares strict CommonMark with the Chinese-punctuation compatibility rule. It does not repair whitespace, unclosed markers, or formula ambiguity in the source. When both parsers fail, use the local patch process above; rerunning the old migration cannot resolve it.
 
 ```sh
-# 通过受信 SSH 隧道访问实例。生成预览只有 GET 请求，报告必须写到新文件。
+# Access the instance through a trusted SSH tunnel. Preview generation uses GET requests only, and the report must be written to a new file.
 npm --prefix web run migrate-strong -- --server http://127.0.0.1:18199/ \
   --source-dir "$PWD/.local/strong-source" --preview "$PWD/.local/strong-preview.json"
-# 审阅报告并取得真实数据修改授权后，先创建应用一致性备份，再应用同一份报告。
+# After reviewing the report and obtaining authorization to modify real data, create an application-consistent backup before applying the same report.
 npm --prefix web run migrate-strong -- --server http://127.0.0.1:18199/ \
   --apply "$PWD/.local/strong-preview.json"
 ```
 
-预览记录每个段落修改前后的 JSON、文档 revision 和内容哈希。写入前先核对全部文档，任一篇在预览后发生变化就停止，重新生成预览；每篇先保存历史快照，再通过带 `baseRevision` 的正常保存 API 写入。写入途中遇到冲突立即停止，已成功的文档可在历史记录中恢复；重新生成预览不会再次改动已修复的段落。只修改配对星号与 bold，无法仅作这些修改、与现存内容不一致或同文档中转义后无法区分的段落会跳过。
+The preview records each paragraph's JSON before and after modification, the document revision, and the content hash. Check every document before writing. If any document changes after preview generation, stop and regenerate the preview. Each document receives a history snapshot before it is written through the normal save API with `baseRevision`. A conflict during writing stops the operation immediately; successfully written documents can be restored from history. Regenerating the preview does not alter already repaired paragraphs again. The tool changes only paired asterisks and bold; it skips paragraphs that cannot be modified in only those ways, do not match current content, or contain escaping whose meaning cannot be distinguished within the document.
 
-## 资料导入后的语义排版修复
+## Semantic Formatting Repair After Material Import
 
-Typora 资料可能用行内代码的粉红色来强调普通文字。共享解析器按语法保留 `code`，存储成功不代表这类视觉意图已迁移。使用 yuyan-doc 时先按原文和上下文列出分类清单，将已确认的自然语言改为原生 `textColor`（如 `#d63384`），保留真实 SQL、命令、标识符、字符串和语法模板；一个代码标记同时包住说明与标识符时拆开处理。不能用“包含中文”作为全局替换规则，也不要修改网页统一代码配色。
+Typora material may use pink inline-code styling to emphasize ordinary text. The shared parser preserves `code` according to syntax; successful storage does not mean this visual intent was migrated. When using yuyan-doc, first classify instances from the original text and context, convert confirmed natural language to native `textColor` (for example, `#d63384`), and preserve real SQL, commands, identifiers, strings, and syntax templates. If one code mark covers both explanatory text and an identifier, split it. Do not use “contains Chinese” as a global replacement rule, and do not modify the site's shared code color scheme.
 
-对包含独立段落或 SQL 编辑区的混合截图，先核对并转写成正文、表格或代码块，再裁剪工作副本并通过 `upload` 换成新素材，保留示意图自身的标签、箭头及图例。阅读遮罩 `crop` 不会减少上传文件内容；用户要求实际去掉文字区时不要用遮罩代替物理裁剪。新节点使用新文件的 `sourceWidth/sourceHeight`、合理显示宽度和 `height:null`。
+For mixed screenshots containing independent paragraphs or SQL editing areas, first verify and transcribe them into document text, tables, or code blocks. Then crop a working copy and replace it with a new asset through `upload`, preserving the illustration's own labels, arrows, and legend. The reading mask `crop` does not reduce uploaded file content; when the user asks to remove a text area physically, do not substitute a mask for an actual crop. New nodes must use the new file's `sourceWidth/sourceHeight`, an appropriate display width, and `height:null`.
 
-正文修改仍走技能 `read/edit` 的完整快照、revision 保护和保存回读；批量内容先隔离验证，再 `edit --dry-run`。保留私有分类与裁剪清单，不把用户原文、OCR 或截图提交到项目仓库。针对性核验既有正文次序、真实代码、表格与链接不变，并检查对应段落的原生颜色及图片比例。详细处理规则维护在 yuyan-doc 的 editing/format 参考中，项目不复制另一套转换脚本。
+Content changes still use the skill's complete `read/edit` snapshot, revision protection, and save readback; for batch content, first verify in isolation and then run `edit --dry-run`. Keep private classification and crop manifests out of the project repository, along with user text, OCR, and screenshots. Targeted verification must confirm that existing content order, real code, tables, and links remain unchanged, and check native color on the relevant paragraphs plus image proportions. Detailed processing rules are maintained in yuyan-doc's editing/format reference; this project does not duplicate the converter scripts.
 
-## 导出
+## Export
 
-导出工具在开发电脑上运行，把全部知识库导出为 Obsidian 可以直接打开的文件夹（Markdown 表达不了的内容写成 HTML，例如设置了列宽行高的表格，见 DESIGN.md 第 18 节）：每个知识库一个文件夹，分组是文件夹，文档是 Markdown 文件，有子文档的文档是同名的 Markdown 文件加同名文件夹；图片与附件放在根目录的 `attachments/`，用相对路径引用。只读取服务器，不做任何修改。先建立上文的受信 SSH 隧道，再使用回环地址。
+The export tool runs on the development computer and exports all knowledge bases into a directory that Obsidian can open directly. Content that Markdown cannot express is written as HTML, such as tables with specified column widths and row heights; see DESIGN.md section 18. Each knowledge base is a directory, each group is a directory, and each document is a Markdown file. A document with child documents is represented by a same-named Markdown file plus a same-named directory. Images and attachments are stored under the root `attachments/` directory and referenced with relative paths. Export only reads the server and makes no changes. Establish the trusted SSH tunnel described above, then use the loopback address.
 
 ```sh
-npm --prefix web run export -- --server http://127.0.0.1:18199/ --dry          # 只转换和检查，不写文件
+npm --prefix web run export -- --server http://127.0.0.1:18199/ --dry          # Convert and check only; do not write files
 npm --prefix web run export -- --server http://127.0.0.1:18199/ --out ~/YuyanExport
 ```
 
-目标文件夹必须是新的、空的，或者是之前的导出结果。再次导出到同一文件夹时会刷新 Markdown，只下载缺少或校验不符的图片、附件，并删除上次导出而本次已不存在的文件；导出之外的文件不会被改动，因此中断后重新运行即可继续。`.yuyan-export/` 里是清单和报告，报告列出下载失败的图片与附件、指向回收站中文档的链接，以及因含有非法字符或同级重名而改过名的文件。全部图片约 340 MB，按服务器约 0.5 MB/s 的下行速度约需 12 分钟；2026-09-26 对正式实例演练，315 篇文档全部转换成功，1,511 张图片都存在。
+The target directory must be new and empty or a previous export result. Exporting again to the same directory refreshes Markdown, downloads only missing images/attachments or those whose checksums do not match, and removes files present in the previous export but absent from the current one. Files outside the export are unchanged, so rerun the command to resume after interruption. `.yuyan-export/` contains the manifest and report. The report lists failed image and attachment downloads, links to documents in the trash, and files renamed because of illegal characters or same-level name collisions. All images total about 340 MB and take about 12 minutes over the server's approximately 0.5 MB/s downstream connection. In the 2026-09-26 production dry run, all 315 documents converted successfully and all 1,511 images were present.
 
-`npm --prefix web run seed -- --server <本地实例>/yuyan/` 向空的本地实例写入合成示例数据，用于试用界面和导出；它拒绝写入已有知识库的实例。
+`npm --prefix web run seed -- --server <本地实例>/yuyan/` writes synthetic sample data into an empty local instance for UI and export evaluation; it refuses to write to an instance that already contains a knowledge base.
 
-## 备份与恢复
+## Backup and Restore
 
-每天 Asia/Shanghai 04:00 加 0–5 分钟随机延迟，保留 14 份 daily。备份 unit 的可写目录必须是整个 /opt/yuyan，原因见共享的 [systemd 沙箱下照片硬链接备份失败](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#systemd-沙箱下照片硬链接备份失败)。备份包含 SQLite 一致性快照（`VACUUM INTO`）、图片/附件硬链接和 SHA-256 清单。before-deploy 按共享发布保留策略轮换，manual 不自动清理；2026-09-27 已另取包含本项目数据库与全部已登记图片的全应用归档，下载到维护电脑并校验，见 [共享备份说明](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#手工数据归档)。本应用脚本不主动异机同步；服务器另有阿里云文件备份，范围、30 天保留与恢复限制见[主机云备份](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#云备份)；需要可供 Obsidian 使用的内容副本时，使用上节的导出工具。
+Daily backups run at 04:00 Asia/Shanghai with a random delay of 0–5 minutes, retaining 14 daily backups. The backup unit's writable directory must be all of `/opt/yuyan`; see the shared [Photo Hard-Link Backups Fail Under the systemd Sandbox](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#systemd-沙箱下照片硬链接备份失败) for the reason. A backup contains a consistent SQLite snapshot (`VACUUM INTO`), hard-linked images/attachments, and a SHA-256 manifest. Before-deploy backups rotate according to the shared deployment-retention policy; manual backups are not cleaned automatically. On 2026-09-27, a separate full-application archive containing this project's database and every registered image was created, downloaded to the maintenance computer, and verified; see the [Shared Backup Guide](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#手工数据归档). This application's scripts do not initiate off-machine synchronization. The server also has Alibaba Cloud file backup; see [Host Cloud Backup](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#云备份) for its scope, 30-day retention, and restore limitations. Use the export tool in the preceding section when an Obsidian-usable content copy is required.
 
 ```sh
 systemctl status yuyan-backup.timer
@@ -217,18 +217,18 @@ journalctl -u yuyan-backup.service -n 50 --no-pager
 runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-UNIQUE
 ```
 
-备份目标目录必须不存在。备份里的图片与附件是硬链接，与正式素材共用同一份数据，不能原地修改。只有带完整 manifest.json 的目录才可恢复。
+The backup target directory must not exist. Images and attachments in a backup are hard links to the production assets and share the same underlying data; they must not be modified in place. Only a directory with a complete `manifest.json` may be restored.
 
 ```sh
 yuyan restore --from /path/to/backup --data /path/to/new-restore-directory
 yuyan check --data /path/to/new-restore-directory
-# 先检查 19084 空闲，再启动隔离恢复实例
+# First check that 19084 is free, then start the isolated restored instance
 yuyan serve --data /path/to/new-restore-directory --listen 127.0.0.1:19084 --with-prefix
 ```
 
-restore 校验清单中的每个文件，拒绝已有目标，图片复制为独立文件。生产恢复前确认时点和可能丢失的后续修改，停服务，保留当前目录，恢复到新目录并校验后再切换，重启验证。程序回退不等于数据库回退。
+`restore` verifies every file in the manifest, refuses an existing target, and copies images into independent files. Before a production restore, confirm the point in time and any later changes that could be lost; stop the service, retain the current directory, restore into a new directory, verify it, switch directories, and restart and verify. Program rollback is not database rollback.
 
-## 诊断
+## Diagnostics
 
 ```sh
 systemctl status yuyan yuyan-backup.timer
@@ -240,34 +240,34 @@ du -sh /opt/yuyan/data /opt/yuyan/backups
 runuser -u yuyan -- /opt/yuyan/bin/yuyan images --data /opt/yuyan/data
 ```
 
-`MemoryCurrent` 包含页缓存：程序本身（anon）启动后约 80 MiB，其中全文搜索索引约 18 MiB（启动日志 `search index ready` 给出文档数、字节数与耗时），其余多为可回收的文件缓存。判断内存问题时看 `/sys/fs/cgroup/system.slice/yuyan.service/memory.stat` 的 anon 与 `memory.events` 的 oom_kill，不能只看接近上限。
+`MemoryCurrent` includes page cache. The program itself (`anon`) uses about 80 MiB after startup, including about 18 MiB for the full-text search index; the `search index ready` startup log reports the document count, byte count, and elapsed time. Most of the remainder is reclaimable file cache. When diagnosing memory, inspect `anon` in `/sys/fs/cgroup/system.slice/yuyan.service/memory.stat` and `oom_kill` in `memory.events`; do not infer a problem merely from usage near the limit.
 
-缺库或损坏时查备份和权限，不能通过 init 创建空库掩盖错误。文档提交推送后运行 `~/agent-config/skills/server-operations/scripts/sync-docs.sh Yuyan`。
+If the database is missing or corrupt, inspect backups and permissions; do not conceal the error by using `init` to create an empty database. After documentation commits are pushed, run `~/agent-config/skills/server-operations/scripts/sync-docs.sh Yuyan`.
 
-## ServerPortal 接入材料
+## ServerPortal Integration Materials
 
-`deploy/portal.json` 是本应用资源说明的维护源。本机发布使用 server-operations 校验器检查，再将同一声明与二进制保存到同一本地版本目录；发布前执行 `portal-check`，发布后执行 `portal`，通过现有受限 SSH 安装到 `/opt/yuyan/config/portal.json` 并核对采集器实际加载的 SHA-256。`config/portal-source.json` 记录声明来源提交；它与程序的 current-commit 各自表示不同材料的版本。
+`deploy/portal.json` is the maintenance source for this application's resource declaration. Local deployment uses the server-operations validator and stores the same declaration and binary in the same local version directory. It runs `portal-check` before deployment and `portal` afterward, installs the declaration at `/opt/yuyan/config/portal.json` through the existing restricted SSH path, and verifies the SHA-256 actually loaded by the collector. `config/portal-source.json` records the declaration's source commit; it and the program's `current-commit` independently identify the versions of different materials.
 
-门户从 `/opt/serverportal/registry.d/yuyan.json` 的受控链接发现本应用，声明成功更新后自动加载，无需重启。首次正常 本机发布也会建立链接，无需再编辑门户中央应用列表。普通发布可更新本应用的声明，其他 unit/env/Nginx/发布脚本仍由管理员安装。
+The portal discovers this application through the controlled link `/opt/serverportal/registry.d/yuyan.json`; it loads a successfully updated declaration automatically, without a restart. The first normal local deployment also creates the link, so the portal's central application list does not need to be edited. Ordinary deployments may update this application's declaration; other units, environment files, Nginx configuration, and deployment scripts still require administrator installation.
 
-源码或数据库行为变更不能使用该选项代替程序发布。
+Source-code or database-behavior changes must not use this option as a substitute for a program deployment.
 
-数据根、媒体、备份格式、unit、端口或访问路径变化时，同一提交维护声明及对应文档，更新共享清单并核对资源覆盖。文件、媒体、数据库表和 systemd 状态由门户自动读取；目录用途、API 说明和权限边界须由维护 agent 明确更新。共同协议、失败处置与新应用接入见 [门户维护](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/portal.md)。
+When the data root, media, backup format, unit, port, or access path changes, update the declaration and corresponding documentation in the same commit, update the shared inventory, and verify resource coverage. The portal automatically reads files, media, database tables, and systemd state; the maintaining agent must explicitly update directory purposes, API descriptions, and permission boundaries. See [Portal Maintenance](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/portal.md) for shared protocols, failure handling, and new-application integration.
 
-门户 /portal/ 已统一保护公网访问，发布脚本通过回环检查应用健康，本机发布公网检查预期未授权返回 401。设备授权永久有效至主动撤销，Cookie 经共享 Nginx 随有效请求续期；本应用若新增 add_header，必须保留共享 Set-Cookie 转发，规则及验收见共享门户维护文档。门户备份使用本应用原生一致性快照；真实完整链恢复验收按用户要求暂缓，不因本次维护自动继续下载或恢复。
+The portal at `/portal/` now uniformly protects public access. Deployment scripts check application health over loopback; a local deployment's public check is expected to receive 401 when unauthorized. Device authorization remains valid until explicitly revoked, and the cookie is renewed by shared Nginx on valid requests. If this application adds an `add_header`, it must preserve shared `Set-Cookie` forwarding; see the shared portal-maintenance document for rules and acceptance checks. Portal backups use this application's native consistent snapshots. Acceptance of the complete real restore chain remains deferred at the user's request and is not performed automatically as part of this maintenance.
 
-## 手机桌面图标
+## Mobile Home-Screen Icon
 
-门户中的应用名为 `Yuyan`，维护源为 deploy/portal.json；中文产品说明不加入门户展示名称。
+The application name in the portal is `Yuyan`, maintained in `deploy/portal.json`; do not append the Chinese product description to the portal display name.
 
-源码已补充 /yuyan/static/apple-touch-icon.png 的 180×180 PNG 和共用页面 head 声明，Nginx 规则仅放行它与 favicon.svg 的 GET/HEAD。图形源为 web/public/favicon.svg；维护电脑已有 libvips 时运行 node web/scripts/generate-icons.mjs 重新生成。页面、API 和用户媒体继续使用设备认证。共同原因、部署状态与手机验收见[共享排障记录](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证后-iphone-桌面图标缺失)。
+The source now includes the 180×180 PNG `/yuyan/static/apple-touch-icon.png` and a shared page-head declaration. The Nginx rules allow anonymous GET/HEAD only for it and `favicon.svg`. The graphic source is `web/public/favicon.svg`; when the maintenance computer has libvips, regenerate the icon with `node web/scripts/generate-icons.mjs`. Pages, APIs, and user media continue to use device authentication. For the shared cause, deployment state, and mobile acceptance checks, see [Missing iPhone Home-Screen Icon After Unified Authentication](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证后-iphone-桌面图标缺失).
 
-## 当前发布入口
+## Current Deployment Entry Point
 
-本项目为个人使用：在本地验证本次改动即可发布，不设全量回归门槛，不默认新增或保留永久测试。界面改动检查实际使用的电脑/手机场景；数据迁移、批量写入/删除和备份恢复先用隔离副本针对性验证。
+This project is for personal use: local verification of the current change is sufficient for deployment. There is no full-regression gate, and permanent tests are neither added nor retained by default. For UI changes, check the actual desktop/mobile scenarios in use; data migrations, batch writes/deletes, and backup restore must first receive targeted verification against an isolated copy.
 
-完整流程见 [本机发布与回退](DEPLOYMENT.md)。GitHub 只保存源码；本机 `make release` 构建，`make deploy` 更新生产，文档单独同步。
+See [Local Deployment and Rollback](DEPLOYMENT.md) for the complete process. GitHub stores source code only; local `make release` builds the artifact, `make deploy` updates production, and documentation is synchronized separately.
 
-## 发布材料自动清理
+## Automatic Cleanup of Release Materials
 
-服务器每天北京时间 05:00 按[发布材料自动保留](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/retention.md)保留最近 3 次成功发布、最近 5 份完整发布前备份，并保护当前版本、对应备份和待核对失败批次。共享实现、锁、回执、预览及停用命令由 server-operations 维护；本项目 deploy 保留发布脚本的 recovery 标记和每日备份的 flock 入口。首次安装先按共享文档建立 /run/lock/ali-release-retention.lock，再启用 backup timer。daily、manual、业务数据、门户 exports 和维护电脑构建材料不在此自动清理范围。
+Every day at 05:00 Asia/Shanghai, the server follows [Automatic Retention of Release Materials](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/retention.md), retaining the most recent 3 successful releases and the most recent 5 complete before-deploy backups while protecting the current version, its corresponding backup, and failed batches awaiting review. server-operations maintains the shared implementation, lock, receipts, preview, and disable command; this project's deployment retains the deployment script's `recovery` marker and the daily backup's `flock` entry point. During initial installation, create `/run/lock/ali-release-retention.lock` according to the shared documentation before enabling the backup timer. Daily and manual backups, business data, portal exports, and build materials on the maintenance computer are outside this automatic cleanup scope.

@@ -1,87 +1,87 @@
-# 可编辑画板
+# Editable Whiteboards
 
-Excalidraw 方案已确认并实现（2026-10-07）。首版包含文档内编辑、不可变保存、阅读预览、导出重导、技术图模板和 Agent 生成入口。既有 MySQL 图片的逐图重绘属于后续内容任务，不随本次平台发布自动执行。
+The Excalidraw approach was confirmed and implemented on 2026-10-07. The first version includes in-document editing, immutable storage, reading previews, export and reimport, technical-diagram templates, and an Agent generation entry point. Redrawing existing MySQL images one by one is a later content task and does not run automatically with this platform release.
 
-## 使用与范围
+## Use and Scope
 
-编辑正文时通过插入菜单或 `/画板` 打开画板，添加形状、文字、绑定箭头或图片，点击“应用”插入。再次编辑从预览上打开；宽度、对齐和说明在正文控件调整。支持空白、数据页、B+ 树、索引扫描、事务时间线五种起点。技术图默认规整线条、实色填充和普通字体，也可使用引擎的其他绘制样式。
+While editing a document body, open the whiteboard from the insertion menu or with `/画板`, add shapes, text, bound arrows, or images, and click `“应用”` to insert it. Open it again for editing from the preview; adjust width, alignment, and caption through document-body controls. Five starting points are available: `空白`, `数据页`, `B+ 树`, `索引扫描`, and `事务时间线`. Technical diagrams default to neat lines, solid fills, and normal fonts, while other engine drawing styles remain available.
 
-引擎固定为 `@excalidraw/excalidraw 0.18.1`，React 通过独立挂载点接入 Vue 弹窗。使用公开 API 和原生元素，不维护内核分支。形状、连线绑定、分组、对齐、图层、缩放、平移和画板内部撤销由引擎管理；Yuyan 管理文档、素材、权限和历史。数据库模板是原生元素组合，不是自定义业务节点。新增模板和程序化布局无需改引擎；字段端口、任意新元素渲染或多人协作不属于首版契约。
+The engine is pinned to `@excalidraw/excalidraw 0.18.1`; React connects to the Vue dialog through a separate mount point. Use public APIs and native elements without maintaining a core fork. The engine manages shapes, connector binding, grouping, alignment, layers, zooming, panning, and whiteboard-internal undo; Yuyan manages documents, assets, permissions, and history. Database templates are combinations of native elements, not custom business nodes. New templates and programmatic layouts do not require engine changes. Field ports, arbitrary new element rendering, and multiplayer collaboration are outside the first-version contract.
 
-| 资料内容 | 表达方式 |
+| Material | Representation |
 | --- | --- |
-| 说明、SQL、规则表格 | 原生段落、代码块、表格 |
-| 可由文本描述和自动布局的流程、时序 | Mermaid |
-| 依赖空间关系的页、树、索引扫描、架构示意 | `drawing` 可编辑画板 |
-| 软件界面、照片、真实执行截图 | 图片；只需拼接/裁切时用既有 `imageBoard` |
+| Explanations, SQL, and rule tables | Native paragraphs, code blocks, and tables |
+| Processes and sequences that can be described with text and automatic layout | Mermaid |
+| Pages, trees, index scans, and architecture diagrams that depend on spatial relationships | Editable `drawing` whiteboards |
+| Software interfaces, photos, and real execution screenshots | Images; use the existing `imageBoard` when only stitching/cropping is needed |
 
-画板不会自动把截图矢量化。图片进入画板后仍占图片空间；迁移前先提取说明文字、表格和代码，再重绘需要空间关系的图形。
+A whiteboard does not automatically vectorize a screenshot. Images placed in a whiteboard still consume image storage. Before migration, extract explanatory text, tables, and code, then redraw the graphics that require spatial relationships.
 
-## 文档与编辑事务
+## Document and Editing Transactions
 
-`drawing` 是独立原子块，可进入正文及允许块内容的容器。节点只有不可变包引用与阅读属性，不把完整场景复制到每次正文修订中：
+`drawing` is an independent atomic block that may appear in the document body and in containers that allow block content. A node contains only an immutable-package reference and reading attributes; it does not copy the full scene into every document-body revision:
 
-| 属性 | 契约 |
+| Attribute | Contract |
 | --- | --- |
-| `src`、`version` | `/drawings/<32位内容ID>`、`1` |
-| `width`、`blockAlign`、`caption` | 100–2400，首建取预览宽度且不超过 800；left/center/right，默认 center；说明文字 |
-| `text` | 从场景文本派生，用于检索与字符统计；不能手填另一份内容 |
-| `previewWidth`、`previewHeight`、`previewMime` | 服务端校验的预览尺寸与类型 |
+| `src`, `version` | `/drawings/<32-character-content-ID>`, `1` |
+| `width`, `blockAlign`, `caption` | 100–2400; initial creation uses the preview width, capped at 800; left/center/right, centered by default; caption text |
+| `text` | Derived from scene text for search and character counting; it cannot be supplied manually as a separate body value |
+| `previewWidth`, `previewHeight`, `previewMime` | Server-validated preview dimensions and type |
 
-“应用”先冻结场景，生成预览并发布完整包，再检查原节点/插入位置仍有效，以一次正文事务写回。异步处理中停止画板输入，失败保留弹窗和草稿；取消保留原正文。图内撤销由引擎管理，应用后正文一次撤销恢复原包。显示宽度、说明改变不创建新包；复制共享原包，编辑一处创建新包并只替换该处。
+`“应用”` first freezes the scene, generates a preview, and publishes the complete package. It then verifies that the original node/insertion position is still valid and writes the result in one document transaction. Whiteboard input stops during asynchronous processing; a failure preserves the dialog and draft, while canceling preserves the original document body. The engine manages undo inside the whiteboard; after application, one document undo restores the original package. Changing display width or caption does not create a new package. Copies share the original package; editing one copy creates a new package and replaces only that occurrence.
 
-草稿用 shallowRef 保留普通数据，避免 Vue 代理进入引擎后无法冻结导出。草稿放本机 IndexedDB，按实例、文档、当前 revision、位置和原包区分，保留未应用的元素及图片。持久化时读取最新 revision，避免正文自动保存后草稿键过期；同一次打开产生的旧键在应用/取消时清除。重新打开匹配的画板时可恢复，网络失败不删除草稿。浏览器清理数据或强制终止前尚未写入的变动不保证恢复。
+Keep ordinary draft data in a shallowRef so Vue proxies do not enter the engine and prevent freezing/export. Store drafts in local IndexedDB, distinguished by instance, document, current revision, position, and original package; retain unapplied elements and images. Read the latest revision when persisting so document autosave does not make the draft key stale. Clear old keys created during the same open session when applying or canceling. When reopening a matching whiteboard, the draft can be restored; a network failure does not delete it. Changes not yet written before browser-data clearing or forced termination are not guaranteed to be recoverable.
 
-普通 Tab / Shift+Tab 不切换控件焦点，取消焦点装饰；IME 和组合键继续交给编辑器。弹窗 Esc 不触发正文双 Esc 保存退出。阅读页只加载静态预览，点击沿用图片放大；打开编辑时才加载 React 和画板引擎。
+Ordinary Tab / Shift+Tab does not move control focus, and focus decoration is removed; IME and key combinations continue to go to the editor. Esc in the dialog does not trigger the document body's double-Esc save-and-exit behavior. The reading page loads only a static preview and reuses image enlargement on click; React and the whiteboard engine load only when editing opens.
 
-## 包格式、预览与校验
+## Package Format, Preview, and Validation
 
-包格式为 `format: yuyan-drawing`、`version: 1`、`engine: excalidraw`、`engineVersion: 0.18.1`，包含：
+The package uses `format: yuyan-drawing`, `version: 1`, `engine: excalidraw`, and `engineVersion: 0.18.1`, and contains:
 
-- `scene.elements`：未删除的引擎原生元素；`scene.appState` 只存 `viewBackgroundColor`。
-- `files`：引擎 fileId 到 `{src: /assets/<ID>.<ext>, mimeType}` 的映射，素材必须存在、类型一致且被使用；不嵌套画板包。
-- `preview`：一份 SVG 字符串或 PNG Base64，加 MIME、实际宽高。PNG Base64 是预览本身；场景图片始终引用去重素材。
-- `text`、`sceneHash`：服务端从文本元素和规范化场景/素材映射计算，不信任客户端派生值。哈希不证明预览与场景视觉一致；应用使用同一冻结场景生成，验收仍需看图。
+- `scene.elements`: non-deleted native engine elements; `scene.appState` stores only `viewBackgroundColor`.
+- `files`: a mapping from engine fileId to `{src: /assets/<ID>.<ext>, mimeType}`. Assets must exist, have matching types, and be used; packages cannot contain nested whiteboard packages.
+- `preview`: one SVG string or PNG Base64 value, with MIME and actual width/height. PNG Base64 is the preview itself; scene images always reference deduplicated assets.
+- `text`, `sceneHash`: calculated by the server from text elements and the normalized scene/asset mapping; client-derived values are not trusted. The hash does not prove visual consistency between preview and scene. The application generates both from the same frozen scene, but acceptance still requires visual inspection.
 
-普通字体、无位图场景使用 SVG。含位图或特殊字体时保存最长边不超过 2400 的 PNG，避免字体回退或独立 SVG 外部图片加载差异。SVG 不内嵌场景、字体、样式和位图；通过 XML 白名单限制元素/属性，仅允许内部片段引用，拒绝脚本、事件、外链、DTD、foreignObject 和不一致的根宽高/viewBox。预览作为受认证图片响应，带 `default-src 'none'; sandbox`，不插入正文 HTML。
+Scenes using ordinary fonts and no bitmap use SVG. A scene containing a bitmap or special font is saved as a PNG with a longest edge no greater than 2400, avoiding font fallback or differences caused by external image loading in standalone SVG. SVG does not embed scenes, fonts, styles, or bitmaps. An XML allowlist restricts elements and attributes; only internal fragment references are allowed, and scripts, events, external links, DTD, foreignObject, and inconsistent root width/height/viewBox are rejected. The preview is served as an authenticated image response with `default-src 'none'; sandbox` and is not inserted into document-body HTML.
 
-请求及规范化后的包均限 12 MiB，1–10000 元素，坐标和几何绝对值最多 1e6；点数组逐点校验。预览边最多 16384，PNG 最多 1600 万像素且声明尺寸须匹配实际头部。服务端校验结构与边界，不是完整的 Excalidraw 几何求解器。网页嵌入、外链动作和自定义应用数据不作为首版持久化内容。
+Both the request and normalized package are limited to 12 MiB and 1–10000 elements; absolute coordinate and geometry values are limited to 1e6, and point arrays are validated point by point. A preview edge is limited to 16384; PNG is limited to 16,000,000 pixels, and declared dimensions must match the actual header. The server validates structure and bounds; it is not a complete Excalidraw geometry solver. Web embeds, external-link actions, and custom application data are not persisted in the first version.
 
-预览导出显式使用 `exportScale: 1`，不继承 Excalidraw 按 `devicePixelRatio` 推导的默认倍率，保证 Retina 等高分屏上的 SVG 宽高与 viewBox 一致。SVG 用 XMLSerializer 序列化，避免 outerHTML 把不换行空格变成 XML 不支持的 `&nbsp;`；序列化前将引擎误带 SVG 命名空间的 frame `clip-path` 还原为普通呈现属性。独立 SVG 下载复用该序列化流程。修改导出时同时覆盖 1/2/3 倍像素密度，窄窗口本身不能代表高分屏。
+Preview export explicitly uses `exportScale: 1` rather than inheriting Excalidraw's default scale derived from `devicePixelRatio`, ensuring that SVG width/height matches viewBox on Retina and other high-density displays. SVG is serialized with XMLSerializer so outerHTML cannot turn a nonbreaking space into the XML-unsupported `&nbsp;`. Before serialization, restore any frame `clip-path` that the engine incorrectly places in the SVG namespace to an ordinary presentation attribute. Standalone SVG download reuses this serialization flow. When changing export, cover 1×/2×/3× pixel densities together; a narrow window alone does not represent a high-density display.
 
-引擎/字体资源随 Go 程序发布，无服务器 Node/浏览器运行时，无默认字体 CDN。SVG 导出的字体子集化在引擎的 Worker 中执行；引擎从页面也会动态导入的分块启动它，与页面一起打包会让 Worker 加载含页面代码的共享分块而失败。`web/vite.config.ts` 将这次导入改为指向同一文件单独打包的 Worker 脚本，页面保留引擎的主线程回退；构建时若该文件进入页面分块或引擎不再这样导入，构建直接失败。依赖覆盖固定在 `web/package.json`；2026-10-07 锁文件审计为 0 项告警。引擎自带的“Mermaid 转画板”（`@excalidraw/mermaid-to-excalidraw` 2.2.2）经覆盖改用根依赖 `mermaid`，与阅读页共用同一组分块；它声明的范围是 ^11，升级 Mermaid 或画板引擎时重新核对转换结果。2026-10-13 合并前后结果一致：时序图和不含子图的流程图生成可编辑图形，含子图的流程图、类图、ER 图、状态图和饼图回退为单张图片。第三方许可随 `web/licenses/excalidraw/` 打包；字体版权以具体字体/上游声明为准，不把引擎 MIT 套到全部字体。
+Engine and font resources ship with the Go program; there is no Node/browser runtime on the server and no default font CDN. SVG export font subsetting runs in an engine Worker. The engine starts it through a chunk that the page also imports dynamically; bundling it with the page would make the Worker load a shared chunk containing page code and fail. `web/vite.config.ts` redirects this import to a separately bundled Worker script for the same file, while the page retains the engine's main-thread fallback. The build fails directly if that file enters a page chunk or if the engine no longer imports it this way. Dependency overrides are pinned in `web/package.json`; the lockfile audit on 2026-10-07 reported 0 advisories. The engine's built-in `“Mermaid 转画板”` (`@excalidraw/mermaid-to-excalidraw` 2.2.2) is overridden to use the root `mermaid` dependency and shares the same chunks as the reading page. Its declared range is ^11; recheck conversion results when upgrading Mermaid or the whiteboard engine. Results before and after the 2026-10-13 merge are identical: sequence diagrams and flowcharts without subgraphs generate editable graphics, while flowcharts with subgraphs, class diagrams, ER diagrams, state diagrams, and pie charts fall back to a single image. Third-party licenses ship under `web/licenses/excalidraw/`. Font copyright follows each specific font/upstream declaration; do not apply the engine's MIT license to all fonts.
 
-## API 与生命周期
+## API and Lifecycle
 
-| 路由 | 行为 |
+| Route | Behavior |
 | --- | --- |
-| `POST /api/drawings` | 校验并发布包，201 返回可直接插入的完整 drawing 节点 |
-| `GET /api/drawings/{id}` | 读取当前受支持的场景包 |
-| `GET /drawings/{id}/preview` | 受认证预览；独立校验预览，不依赖场景引擎版本 |
-| `GET /drawings/{id}/file` | 下载精确原始包字节，保持内容寻址哈希 |
+| `POST /api/drawings` | Validate and publish a package; return status 201 with a complete drawing node that can be inserted directly |
+| `GET /api/drawings/{id}` | Read a currently supported scene package |
+| `GET /drawings/{id}/preview` | Authenticated preview; validate the preview independently of the scene engine version |
+| `GET /drawings/{id}/file` | Download the exact original package bytes, preserving the content-addressed hash |
 
-复用 `assets` 表和目录，包为 `.bin`，MIME 为 `application/vnd.yuyan.drawing+json`，无数据库迁移。不能用普通附件上传绕过包和依赖校验。发布与保留图片依赖处于同一事务和目录共享锁；正文/模板写入时再次核对包、派生属性与图片。
+Reuse the `assets` table and directory. A package uses `.bin` and MIME `application/vnd.yuyan.drawing+json`, with no database migration. A normal attachment upload cannot bypass package and dependency validation. Publication and retention of image dependencies occur in the same transaction under the directory's shared lock; document/template writes recheck the package, derived attributes, and images.
 
-正文（含回收站）、历史、模板/片段以及媒体链接都保护包。GC 展开包内图片引用，未引用包在一小时宽限期内也保护图片；包回收后图片才开始自己的宽限期。无法解析的登记包使本轮 GC 停止并报告，不能猜测依赖后删除。v2 原生备份覆盖包与全部登记图片，既有备份硬链接不因源素材回收损坏。
+Document bodies (including trash), history, templates/snippets, and media links all protect packages. GC expands image references inside packages. An unreferenced package continues protecting images during its one-hour grace period; only after the package is collected do the images begin their own grace period. If a registered package cannot be parsed, the current GC run stops and reports the error; it must not guess dependencies and delete. v2 native backups include packages and all registered images; hard links in existing backups are not broken when source assets are collected.
 
-`GET /api/meta` 公布 `features: ["drawing-v1"]`。保存/取消编辑含画板的当前文档，要求 `X-Yuyan-Features: drawing-v1`，拒绝旧标签页重存导致的未知节点丢失；新网页和 yuyan-doc 自动携带。revision 冲突检查仍独立执行。模板正文不可原地替换，复制/历史恢复直接保留完整服务端节点。
+`GET /api/meta` publishes `features: ["drawing-v1"]`. Saving or canceling edits to a current document containing a whiteboard requires `X-Yuyan-Features: drawing-v1`, preventing an old tab from resaving and losing an unknown node; the new web application and yuyan-doc add it automatically. Revision conflict checking still runs independently. Template bodies cannot be replaced in place; copying and history restoration retain complete server-side nodes directly.
 
-未知包/引擎版本禁止编辑和重新发布；其预览在独立安全校验通过时仍可读取，原包仍可下载。未知包的 GC 会保守停止，需要升级到理解该版本的程序。不能回退到完全不认识 drawing 的旧程序编辑已有画板资料；无 SQLite 迁移不等于正文格式向后兼容。
+Editing or republishing an unknown package/engine version is forbidden. Its preview may still be read if it passes independent safety validation, and the original package remains downloadable. GC conservatively stops for an unknown package; upgrade to a program that understands that version. Do not roll back to an old program that does not recognize drawing at all and then edit documents containing whiteboards; the absence of a SQLite migration does not imply document-format backward compatibility.
 
-## 导出与 Agent
+## Export and Agents
 
-网页知识库导出、项目 CLI 全库导出及 yuyan-doc 单篇导出保留画板包、单份预览和所需图片。Markdown 用含预览/说明/源链接的 HTML figure 回退；包文件 `<ID>.yuyan.json`、预览 `<ID>.svg|png` 与图片放在同一 attachments 目录。完整文件夹可由项目导入工具导入空实例，先校验图片哈希、重新上传依赖与包，再保留节点宽度/对齐/说明。只复制一篇 Markdown 不能获得独立可编辑画板；缺包时导入报错，不静默丢图。
+Web knowledge-base export, project-CLI full export, and yuyan-doc single-document export retain the whiteboard package, one preview, and required images. Markdown falls back to an HTML figure containing the preview, caption, and source link. Package files named `<ID>.yuyan.json`, previews named `<ID>.svg|png`, and images are placed in the same attachments directory. The project import tool can import the complete folder into an empty instance: it first validates image hashes, reuploads dependencies and packages, and then preserves node width/alignment/caption. Copying only one Markdown file does not produce an independently editable whiteboard; when the package is missing, import fails instead of silently dropping the image.
 
-画板弹窗可导入 `.excalidraw`，下载独立 `.excalidraw`/SVG/PNG；独立文件按格式需要临时嵌入图片/字体，区别于服务端长期存储。
+The whiteboard dialog can import `.excalidraw` and download standalone `.excalidraw`/SVG/PNG. A standalone file temporarily embeds images/fonts as required by its format, unlike long-term server storage.
 
-Agent 使用 `yuyan-doc drawing --input spec.json --out NEW_DIRECTORY`：输入 `template` 或 `elements`（二选一）、可选背景和图片数据，经本机隔离实例和同一浏览器适配层生成包与预览。只生成本地材料，不连接生产。先 `preview-setup` 准备已提交源码的本机程序；审阅后单独 `upload --kind drawing`，再用 revision 保护的 `create/edit` 插入返回节点。生成 API/工具入口为 `web/src/drawing/tool.ts`，技能脚本仅放 agent-config。
+Agents use `yuyan-doc drawing --input spec.json --out NEW_DIRECTORY`: input contains either `template` or `elements` (exactly one), with optional background and image data. The local isolated instance and the same browser adapter produce the package and preview. This generates local materials only and does not connect to production. First use `preview-setup` to prepare a local program from committed source. After review, separately run `upload --kind drawing`, then use revision-protected `create/edit` to insert the returned node. The generation API/tool entry point is `web/src/drawing/tool.ts`; skill scripts live only in agent-config.
 
-## 实施状态与后续
+## Implementation Status and Follow-up
 
-P0 引擎验证、P1 文档/存储集成、P2 数据库模板与 Agent 入口均已实现。针对性验证材料使用隔离合成数据，保留在 `.local`，不新增永久回归套件；验证结果和发布记录见 OPERATIONS。
+P0 engine validation, P1 document/storage integration, and P2 database templates and the Agent entry point are all implemented. Targeted verification materials use isolated synthetic data and remain in `.local`; no permanent regression suite is added. See [VERIFICATION.md](VERIFICATION.md) for verification results and release records.
 
-P3 逐图迁移仍待单独执行。先核对标签、数字、连线和图例，再局部替换真实文档；保留原生文字/SQL/表格。空间评估计入实际包（已含预览）、去重图片、历史和备份，单列传输 gzip；尚未完成原图逐一重绘对比，因此不承诺节省比例。
+P3 redrawing one image at a time remains a separate future task. First verify labels, numbers, connectors, and legends, then replace content selectively in real documents; preserve native text/SQL/tables. Storage assessment includes the actual package (which already contains a preview), deduplicated images, history, and backups; report the gzip-compressed transfer size separately. Since one-by-one redraw comparisons against the originals have not been completed, no savings ratio is promised.
 
-后续可沿公开 API 增加图形模板、布局辅助、元素选择工具及导入器；升级引擎前以代表性旧包验证编辑和导出，按需增加版本适配，不直接重写全部存量包。
+Future work may add shape templates, layout assistance, element-selection tools, and importers through the public API. Before upgrading the engine, verify editing and export with representative old packages; add version adapters as needed instead of rewriting all stored packages directly.
 
-官方依据：[嵌入与字体托管](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/installation)、[场景 API](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/props/excalidraw-api)、[元素生成](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/excalidraw-element-skeleton)、[导出](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/utils/export)、[固定版本源码](https://github.com/excalidraw/excalidraw/tree/v0.18.1)。
+Official references: [embedding and font hosting](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/installation), [scene API](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/props/excalidraw-api), [element generation](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/excalidraw-element-skeleton), [export](https://docs.excalidraw.com/docs/@excalidraw/excalidraw/api/utils/export), and [pinned-version source](https://github.com/excalidraw/excalidraw/tree/v0.18.1).

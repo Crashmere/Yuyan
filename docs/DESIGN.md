@@ -1,127 +1,127 @@
-# Yuyan（语燕）设计讨论稿
+# Yuyan (语燕) Design Discussion Draft
 
-更新日期：2026-10-13
+Updated: 2026-10-13
 
-状态：已部署到 ali 并正式导入全部笔记（阶段 C，见 11.2）；用户已在电脑和手机上确认可以正常使用。界面与编辑体验改版（阶段 D，第 12 节）中，D1（单页应用、新界面、目录管理与导出）已经用户确认发布，结果见 12.10；D2 编辑器交互与 D3 内容块已完成并发布，结果见 12.11、12.12，用户已验收。阶段 E 第一批（搜索面板、版本对比、图片预留尺寸）已发布，结果见 13.6，2026-09-27 用户验收完毕。第二批小功能（搜索知识库与全拼、从搜索结果定位、大纲隐藏、菜单滚动提示）已发布，见第 14 节。第三批（手机端大纲与代码复制按钮的修复、离开文档时停止加载图片、Obsidian 代码框风格、正文按标题折叠、大纲移到右侧）已发布，见第 15 节。第四批（语雀式代码块，线上 `[!code]` 全部改回代码块）已发布并完成线上迁移，见第 16 节。第五批（大纲按语雀方式收起）见第 17 节。第六批（统一按钮提示、大纲与目录折叠、取消编辑、表格拖动调整宽高等十项）见第 18 节。
+Status: Deployed to ali with all notes formally imported (Phase C; see 11.2); the user has confirmed normal operation on both desktop and mobile. Within the interface and editing-experience redesign (Phase D, Section 12), D1 (single-page application, new interface, directory management, and export) was released after user confirmation; see 12.10 for the results. D2 editor interactions and D3 content blocks have been completed and released; see 12.11 and 12.12 for the results, which the user has accepted. The first batch of Phase E (search panel, version comparison, and reserved image dimensions) has been released; see 13.6 for the results, accepted by the user on 2026-09-27. The second batch of small features (searching knowledge bases and matching full Pinyin, locating content from search results, hiding the outline, and menu scroll indicators) has been released; see Section 14. The third batch (fixes for the mobile outline and code-copy button, stopping image loads after leaving a document, Obsidian-style code boxes, folding body content by heading, and moving the outline to the right) has been released; see Section 15. The fourth batch (Yuque-style code blocks and conversion of every `[!code]` item in production back into a code block) has been released and the production migration is complete; see Section 16. For the fifth batch (collapsing the outline in the Yuque style), see Section 17. For the sixth batch (ten items including unified button tooltips, outline and directory collapsing, canceling edits, and drag-resizing table width and height), see Section 18.
 
-本文件是项目方案的统一讨论入口。后续讨论直接修改对应章节，保持“已确认需求”“设计与实现中”“已发布”“待讨论事项”的区别，以各节标注的状态为准。技术选型可以调整；不能把建议或验证计划写成已经实现的能力。本文只保留设计与约束；各批次的验证、实测与上线核对记录按本文章节编号归档在 [VERIFICATION.md](VERIFICATION.md)，新的记录写在那里。
+This file is the single discussion entry point for the project design. Future discussions should modify the corresponding sections directly and preserve the distinctions among "confirmed requirements," "under design and implementation," "released," and "items to discuss"; the status marked in each section is authoritative. Technology choices may change; proposals or verification plans must not be described as implemented capabilities. This document retains only designs and constraints. Verification, measured results, and release checks for each batch are archived by this document's section numbers in [VERIFICATION.md](VERIFICATION.md); new records belong there.
 
-2026-09-26 项目方向调整：不再以 Obsidian 为出发点。此前“Obsidian 多仓库同步 + 图床 + 阅读站 + 配置中心”的方案已停止，讨论记录保存在 [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md)，其中第 3 节的笔记库调查仍作为导入依据。
+Project direction changed on 2026-09-26: Obsidian is no longer the starting point. The previous "multi-vault Obsidian synchronization + image hosting + reading site + configuration center" plan has been discontinued. Its discussion record is preserved in [archive/obsidian-sync-design.md](archive/obsidian-sync-design.md); the note-vault survey in Section 3 of that document remains the basis for importing.
 
-## 1. 项目定位与当前工作范围
+## 1. Project Positioning and Current Scope
 
-Yuyan（语燕，名称模仿语雀）是一个供用户一人使用的网页知识库，部署在 ali 上：在浏览器中完成写作、编辑和阅读，功能取语雀网页版中适合单人使用的部分。
+Yuyan (语燕, a name modeled after 语雀/Yuque) is a single-user web knowledge base deployed on ali. Writing, editing, and reading all take place in the browser, using the subset of Yuque's web features suitable for one person.
 
-- 内容由 Yuyan 独立保存，不依赖 Obsidian。Obsidian 继续作为个人笔记工具，由用户自行维护（本地单个仓库，经 GitHub 同步）；两者之间只有导入和导出关系。
-- 现有 `Crashmere/ObsidianRepository` 继续作为用户的笔记同步仓库，此前“改名归档”的计划取消。
-- 命名：代码仓库为公开的 `Crashmere/Yuyan`，本地目录为 `~/ali/Yuyan`；服务器上的目录、URL 前缀、运行用户和 systemd unit 使用 `yuyan`。
-- 2026-09-26 已部署到 ali，经共享 Nginx 以 `/yuyan/` 访问，全部笔记已正式导入。
+- Yuyan stores its content independently and does not depend on Obsidian. Obsidian remains the user's personal note-taking tool, maintained by the user as a single local vault synchronized through GitHub; the only relationship between the two is import and export.
+- The existing `Crashmere/ObsidianRepository` remains the user's note-synchronization repository. The previous plan to rename and archive it has been canceled.
+- Naming: the public code repository is `Crashmere/Yuyan`, and the local directory is `~/ali/Yuyan`; the server directory, URL prefix, runtime user, and systemd unit use `yuyan`.
+- Yuyan was deployed to ali on 2026-09-26, is accessible through the shared Nginx at `/yuyan/`, and has formally imported all notes.
 
-## 2. 已确认需求
+## 2. Confirmed Requirements
 
-| 方面 | 要求 |
+| Aspect | Requirement |
 | --- | --- |
-| 定位 | 单人使用的网页知识库：一个人写作、编辑和阅读；功能只取语雀网页版中适合单人使用的部分 |
-| 与 Obsidian 的关系 | 各自独立：Yuyan 自己保存内容，内容可随时导出为 Markdown |
-| 协作与分享 | 不需要：没有分享、协作和评论，也没有公开与私密之分 |
-| 编辑体验 | 所见即所得，参照语雀；可以直接用 Markdown 语法快速输入格式，例如 `#` 标题、`-` 无序列表、三个反引号代码块 |
-| 编辑器选型原则 | 扩展性和可定制性优先，尽量通过自研扩展实现所需功能 |
-| 知识库划分 | 原来的顶层目录各为一个知识库；`备份` 只是当时的临时堆放目录，其下的子目录各自提升为顶层知识库，`备份` 本身不保留 |
-| 现有笔记 | 全部导入，只导入一次；导入后这些笔记以 Yuyan 为准，只在 Yuyan 中修改，Obsidian 中的旧副本不再同步 |
-| Markdown 能力 | 代码高亮、数学公式、表格、图片、Callout 与折叠、Mermaid、目录 |
-| 图片 | 全部保存在服务器本地 |
-| 样式偏好 | 尽量通过 CSS 满足样式需求 |
-| 访问与安全 | 公网使用可信 IP 证书的 HTTPS，与 ali 上其他应用共享 Nginx；HTTP 跳转 HTTPS，登录认证待后续接入 |
-| 手机 | 手机上只需要阅读，编辑在电脑上进行 |
-| 代码仓库 | `Crashmere/Yuyan` 公开；不提交真实笔记、数据库、备份和服务器公网地址，测试使用合成样例 |
-| 异机备份 | 暂时不做 |
-| 发布 | 本地按需验证与构建，make deploy 发布；GitHub 仅备份源码 |
-| 服务器 | 使用现有 SSH 别名 `ali` 对应的服务器，遵守共享 `server-operations` 约定 |
-| 开发方式 | 接受必要的开发成本，先通过文档明确方案 |
-| 界面改版（2026-09-26） | 参照语雀改版界面与编辑体验；页面改为单页应用，切换文档、进入和退出编辑都不整页刷新；依次改进整体观感、目录管理、编辑器操作和内容块，搜索面板与知识管理功能放到以后 |
-| 格式范围 | 以 Markdown 可表达的格式为基础，支持表格尺寸、图片/段落/表格对齐、文字颜色、图片说明、合并/拆分单元格、单元格底色和可选表头；超出 Markdown 的内容导出为 HTML 保留。分栏与附件已实现（第 23 节），通用画板已实现（第 25 节） |
-| 同名分组与文档 | 导入产生的 7 处“同名分组 + 同名文档”合并为带子文档的文档；目录能够移动后由 agent 通过接口处理，操作前先备份 |
+| Positioning | A single-user web knowledge base in which one person writes, edits, and reads; only the subset of Yuque's web features suitable for one person is included |
+| Relationship with Obsidian | Independent systems: Yuyan stores its own content, which can be exported to Markdown at any time |
+| Collaboration and sharing | Not needed: there is no sharing, collaboration, or commenting, and no distinction between public and private content |
+| Editing experience | WYSIWYG, modeled after Yuque; Markdown syntax can be entered directly for quick formatting, such as `#` for a heading, `-` for an unordered list, and three backticks for a code block |
+| Editor-selection principle | Extensibility and customizability take priority; implement required capabilities through in-house extensions wherever possible |
+| Knowledge-base division | Each original top-level directory becomes a knowledge base. `备份` was only a temporary holding directory; each of its child directories is promoted to a top-level knowledge base, while `备份` itself is not retained |
+| Existing notes | Import all of them, exactly once. After import, Yuyan is authoritative for these notes and they are modified only in Yuyan; the old copies in Obsidian are no longer synchronized |
+| Markdown capabilities | Syntax highlighting, mathematical formulas, tables, images, Callouts and folding, Mermaid, and a table of contents |
+| Images | All stored locally on the server |
+| Styling preference | Meet styling needs through CSS wherever possible |
+| Access and security | Use HTTPS over the public network with a trusted IP certificate and share Nginx with the other applications on ali; redirect HTTP to HTTPS, with login authentication to be integrated later |
+| Mobile | Reading only on phones; editing is done on a computer |
+| Code repository | `Crashmere/Yuyan` is public; real notes, databases, backups, and the server's public address must not be committed, and tests use synthetic samples |
+| Off-machine backup | Not implemented for now |
+| Release | Verify and build locally as needed, then release with `make deploy`; GitHub backs up source code only |
+| Server | Use the server addressed by the existing SSH alias `ali` and follow the shared `server-operations` conventions |
+| Development approach | Accept necessary development costs and clarify the design in documentation first |
+| Interface redesign (2026-09-26) | Redesign the interface and editing experience with reference to Yuque; convert the site to a single-page application so switching documents and entering or leaving edit mode do not reload the entire page; improve the overall appearance, directory management, editor operations, and content blocks in sequence, leaving the search panel and knowledge-management features for later |
+| Format scope | Begin with formats representable in Markdown, while supporting table dimensions, image/paragraph/table alignment, text colors, image captions, merged/split cells, cell background colors, and optional table headers; preserve content beyond Markdown's capabilities by exporting it as HTML. Columns and attachments have been implemented (Section 23), as has the general-purpose whiteboard (Section 25) |
+| Same-named groups and documents | Merge the seven imported occurrences of a same-named group plus same-named document into documents that have child documents. Once directory movement is available, an agent will perform the operation through the API, after taking a backup |
 
-公网已接入 ServerPortal 统一设备认证；授权设备可以查看、编辑和删除内容。版本历史、回收站和备份（见 3.3 与第 9 节）本身就是功能，也能在误操作或内容被改动时恢复。含敏感信息的笔记仍由用户在导入前自行检查。
+Unified ServerPortal device authentication is now connected for public-network access; authorized devices can view, edit, and delete content. Version history, the recycle bin, and backups (see 3.3 and Section 9) are themselves features and also support recovery from accidental operations or content changes. The user remains responsible for reviewing notes containing sensitive information before import.
 
-暂不做异机备份同样是用户确认的选择：导入后，新写的内容只存在于 ali，而本机备份与数据在同一块磁盘上，磁盘或云主机出问题时无法恢复。需要时可以用导出工具在本地导出一份 Markdown 和图片（见 OPERATIONS.md）。
+Not implementing off-machine backups for now is likewise a user-confirmed choice: after import, newly written content exists only on ali, while the local backup and the data reside on the same disk, so neither can recover from a disk or cloud-host failure. When needed, the export tool can export a local copy of the Markdown and images (see OPERATIONS.md).
 
-## 3. 建议架构
+## 3. Recommended Architecture
 
-一个 Go 服务：SQLite 保存知识库、文档、版本和元数据，本地文件保存图片；前端在本机 中构建并嵌入程序。ali 上不需要 Node、Docker 或数据库服务，与其他应用的运行方式一致。
+One Go service: SQLite stores knowledge bases, documents, versions, and metadata, while local files store images. The frontend is built locally and embedded in the program. ali requires no Node, Docker, or database service, matching how the other applications run.
 
 ```mermaid
 flowchart LR
-    B[浏览器] -->|页面外壳、首屏数据、正文 HTML| G[Go 服务]
-    B -->|编辑器读取与保存文档 JSON| G
-    B -->|粘贴或拖入图片| G
-    G --> S[(SQLite：知识库、文档、版本)]
-    G --> A[图片文件]
-    T[开发电脑上的导入与导出工具] -->|HTTP 接口| G
+    B[Browser] -->|Page shell, initial-view data, body HTML| G[Go service]
+    B -->|Editor reads and saves document JSON| G
+    B -->|Paste or drag in images| G
+    G --> S[(SQLite: knowledge bases, documents, versions)]
+    G --> A[Image files]
+    T[Import and export tools on the development computer] -->|HTTP API| G
 ```
 
-### 3.1 页面与接口
+### 3.1 Pages and APIs
 
-- 所有页面和接口经共享 Nginx 以 `/yuyan/` 对外，服务只监听 `127.0.0.1:<端口>`。
-- 单页应用（阶段 D1 起，见 12.3）：Go 对每个页面地址返回同一个外壳，并内嵌首屏需要的接口数据；切换文档、进入和退出编辑都在页面内完成，不整页刷新。
-- 正文仍由 Go 按文档 JSON 渲染成 HTML，经接口交给页面；编辑器只在进入编辑时加载，阅读时不下载编辑器脚本（ali 下行只有约 0.5 MB/s）。
-- 所有写操作集中在 `/yuyan/api/` 下，经过同一个中间件入口。以后加登录时只需在这里接入，不需要调整页面或接口结构。
-- 页面也会预加载的读取接口（阅读、目录、标题索引、链接候选等）返回 `Cache-Control: private, no-cache` 和按响应内容计算的 ETag：浏览器每次仍向服务确认，内容没变时得到 304，不再重传。Nginx 压缩时把 ETag 改为弱形式，服务端同样接受。搜索、错误和其余读取保持 `no-store`。
-- JSON 不再把 `<`、`>`、`&` 转义成 `\u003c` 等（接口响应带 `nosniff`）。正式实例抽样中，渲染正文为主的响应未压缩约小 20%–30%，gzip 后约小 5%–8%。外壳内嵌的首屏数据只转义 `<`，数据不能结束所在的 script 元素，也不能在其中开始注释。
-- 标题索引、阅读页和目录的字数与图片数按文档缓存在进程内，键为 revision 与创建时间，只重新统计上次以来写过的文档；服务启动后先统计一遍。链接候选的章节同样按文档缓存。均不落库、不迁移。
+- All pages and APIs are exposed through the shared Nginx under `/yuyan/`; the service listens only on `127.0.0.1:<port>`.
+- Single-page application (starting with Phase D1; see 12.3): Go returns the same shell for every page address and embeds the API data required for the initial view. Switching documents and entering or leaving edit mode all happen within the page without a full-page reload.
+- Go still renders body content from document JSON into HTML and delivers it to the page through an API. The editor loads only upon entering edit mode, and editor scripts are not downloaded while reading (ali's downstream bandwidth is only about 0.5 MB/s).
+- All write operations are grouped under `/yuyan/api/` and pass through the same middleware entry point. When login is added later, it needs to be integrated only here; the page and API structures need no adjustment.
+- Read APIs that pages also preload (reading, directory, title index, link candidates, and so on) return `Cache-Control: private, no-cache` and an ETag calculated from the response content. The browser still checks with the service every time, but receives 304 when the content has not changed and avoids retransmission. Nginx converts the ETag to weak form when compressing, which the server also accepts. Search, errors, and other reads remain `no-store`.
+- JSON no longer escapes `<`, `>`, and `&` as `\u003c` and similar sequences (API responses include `nosniff`). In production-instance samples, responses dominated by rendered body content were about 20%-30% smaller uncompressed and about 5%-8% smaller after gzip. Initial-view data embedded in the shell escapes only `<`; the data must neither terminate its containing script element nor begin a comment inside it.
+- Character and image counts for the title index, reading page, and directory are cached per document in process, keyed by revision and creation time; only documents written since the previous pass are recounted. One full count is performed after service startup. Sections used as link candidates are cached per document in the same way. None of these caches are persisted or require a migration.
 
-### 3.2 组件
+### 3.2 Components
 
-| 组件 | 建议 | 说明 |
+| Component | Recommendation | Notes |
 | --- | --- | --- |
-| 后端 | Go + SQLite | 单个可执行文件，本机构建 |
-| 编辑器 | Tiptap 3 | 见第 5 节 |
-| 存储格式 | Tiptap（ProseMirror）文档 JSON | 见 3.4 |
-| 阅读页渲染 | Go 按文档 JSON 渲染 HTML | 与编辑器输出保持一致，见 6.3 |
-| 导入与导出工具 | TypeScript，在开发电脑上运行 | 与编辑器共用同一套扩展定义和 Markdown 转换规则，见 4.3 与第 9 节 |
-| 图片 | 按内容寻址的本地文件 | 见第 7 节 |
-| 搜索 | 服务端全文匹配 | 从文档 JSON 提取纯文本；正文只有几 MiB，内存匹配即可，中文无需分词 |
+| Backend | Go + SQLite | One executable, built locally |
+| Editor | Tiptap 3 | See Section 5 |
+| Storage format | Tiptap (ProseMirror) document JSON | See 3.4 |
+| Reading-page rendering | Go renders HTML from document JSON | Keep it consistent with editor output; see 6.3 |
+| Import and export tools | TypeScript, run on the development computer | Share the same extension definitions and Markdown conversion rules as the editor; see 4.3 and Section 9 |
+| Images | Content-addressed local files | See Section 7 |
+| Search | Server-side full-text matching | Extract plain text from document JSON. The body content totals only a few MiB, so in-memory matching is sufficient; Chinese does not require word segmentation |
 
-### 3.3 内容组织
+### 3.3 Content Organization
 
-- 知识库：名称、简介和排序（排序在首页拖动卡片，见 12.5）。
-- 文档树：文档可以嵌套、拖动排序和移动（包括移到其他知识库，见 12.5）；导入时的目录成为只有标题的分组节点。
-- 首页：知识库列表和最近编辑的文档。
-- 保存即生效：编辑时自动保存，阅读页总是显示最新内容，不区分草稿和发布。
-- 保存冲突：每次保存都携带文档的版本号。同一文档在两个标签页或两台电脑上同时编辑时，后保存的一方会收到提示，由用户选择重新加载或保留自己的版本，不会静默覆盖。提示中可先“查看差异”，以版本对比的方式列出当前页面相对已保存最新版本的改动，再在对比中选择；从对比中覆盖以所看的版本为基础，期间别处再保存仍会提示冲突。
-- 断网与保存失败：未保存的内容先保存在浏览器本地并自动重试；有未保存的内容时，关闭页面会提醒。
-- 版本历史：首次保存记录编辑前的内容，编辑过程每隔 10 分钟在保存时记录修改后的快照，正常离开编辑页先等待正文与会话快照完成；关闭标签页用 beacon 尽力补记。快照保留 30 天，每天北京时间 03:00 清理，不保留最低版本数；当前正文独立保存。自动生成相对上一条快照的结构化改动摘要，可以预览、比较与恢复，详见 13.2。
-- 回收站：删除的文档和知识库先进入回收站，可以恢复；回收站不自动清空，彻底删除和清空回收站都需要手动确认。
+- Knowledge bases: name, description, and order (ordered by dragging cards on the home page; see 12.5).
+- Document tree: documents can be nested, drag-sorted, and moved, including between knowledge bases (see 12.5); directories from the import become title-only group nodes.
+- Home page: a list of knowledge bases and recently edited documents.
+- Saving takes effect immediately: editing auto-saves, and the reading page always shows the latest content, with no distinction between drafts and published content.
+- Save conflicts: every save carries the document's version number. If the same document is edited concurrently in two tabs or on two computers, the later saver receives a prompt and chooses either to reload or keep their own version; nothing is silently overwritten. The prompt can first open the exact UI action `查看差异` ("View Differences"), which lists changes on the current page relative to the latest saved version using version comparison, then lets the user choose within that comparison. An overwrite from the comparison uses the viewed version as its base; if another save occurs elsewhere in the meantime, the conflict prompt appears again.
+- Network loss and save failures: unsaved content is first retained in the browser locally and retried automatically. Closing the page while content remains unsaved triggers a warning.
+- Version history: the first save records the content from before editing. During editing, a post-change snapshot is recorded on save every 10 minutes; normally leaving the edit page waits for both body content and the session snapshot to complete. Closing the tab uses a beacon to make a best-effort final record. Snapshots are retained for 30 days and cleaned daily at 03:00 Beijing time, with no minimum version count retained; the current body is stored separately. A structured change summary relative to the preceding snapshot is generated automatically and can be previewed, compared, and restored; see 13.2.
+- Recycle bin: deleted documents and knowledge bases first enter the recycle bin and can be restored. The recycle bin is not emptied automatically; permanently deleting an item or emptying the recycle bin both require manual confirmation.
 
-### 3.4 存储格式
+### 3.4 Storage Format
 
-正文以 Tiptap 的文档 JSON 保存，并记录格式版本号；Markdown 只用于导入和导出。
+Body content is stored as Tiptap document JSON together with a format-version number; Markdown is used only for import and export.
 
-- 编辑器直接读写自己的原生格式，日常编辑不会因为重新生成 Markdown 而改写格式。
-- 可以保存 Markdown 表达不了的内容，例如文字颜色、对齐、Callout 的自定义标题和折叠状态、图片尺寸与对齐；以后新增的块类型也不受 Markdown 语法限制。
-- 代价：
-  - 数据不如 Markdown 直观，因此格式要有文档说明，并保证随时可以导出为 Markdown。
-  - 阅读页需要一个 Go 渲染器，与编辑器的扩展一一对应（见 6.3）。
-  - 扩展变化时，需要按格式版本号迁移旧文档。
-- 导出 Markdown 时，Markdown 能表达的内容（Callout、公式、Mermaid、表格、高亮等）按 Obsidian 可读的写法输出。表达不了的部分写成 HTML，导入时读回，尽量不丢信息，例如设置了列宽行高的表格（第 18 节）。这是用户 2026-09-27 确认的规则：以后新增的 Markdown 之外的能力都这样导出。已有的细节样式不必完全保留，例如代码块只要留下标题。
+- The editor reads and writes its native format directly, so routine editing does not rewrite formatting by regenerating Markdown.
+- The format can store content Markdown cannot express, such as text colors, alignment, custom Callout titles and collapsed state, and image dimensions and alignment. Block types added later are likewise not constrained by Markdown syntax.
+- Costs:
+  - The data is less immediately readable than Markdown, so the format must be documented and must remain exportable to Markdown at any time.
+  - The reading page needs a Go renderer with a one-to-one correspondence to editor extensions (see 6.3).
+  - When extensions change, old documents must be migrated according to their format-version number.
+- When exporting Markdown, content expressible in Markdown (Callouts, formulas, Mermaid, tables, highlighting, and so on) uses syntax readable by Obsidian. Parts that cannot be expressed are written as HTML and read back during import, losing as little information as possible; one example is a table with column widths and row heights (Section 18). This is the rule confirmed by the user on 2026-09-27: every capability added beyond Markdown in the future is exported this way. Existing fine-grained styling does not have to be preserved completely; for example, retaining a code-block title is sufficient.
 
-此前曾建议以 Markdown 为存储格式。用户确认“扩展性和可定制性优先”后改为此方案：Tiptap 的官方 Markdown 支持仍是早期版本，只用于一次性导入和导出时，问题可以在导入报告中逐项核对，不会影响日常编辑。
+Markdown was previously proposed as the storage format. After the user confirmed that "extensibility and customizability take priority," the design changed to this approach. Tiptap's official Markdown support is still at an early stage, but because it is used only for one-time import and for export, issues can be checked individually in the import report without affecting routine editing.
 
-数据库表的列顺序、布局版本与迁移见 26.1。
+See 26.1 for database-column order, layout versions, and migrations.
 
-## 4. 现有笔记导入
+## 4. Importing Existing Notes
 
-### 4.1 知识库与规模
+### 4.1 Knowledge Bases and Scale
 
-调查基于 GitHub `Crashmere/ObsidianRepository` 的 `main@388e3bd`（2026-09-26），详见归档文档第 3 节。导入只做一次，按导入时 GitHub 上的最新状态进行，不必等 Obsidian 合并整理；导入前重新调查一次。
+The survey is based on `main@388e3bd` (2026-09-26) of the GitHub repository `Crashmere/ObsidianRepository`; see Section 3 of the archived document for details. The import is performed only once, using the latest state on GitHub at import time; there is no need to wait for Obsidian content to be consolidated and reorganized. Run the survey again before importing.
 
-| 知识库 | 笔记数 | 来源 |
-| --- | --- | --- |
-| 算法课 | 63 | 顶层目录 |
-| 读书笔记 | 55 | 顶层目录 |
-| 开发手册 | 42 | 顶层目录 |
-| 杂项 | 34 | 顶层目录 |
-| AI记录 | 14 | 顶层目录 |
+| Knowledge base | Note count | Source |
+| --- | ---: | --- |
+| 算法课 | 63 | Top-level directory |
+| 读书笔记 | 55 | Top-level directory |
+| 开发手册 | 42 | Top-level directory |
+| 杂项 | 34 | Top-level directory |
+| AI记录 | 14 | Top-level directory |
 | MySQL | 26 | `备份/MySQL` |
 | CentOS | 18 | `备份/CentOS` |
 | Linux服务搭建 | 18 | `备份/Linux服务搭建` |
@@ -131,903 +131,903 @@ flowchart LR
 | Spring | 6 | `备份/Spring` |
 | 实验记录 | 3 | `备份/实验记录` |
 
-共 13 个知识库、314 篇笔记；`备份` 目录下没有直接存放的笔记。
+There are 13 knowledge bases and 314 notes in total; no notes are stored directly under the `备份` directory.
 
-- 正文合计约 3.25 MiB，最大的一篇约 553 KiB。
-- 1,538 张图片，约 339 MiB：大小中位数约 92 KiB，61 张超过 2 MiB；另有 21 张与其他图片内容完全相同。
-- 未发现外链图片和 YAML 属性。
+- Body content totals about 3.25 MiB; the largest individual note is about 553 KiB.
+- There are 1,538 images totaling about 339 MiB: the median size is about 92 KiB, 61 images exceed 2 MiB, and another 21 have content identical to other images.
+- No externally linked images or YAML properties were found.
 
-### 4.2 语法与转换
+### 4.2 Syntax and Conversion
 
-| 内容 | 数量 | 转换为 |
-| --- | --- | --- |
-| 代码块 | 约 3,428 个 | 代码块节点，保留语言；无法识别的语言回退为纯文本 |
-| Callout | 726 个，其中 567 个带折叠标记 | Callout 节点，保留类型、标题和默认折叠状态 |
-| 自定义 `[!code]` Callout | 313 个 | 正式导入时同上；第四批改为带标题栏、可以收起的代码块，保留标题和展开状态（第 16 节） |
-| 数学公式 | 约 79 篇文章 | 行内与块级公式节点，逐篇检查能否渲染 |
-| 表格 | 约 177 处 | 表格节点 |
-| Markdown 图片 | 1,524 处引用 | 图片上传到图床，图片节点引用图片 ID |
-| 其他图片语法 | Wiki 图片嵌入，以及 3 个带高度的 `<img>` | 图片节点，保留尺寸 |
-| Wiki 笔记链接 | 11 处 | 指向对应文档的内部链接 |
-| 高亮、任务列表、删除线 | 有使用 | 对应的标记与节点 |
+| Content | Quantity | Converted to |
+| --- | ---: | --- |
+| Code blocks | About 3,428 | Code-block nodes, preserving the language; unrecognized languages fall back to plain text |
+| Callouts | 726, of which 567 have fold markers | Callout nodes, preserving the type, title, and default collapsed state |
+| Custom `[!code]` Callouts | 313 | The same as above during the formal import; the fourth batch converted them to collapsible code blocks with title bars while preserving title and expanded state (Section 16) |
+| Mathematical formulas | About 79 articles | Inline- and block-formula nodes, checked article by article for renderability |
+| Tables | About 177 | Table nodes |
+| Markdown images | 1,524 references | Images uploaded to image storage, with image nodes referencing image IDs |
+| Other image syntax | Wiki image embeds, plus three `<img>` elements with explicit heights | Image nodes, preserving dimensions |
+| Wiki note links | 11 | Internal links to the corresponding documents |
+| Highlighting, task lists, strikethrough | Present | Corresponding marks and nodes |
 
-### 4.3 导入工具与流程
+### 4.3 Import Tool and Process
 
-- 导入工具用 TypeScript 编写，在开发电脑上运行，与编辑器共用同一套扩展定义和 Markdown 解析规则，保证导入结果与在编辑器里粘贴 Markdown 的效果一致。它通过 HTTP 接口上传图片和文档，ali 上不需要 Node。
-- 加粗允许中文标点紧邻星号，例如 `**标签：**正文`、`正文**“引用”**正文`；相邻的 `**标签：****解释**` 也能识别。`web/src/schema/strong.ts` 扩展 micromark 的星号边界与相邻加粗配对，沿用其转义、代码/公式隔离及嵌套解析。标记内首尾空白仍按普通文字处理，反斜线转义的星号保持字面含义。正文 JSON 继续使用已有的 bold 标记，日常打开文档不重新解释其中的 Markdown 字符。
-- 带 `issue` 回调的 Markdown 导入会检查语法树中仍落为普通文字的未转义 `**`，报告源文件行列；常见原因是 `**重点 **` 的内部空白、缺少结束标记，或公式乘号与强调配对混淆。检查依赖原始源码位置，不扫描保存后的 JSON 猜语义；代码、公式、HTML、链接地址和转义字面星号不受影响。yuyan-doc 将这些诊断作为 `conversion_error` 在写入前拒绝，维护用批量导入将其列入报告。无回调的网页粘贴维持既有解析规则；这项导入诊断由开发电脑的转换器使用，无需重启生产服务。
-- 存量加粗修复以原始导入版本为依据：分别用旧、新规则解析，匹配仍与旧结果一致的段落，只删除配对星号并调整 bold。保留现有链接地址、图片和块属性；存在转义歧义、其他格式变化或后续编辑的段落不自动修复。工具与预览/应用流程见 OPERATIONS 的“存量加粗修复”。
-- 文件名成为文档标题；原路径记录在元数据中，用于链接解析和导入报告。
-- 转换器按 Markdown 语法保留行内代码，不猜测作者是否借用了 Typora 的代码配色。需要还原这类文字强调时，由资料迁移流程结合上下文改成已有 `textColor`，真实代码及混合内容中的标识符仍保留 `code`。混合截图中的独立文字应转为原生内容；实际裁剪后的图片重新上传，尺寸来自新素材。此类语义修复通过 yuyan-doc 局部编辑完成，不改变全站代码样式或图片渲染规则。
-- 图片按原仓库的规则定位原文件。`AI记录/Gradle 入门.md` 引用的 `img-001.png` 存在两张内容不同的同名文件，必须明确选择，不能随意挑一张。
-- 链接无法解析或有歧义时列入导入报告；未带协议的外链（如 `www.rpmfind.net`）标记为待修正。
-- 先在开发电脑上的本地实例试跑，生成报告并抽查，确认后再导入 ali 上的正式实例。试跑可以反复执行，不会产生重复文档或图片。
-- 正式导入只做一次，之后这些笔记以 Yuyan 为准，不再从 Obsidian 重新导入。
-- 需要人工选择的项（如同名不同图）写在 overrides 文件中，不入库。正式导入时只有一项：`{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`；导入完成后，本地文件已按用户要求删除。
-- 导入后运行 `npm --prefix web run roundtrip -- --server <实例地址>`，确认每篇文档都能被编辑器原样接受。
+- The import tool is written in TypeScript, runs on the development computer, and shares the same extension definitions and Markdown parsing rules as the editor, ensuring that imports produce the same result as pasting Markdown into the editor. It uploads images and documents through the HTTP API; ali does not require Node.
+- Bold syntax permits Chinese punctuation immediately next to asterisks, as in the exact examples `**标签：**正文` and `正文**“引用”**正文`; adjacent pairs such as `**标签：****解释**` are also recognized. `web/src/schema/strong.ts` extends micromark's asterisk boundaries and adjacent-bold pairing while retaining its escaping, code/formula isolation, and nested parsing. Leading and trailing whitespace inside a marker is still treated as ordinary text, and backslash-escaped asterisks remain literal. Body JSON continues to use the existing bold mark; opening a document for routine editing does not reinterpret Markdown characters in it.
+- Markdown imports with an `issue` callback inspect the syntax tree for unescaped `**` sequences that still became plain text and report their source-file line and column. Common causes include internal whitespace in the exact example `**重点 **`, a missing closing marker, or confusion between a formula multiplication sign and an emphasis pair. The check depends on positions in the original source and does not scan saved JSON to guess semantics; code, formulas, HTML, link addresses, and escaped literal asterisks are unaffected. yuyan-doc rejects these diagnostics as `conversion_error` before writing, while the maintenance batch importer includes them in its report. Browser paste without a callback retains the existing parsing rules. This import diagnostic is used by the converter on the development computer and does not require restarting the production service.
+- Existing-content bold repair uses the original imported version as its basis: it parses with the old and new rules separately, then, only for paragraphs whose matches still agree with the old result, removes the paired asterisks and adjusts bold. Existing link addresses, images, and block attributes are preserved; paragraphs with escaping ambiguity, other formatting changes, or subsequent edits are not repaired automatically. See the exact OPERATIONS heading `存量加粗修复` for the tool and preview/apply process.
+- The filename becomes the document title. The original path is recorded in metadata for link resolution and the import report.
+- The converter preserves inline code according to Markdown syntax and does not guess whether the author borrowed Typora's code coloring. When this kind of textual emphasis must be restored, the content-migration process changes it to the existing `textColor` according to context; real code and identifiers inside mixed content retain `code`. Standalone text in a composite screenshot should become native content; actually cropped images are uploaded again, with dimensions taken from the new asset. Such semantic repairs are performed through localized yuyan-doc edits and do not change site-wide code styles or image-rendering rules.
+- Images are resolved to their original files according to the source repository's rules. The `img-001.png` referenced by `AI记录/Gradle 入门.md` has two same-named files with different content; one must be selected explicitly rather than arbitrarily.
+- Links that cannot be resolved or are ambiguous are included in the import report. External links without a protocol, such as `www.rpmfind.net`, are marked for correction.
+- First perform a trial run against a local instance on the development computer, generate and sample-check the report, and import into the production instance on ali only after confirmation. Trial runs can be repeated without creating duplicate documents or images.
+- The formal import is performed only once. Afterward, Yuyan is authoritative for these notes and they are not re-imported from Obsidian.
+- Items requiring a human choice, such as different images with the same filename, are written to an overrides file and not stored in the database. There was only one such item for the formal import: `{"images": {"AI记录/Gradle 入门.md|img-001.png": "AI记录/attachments/img-001.png"}}`. After the import completed, the local file was deleted at the user's request.
+- After importing, run `npm --prefix web run roundtrip -- --server <instance-address>` to confirm that the editor accepts every document without changing it.
 
-## 5. 编辑器
+## 5. Editor
 
-### 5.1 选择 Tiptap 3 的理由
+### 5.1 Reasons for Choosing Tiptap 3
 
-按“扩展性和可定制性优先”的原则，建议使用 Tiptap 3：
+Under the principle that "extensibility and customizability take priority," Tiptap 3 is recommended:
 
-- 只提供编辑器内核，界面完全自己实现；每个功能都是一个扩展，需要时可以直接使用底层的 ProseMirror。
-- 生态最大，维护活跃，MIT 许可。拖动块（DragHandle）、折叠块（Details）、公式（Mathematics，基于 KaTeX）、目录（TableOfContents）、文件粘贴与拖入（FileHandler）、稳定块 ID（UniqueID）等原付费扩展，已于 2025 年改为 MIT 开源。付费部分只剩协作、AI、文档格式转换和云服务，Yuyan 都不需要。
-- 原生格式是 JSON，与 3.4 的存储方案一致；官方提供 Markdown 转换，以及不依赖浏览器的静态渲染器，用于导入导出工具与按需内容核对。
+- It provides only the editor core, leaving the interface entirely to the application. Every feature is an extension, and the underlying ProseMirror can be used directly when needed.
+- It has the largest ecosystem, is actively maintained, and uses the MIT license. Formerly paid extensions including block dragging (DragHandle), collapsible blocks (Details), formulas (Mathematics, based on KaTeX), a table of contents (TableOfContents), file paste and drag-and-drop (FileHandler), and stable block IDs (UniqueID) were made open source under MIT in 2025. Only collaboration, AI, document-format conversion, and cloud services remain paid, none of which Yuyan needs.
+- Its native format is JSON, matching the storage design in 3.4. Official Markdown conversion and a browser-independent static renderer are available for the import/export tools and on-demand content checks.
 
-曾比较的其他候选：
+Other candidates previously compared:
 
-- **Milkdown Crepe：** 开箱体验最接近语雀，Markdown 保真度好；但界面预设较多，深度定制不如 Tiptap 灵活。
-- **Vditor：** 功能齐全；但架构较老，扩展方式受限。
-- **BlockNote：** 提供现成的 Notion 式界面；但定制空间更小。
+- **Milkdown Crepe:** Its out-of-the-box experience is closest to Yuque and its Markdown fidelity is good, but it has more interface presets and is less flexible than Tiptap for deep customization.
+- **Vditor:** Feature-complete, but with an older architecture and constrained extension mechanisms.
+- **BlockNote:** Provides a ready-made Notion-style interface, but offers less customization space.
 
-### 5.2 功能与需要自研的扩展
+### 5.2 Features and Extensions Requiring In-House Development
 
-现成扩展覆盖：标题、列表与任务列表、引用、表格、代码块（lowlight 高亮）、图片、链接、高亮、文字颜色、对齐、撤销与重做、占位提示、拖动块、折叠块、公式、目录、文件粘贴与拖入。
+Existing extensions cover headings, lists and task lists, block quotes, tables, code blocks (highlighted with lowlight), images, links, highlighting, text colors, alignment, undo and redo, placeholders, block dragging, collapsible blocks, formulas, a table of contents, and file paste and drag-and-drop.
 
-需要自研：
+The following require in-house development:
 
-- 斜杠菜单与浮动工具栏的界面，基于 Tiptap 的 Suggestion 与 BubbleMenu。
-- Callout 节点：类型、标题、默认折叠状态；在编辑器中可以切换类型、展开和折叠。
-- Mermaid 块：编辑源码，并实时预览。
-- 图片上传：粘贴或拖入后上传并显示进度，失败时保留图片并可重试。
-- 代码块的语言选择与复制按钮。
-- Obsidian 写法的 Markdown 解析与输出规则（Callout、高亮、图片尺寸），供导入、导出和粘贴 Markdown 使用。
+- The slash-menu and floating-toolbar interfaces, based on Tiptap's Suggestion and BubbleMenu.
+- A Callout node with type, title, and default collapsed state; its type can be changed and it can be expanded or collapsed in the editor.
+- A Mermaid block with source editing and live preview.
+- Image upload: upload after paste or drag-in and show progress; retain the image and allow retries on failure.
+- Language selection and a copy button for code blocks.
+- Obsidian-style Markdown parsing and output rules for Callouts, highlights, and image dimensions, used by import, export, and Markdown paste.
 
-### 5.3 Markdown 快捷输入
+### 5.3 Markdown Quick Input
 
-在行首或文字后输入 Markdown 符号，编辑器立即转换为对应格式；转换后马上按退格键，可以恢复为刚输入的原文。
+When Markdown symbols are typed at the beginning of a line or after text, the editor immediately converts them to the corresponding format. Pressing Backspace immediately after conversion restores the source text just entered.
 
-- Tiptap 现成的输入规则：
-  - `#` 到 `######` 加空格：一到六级标题。
-  - `-`、`*` 或 `+` 加空格：无序列表；`1.` 加空格：有序列表；`[ ]` 或 `[x]` 加空格：任务列表。
-  - `>` 加空格：引用。
-  - 三个反引号（可以紧跟语言名）加空格或回车：代码块。
-  - `---`：分割线。
-  - `**粗体**`、`*斜体*`、`` `行内代码` ``、`~~删除线~~`、`==高亮==`、`![说明](地址)`。
-- 需要自研的输入规则：
-  - `> [!note]` 等 Obsidian 写法：Callout。
-  - 三个反引号加 `mermaid`：Mermaid 块。
-  - `$…$` 与 `$$`：行内与块级公式，按 Obsidian 的习惯配置。
-  - `[文字](链接)`：链接。
-- 中文输入法下，这些符号常被输入成全角，例如反引号变成 `·`、`>` 变成 `》`、`$` 变成 `￥`。输入规则同时识别这些全角写法，不必切换到英文输入。
-- 表格通过斜杠菜单插入；粘贴一段 Markdown 文本时自动转换为对应格式。
-- 常用格式同时提供快捷键，例如 `Ctrl`/`Cmd` + `B` 加粗。
+- Tiptap's existing input rules:
+  - `#` through `######` followed by a space: level-one through level-six headings.
+  - `-`, `*`, or `+` followed by a space: unordered list; `1.` followed by a space: ordered list; `[ ]` or `[x]` followed by a space: task list.
+  - `>` followed by a space: block quote.
+  - Three backticks, optionally followed immediately by a language name, then a space or Enter: code block.
+  - `---`: horizontal rule.
+  - The exact examples `**粗体**`, `*斜体*`, `` `行内代码` ``, `~~删除线~~`, `==高亮==`, and `![说明](地址)`.
+- Input rules requiring in-house development:
+  - Obsidian syntax such as `> [!note]`: Callout.
+  - Three backticks followed by `mermaid`: Mermaid block.
+  - `$…$` and `$$`: inline and block formulas, configured according to Obsidian conventions.
+  - The exact form `[文字](链接)`: link.
+- With a Chinese IME, these symbols are often entered in full-width form, such as a backtick becoming `·`, `>` becoming `》`, or `$` becoming `￥`. The input rules also recognize these full-width forms, so switching to English input is unnecessary.
+- Tables are inserted through the slash menu. Pasting a block of Markdown text converts it automatically to the corresponding formatting.
+- Common formats also provide keyboard shortcuts; for example, `Ctrl`/`Cmd` + `B` applies bold.
 
-### 5.4 原型验证
+### 5.4 Prototype Verification
 
-用真实笔记验证：
+Verify with real notes:
 
-- Callout、公式、代码和表格从 Markdown 导入后的显示效果，以及再导出为 Markdown 的结果。
-- KaTeX 能否渲染现有公式。这些公式是按 Obsidian 使用的 MathJax 写的，KaTeX 不支持的写法需要列出并决定处理方式。
-- 553 KiB 长文的加载与编辑性能。
-- 中文输入法下不丢字、不跳光标，Markdown 快捷输入（含全角写法）正常转换。
-- 粘贴与拖入图片上传。
+- How Callouts, formulas, code, and tables appear after import from Markdown, and the result of exporting them back to Markdown.
+- Whether KaTeX can render the existing formulas. These formulas were written for MathJax as used by Obsidian; unsupported KaTeX forms must be listed and a handling strategy chosen.
+- Load and editing performance for the 553 KiB long-form document.
+- Under a Chinese IME, no dropped characters or cursor jumps, and correct conversion of Markdown quick input, including full-width forms.
+- Image upload by paste and drag-in.
 
-## 6. 阅读体验
+## 6. Reading Experience
 
-### 6.1 页面
+### 6.1 Pages
 
-- 首页、知识库页（文档树）、文章页（文章目录、上一篇与下一篇）、搜索页。手机上的上一篇与下一篇左右并排，标题单行显示并在溢出时省略；仅一个方向可用时占满整行。
-- 阅读页适配手机；编辑页面向电脑，不为手机单独适配编辑交互。深色模式可选。
+- Home page, knowledge-base page (document tree), article page (article table of contents, previous article, and next article), and search page. On phones, the previous and next entries sit side by side, with single-line titles truncated on overflow; if only one direction is available, it occupies the full row.
+- The reading page is adapted for phones. The editing page targets computers and does not provide separately adapted mobile editing interactions. Dark mode is optional.
 
-### 6.2 渲染能力
+### 6.2 Rendering Capabilities
 
-- 代码高亮在服务端完成；宽代码块和宽表格可以横向滚动。
-- Callout 显示类型和标题，保留默认折叠状态并可以展开折叠。
-- 公式与 Mermaid 只在含有它们的页面加载；脚本随站点部署，不依赖外部 CDN。
-- 标题锚点支持中文；图片懒加载；长文测试滚动、目录和高亮性能。
-- 中文使用系统字体，不下发中文网页字体。
-- 渲染器只输出已知的节点类型并对文本转义；遇到未知节点时显示占位提示，不会因为编辑器新增扩展而导致页面出错。
-- HTTP 页面上浏览器不提供剪贴板接口，代码复制按钮需使用降级方式。
+- Syntax highlighting is performed on the server; wide code blocks and tables can scroll horizontally.
+- A Callout displays its type and title, preserves its default collapsed state, and can be expanded and collapsed.
+- Formulas and Mermaid load only on pages that contain them. Their scripts are deployed with the site and do not depend on an external CDN.
+- Heading anchors support Chinese; images load lazily; scrolling, table-of-contents, and highlighting performance are tested with long documents.
+- Chinese text uses system fonts; no Chinese web font is delivered.
+- The renderer outputs only known node types and escapes text. An unknown node displays a placeholder instead of causing the page to fail when the editor gains a new extension.
+- Browsers do not provide the Clipboard API on HTTP pages, so the code-copy button needs a fallback.
 
-### 6.3 编辑与阅读的一致性
+### 6.3 Consistency Between Editing and Reading
 
-编辑器在浏览器中渲染，阅读页由 Go 渲染。两者的 HTML 结构和类名保持一致，共用一份样式。
+The editor renders in the browser, while Go renders the reading page. Their HTML structures and class names remain consistent and share one set of styles.
 
-Mermaid 的 SVG 由两端共用的 `shared/mermaid.ts` 生成。图表标签在正文之外测量后才插入页面，阅读容器 `.yy-mermaid` 与编辑预览 `.yy-mermaid-svg` 统一使用 `overflow-wrap: normal`，保持测量时的文字固有宽度；否则正文的 `overflow-wrap: anywhere` 会把长标签重新挤窄，而节点框仍保留原尺寸，造成左偏和裁切。普通正文继续自动换行。
+Mermaid SVG is generated by `shared/mermaid.ts`, which both sides share. Diagram labels are measured outside the body before being inserted into the page. The reading container `.yy-mermaid` and editing preview `.yy-mermaid-svg` both use `overflow-wrap: normal` to preserve the text's intrinsic width from measurement; otherwise, the body's `overflow-wrap: anywhere` would squeeze long labels again while node boxes retained their original dimensions, causing leftward displacement and clipping. Ordinary body text continues to wrap automatically.
 
-## 7. 图片
+## 7. Images
 
-- 以图片内容的 SHA-256 作为 ID（可截取前 128 位）：相同内容共用一个对象，同名的不同图片得到不同 ID；图片对象不可原位覆盖。
-- 原图保留，不默认有损压缩，GIF 保留动画。网页显示另行生成较窄的版本，照片类的无损原图通过画质检查时显示为 JPEG（26.3）；导出、备份和查看原图仍用原图。
-- 图片经编辑器或导入工具上传，按文件内容校验类型并限制大小。
-- 图片由程序返回，并设置一年的 `immutable` 缓存。数据目录保持 0700，不让 Nginx 直接读取。ali 下行带宽实测只有约 0.5 MB/s（约 4 Mbps），长期缓存是必需的。
-- 文档中只保存图片 ID，不保存带主机或前缀的地址；页面地址由渲染器和编辑器生成，导出时改写为相对路径并附带图片文件。
-- 首版不自动删除图片。以后清理时需要同时考虑当前文档、版本历史和回收站中的引用。
+- Use the SHA-256 of image content as its ID, optionally truncated to the first 128 bits: identical content shares one object, while different same-named images receive different IDs. Image objects cannot be overwritten in place.
+- Preserve originals and do not apply lossy compression by default; preserve GIF animation. Generate narrower versions separately for web display, and display lossless photographic originals as JPEG when they pass the quality check (26.3); exports, backups, and original-image viewing continue to use the originals.
+- Images are uploaded through the editor or import tool, with type validated from file content and size limited.
+- Images are returned by the program with a one-year `immutable` cache. The data directory remains mode 0700, preventing direct Nginx reads. ali's measured downstream bandwidth is only about 0.5 MB/s (about 4 Mbps), so long-term caching is essential.
+- Documents store only image IDs, not addresses containing a host or prefix. The renderer and editor generate page addresses; export rewrites them to relative paths and includes the image files.
+- The first version does not delete images automatically. Future cleanup must consider references from current documents, version history, and the recycle bin together.
 
-## 8. 部署与运行
+## 8. Deployment and Operation
 
-沿用共享 `server-operations` 约定：应用独立运行身份、只监听 loopback、systemd 管理、Nginx 路径入口，程序在本机构建。部署前重新核对共享应用清单和端口，登记新应用并验证已有应用。
+Follow the shared `server-operations` conventions: a dedicated application runtime identity, loopback-only listening, systemd management, an Nginx path entry point, and a locally built program. Before deployment, recheck the shared application inventory and ports, register the new application, and verify existing applications.
 
-- 应用自己的 Nginx location：
-  - 按图片大小上限设置 `client_max_body_size`（Nginx 默认只有 1 MB）。
-  - 为 CSS、JS、JSON 开启 gzip（ali 的 `nginx.conf` 目前只压缩 HTML）；`gzip_types` 要包含 Go 返回的 `text/javascript`，只写 `application/javascript` 时脚本不会被压缩。
-- 为服务设置内存和 CPU 上限；ali 只有约 1.7 GiB 内存，且没有 swap。
-- 不引入新的系统运行依赖。
-因此 Yuyan 的发布脚本从一开始就先压缩再上传，并放宽上传时限。这只涉及 Yuyan 自己的脚本，不改动其他应用。
+- In the application's own Nginx location:
+  - Set `client_max_body_size` according to the image-size limit (Nginx defaults to only 1 MB).
+  - Enable gzip for CSS, JS, and JSON (ali's `nginx.conf` currently compresses only HTML). `gzip_types` must include the `text/javascript` returned by Go; scripts will not be compressed if only `application/javascript` is listed.
+- Set memory and CPU limits for the service; ali has only about 1.7 GiB of memory and no swap.
+- Introduce no new system runtime dependencies.
+Consequently, Yuyan's release script has compressed files before upload and allowed a longer upload timeout from the outset. This affects only Yuyan's own scripts and does not modify other applications.
 
-建议的服务器数据结构，此结构是设计提案，不是现场目录清单：
+Proposed server data structure; this structure is a design proposal, not an inventory of the live directories:
 
 ```text
 /opt/yuyan/
-  config/          运行与部署配置
+  config/          Runtime and deployment configuration
   data/
-    yuyan.db       SQLite：知识库、文档、版本、图片元数据
-    assets/        图片原图
-  backups/         一致性备份
-  releases/        程序发布结果
-  docs/            已发布项目文档副本
+    yuyan.db       SQLite: knowledge bases, documents, versions, image metadata
+    assets/        Original images
+  backups/         Consistent backups
+  releases/        Program release outputs
+  docs/            Copies of released project documentation
 ```
 
-## 9. 备份、导出与恢复
+## 9. Backup, Export, and Restore
 
-- 每日备份：SQLite 一致性快照，加上图片硬链接和校验清单，做法参照 FabricWorld 与 RecipeBox。备份 unit 的可写路径必须覆盖整个应用目录，否则硬链接会失败，见共享 `common-issues`。启用 timer 后，通过 unit 实际运行一次备份并确认成功。
-- 暂时不做异机备份（见第 2 节），与 ali 上其他应用一样只有同盘备份。以后需要时，图片是不可变文件，可以增量同步到别处。
-- 导出：在网页中导出单篇或单个知识库，用导出工具导出全部内容；格式为 Markdown 加图片（相对路径），可以直接用 Obsidian 打开。导出工具已实现（2026-09-26，用法见 OPERATIONS.md）：知识库、分组为文件夹，有子文档的文档为同名 Markdown 文件加同名文件夹，图片集中在根目录的 `attachments/`；可以中断后继续。网页导出随 D1 实现，与导出工具使用同一布局，见 12.10。
-- 在隔离端口上演练恢复，不使用生产数据库做测试。
+- Daily backup: a consistent SQLite snapshot plus hard links to images and a verification manifest, following the FabricWorld and RecipeBox approach. The backup unit's writable paths must cover the entire application directory or hard links will fail; see the shared `common-issues`. After enabling the timer, actually run one backup through the unit and confirm that it succeeds.
+- No off-machine backup for now (see Section 2); like the other applications on ali, backups remain on the same disk. If needed later, images are immutable files and can be synchronized incrementally elsewhere.
+- Export: export one article or one knowledge base from the web interface, and export all content with the export tool. The format is Markdown plus images using relative paths and can be opened directly in Obsidian. The export tool was implemented on 2026-09-26 (see OPERATIONS.md for usage): knowledge bases and groups become folders; a document with child documents becomes a same-named Markdown file plus a same-named folder; images are collected under `attachments/` at the root. Interrupted exports can resume. Web export was implemented with D1 and uses the same layout as the export tool; see 12.10.
+- Rehearse restoration on an isolated port; do not use the production database for testing.
 
-## 10. HTTPS 与后续认证
+## 10. HTTPS and Subsequent Authentication
 
-当前与其他四个应用统一使用共享 Nginx 的 HTTPS 入口，证书覆盖服务器公网 IP；原有 /yuyan/ 路径保持，公网 HTTP 跳转 HTTPS。证书申请、自动续期、代理信任边界、回退和整机检查统一由 [共享 HTTPS 运维](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/https.md) 维护，不在本项目复制共享配置。
+Yuyan currently shares the Nginx HTTPS entry point with four other applications, using a certificate that covers the server's public IP. The existing `/yuyan/` path remains, and public HTTP redirects to HTTPS. Certificate issuance, automatic renewal, the proxy trust boundary, rollback, and whole-machine checks are maintained centrally in [shared HTTPS operations](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/https.md); this project does not duplicate the shared configuration.
 
-- 所有写接口集中在 /yuyan/api/ 下，经过同一个中间件入口：Go 标准库 `http.CrossOriginProtection` 按 `Sec-Fetch-Site`（缺失时比较 `Origin` 与 `Host`）拒绝其他网站发起的浏览器修改请求，返回 403 `cross_origin`；两者都不带的命令行与本机调用照常通过。读取 JSON 正文的写接口要求 `Content-Type: application/json`，否则返回 400，普通表单不能冒充 JSON 提交；上传仍为 multipart。
-- Nginx 覆盖 X-Forwarded-Proto；以后按该头判断协议时，只信任回环地址连接，不信任客户端伪造的头。
-- 页面、图片与 API 使用本站相对地址，导入导出工具的公网地址使用 HTTPS。
-- 统一设备认证由共享 Nginx 与 ServerPortal 提供；使用 Secure、HttpOnly、SameSite=Strict、Path=/ 的 Cookie，操作保留来源校验，本机调用按共享契约保留。五个路径仍属同源，不构成应用间安全隔离。
-- 本机后端、服务间调用与仅回环可达的发布检查继续使用 HTTP。
+- All write APIs are grouped under `/yuyan/api/` and pass through the same middleware entry point. The Go standard library's `http.CrossOriginProtection` rejects browser mutation requests initiated by other sites according to `Sec-Fetch-Site`, or by comparing `Origin` with `Host` when that header is absent, returning 403 `cross_origin`. Command-line and local calls that carry neither header continue to pass normally. Write APIs that read a JSON body require `Content-Type: application/json` and otherwise return 400, so an ordinary form cannot masquerade as a JSON submission; uploads remain multipart.
+- Nginx overwrites `X-Forwarded-Proto`. If protocol decisions later depend on this header, trust it only on connections from loopback addresses, never a client-forged header.
+- Pages, images, and APIs use site-relative addresses; public addresses used by the import/export tools use HTTPS.
+- Unified device authentication is provided by the shared Nginx and ServerPortal. It uses a cookie with Secure, HttpOnly, SameSite=Strict, and Path=/; operations retain origin checks, and local calls remain available under the shared contract. The five paths are still same-origin and do not constitute security isolation between applications.
+- The local backend, service-to-service calls, and loopback-only release checks continue to use HTTP.
 
-## 11. 实施阶段与验收
+## 11. Implementation Phases and Acceptance
 
-### 阶段 A：设计讨论（已完成）
+### Phase A: Design Discussion (Completed)
 
-- 维护本文，确定首版范围和主要选型。
+- Maintain this document and determine the first-version scope and primary technology choices.
 
-### 阶段 B：原型（已完成，结果见 11.1）
+### Phase B: Prototype (Completed; See 11.1 for Results)
 
-- 新建 `Crashmere/Yuyan` 仓库，本地目录改名为 `~/ali/Yuyan`。
-- 原型和导入试跑都在开发电脑上运行，不在 ali 上另开测试实例。
-- 编辑器：搭建 Tiptap 编辑器与 Callout、Mermaid、图片上传、Markdown 快捷输入等自研扩展，按 5.4 用真实笔记验证。
-- 导入工具：在副本上完整试跑，查看导入报告。
-- 阅读页：实现 Go 渲染器，用代表样本验证，包括 `题目描述.md`、树形 DP、最短路、《Effective C++》、最长的一篇，以及新写的 Mermaid 样本。
+- Create the `Crashmere/Yuyan` repository and rename the local directory to `~/ali/Yuyan`.
+- Run both the prototype and import trial on the development computer; do not create a separate test instance on ali.
+- Editor: set up the Tiptap editor and in-house extensions for Callouts, Mermaid, image upload, Markdown quick input, and related features; verify them with real notes as described in 5.4.
+- Import tool: perform a complete trial run against a copy and inspect the import report.
+- Reading page: implement the Go renderer and verify it with representative samples, including `题目描述.md`, tree DP, shortest paths, 《Effective C++》, the longest article, and a newly written Mermaid sample.
 
-### 11.1 阶段 B 结果（2026-09-26）
+### 11.1 Phase B Results (2026-09-26)
 
-- **导入中处理的问题：**
-  - `AI记录/Gradle 入门.md` 引用的 `img-001.png` 有两张同名图片。笔记描述的是 IDEA 项目截图，因此选 `AI记录/attachments/img-001.png`（该仓库在 Obsidian 中的附件目录也是 `./attachments`），另一张是 Windows 磁盘列表。
-  - `备份/CentOS/软件安装.md` 中未写协议的链接 `www.rpmfind.net` 按 `https://www.rpmfind.net` 导入。
-  - KaTeX 原有 10 处无法渲染，主要是写在行内公式里的 `align` 等环境（MathJax 能显示）。改为按块级公式渲染，并忽略只影响细节的严格模式提示后，降为 0。
-  - 转换器原先会给嵌套的同类格式重复加标记，行内代码也不能与粗体、链接并存（Tiptap 默认规则），共有 10 篇文档含编辑器不接受的格式组合。现在同类标记只保留一个，schema 允许行内代码与其他格式并存。
-  - 以代码块等结尾的 162 篇文档，导入时在末尾补一个空段落，避免只是打开编辑页就触发一次自动保存。
-- **发现并修复：** Go 的 embed 默认忽略以 `_` 开头的文件，Vite 生成的 `_baseUniq-*.js` 被漏掉，导致 Mermaid 加载失败，已改用 `all:` 前缀。
+- **Issues handled during import:**
+  - The `img-001.png` referenced by `AI记录/Gradle 入门.md` had two same-named images. The note describes an IDEA project screenshot, so `AI记录/attachments/img-001.png` was selected (the repository's attachment directory in Obsidian is also `./attachments`); the other image is a Windows disk list.
+  - The protocol-less link `www.rpmfind.net` in `备份/CentOS/软件安装.md` was imported as `https://www.rpmfind.net`.
+  - KaTeX originally failed to render 10 occurrences, chiefly environments such as `align` written inside inline formulas, which MathJax could display. After rendering them as block formulas and ignoring strict-mode notices that affect only details, the failure count fell to zero.
+  - The converter originally added duplicate marks to nested occurrences of the same format, and inline code could not coexist with bold or links under Tiptap's default rules. Ten documents contained format combinations rejected by the editor. Now only one mark of the same type is retained, and the schema allows inline code to coexist with other formatting.
+  - During import, an empty paragraph was appended to each of the 162 documents ending in a code block or similar node, preventing the act of merely opening the edit page from triggering an auto-save.
+- **Found and fixed:** Go's embed ignores files beginning with `_` by default, so Vite-generated `_baseUniq-*.js` was omitted and Mermaid failed to load. The `all:` prefix is now used.
 
-### 阶段 C：首版（已完成部署与正式导入，结果见 11.2）
-
-- 在 ali 安装与部署：运行身份、目录、systemd、Nginx location（含压缩与图片缓存）、发布脚本（压缩上传）、本机发布作业、备份与隔离恢复验证。
-- 在 ali 的空实例上正式导入全部笔记，使用与试跑相同的 overrides 文件，并运行原样保存检查。
-- 用户试用后，按反馈补齐首版功能细节。
-
-### 11.2 阶段 C 结果（2026-09-26）
-
-- **安装：** `/opt/yuyan`，服务监听 127.0.0.1:18084，经共享 Nginx `/yuyan/` 访问；运行身份 yuyan，发布身份 yuyan-deploy（只能执行发布命令，sudo 只允许 root 管理的发布脚本）。发布私钥保存在维护电脑，主机公钥与本机记录的指纹一致。操作细节见 [OPERATIONS.md](OPERATIONS.md)。
-
-### 阶段 D：界面与编辑体验改版（方案见第 12 节，已完成）
-
-- 导出工具、D1（含网页导出）、D2 编辑器交互、D3 内容块均已发布（2026-09-26，见 12.10–12.12）。按用户指示，D2、D3 连续完成后一起发布，2026-09-26 用户在线上验收完毕。
-
-### 阶段 E：后续按需
-
-- 第一批（第 13 节）：快捷键搜索面板、历史版本差异对比、阅读页图片预留尺寸。2026-09-26 全部发布，2026-09-27 用户验收完毕。
-- 第二批（第 14 节）：搜索知识库与全拼、从搜索结果定位到匹配处、阅读页大纲隐藏、菜单滚动提示。2026-09-27 发布。
-- 第三批（第 15 节）：手机端大纲与代码复制按钮的修复、离开文档时停止加载图片、`[!code]` 的 Monokai Pro 代码框、正文按标题折叠、大纲移到页面右侧。2026-09-27 发布。
-- 第四批（第 16 节）：语雀式代码块（One Dark Pro、标题栏、可以收起），线上全部 `[!code]` 改回代码块。2026-09-27 发布并完成迁移。
-- 第五批（第 17 节）：大纲按语雀方式收起（取消固定后显示为横线，鼠标靠近时临时展开）。2026-09-27 发布。
-- 第六批（第 18 节）：统一按钮提示、大纲与目录的折叠、编辑页大纲、结构内全选、标题级别、连按两次 E、取消编辑、表格插入图标、表格拖动调整宽高与宽表格滚动。2026-09-27 发布。
-- 其余按需：标签、收藏、自定义 CSS；附件上传已实现，见 23.8。文档模板、内容片段、文档间链接选择器（`[[`）与反向链接见第 24 节。
-- 超出 Markdown 的格式扩展（见 12.1）。
-- 全服务 HTTPS 与 ServerPortal 统一设备认证已启用，见 [OPERATIONS.md](OPERATIONS.md)。
-
-### 首版验收条件
-
-1. 能完成新建、编辑、自动保存、恢复历史版本、从回收站恢复；中文输入流畅，Markdown 快捷输入可用；粘贴或拖入的图片能上传。
-2. 13 个知识库、314 篇笔记全部导入；导入报告中的歧义与断链均已处理或明确记录；抽查样本在阅读页和编辑器中显示正确；导出 Markdown 后，Callout、公式、代码和表格仍然正确。
-3. 阅读页支持代码高亮、公式、Mermaid、Callout 折叠、表格和文章目录，手机上可以正常阅读；本次涉及的内容在编辑与阅读页显示一致。
-4. 图片保存在服务器本地并按内容去重，阅读时长期缓存生效。
-5. 备份包含 SQLite 与图片，并完成隔离恢复验证；可以导出全部内容。
-6. 同一文档在两处同时编辑不会静默覆盖；断网时未保存的内容不丢失。
-7. 新服务不改变其他 ali 应用的访问与运行行为。
-
-## 12. 界面与编辑体验改版（阶段 D）
-
-2026-09-26 用户提出：现有界面过于简陋，编辑功能与语雀差距很大，开始规划改版。本节是按用户确认的范围写的建议实现；D1、D2、D3 均已实现并发布，结果见 12.10–12.12。
-
-### 12.1 范围
-
-- 参照语雀网页版的界面与交互，视觉贴近语雀：绿色主色、浅灰侧栏、线性图标、紧凑的界面文字。
-- 按用户确认的优先级依次改进整体观感、目录管理、编辑器操作和内容块。快捷键搜索面板与知识管理功能（文档互链与反向链接、历史版本对比、模板、标签、收藏）放到阶段 E。
-- 阶段 D 只在 Markdown 能表达的范围内优化。阶段 E 按用户要求增加代码块标题与收起（第 16 节）、表格尺寸（第 18 节）和图片、段落、表格对齐（第 19 节）；文字颜色、图片说明与丰富表格见第 23 节。Markdown 能表达的按 Markdown 导出，其余格式用 HTML 保留，并能导入读回。分栏与附件已实现（第 23 节），通用画板已实现（第 25 节）。
-- 代码行号始终显示；自动换行在每个代码块的标题栏独立切换，只影响本次显示，不写入文档。主题等偏好保存在浏览器本地。页面统一使用最大 1100 px 的宽页，不再提供宽度切换。
-- 手机仍只需阅读，编辑面向电脑。
-
-### 12.2 现状问题
-
-2026-09-26 检查代码和线上页面（只读）的结果：
-
-- **基础组件：** 新建、重命名、删除、插入链接、编辑公式都用浏览器原生弹窗；界面上没有图标、下拉菜单、右键菜单和对话框。
-- **目录：** 不能折叠（算法课的 75 个节点全部展开），没有悬停和右键操作，不能拖动排序或移动；服务端没有移动和排序接口，回收站没有彻底删除（均属 3.3 的内容，尚未实现）。
-- **页面：** 阅读页和编辑页是两套布局，编辑时看不到目录；知识库页只是把侧栏目录再列一遍；手机上目录堆在正文上方，最多占 40% 屏高。
-- **编辑器：** 没有顶部工具栏，选区工具栏只有 6 个按钮；块左侧只有拖动手柄；斜杠菜单是纯文字列表；链接和公式用浏览器弹窗编辑；表格插入后不能用界面增删行列；图片不能缩放，阅读页不能放大；代码块语言用原生下拉框选择；没有查找替换、编辑时的大纲和快捷键说明。
-- **导出：** 第 9 节的网页导出和导出工具都没有实现，只有 Markdown 转换函数和测试，因此首版验收第 5 条中的“可以导出全部内容”并未达成。导出工具已于当天补上，网页导出随 D1 实现。
-- **数据：** 导入把 Obsidian 的 7 处文件夹笔记变成了并列的“同名分组 + 同名文档”，见 12.8。
-
-### 12.3 页面架构：单页应用
-
-用户确认改为单页应用：切换文档、进入和退出编辑都不整页刷新，阅读和编辑共用侧栏与大纲，是否常驻按窗口宽度决定。
-
-- 页面地址不变：`/`、`/books/{id}`、`/docs/{id}`、`/docs/{id}/edit`、`/docs/{id}/history`、`/versions/{id}`、`/search`、`/trash`。正文中的站内链接和已有书签继续有效，点击站内链接在应用内跳转。
-- Go 对这些地址返回同一个页面外壳，并内嵌当前地址需要的初始数据，首屏不必再等一轮接口请求；ID 不存在时返回 404 状态码，由应用显示“找不到内容”。现有的 Go 页面模板和阅读页入口脚本随之删除。
-- 进入知识库首页时，按路由中的知识库 ID 同步切换正文、侧栏与面包屑，已有缓存立即显示，不等待详情请求才切换导航。顶部进度提示覆盖知识库详情与目录加载；离开该页后返回的成功或失败请求不再修改当前页面上下文与标题，避免慢网速或快速切换时显示错库。
-  - 知识库首页统一并行加载详情、知识库列表与目录，侧栏复用同一目录请求。
-- 正文仍由 Go 渲染器生成：新增接口返回渲染后的 HTML、文章目录和上下篇，沿用按修订号的缓存；公式、Mermaid、代码复制、Callout 折叠等增强沿用现有脚本。编辑器、KaTeX 和 Mermaid 仍按需加载，阅读时不下载编辑器。
-- 从阅读页点击“编辑”或连按两次 E 时，编辑页接着显示当前阅读的位置，光标放在可见内容附近。路由在离开阅读页前记录正文块及块内偏移，等编辑器的正文与节点视图挂载后恢复，并扣除编辑工具栏的高度；前面的折叠章节、长代码块和表格不会让定位错位。位置只用于这次同一文档的切换，直接打开编辑地址或从文首进入仍从顶部开始。
-- 从编辑页通过“完成”“取消”或浏览器返回到同一文档时，阅读页接着显示退出编辑那一刻的位置。等正文、公式和图表绘制完成后恢复，先展开遮住目标的章节，以及目标块里的 Callout 和长代码。“取消”会把编辑期间的块位置变化映射回原文；退出时所在的新增块被丢弃，则定位到原文中最近的位置。位置只恢复一次，之后切换主题不会重新跳转。
-- 离开编辑视图（点“完成”、切换文档、点目录、打开历史）前先等待正文保存和会话快照完成；快照失败时提示正文已保存并留在编辑页重试；离线、保存失败或冲突时给出提示，未保存的内容仍留在本地草稿中。保存后正文缓存失效，回到阅读视图即显示最新内容；标题修改同步到目录。
-- 脚本预算：阅读页首次加载的应用脚本 gzip 后不超过约 115 KB，按内容哈希长期缓存。只有阅读页随应用入口加载；首页、知识库、编辑、历史、版本、搜索、回收站和找不到页面都在打开时加载。页面外壳按地址列出入口的全部静态分块和该页面的分块，浏览器一次并行下载，不再逐层发现；页面自身的分块和样式用低优先级，编辑器这类大分块不拖慢应用和占位的显示。新增按需加载的页面要同时登记到 `internal/server/app.go` 的 `routeViews`，构建与登记不一致时服务启动报错。每次发布前从构建清单 `web/dist/manifest.json` 的 app 入口沿静态 imports 核对 gzip 体积。
-  - 阅读页首次加载约 107 KiB（2026-10-14，30 个分块）：Vue 与 vue-router 约 50 KB，其余是阅读、侧栏目录、图标与共用逻辑。reka-ui 菜单、弹窗与 floating-ui 定位（约 33 KB）已改为首次使用时下载，并在首屏显示后空闲时预取（26.5）；入口代码不再静态引用它们。
-- 发布后旧标签页可能引用已不存在的分块。全局监听 Vite 的模块加载失败，显示刷新提示，覆盖编辑器、Mermaid 及其图表类型等按需加载功能；路由失败不自动循环刷新。编辑页的“保存并刷新”先等待上传和全部修改保存，保存期间继续输入的内容也会再次保存，冲突或失败时保留当前页面和本地草稿。阅读页可直接刷新；网络中断也使用同一恢复入口。
-- 直接打开编辑地址时，编辑器分块下载期间在原位置显示文档标题和几行占位，工具栏高度与正文栏宽同编辑器，载入后标题不移动；分块加载失败时占位处注明，刷新沿用上面的提示。从阅读页进入编辑仍保留阅读页和顶部进度条，直到编辑器就绪。编辑页读取文档失败时可就地重试。
-- Mermaid 将组件加载失败、语法错误和其他渲染失败分别提示。失败时编辑页保留上一次成功的预览，阅读页保留源码；清除失败的加载 Promise，过期的异步预览结果不覆盖最新输入。模块失败后整页刷新取得当前构建及其完整依赖，避免浏览器继续复用失败的模块记录。
-- 写接口仍集中在 `/api/` 的同一个中间件入口，不影响以后接入登录。
-
-### 12.4 界面基础
-
-- **设计规范：** 颜色、字号、间距、圆角、阴影用 CSS 变量定义，浅色和深色各一套；增加“跟随系统 / 浅色 / 深色”手动切换，Mermaid 主题随之切换。
-- **正文标题：** 一级标题下方为细分隔线，起始 44 px 用绿色加重；二级标题左侧为 3 px 绿色竖线。阅读页和编辑页共用样式，浅色与深色沿用主题颜色，装饰不写入文档，也不占用折叠指示或编辑占位文字。阅读页标题左侧的级别与折叠按钮向外留出间距，桌面整体左移 6 px（left: -42 px）；手机二级标题左移 3 px（left: -19 px），保留图标在视口内。
-- **组件：** 继续用 Vue 3，加上 Reka UI（不带样式、支持键盘操作与无障碍的菜单、对话框、弹出层、右键菜单、提示等组件，MIT）和 Lucide 图标（ISC，只打包用到的图标），样式自己写。Tiptap 官方的界面组件只有 React 版，只作交互参考。
-- **即时定位与标题提示：** 阅读/编辑大纲、正文锚点、搜索命中、最近修改、侧栏定位、分栏浏览与表格横向翻页共用 `shared/scroll.ts`，无论距离远近均一次直接定位，不做滑动动画。通过大纲、标题链接或地址锚点定位正文标题时，目标标题整行显示柔和的 Yuyan 绿色圆角背景（复用主题 `--yy-primary-soft`，浅色 #e8f7ef、深色 #173826，6 px 圆角），总时长保持 2.2 秒，分为 500 ms 淡入、1.2 秒保持和 500 ms 淡出；重复点击重新计时，跳到另一处或换页时清除旧提示。减少动态效果时静态显示约 2 秒后直接恢复，不渐变。提示使用 Web Animations，不写 DOM 样式/属性、正文格式或编辑历史，保留标题布局、原有文字配色和光标，提示结束恢复原有背景。内容定位沿用标题的滚动边距，只移动正文页面；侧栏和横向定位各自只移动所属容器。大纲更新地址锚点与正文锚点监听只发起一次定位。
-- **菜单滚动：** 下拉菜单和右键菜单隔离滚动传递。指针在菜单内时，即使滚到顶部、底部或在各项之间移动，也不把后续滚轮交给正文；关闭菜单后正文照常滚动。
-- 所有浏览器原生弹窗（prompt、confirm、alert）改为应用内的对话框、浮层和轻提示。
-- 先在本机做可点击的原型（合成数据），覆盖首页、知识库首页、阅读页、编辑页框架和目录操作；用户确认视觉与交互后再全面实现。2026-09-26 用户在本机试用后确认，同意发布。
-
-### 12.5 框架、目录与导出（D1）
-
-- **顶栏：** 面包屑（知识库 / 上级文档 / 当前文档）、搜索入口、新建、主题切换。
-- **正文位置：** 阅读页和编辑页统一使用原来的宽页，最大 1100 px；以侧栏收起时的位置为基准，按整个窗口定位。侧栏开合、调宽与专注模式都不推动正文，旧的标准页偏好不再生效。
-- **侧栏：** 分工作台（首页、知识库列表、回收站）和知识库（名称与目录）两种。窗口大于 1700 px 时固定在正文左侧留白中；可拖动调宽、可收起，状态保存在本地，实际宽度不超过留白。仅顶栏和编辑工具栏避让侧栏。窗口不超过 1700 px 时，从顶栏打开目录抽屉；点击正文区域或选完文档后收起，选中当前文档也会收起，展开分组时保留抽屉。两种侧栏开合都采用约 180 ms 的滑动与淡入淡出，正文保持不动；系统要求减少动态效果时取消动画。
-- **知识库新建入口：** 当前知识库名称右侧的“+”与知识库首页顶栏的“新建”共用菜单，提供“新建文档”和“新建分组”，均创建在当前知识库目录的根层级。新建文档后进入编辑页；新建分组先输入名称，确认后更新目录并保留当前页面，取消不创建。
-- **目录树：**
-  - 折叠与展开，按知识库记住展开状态；打开文档时自动展开到当前文档并滚动到可见处。
-  - 文档列表统一使用普通箭头光标，标题、展开按钮、复选框与悬停操作按钮继承整行光标，避免 Chrome 中缓慢移动时普通箭头与手型交替；重命名输入保留文字光标，禁用状态与原生拖动保留各自反馈。目录行使用完整矩形响应鼠标，圆角只绘制在不接收鼠标事件的背景层。悬停、当前文档、批量选中与拖入高亮共用该背景层，拖放插入线独立绘制。
-  - “目录”右侧、全部折叠按钮左侧提供“定位当前文档”：图标为外圆加四向穿过圆周的短刻度，中心留空；展开父级并将对应行滚到侧栏可见区域中部，只滚动目录，不改变正文位置。没有当前文档或当前对象不在树中时禁用；遵循系统减少动画设置。
-  - 侧栏与知识库主页的目录分组共用章节标记：标题左侧为 2 × 12 px 的灰绿色短竖线，后方是向右淡出的浅绿底色，保留半粗的次级文字颜色；可打开的文档保持普通文字。装饰随浅色、深色主题调整，限定在标题区域，不增加图标占位或动画；长标题沿用省略，拖放示意线、批量选中与展开箭头独立显示。悬停显示“+”（新建子文档）和“…”；“…”与右键菜单提供新建子文档、新建分组、重命名（原地编辑）、移动到、复制链接、导出、删除。
-  - 可以拖到节点之前、之后或里面，并显示落点提示；绿色插入线从实际目标层级的标题起点向右延伸，每深入一级随目录缩进缩短 16 px。拖到已展开节点的下沿时落在其第一个子项之前，示意线按子级缩进；同级排序沿用该层级缩进。目录列表下方的空白提供“放到最顶层末尾”落点，按顶层缩进显示插入线；即使最后一项是展开的分组，也能将文档或整个分组排到顶层末尾，子项随之移动，已经在末尾时不重复保存。不能拖进自己的子孙节点。拖拽停在目录滚动区上下 80 px 边缘时连续自动滚动，越靠近边缘越快（120–900 px/s），只滚动目录；指针不动也会重新计算当前行与落点。移到中部、离开目录或到达边界停止滚动，放开、取消或卸载目录时清理跟踪；同时监听 dragenter 与 dragover，兼容 WebKit 进入新元素后不立即派发 dragover 的行为。“移动到”对话框可以选择其他知识库，子文档随之移动。
-  - “目录”右侧提供批量操作入口，图标为两枚空心圆与两条横线。进入后，知识库标题旁显示全选框和“退出”，树节点显示复选框，底部固定操作卡片显示“批量操作 / 已选 N 项”及复制、移动、导出、复制链接、移到回收站五个按钮；没有选项时禁用操作。目录可独立滚动，手机抽屉内保持底部按钮可见。
-  - 勾选父项包含全部后代（包括折叠的子项）；取消子项时祖先变为半选，不操作这些祖先。数量包含文档、分组和后代，实际操作按目录顺序去除重复子树；Shift 可连续选择当前可见的范围。批量模式下点击行只切换选择，收起展开仍可用，隐藏单项菜单并禁用拖动；退出或切换知识库清空选择，焦点在侧栏内时 Esc 退出批量模式。
-  - 复制与移动可选择其他知识库，放在目标位置的末尾。弹窗最左侧按首页知识库分组及组内顺序展示，组名下列出知识库，未分组放最后，空分组省略；没有配置分组时保持普通知识库列表，所有可选库直接展开，不受首页折叠状态影响。复制保留内容、层级和子项顺序，根项使用不重名的“（副本）”后缀，共享原有不可覆盖图片；复制范围内的文档链接改指向新副本，各副本有初始历史快照。移动禁止放进所选子树。导出沿用 Markdown/ZIP 格式；复制链接只包含文档；删除确认明确所选数量并移入现有回收站。
-  - 删除当前打开的文档后，转到父文档或父分组；没有父级则回当前知识库首页。删除包含当前文档的子树或批量删除时，转到最近的、未被删除的祖先，没有则回知识库。当前文档正在编辑时，先等待上传、保存和会话快照完成并离开编辑器，再提交删除，防止自动保存或离开守卫继续写入已删除内容；保存或快照失败时留在编辑页，不发送删除请求。删除其他文档保持当前编辑页面。删除成功但目录刷新失败仍完成跳转并提示刷新；删除失败保留文档并提示原因。
-  - `POST /api/docs/batch` 接收 `bookId`、`ids`、`action`（`copy` / `move` / `trash`），复制和移动另传 `targetBookId`、`parentId`。一次最多 5000 项，在同一事务内校验并提交；父项必须同时提交全部存活后代，项目已删除或目录新增了未选子项时返回 409，请用户重选。复制返回新 ID，其他操作返回原 ID。当前编辑文档被选中时先完成保存；移动、删除先离开该编辑页；移动后转到目标知识库，删除后的去向遵循下述规则。成功写操作清空选择；取消、导出、复制链接保留选择。
-  - 目录分组菜单提供“解散分组”：确认后将直接子项按原顺序放到该分组原来的同级位置，保留子项内部层级，只把空分组移入回收站。已在回收站的直接子项也改到同级但保持删除状态，日后恢复不再依赖已解散分组；恢复空分组不会撤销解散。`POST /api/docs/{id}/dissolve` 提交 `bookId`、`parentId` 与当前存活直接子项的有序 `childIds`，在同一事务校验结构、提升子项和删除空分组；归属、父级或直接子项顺序变化返回 409，失败全部回滚。文档 ID、正文、revision 与历史不变。正在阅读或编辑的子文档继续留在原页面；若正在查看被解散的分组，则转到父级或知识库首页。
-  - 目录分组菜单提供“提取为知识库”：以分组名新建知识库，将直接子项按原顺序放到新库根层，保留全部内部层级，仅将原空分组移入回收站。新库归入来源知识库当前所属的首页分组并追加到该组末尾；来源未分组时同样未分组。同名库不合并或覆盖，空分组可提取为空库。确认后先等待当前编辑保存与会话快照完成并退出编辑器，失败不发送提取请求；成功打开新库，用户已切换页面时不强制跳回。刷新失败仍报告提取已成功，防止重复创建。
-  - `POST /api/docs/{id}/extract` 显式提交当前 `bookId`、`parentId`（根为 null）、`title` 和存活直接子项的有序 `childIds`，空分组使用 []。同一事务校验名称与位置、新建库并归组、移动全部后代、将直接子项变为根层、删除空分组；成功 201 返回 `{book, bookGroups}`，有首页归属时递增分组 revision。名称、来源、父级或直接子项顺序变化返回 409，非法参数/非分组返回 400，已删除分组或知识库返回 404；失败全部回滚。回收站后代也改归新库并保持删除状态，恢复原空分组不撤销提取；文档 ID、正文、revision、更新时间与历史保持，无数据库迁移。
-  - 服务端新增移动接口：在同一事务内重排同级顺序，并校验不会成环；在目录中重命名同样检查修订号，与打开的编辑页冲突时给出提示。
-- **知识库：** 知识库首页显示名称、简介（可编辑）、文档数、最近更新和完整目录；首页的知识库卡片可以拖动排序。目录中每篇文档的统计顺序为图片数量（无图时省略）、字数、最近编辑时间；电脑端放在标题右侧，手机端放在标题下方；三项各占固定列宽、右对齐并使用等宽数字，无图时仍保留图片列位置，避免位数变化使相邻列错位。窄屏极深层目录按可用宽度收缩。字数与阅读页共用排除空白字符的统计，图片按正文中的出现次数计数，同一图片出现两次计为两张；目录分组不显示统计。树接口直接从现有 `plain_text` 与正文 JSON 读取，不新增数据库字段；保存或取消编辑后使目录缓存失效，再次进入目录即更新。
-  - 知识库更多菜单提供“转为分组…”：按首页分组、知识库选择另一个存活知识库，在目标根目录末尾新建与来源同名的分组，并把来源的全部根项放到分组内，原顺序与内部层级保留；空库变为空分组，同名分组不合并或覆盖。原空库移入回收站，保留名称、简介及首页归属；恢复原空库不撤销转换。确认前加载最新来源名称、目录与知识库列表；确认后等待当前编辑保存及会话快照完成并退出编辑器，保存失败不转换。成功打开新分组，用户已切换页面时不跳回；刷新失败仍明确报告转换成功。
-  - `POST /api/books/{id}/to-group` 提交来源当前 `name`、目标 `targetBookId` 与完整有序存活根项 `rootIds`，空库显式使用 []。事务内校验、新建分组与创建快照、迁移全部文档、将原空库移入回收站；201 返回 `{group: DocMeta, book: 目标Book}`。名称或根项顺序不符返回 409，非法参数或目标为来源自身返回 400，来源/目标已删除或不存在返回 404。所有失败整体回滚。已删除项保持删除状态并改归目标；现有正文、ID、revision、时间、历史、链接与素材不变，不改首页分组配置，无数据库迁移。
-  - 首页卡片菜单顶部将“从其他知识库移入”和“转为分组…”依次放在同一分隔线分组内；移除“新建文档”“从模板新建”“新建目录分组”，知识库内的操作菜单仍保留这三个入口；知识库菜单中选择首页分组的入口统一命名为“移动到”。
-- **知识库分组：** 首页、工作台侧栏、知识库切换菜单共用单层分类，每个知识库属于一个分组或“未分组”。首页可新建、重命名、上下移动、折叠和删除分组；卡片右上角菜单和知识库操作菜单可选择目标分组，也可直接拖动卡片到分组标题或空区域。组内卡片仍可拖动排序，手机可通过菜单移动。删除分组只把知识库移到“未分组”，不删除文档；知识库移入回收站后保留归属，恢复时回到原分组，彻底删除时在同一事务内清理归属，防止 ID 复用。
-  - 拖动卡片到另一分组时，整个目标区域以绿色底色和轮廓渐显，并提示“松开以移入此分组”；标题、卡片、空白及折叠分组使用相同提示，在分组内部移动不闪烁。组内与跨组排序共用落点：悬停卡片左半边在其前插入，右半边在其后插入，卡片对应侧显示绿色插入线；拖到组标题或空白处放到组末尾。松开后立即更新最终归属与顺序，不等待保存响应；落定动画始终以目标位置为中心，不回到原分组或从旧位置再次移入。离开目标、松开或取消拖动即清除提示；折叠分组保持折叠。系统要求减少动态效果时只保留颜色与落点反馈。
-  - 拖动动画由 `app/bookDragMotion.ts` 与首页样式配合：拖起时原卡片轻缩至 97% 并淡化，原生拖动预览放大至 103.5%、轻斜 1.2° 并增加投影；经过卡片时向落点相反方向让出 4 px，插入线在 140–180 ms 内显现。松手后卡片在最终位置用 260 ms 的轻缩放和投影消退落定，周围卡片、分组标题及下方内容用 220 ms 平滑归位；不平移承载目标卡片的整个分组。取消时恢复原卡片，落入折叠分组时仅轻提示数量。动画和拖动预览在完成、下次拖动或离开首页时清理；减少动态效果时跳过位移、旋转与缩放。
-  - 分组标题带拖动标识，可将整个分组拖到其他分组之前或之后；绿色插入线标明落点，松开后保存分组数组顺序并用短过渡移动内容，侧栏和切换菜单同步沿用此顺序。“未分组”固定在最后；手机仍可用分组菜单的上移、下移。
-  - 拖动时保持原有网格布局，不额外插入“放到组末尾”的占位方块。拖到最后一张卡片右半边、分组标题或组内空白处均可移到末尾，已经在末尾时不重复保存。菜单移至另一分组也追加到末尾，点击已选中的当前分组不改变顺序。
-  - 分组标题的“…”菜单顶部提供“新建知识库”，弹窗标明目标分组；创建成功后追加到该组末尾并停留在首页，不自动打开知识库。空分组与折叠分组同样可用，折叠状态保留。首页顶部、未分组网格和侧栏的全局新建入口仍创建到“未分组”。`POST /api/books` 可选 `groupId`（省略或空字符串表示未分组），创建与追加归属在同一事务完成，保留其他分组、既有顺序和回收站归属，并递增分组 revision；只向最新配置追加，不要求提交整份分组或 baseRevision。目标分组不存在时返回 404 且不创建知识库；随后用旧 revision 保存完整分组配置仍返回 409。
-  - 主页和侧栏分组共用展开状态与内容高度的 180 ms 过渡，从任一处切换时两处同步动画；后续分组及最近浏览区域随高度平稳移动，避免最近浏览瞬间跳位。收起内容保留渲染但设为 inert，不能点击或获得键盘焦点；减少动态效果时立即切换。
-  - 首页侧栏“新建分组”与“新建知识库”按钮并排靠右；侧栏知识库列表及当前知识库名称前不再显示书本图标。
-  - 首页知识库卡片的“…”、知识库页操作菜单、侧栏知识库右键菜单共用重命名、编辑简介、移动到、转为分组、复制链接、导出及删除知识库；知识库页与侧栏菜单另保留文档/模板/目录分组创建入口，首页卡片不提供这三个入口。当前知识库的侧栏标题也支持右键。分组选择使用子菜单并标记当前归属，删除在底部分隔显示，确认后将知识库及全部文档移到回收站，可整体恢复。
-  - 首页知识库卡片菜单提供“从其他知识库移入”：弹窗按知识库分组、来源知识库、逐级文档目录分栏浏览，排除目标知识库。单次操作选择一个来源知识库；单击替换选择，⌘/Ctrl 切换选择，Shift 选择当前列的连续范围，复选框保留不同目录中的选择；箭头仅进入目录。选择父项包含所有后代，取消子项使祖先半选。支持全选当前列和清空，并显示文档与分组数量。手机每次显示一列，可横滑或通过路径返回。复用 `POST /api/docs/batch` 的原子移动，一次最多 5000 项，按来源目录顺序追加到目标根目录，保留 ID、正文、历史及内部层级；取消不修改数据，冲突提示重新选择，成功后仍停留首页。
-  - `GET /api/book-groups` 返回 `{ revision, groups: [{ id, name, bookIds }] }`；`PUT` 接收 `{ baseRevision, groups, bookOrder? }`，冲突返回 409 并由页面刷新后重试，校验分组名称、ID、知识库归属唯一性。可选 `bookOrder` 必须恰好包含所有存活知识库 ID（包括其他组与未分组），不含回收站；归属、完整顺序与新 revision 在同一事务提交，顺序无效返回 400 且全部回滚，省略时保留原顺序。界面先更新归属和位置并在后台保存，失败时一并恢复已确认的配置与顺序并尝试刷新；连续失败且离线时也不保留未保存的结果。“未分组”是保留名称。配置按分组数组顺序显示，保存在现有 `meta.book_groups` JSON 中，无配置时返回空分组且不写入；不增加数据库表或迁移现有数据。组内顺序沿用 `books.position`，`bookIds` 只表示归属；折叠状态仅保存在本机。分组配置随数据库一致性备份保存。
-- **首页：** 在首页通过全局入口或分组菜单新建知识库后停留原处，保留滚动与分组折叠状态；在其他页面发起新建时沿用打开新知识库的行为。最近浏览（本机记录）、最近编辑、知识库卡片和新建入口。知识库列表下方右侧显示所有存活文档的正文总字数（如“共 1,234,567 字”），每张知识库卡片右下角显示该库字数（如“123,456 字”，空库显示“0 字”），卡片左下角保留文档数。电脑与手机均靠右，窄卡片空间不足时字数换行且保持右对齐；全站总数不受知识库分组折叠影响。与阅读页及目录共用非空白字符口径，不计文档标题、目录分组、回收站文档/知识库、历史或模板。`GET /api/stats` 返回 `{chars: number, bookChars: {[bookId: string]: number}}`，包含每个存活知识库（空库为 0）；按文档缓存的字数累加（见 3.1），只为上次以来写过的文档读取现有 `plain_text`，不新增数据库字段。仅首页预加载，返回首页或在首页修改知识库列表后同时更新分库及全站字数。
-- **回收站：** 恢复、彻底删除（二次确认）和清空回收站；图片文件不随之删除，与第 7 节一致。
-- **搜索：** 沿用现有搜索，迁移为应用内页面。
-- **导出：** 补上第 9 节的导出。网页中可以导出单篇（Markdown）和整个知识库（Markdown 加图片的压缩包，按目录结构存放，图片使用相对路径）；导出全部内容用开发电脑上的导出工具（已实现，见 OPERATIONS.md）。网页导出与导出工具共用同一套文件布局和链接改写规则（`web/src/shared/export.ts`）。
-- **手机：** 目录和大纲改为抽屉，正文全宽。
-
-### 12.6 编辑器交互（D2）
-
-- **布局：** 编辑视图与阅读视图共用 12.5 的框架，右侧大纲可以开关，正文上方是固定工具栏；可切换专注模式隐藏常驻侧栏，窄窗口仍可打开目录抽屉。
-- **顶部工具栏：** 撤销、重做；正文与标题 1–6；粗体、斜体、删除线、下划线、行内代码、高亮；链接；对齐（第 19 节）；无序、有序和任务列表；插入菜单（引用、Callout、代码块、Mermaid、公式、表格、图片、分割线）；清除格式。标题选择旁提供整批提升、降低标题等级按钮（第 22 节）；右侧是查找替换和专注模式。
-- **选区工具栏：** 文字和单元格选区共用常用格式、链接、转为标题或正文、清除格式，最右侧是垃圾桶。移除规则见第 20 节：按选区删除文字、节点、整行或整列，局部单元格只清空内容。代码文字和整块选区只显示移除与内容片段按钮；图片工具栏也共用移除按钮。普通文字只有光标时不显示，表格内光标保留表格工具。工具栏按渲染后的实际尺寸定位，选中文字时优先放在选区上方并留出 8 px 间距，上方空间不足则翻到下方；首次显示、工具切换与窄屏换行后重新计算，避免以尚未渲染按钮的空框尺寸定位而盖住选区。表格仍使用独立的单元格锚点和控制条间距。
-- **标题控件：** 阅读与编辑共用 H1–H6 层级标识和折叠箭头；正文左侧不再出现拖动图标、块菜单或加号。标题下到下一个同级或更高级标题之前的内容构成一节，分栏、高亮块、折叠块、引用与表格中的标题在自己的内容容器内计算范围。悬停显示控件，收起时保持可见，触屏上常显；控件与标题之间保留可经过的区域。编辑时用装饰隐藏整节，不写正文、不占内容撤销，光标或大纲定位进入隐藏内容时先展开；折叠状态与阅读页按标题锚点共用本机记录。插入使用顶部“＋”或 `/`，章节移动改在大纲中进行（第 22 节）。
-- **块间空白：** 单击图片段落、表格、代码块、块公式、Callout 或分割线上下与相邻内容之间的空白（距块边缘 28 px 内），插入普通空段落并定位光标；有相邻空段落则直接使用。新插入的段落只在本次编辑中跟踪来源，未使用就移走光标、切换到标题或离开编辑时自动移除；输入或粘贴内容、Enter 分段、设置格式、开始上传图片后保留，即使之后删空也不再自动移除。既有空段落及主动新增的空栏不受影响；格式/插入浮层暂时接管焦点时保留操作位置，清理不加入撤销记录。支持文首、相邻非文本块及列表、Callout、单元格内的块。同一段落内图片自动折行之间的空白只定位光标，用 Enter 或 Shift+Enter 明确分段或换行（第 19.1 节）。插入可撤销，优先保留已激活的表格缩放操作，修饰键和文字选择保持原行为。实现在 `web/src/editor/blockSpaces.ts`，不修改文档格式。
-- **文末空白：** 单击最后一个可见块下方、正文栏宽度内的空白，在文档末尾插入普通空段落并聚焦光标；覆盖短文编辑区内部及正文栏底部留白，不受块类型或 28 px 距离限制。末尾已有空段落时直接使用，连续点击不重复新增。聚焦后检查光标可见范围，必要时直接滚动到顶部工具栏以下，避免从远处留白点击后输入位置仍在屏幕外。沿用块间空白的临时段落跟踪、使用判定、离开清理和撤销规则；正文、嵌套内容、工具控件及正文栏外的点击保持原行为。
-- **分割线：** 编辑时保持细线外观，单击命中区域增至 20 px 高，点击即可选中整条分割线，随后可删除或用选区工具栏操作；阅读样式不变。
-- **斜杠菜单：** 图标、分组、说明和对应的 Markdown 写法；输入 `/` 或中文输入法的 `、` 打开。搜索共用 `Cmd/Ctrl + K` 的匹配器，支持中文与英文关键词的部分匹配、全拼、首字母及两者混输，也可从名称中间开始；拼音中的空格和隔音符 `'` 忽略。例如 `daimakuai`、`dmk`、`daimk`、`makuai` 均可找到代码块。固定菜单标签显式维护逐字拼音，不引入浏览器端字典。
-  - Markdown 写法与别名也可搜索：一个或多个反引号、波浪号找到普通代码块、带标题的代码块和 Mermaid；`#`/`##`/`###` 找标题，`-`/`*`/`+` 找无序列表，`1.` 找有序列表，`[ ]`/`- [ ]` 找任务列表，`>` 找引用和提示块，`|` 找表格，`![]` 找图片，`[]()` 找链接，`---`/`***`/`___` 找分割线，`$`/`$$` 找公式，`[!note]` 等找到提示块。
-  - 精确语法匹配优先，其余按名称/关键词包含、拼音匹配排序，开头匹配优先于中间匹配；同分保留菜单顺序。不输入查询时最近使用的项目置顶。方向键选择、Enter 插入、Esc 退出，中文组字期间不执行插入；插入表格时仍用网格选择行列数。
-  - “文档”直接打开链接浮层的“文档与章节”页签并聚焦搜索框，支持 `wendang`、`wd`、`document` 和 `[[` 搜索。原有“链接”仍默认打开“网址”页签；顶部插入菜单共用这两个入口。
-- **链接：** `Cmd/Ctrl + K` 或工具栏打开链接浮层；光标位于链接上时显示链接卡片（打开、编辑、取消链接）。阶段 E 起 `Cmd/Ctrl + K` 改为打开搜索面板，见 13.1。
-- **公式：** 点击公式或用快捷输入插入后打开浮层，输入 LaTeX 并实时预览，Enter 确认，Esc 取消。
-- **其他：** 编辑时的大纲随滚动高亮、点击跳转；`Cmd/Ctrl + F` 查找替换（可区分大小写、全部替换）；`Cmd/Ctrl + /` 在全站打开快捷键说明，代码编辑区保留行注释；入口位于左下角外观菜单（第 22 节）。
-- **快捷键说明：** 按常用、文字、段落、代码块和 Markdown 分成页签，可用方向键切换。桌面两列、手机一列对齐显示操作与按键；每个按键独立展示，Mac 修饰键使用统一图标并附名称对照，Windows/Linux 使用文字键名。标题、分类和关闭按钮固定，长列表仅滚动内容区；Markdown 区分输入符号与后续按键。
-- 保存状态改为图标加文字；自动保存、冲突检测和本地草稿的机制不变。
-- 保存状态旁的字数与阅读页、目录同一口径（Go `PlainText` 与 `CountChars`）：正文、公式源码、图片替代文字与说明、附件名、代码块标题和画板文字，不计空白。`editor/characters.ts` 按节点缓存结果，编辑时只重新统计变化的块，长文档每次按键不再遍历全文。
-
-### 12.7 内容块（D3）
-
-- **表格：** 外围格子选择行列、分隔点插入行列（第 18 节）；对齐使用顶部对齐菜单（第 19 节）；删除使用选区工具栏最右侧的移除按钮（第 20 节）。不再显示表格专用工具栏。
-- **图片：** 选中后显示工具条：适应宽度、原始尺寸、常用宽度、替换、下载、查看原图、编辑替代文字、删除；拖动角点调整宽度，写入已有的宽度属性，导出为 Obsidian 的 `|宽度` 写法。上传时先显示占位和进度，失败可以重试。阅读页点击图片放大查看，可以在同一页的图片之间切换。
-- **代码块：** 可搜索的语言选择、复制、Tab 与 Shift+Tab 缩进；行号始终显示，自动换行在每个代码块的标题栏独立切换，与复制并排，两者都有图标；隐藏标题栏时右上角的复制只显示图标。阅读页的长代码可以折叠。
-- **Callout：** 带颜色和图标的类型选择面板、折叠方式切换；编辑器中标题为空时显示与阅读页相同的默认标题。
-- **Mermaid：** 源码与预览并排；语法有误时给出提示，并保留上一次成功的预览。
-
-### 12.8 同名分组与文档的合并
-
-用户确认合并。D1 的移动功能上线后，通过接口处理下列 7 处：把分组下的文档移到同名文档下面，再删除已空的分组（进入回收站，可以恢复）。只调整目录结构，不改文档内容；操作前先备份，完成后核对目录并请用户确认。
-
-- 设计模式：创建型模式（分组下 5 篇）、结构型模式（4 篇）、行为型模式（4 篇）。
-- Spring：组件注册（2 篇）。
-- 开发手册 / 文件处理：操作本地文件、获取文件信息、文件加工（各 1 篇）。
-
-### 12.9 实施与验收
-
-- **顺序：** 导出工具 → D1 框架、目录与导出 → D2 编辑器交互 → D3 内容块，均已完成。原计划每步单独发布并由用户验证后再进入下一步；D1 按此交付了本地原型并经用户确认发布，之后用户指示连续完成其余内容，由执行者决定提交时机，全部完工后在线上做最终验收，因此 D2、D3 一起发布。
-- **按需验证：**
-  - D2、D3 改动编辑器配置，发布前用新编辑器对线上全部文档运行原样保存检查（只读）。
-  - 涉及编辑性能的改动，按需用约 3,800 个块的合成长文档核对打开与输入耗时（基线见验证归档 12.11）。
-- **验收：**
-  1. D1：现有功能（新建、编辑、自动保存、冲突提示、历史与恢复、回收站、搜索）在新界面全部可用，不再出现浏览器原生弹窗；目录的拖动与移动正确，刷新后保持；能导出单篇、单个知识库和全部内容，导出结果能用 Obsidian 打开；手机阅读正常；阅读脚本符合 12.3 的预算。
-  2. D2：12.6 的交互可用；中文输入法下工具栏、斜杠菜单和 Markdown 快捷输入正常；最长的文档（约 3,800 个块）编辑不卡顿。
-  3. D3：12.7 的操作可用；导出 Markdown 后，表格、图片尺寸、代码块和 Callout 保持正确。
-
-### 12.10 D1 结果（2026-09-26）
-
-- **页面架构：** Go 只保留一个页面外壳（`internal/server/templates/shell.html`）；`internal/server/app.go` 为每个地址预加载首屏接口数据，前端第一次请求同一路径时直接使用，之后都向服务器重新请求。ID 不存在时页面返回 404 状态码。旧的 Go 页面模板和阅读页脚本已删除。
-- **前端：** `web/src/app`（路由、布局、目录树、各页面）、`web/src/ui`（对话框、提示、菜单、图标按钮）、`web/src/editor`（编辑器，按需加载）。Vue 3 + Vue Router + Reka UI + Lucide；颜色用 CSS `light-dark()` 定义，支持跟随系统、浅色、深色，代码高亮与 Mermaid 随之切换。
-- **已实现：** 12.5 中除网页导出外的全部内容；编辑页与阅读页共用框架，离开编辑前先保存，保存失败时提示；在目录中重命名正在编辑的文档时，经编辑器的标题保存，避免版本冲突；编辑器中的链接与公式输入也改为应用内对话框。进入编辑时显示顶部进度条，鼠标移到“编辑”按钮上时预先下载编辑器；发布新版本后，旧标签页取不到已删除的脚本时自动重新加载页面。
-- **服务端：** 新增文档视图、版本视图、最近编辑、回收站列表，以及移动、重命名、知识库排序、彻底删除和清空回收站接口；知识库修改改为只更新传入的字段，修复了重命名知识库时清空简介的问题（线上知识库此前都没有简介，没有丢失数据）。
-- **补齐（2026-09-26）：** 网页导出：目录节点的“导出”和知识库菜单的“导出知识库”；没有图片、没有子文档的单篇直接下载 Markdown，其余下载压缩包（Markdown 加 `attachments/`，与导出工具同一布局，图片原样存储），链接到导出范围之外的文档改为网页地址。同名分组与文档已按 12.8 合并。
-
-### 12.11 D2 结果（2026-09-26）
-
-- **布局：** 编辑工具栏固定在顶栏下方；右侧编辑大纲可以开关，随滚动高亮当前标题，点击跳转；专注模式隐藏侧栏。阅读页和编辑页统一为最大 1100 px 的宽页，侧栏不影响正文位置（12.5）。代码行号始终显示，换行在代码块标题栏切换（12.7），全局菜单不再提供这两个选项。
-- **工具栏：** 顶部工具栏按 12.6 实现，格式按钮显示当前状态和快捷键，在代码块中停用；插入菜单列出对应的 Markdown 写法，表格用网格选择行列数（默认第一行为表头，可以取消）。选区工具栏有正文与标题 1–6、六种文字格式、文字颜色、链接、清除格式与统一移除按钮（第 20 节）；表格工具见第 23 节。
-- **标题控件：** 正文旁仅保留与阅读页相同的标题级别与折叠按钮，章节拖动移至编辑大纲；普通内容块的工具与块旁加号均已移除。控件按标题级别和折叠状态复用，上方输入不会重建全文的标题控件；点击时按控件当前所在位置找到对应标题（`editor/headingFolds.ts`）。
-- **斜杠菜单：** 按基础、列表、插入、提示块分组，带图标、说明和 Markdown 写法；名称、关键词、拼音与语法搜索规则见 12.6；最近使用的项目置顶；输入 `/` 或中文输入法的 `、` 都能打开。
-- **链接与公式：** `Cmd/Ctrl + K` 或工具栏打开链接浮层（没有选中文字时同时填写文字；阶段 E 起快捷键改为打开搜索面板，链接从工具栏、选区工具栏或斜杠菜单插入，见 13.1）；本站地址自动改为站内链接，没写协议的地址补 `https://`。光标在链接中时显示链接卡片：打开、编辑、复制、取消链接。点击公式、用 `$$` 快捷输入或从菜单插入公式后打开公式浮层，KaTeX 实时预览；Enter 确认，Shift+Enter 换行，Esc 取消，新插入的空公式取消后删除。
-- **查找替换与快捷键：** `Cmd/Ctrl + F` 查找替换（区分大小写、上一个下一个、替换、全部替换），匹配项在正文中高亮；`Cmd/Ctrl + /` 在全站打开快捷键说明，另列 Markdown 快捷输入；代码编辑区保留行注释。在标题输入框中也能使用这两个快捷键。按语雀的写法补充了删除线 `⌘⇧X` 和列表缩进 `⌘]` / `⌘[`。
-
-### 12.12 D3 结果（2026-09-26）
-
-- **表格：** 行列插入、对齐和删除分别使用外围控件、顶部对齐菜单与统一选区工具栏（第 18–20 节）。表头、合并与底色按第 23 节保留实际结构，不自动补表头；保留 Markdown 列默认对齐和单元格的独立覆盖，按 Tab 在末尾新增的行沿用各列默认对齐与列宽。
-- **图片：** 选中后显示工具条：尺寸（原始尺寸、适应宽度、75%、50%、25%）、替换、下载、查看原图、替代文字、删除。拖动左下或右下角调整宽度，同时显示像素值；松开后写入宽度并清除高度，导出为 Obsidian 的 `![说明|宽度](路径)`。粘贴、拖入或选择的图片先显示预览占位和上传进度，失败时显示原因，可以重试或移除；离开编辑页时先等上传完成。阅读页点击图片打开查看器，可以用左右键或按钮在同一页的图片之间切换，也可以打开原图。
-- **代码块：** 可搜索的语言选择，按名称或常用别名搜索，也可以填写列表之外的语言；复制；Tab 与 Shift+Tab 按 4 个空格缩进。行号和自动换行在编辑器与阅读页都生效，自动换行时行号仍与每一行对齐。阅读页超过 35 行的代码默认折叠到 30 行，可以展开和收起。
-- **Callout：** 带颜色和图标的类型面板，以及折叠方式（不折叠、默认展开、默认折叠）；编辑器中标题为空时显示与阅读页相同的默认标题（Note、Tip 等），不再显示“标题（可留空）”。
-- **Mermaid：** 源码与预览左右并排，窄屏时上下排列；源码背景铺满所在区域，预览按内容确定高度，单行代码下方不露出白底或保留固定的空白高度。语法错误时显示出错位置，并以淡色保留上一次成功的预览。
-- **代码配色：** 发布后在线上核对时发现，深色模式下阅读页代码里的括号等标点几乎与背景同色（D1 起如此）。原因是 GitHub 浅色样式给标点设了颜色，深色样式没有，浅色规则在深色模式下仍然生效。现在两套规则只在各自的模式下生效。
-- **原样保存检查：** `roundtrip` 工具增加一项：统计编辑时会被调整表头或列对齐的现有表格。保持表格形状的逻辑也处理各行单元格数不等的表格（导入的笔记本来如此）。
-
-## 13. 阶段 E 第一批
-
-2026-09-26 用户验收阶段 D 后，从建议中选定下列四项。13.1–13.5 是用户确认的方案，当天实施并发布，结果见 13.6；2026-09-27 用户验收完毕。四项都不改文档格式，也不改编辑与阅读的一致性快照。
-
-### 13.1 搜索面板与快速跳转
-
-现在只能从侧栏进入搜索页查找。改为弹出面板，随时可以打开并跳转：
-
-- **入口：** 侧栏的搜索按钮改为打开面板；快捷键 `Cmd/Ctrl + K`（用户选定），阅读页和编辑页都能用。编辑器中原来插入链接的 `Cmd/Ctrl + K` 取消，链接从工具栏、选区工具栏或斜杠菜单的“链接”插入。原搜索页保留，面板底部的“查看全部结果”进入。
-- **还没输入时：** 显示最近浏览（本机记录）和最近编辑。
-- **输入后：**
-  - 标题：打开面板时取一次全部文档的标题索引（新接口，返回标题、所在知识库和上级文档，约 300 条），在本地即时匹配。支持拼音首字母，例如 `zs` 找到“装饰”；首字母用浏览器内置的中文排序规则推算，不引入拼音字典（第二批改为服务端词典并支持全拼，见第 14 节）。
-  - 全文：沿用现有的搜索接口，停止输入约 120 毫秒后请求（2026-10-14 改用内存索引后由 200 毫秒缩短，见 26.4），结果带高亮的上下文。后来支持用空格（含全角空格）分开多个词：每个词都要出现在标题或正文中，最多取前 10 个不同的词，标题含词多的在前；上下文从最先出现的词截取，各词分别高亮，从结果打开的文档也逐词高亮。标题匹配同样接受各词都在标题中；只含字母的查询仍可按带空格的拼音匹配。搜索页结果达到 50 条上限时提示仅显示前 50 条，可以加词缩小范围。
-  - 标题匹配排在全文结果前面，每项显示所在知识库和上级文档。
-- **操作：** `↑` `↓` 选择，Enter 打开，Esc 关闭；手机上全屏显示。
-- **体积：** 面板代码按需加载，首次打开页面的脚本（现约 104 KB）不增加。
-
-### 13.2 历史版本对比
-
-- **快照语义：** 快照保存完整内容，按 ID 从新到旧排列；常规快照是修改后的内容，编辑与恢复前另记“编辑前”“恢复前”快照。revision（显示为 rN）用于并发控制，自动保存和取消编辑也可能使其增加，因此不等同于历史快照序号。当前内容独立显示，快照用标题和规范化 JSON 判断“与当前内容一致”，不只比较 revision；没有新快照的已保存内容单独展示相对最近快照的摘要。
-- **保留期限：** 所有历史快照按创建时间保留 30×24 小时，每天北京时间 03:00 清理达到期限的记录；不保留最低版本数，长期未修改的文档可以没有历史。服务每分钟检查任务是否到期，停机后启动补跑，同一天的重复启动不重复执行；成功时间存于既有 meta。当前正文、回收站中的正文、模板与片段不受历史清理影响，回收站的历史快照仍适用同一期限。已有备份按自身策略保留。
-- **编辑与恢复保护：** 编辑会话第一次成功保存时，在同一事务中先记录一份新“编辑前”快照，保护取消编辑所需的原文及媒体，即使旧历史已经清空；取消编辑删除本会话的快照和这份基线。最新快照若已是同一 revision、标题和正文的“编辑结束”“恢复”或“新建”快照，且距过期还有一周以上，就由它充当基线，不再重复记录“内容无变化”的“编辑前”；“自动保存”不是会话边界，仍另记“编辑前”，以便“最近修改”找到本次会话的起点。沿用基线的会话从开始编辑起计 10 分钟自动快照，服务重启后可能提前一次。会话净改动为零时，“最近修改”显示上一次有改动的会话。恢复历史时，在一个事务内校验目标版本与当前 revision、记录“恢复前”、更新正文并记录恢复结果，冲突或失败全部回滚。两类保护快照也按 30 天过期，不形成永久保留例外。历史 ID 的高水位存于 meta，清理后不会重用旧链接。
-- **附件衔接：** 过期历史清理与其媒体回收计时重置在同一事务；仅被这些历史引用的图片与附件在最后引用消失后重新开始一小时宽限期，不根据上传日期立即删除。正文、剩余历史、回收站、模板或片段仍有引用则继续保留；引用解析失败时整批历史不删。
-- **保存时序：** 正常离开编辑页等待正文 flush 后，通过可确认结果的请求保存会话快照，再进入目标页面；失败保留编辑页并可重试。标签页关闭仍用 beacon 尽力补记。以前仅在卸载组件时发送 beacon，立即进入历史页可能抢先读到旧列表；存储本身保存的是修改后内容，没有向前错一版。
-- **改动摘要：** 服务端在读取历史时比较相邻快照，返回标签、数量和涉及的标题路径，旧记录自动获得摘要，不增加数据库字段或调用外部模型。标题分文字和等级；正文分内容、格式及结构；图片分增删、大小、对齐、说明及相对顺序；表格分增删、内容、尺寸、单元格对齐、结构和整体对齐；另区分代码块、Mermaid 图表、公式、分隔线。重复类型合并计数，涉及位置默认显示三处，可展开其余位置。
-- **读取开销：** 历史列表、版本预览和阅读页最近修改先读取不含正文的版本信息，只在需要比较或渲染时解析快照，同一时刻最多保留两份解析后的正文。快照不可变且 ID 不重用，相邻摘要、快照内容哈希和版本预览按快照 ID 缓存在内存中；“此后改动”和“与当前内容一致”另以当前正文的 revision、更新时间与标题区分，正文变化后自然失效。缓存有条数上限，重启后重新计算，不写数据库。
-- **匹配边界：** 优先匹配内容相同的块，再按图片来源、标题文字、同节同类型匹配。移动依据已匹配块的相对顺序，前方插入内容不误报全部后续块移动；相同内容的重复块及大幅重写没有稳定节点 ID 时按结构近似匹配，摘要用于定位，精确内容以差异和快照为准。图片换来源按增删呈现；空行或未细分的格式使用通用说明。忽略 JSON 中显式/省略的默认属性差别。正文不会因单独调整图片大小或表格列宽而被误标为修改。
-- **界面：** 历史列表使用常规页面宽度，桌面按时间与版本信息、标题与改动摘要、操作按钮三栏排列，操作靠右；中等宽度将操作放到摘要下方，手机单栏顺排。当前内容卡片同样将操作置于右侧，长标题和章节路径自然换行。列表与预览页显示摘要；“本次改动”明确为上一条快照 → 本条快照，“此后改动”为本条快照 → 当前内容，差异顶部显示两端 revision。预览展示快照的完整内容。保留的最早记录没有“本次改动”，仅创建时的初始快照称“初始内容”；与当前内容一致的快照没有“此后改动”和恢复按钮。历史页说明 30 天期限，空列表显示“最近 30 天没有历史版本”；旧版本链接显示已过期或不存在，读取/恢复缺失版本返回 404 / version_not_found。
-- 两个版本都转换成 Markdown（与导出同一套转换）后逐行比较：增加的行标绿，删除的行标红，修改过的行内再标出具体改动的文字；大段没有变化的内容折叠，只显示改动附近的几行；标题的修改单独显示。
-- 比较使用成熟的 diff 库（jsdiff，BSD 许可），在打开对比时才加载。只读，不改变版本数据。
-
-#### 阅读模式的最近修改
-
-- 顶部栏编辑按钮左侧提供“最近修改”开关，滚动到任何位置都可开关，默认关闭并在当前浏览器记住选择。开启后正文底部悬浮一条胶囊栏，长文阅读和文末均保持距视口底部 16 px（另加设备安全区域），页尾留白与此间距一致，避免滚到文末时被正文带起；短文档仍停在翻页卡片之后：“修改”“删除”两个开关各带处数，可单独或同时显示，至少保留一种；本文只有一种时另一种不可点，记住的组合在本文无可显示内容时临时两种都显示。其后是上一处/下一处循环定位（定位后显示“第几处 / 共几处”，自动展开所属标题、折叠块和代码）、“完整差异”及关闭。有基线但没有可显示的增删时显示摘要；没有保留基线时明确提示历史不足。
-- `GET /api/docs/{id}/recent-changes?revision=N` 按需读取，返回 `{revision, baseline, summary?}`；baseline 为 `{id, revision, title, html}` 或 null。优先回溯至最近编辑/恢复会话的 before-edit/before-restore，跳过同一会话的自动保存与相同结果快照；缺少会话边界的旧写入回退到最近不同快照。revision 可选，提供时不符返回 409，分组与已删除文档返回 404。查询只考虑不高于所读正文 revision 的历史，不改快照或 30 天期限。
-- 前端只在开启时加载 `content/recentChanges.ts`（比较在 `recentDiff.ts`，删除副本在 `recentGhosts.ts`）与 diff 库；副本所需的公式、图表、表格框与附件卡片增强由 `DocContent` 传入，按需模块不直接引用阅读页模块，以免拆散首屏分块。对比两端原始阅读 HTML，先匹配相同块，再按文字相似度及结构配对；文字按字符和行内格式比较。标题、表格单元格、代码、图片、公式、画板、附件及容器格式均可定位。大幅重写、重复内容和无稳定 ID 的重排按结构近似匹配，精确内容以完整差异为准；差异计算有时间上限，复杂块回退为整块提示。
-- 效果按“补丁”绘制在正文外的独立浮层：每处修改是一块浅紫底色、内缩虚线“针脚”的圆角补丁，横向铺满所在栏道（正文栏左右各外扩 12px；单元格、分栏、提示块、高亮块和折叠块内则限于该容器）。文档顺序相邻、同一栏道的修改合并为一块补丁，块间空隙一并填满，计数与上一处/下一处按补丁计；补丁内只有局部改动时，改动的字再垫一层稍深底色，整段新增或纯格式变化只显示补丁。图片、公式、画板、附件、Mermaid 和代码块不着色，补丁以环形包在外侧。当前定位的补丁底色与针脚加深。浮层在浅色主题用正片叠底、深色主题用滤色，不覆盖或替换正文颜色、字体与背景，不影响原有高亮、链接、语法配色、选择与复制，不修改文档 JSON/HTML。
-- 浮层按页面坐标从文档左上角铺开，随页面一起滚动，页面滚动时不重绘也不读取布局，快速滑动时补丁与文字同帧移动。宽度为视口宽并横向裁切，不撑宽页面。WebKit 只在浮层自身范围内混合颜色，所以高度设到最低一块补丁；它始终在正文之内，不会让页面变高，折叠后页面照常变短。改动的字用 CSS Custom Highlight API（`::highlight(yy-recent)`，代码内为 `yy-recent-code`）随文字一起绘制，代码横向滚动时不需重绘；不支持该接口的浏览器只显示补丁。内容变化、尺寸变化、窗口缩放和含修改的宽表格横向滚动时重新定位，宽表格内的补丁裁切到表格框可见部分；浮层不响应指针，打印时隐藏。代码与 Mermaid 增强保留原元素对应关系；离开文档、关闭开关和重绘时清理观察器及浮层。
-- 删除的内容以“剪下的旧内容”显示：从基线 HTML 复制当时的渲染放回原处，套上玫红虚线圆角框和骑在框线上的“已删除”/“修改前”小标签，底色浅、文字降为次要色，与修改的浅紫补丁区分；旧内容保持原有格式，一眼能看出删除前的样子。
-  - 整块删除（已删除）：放在与之共享最近容器的保留邻居旁（同一栏、单元格、列表或折叠块），连续删除合为一框。排在邻居之后时，越过页面附加在该块后的“展开全部 N 行”按钮和图表出错提示，使它们仍紧随原块。列表项、表格行和单元格分别以对应的副本显示，有序列表副本自绘原编号，不打乱现有编号；代码块、提示块的部分内容回到所属容器整体旁。删掉的空行只随其他删除出现。
-  - 部分删除（修改前）：修改后失去文字、图片、附件、公式或图表的块，在新版本前显示旧版。被删的字以浅红底加删除线标出，自带颜色、高亮或链接的字保留原色；删掉的行内公式与图片以红底或描边标出。代码按行比较，只列出失去的行并保留原行号与语法配色：原地改写的行只标删去的字，只加字的行不显示，不连续处以 ⋯ 隔开。只增加内容的 Mermaid、公式等原子块不算删除。标题旧版随标题一起折叠，文档标题删字时在标题前显示旧标题。
-  - 删除与同位置的修改合为一处：计数、上一处/下一处与当前态把替换视为一处；补丁遇到旧内容框时在框边截断，不盖住旧内容。
-  - 不干扰原文：副本不可选中，全选复制不含旧内容；不参与标题折叠工具、大纲、阅读位置记忆、搜索高亮、图片灯箱和标题收起点击；副本去掉 id，详情块展开显示，公式、图表、表格框与附件卡片按阅读页方式绘制，代码保持静态。插入或移除副本时保持阅读线处的内容不跳，期间暂停浏览器自身的滚动锚定。收起的折叠块、提示块含删除时边框改为玫红虚线，定位时自动展开。关闭“删除”或离开文档后正文 HTML 恢复原样，打印时隐藏。
-
-### 13.3 图片预留尺寸
-
-- **问题：** 线上有 93 篇文档含 3 张以上图片，最多的一篇 114 张。导入的图片大多没有写尺寸，懒加载前不占高度，加载时把下面的内容往下推，点大纲或页内链接跳转后位置会偏。
-- **做法：** 服务端上传图片时已记录原始宽高。文档视图和版本视图的接口额外返回本文图片的原始宽高；前端插入正文后，给缺少尺寸的图片补上 `width`、`height` 属性（只写了宽度的按比例补高度），浏览器据此预留空间。编辑器的图片节点视图同样用这些尺寸显示，只影响显示，不写入文档。
-- 渲染器输出不变。取不到尺寸的图片照常显示；上线后统计线上图片的尺寸覆盖率。
-
-### 13.4 本机发布
-
-当前采用本地按需验证与构建，GitHub 只备份源码，完整流程见 [DEPLOYMENT.md](DEPLOYMENT.md)。
-
-### 13.5 验证与发布
-
-按本次改动选择本地样例验证，发布入口见 [DEPLOYMENT.md](DEPLOYMENT.md)。不保留历史自动化测试数量与全量回归要求。
-
-### 13.6 结果（2026-09-26）
-
-- **图片预留尺寸（`79c6278`）：**
-  - 文档视图、完整文档和版本视图的接口多返回 `images`：本文已上传图片的原始宽高，按图片 ID 索引。
-  - 阅读页和版本页插入正文后，给没写尺寸的图片设 CSS `aspect-ratio` 和原始宽度，只写了宽度的只设 `aspect-ratio`。编辑器的图片节点视图同样处理，不写入文档。
-  - 没有照 13.3 补 `width`、`height` 属性：正文样式中带 `height` 的图片宽度为 auto，限宽后会变形。
-- **搜索面板（`6472296`）：**
-  - `Cmd/Ctrl + K` 在阅读页和编辑页都能打开面板；侧栏的搜索按钮也打开面板。
-  - 没输入时列出最近浏览和最近编辑各 6 篇。输入后先按标题匹配：标题开头或包含查询的在前，其次是拼音首字母（只含字母的查询）；每项显示所在知识库和上级文档。约 200 毫秒后补上全文结果，带高亮的上下文，已在标题结果中的文档不重复。
-  - `↑` `↓` 循环选择，Enter 打开，没有结果时 Enter 进入搜索页；中文输入法组字时不响应；手机上全屏。
-  - 标题索引来自新接口 `GET /api/titles`；面板分块在第一次打开时才下载。
-  - 编辑器的斜杠菜单和插入菜单增加“链接”（可用拼音首字母 `lj` 筛选），快捷键说明中 `Cmd/Ctrl + K` 改为“搜索文档”。
-- **版本对比（`757a07f`）：**
-  - 版本预览页顶部有“预览”“本次改动”“此后改动”三个标签，地址保留 `?compare=previous` 或 `?compare=current`，可以直接打开。列表与内容一致性判定、摘要及按钮规则以 13.2 为准。版本视图接口返回上一条快照的信息。
-  - 两边都转换成 Markdown，用导出的同一套转换，只是表格不补齐列宽：否则一个单元格变长，整张表每行都会显示为修改。
-  - 用 jsdiff 9 逐行比较。修改过的行与新的一行配对显示，按顺序优先配对最相似的行，例如删除列表第 2 项后，原第 3 项与改号后的第 2 项配对。配对的行内再标出改动：中文按字，英文和数字按词；两处改动之间只隔一个字（如“的”、逗号）时，一并算作改动。相同部分不到三成的行不配对，整行显示为删除和增加。
-  - 没有变化的内容折叠，改动前后各保留两行有字的内容，点击展开；标题的修改单独显示在最上方；顶部显示新增、删除的行数（不计空行）。
-  - 很长且差别很大的两版（例如恢复了完全不同的内容）逐行比较最多约 1 秒、配对最多约 0.5 秒，超时后整段显示为删除和增加，不会卡住页面。
-  - 对比视图的界面（`versions/DiffBody.vue`）随版本页按需加载（12.3），编辑页的保存冲突对比也复用它；jsdiff 与比较逻辑（gzip 后约 4.4 KB）在打开对比时下载，并复用编辑器与导出已有的 Markdown 分块。
-
-## 14. 阶段 E 第二批：小功能
-
-2026-09-27 用户验收第一批后提出下面几项，要求直接实施并发布。都不改文档格式，也不改一致性快照。
-
-- **菜单滚动提示：** 菜单的高度上限不变（420 像素，窗口矮时按可用高度）。放不下时把菜单稍微缩短，让最后一项只露出上半行，一眼能看出还能滚动（macOS 平时不显示滚动条）。下拉菜单、子菜单和右键菜单都这样处理。
-- **从搜索结果打开文档：**
-  - 搜索面板的“正文”结果和搜索页的结果打开文档时，地址带 `?hl=关键词`：正文中的匹配处全部高亮，页面滚动到第一处。第一处在折叠的长代码或默认折叠的 Callout 里时，先展开再滚动。
-  - 高亮用浏览器的 CSS Custom Highlight API，不改动正文；公式和图表的源码不参与匹配。
-  - 标题匹配的结果照常从文档开头打开。
-- **搜索面板：**
-  - 输入时在最上方列出名称匹配的知识库（最多 5 个），显示文档数，Enter 进入知识库。
-  - 标题和知识库名称可以输入全拼（`zuiduanlu`）、首字母（`zdl`）或两者混合（`zuidl`），也可以从中间的字开始；空格和隔音符 `'` 忽略。
-  - 排序不变：名称包含所输入内容的在前，以它开头的最前；其次是拼音匹配，从第一个字开始匹配的在前。
-  - 拼音改由服务端提供：`/api/titles` 和 `/api/books` 多返回 `pinyin` 字段，由 [go-pinyin](https://github.com/mozillazg/go-pinyin)（MIT）的词典生成，包含多音字的全部读音，ü 同时写作 v 和 u。前端原来用浏览器中文排序推算首字母的做法（13.6）随之删除。程序因词典增大约 1.3 MB。
-- **阅读页大纲：** 大纲标题旁增加眼睛按钮，点击后隐藏大纲列表，只留“大纲”和划掉的眼睛，正文位置不变；再点一次显示。选择保存在本机浏览器。窄屏时大纲从顶栏按钮打开，不显示眼睛按钮。编辑页的大纲仍用工具栏按钮开关。（第三批改为隐藏后收到顶栏按钮，见第 15 节。）
-
-## 15. 阶段 E 第三批：反馈修复与阅读改进
-
-2026-09-27 用户验收第二批时反馈了下面几项，直接实施并发布。都不改文档格式，也不改一致性快照。
-
-- **手机端大纲不能滚动：** 窄屏时大纲是固定在右侧的抽屉，沿用了宽屏粘性大纲的 `align-self: start`。对固定定位的元素，这一属性让它按内容撑开，而不是按窗口高度，所以抽屉比屏幕还高，永远滚不动，手指滑动的是后面的正文。抽屉里改为重置这一属性，并阻止滚到头时带动正文。
-- **代码复制按钮跟着横向滚动：** 复制按钮放在 `pre` 的角上，而横向滚动的正是 `pre`，所以按钮随长行一起滚走（手机上最明显）。阅读页改由里面的 `code` 横向滚动，按钮留在原处。
-- **离开图片很多的文档：** 实测离开页面后，还没加载完的图片会继续下载。站点走 HTTP/1.1，浏览器对一个服务器只开几个连接，这些下载会挡住下一篇文档的请求，看起来像整个程序卡住。现在阅读页、版本页和编辑器在离开时取消未完成的图片下载（去掉 `src`），离开时中止这些请求。
-- **Obsidian 的代码框风格：** 用户在 Obsidian 的算法课仓库中写过 `.obsidian/snippets/custom-callouts.css`，把 `[!code]` Callout 做成带标题栏的代码框。现在阅读页和编辑器都按它显示：2 像素的强调色（主题绿）边框、深色标题栏与代码区相连，代码用 Monokai Pro 配色（关键字粉红、字符串黄绿、数字橙色、函数青蓝、类型黄色、注释和标点灰色）。阅读页用 Chroma 的高亮类，编辑器用 highlight.js 的高亮类，两边颜色一致。复制按钮、折叠按钮和行号也改成深色。普通代码块保持原样。（第四批改为语雀式代码块，`[!code]` 改回代码块，见第 16 节。）
-- **正文按标题折叠：**
-  - 阅读页上，鼠标移到标题时左侧一起出现级别标记和箭头（手机上常显），点击折叠这一节：隐藏到下一个同级或更高级标题之前的全部内容，标题后显示“⋯”。级别标记样式见第 18 节。
-  - 折叠状态按文档保存在本机浏览器。
-  - 点大纲中被折叠的标题、打开指向它的链接，或从搜索结果打开时匹配在折叠的节中，都会先展开再滚动。
-  - 编辑页不折叠。
-- **大纲移到右侧：** 仿照语雀，宽屏时大纲贴在页面右侧；它占的那一列在隐藏后仍然保留，正文位置不变，宽屏上正文居中。大纲标题旁的眼睛按钮把大纲收起到顶栏最右侧的大纲按钮，再点这个按钮展开；按钮在展开时呈选中状态。窄屏时这个按钮照旧打开抽屉。编辑页的大纲不变。（第五批改为语雀的收起方式，见第 17 节。）
-
-## 16. 阶段 E 第四批：语雀式代码块与 `[!code]` 迁移
-
-2026-09-27 用户说明：`[!code]` 是当初把文档从语雀迁到 Obsidian 时，为了模仿语雀带标题栏、可以收起的代码块而不得不用的写法。现在把原生代码块直接做成语雀的样子，并把已有文档中的 `[!code]` 全部改回代码块，保留标题和展开状态。用户的选择：
-
-- 所有代码块都用 One Dark Pro，浅色模式下也是深色代码。
-- 没有标题也没有折叠标记的 `[!code]` 改为普通代码块，不显示标题栏。
-- 收起的代码块在编辑器里同样收起。
-- 块内语法折叠后续按第 21 节实现。
-
-具体实现：
-
-- **文档格式：** 代码块标题和收起状态是文档格式第一次扩展（12.1 约定只在 Markdown 范围内优化，本批按用户要求扩展，仍能用 Markdown 表达）。
-  - `title` 保存标题文字，null 表示尚无标题，空字符串表示空标题；`titleHidden` 默认为 false，隐藏标题栏时只设为 true，保留标题文字。`collapsed` 表示默认收起，只在标题栏可见时起作用。
-  - Markdown 中写在代码围栏的信息串里，例如 ```` ```cpp title="家谱树" collapsed ````；隐藏标题栏使用 `title="家谱树" title-hidden`。HTML 使用 `.code-block.no-title` 与带 `hidden` 的标题元素保留文字，编辑器和 Go 渲染对应，复制粘贴也能读回。Obsidian 只读取语言，显示为普通代码块。标题含双引号时改用单引号，两种都有时写 `&quot;`；反斜杠和形如实体的 `&` 也能原样往返。
-  - 导入时读取这种写法；Obsidian 的 `[!code]` Callout 在导入时按下面的迁移规则直接转换。
-  - Go 渲染器与编辑器的静态渲染同时更新，一致性快照新增带标题和空标题的代码块。代码块标题计入全文搜索。
-- **样式：**
-  - 阅读页和编辑器的代码块都是 One Dark Pro 的深色背景（`#282c34`），深浅色模式一致。
-  - 阅读页的高亮用 Chroma 的 onedark 配色，并按语雀调整：类型和预处理行青色，头文件名绿色，函数名不加粗。调用处（`q.push(i)`、`f(x)`）标为函数；`vector<int> a(n)`、`vector d(n, 0)` 这类带参数的变量声明仍是变量；C++ 常用容器（`vector`、`queue` 等）标为类型。
-  - 编辑器用 highlight.js 的类名对应同一套颜色。highlight.js 不标注普通变量名，所以编辑器中变量保持正文颜色；阅读页与语雀一样是红色。
-  - 有标题栏时，左侧是收起箭头和标题，右侧依次是语言、自动换行和复制；换行与复制都有图标。每个代码块独立控制换行，隐藏标题栏及阅读/编辑切换后保留选择，并按第 21 节保存在本机。阅读页点击标题栏的其他区域收起或展开，只在本次浏览中有效；这类代码块不再按 35 行自动折叠。
-  - 没有标题栏时，复制按钮在右上角且只显示图标，长代码自动折叠。所有代码块始终显示行号，长行换行后的行号仍与原始代码行对齐；旧的全局行号与换行偏好不再生效。
-  - 和语雀一样，鼠标移到代码块上时，代码区上边缘正中出现一个 10 px 高的小按钮：没有标题栏时它贴齐代码块顶部，不留缝隙，箭头朝下，点击显示标题栏；有标题栏时它居中跨在标题栏下边线上，箭头朝上，点击隐藏。代码收起时按钮随代码一起隐藏。按用户的选择，阅读页上的切换只影响这次浏览，不改文档：显示出来的标题栏也能收起代码；隐藏后复制按钮回到右上角。
-- **编辑器：**
-  - 有标题栏时，可以直接在标题栏输入标题，中文输入法选完字才写入；Tab 进入代码开头，收起时自动展开，回车仍回到原代码光标处。只对代码标题输入框放行这一编辑命令，Shift+Tab 不切换页面控件，输入法和修饰键组合保持原行为。手机窄屏让标题单独占一行，语言与操作按钮放在下一行，避免输入框被挤没。箭头收起或展开并保存到文档。
-  - 显示或隐藏标题栏的小按钮与阅读页相同，但切换会保存到文档：隐藏标题栏时保留标题文字并展开代码；显示标题栏时恢复原文字、光标进入标题输入框，保存重开也保留。显隐各自单步撤销，不同时撤销刚输入的标题；历史摘要记为代码块设置变更。阅读页显示已保存为隐藏的标题时也恢复原文字，仅影响本次浏览。斜杠菜单和工具栏的插入菜单增加“带标题的代码块”。
-  - 光标因任何原因进入收起的代码块（例如查找定位到其中的匹配、撤销）时，代码块自动展开。收起时如果光标在里面，移到代码块之后。
-  - Callout 类型菜单、斜杠菜单和插入菜单去掉“代码”，第 15 节 `[!code]` 的 Monokai Pro 样式删除。历史版本中的 `[!code]` 按普通 Callout 显示，里面的代码为 One Dark。
-- **迁移（`web/tools/migrate/code-callouts.ts`，用法见 OPERATIONS.md）：**
-  - 规则：标题成为代码块标题；`-` 为收起；`+` 或没有标记为展开；无标题但有 `-` 时为空标题栏并收起；无标题且没有标记时为普通代码块。只转换里面恰好是一个代码块的 `[!code]`，其他情况报告出来，不改动。
-  - 每篇有改动的文档先保存一个版本（历史里留有原来的 Callout），再按读取时的 revision 保存；期间被修改过的文档跳过并报告。重复运行不会再改动。保存会更新文档的修改时间。
-
-## 17. 阶段 E 第五批：大纲按语雀方式收起
-
-2026-09-27 用户指出语雀收起大纲的方式与第 15 节的做法不同，要求照语雀修改。只改阅读页的宽屏布局：
-
-- 大纲标题旁的眼睛只切换大纲是否固定显示，选择保存在本机浏览器。
-- 取消固定后，大纲那一列显示为每个标题一条灰色短横线，靠右对齐。级别越高线越长（24、16、10 像素），当前所在的一节颜色深一些。横线在窗口高度内排开：标题多时行距从 28 像素缩小，最小 4 像素，仍放不下的部分不显示。
-- 鼠标移到横线附近时，完整大纲以浮层临时展开，盖在横线上，不推动正文；移开约 0.2 秒后收回。浮层中的条目与固定时的位置完全重合，点眼睛切换时大纲不会移动；浮层中的眼睛可以重新固定。
-- 顶栏的大纲按钮原来用于在宽屏上找回隐藏的大纲，现在只在窄屏时出现，用来打开抽屉。窄屏的抽屉和编辑页的大纲不变。（第六批编辑页也改用这套大纲，见第 18 节。）
-- **当前节的判定（用户反馈加粗乱跳后修正）：**
-  - 原来的做法：标题进入“顶部 64 像素到窗口 30% 高度”这一段时加粗它。点击跳转时，平滑滚动经过的标题、紧跟在目标下面的标题都会抢走加粗；向上滚动时，加粗也不会交还给上一节。
-  - 现在取最后一个越过“跳转落点下方 8 像素那条线”的标题；折叠起来的节里的标题跳过。滚到最后一屏时，这条线随滚动下移到窗口底部，末尾几节依次轮到。
-  - 从大纲点击跳转后，被点的条目保持加粗，直到页面停稳后再次滚动；这样末尾那些滚不到顶部的标题，点击后也不会被别的节抢走。
-  - 标题按文档顺序排列、位置只增不减，判定用二分查找，只测量少数标题；遇到没有盒子的折叠标题时向后找最近的可见标题。编辑页保留标题元素和条目，按键只改变位置时原地更新，标题文字、等级或数量变化时才重新渲染大纲；几百个标题的长文档按键不再逐个测量和重排大纲。
-- **当前项跟随：** 大纲长到需要滚动时，当前项离开大纲可见范围（扣除顶部标题栏）后，大纲自己滚动，把它放到中间，下面几节随之可见；仍在范围内时不动。只滚动大纲所在的容器（固定大纲是侧栏，取消固定是浮层，浮层隐藏时也保持位置，展开即可见），不滚动页面。鼠标停在大纲上时不跟随，避免列表在指针下移动。窄屏抽屉打开时同样定位当前项。阅读页和编辑页共用 `OutlinePanel.vue` 的这套规则。
-
-## 18. 阶段 E 第六批：编辑与阅读的一批改进
-
-2026-09-27 用户提出下面十项，一起实施发布。
-
-- **统一的按钮提示：** 全站的按钮提示改用同一个提示框（`web/src/ui/tooltip.ts`）。
-  - 按钮用 `data-tip` 写提示文字，鼠标停留约 0.3 秒出现。原来图标按钮要 0.5 秒，其余按钮用浏览器自带的提示，要一秒多，样式也不同。
-  - 提示显示时移到相邻按钮会立即切换；键盘焦点也会显示提示，触屏不显示。只靠提示文字说明用途的按钮都补了 `aria-label`。
-  - 目录项、面包屑等文字被截断时显示全名的提示，仍用浏览器自带的，避免移动鼠标时不停弹出。
-- **大纲：**
-  - 编辑页的大纲改成与阅读页相同：贴在页面右侧，眼睛切换是否固定，取消固定后显示为横线、鼠标靠近时展开，当前节的判定也相同。编辑工具栏的大纲开关随之去掉。两处共用 `OutlinePanel.vue` 和 `outline.ts`。
-  - 大纲可以折叠：有下级标题的条目左侧有箭头（鼠标移到大纲上时显示，折叠的条目常显），标题旁的单按钮按当前状态切换全部折叠/展开，与文件目录共用规则。当前节被折叠时，加粗落在折叠它的条目上。
-  - 长大纲独立滚动时，顶部“大纲”、固定按钮和全部折叠/展开按钮保持可见；标题栏覆盖下方滚过的目录项和折叠箭头，避免文字重叠或按钮被遮挡。阅读页、编辑页的固定与悬浮大纲，以及手机阅读抽屉共用这一规则。
-  - 修正鼠标快速移向滚动条时大纲闪一下：横线区域向右延伸到页面边缘，展开前等约 0.15 秒。macOS 的滚动条隐藏时，鼠标到边缘会展开大纲；滚动时滚动条出现并盖在边缘上，鼠标落在滚动条上，大纲不展开，与语雀相同。
-- **文件目录：** 目录上方单独一行“目录”，右侧使用一个全部折叠/展开按钮，不挤占知识库名称的位置。阅读大纲、编辑大纲与文件目录共用 `web/src/ui/FoldAllButton.vue`，图标按语雀的横线与三角样式绘制；有可见的展开层级时显示“全部折叠”，全部收起后切换为“全部展开”。手动折叠、展开与目录自动定位也会更新按钮；隐藏在已收起节点里的展开状态不参与判断。没有可折叠层级时不显示按钮。
-- **全选：** 编辑正文时 Cmd/Ctrl+A 直接选中全文，包含折叠块标题与内容、分栏、高亮块、Callout、表格、图片和组合画板，不只选择可见纯文字。代码编辑区保留例外：先选中整个代码块，再按一次直接选全文；放大代码时第二次同时关闭放大视图。容器内部的逐层选择使用 Option/Alt+L。
-- **标题级别：**
-  - 阅读与编辑中鼠标移到标题上时，左侧统一显示绿色“H₂”这样的级别与折叠箭头；章节拖动通过编辑页大纲完成。
-  - 阅读页正文的一至六级标题沿用同样的标记，鼠标移近时和已有的折叠箭头一起淡入，移开后一起淡出；已折叠的标题保持显示。没有可折叠内容的标题只显示级别，不增加无效按钮。
-  - 标记放在标题左侧留白，窄屏时与箭头上下排列，触屏上常显。标记由 CSS 生成，不移动正文、不混入复制的标题文字，也不影响大纲、搜索和阅读位置恢复。
-- **连按两次 E：** 阅读页按一次 E，约 0.4 秒后提示“连按两次 E 键进入编辑模式”；0.4 秒内连按两次则直接进入编辑页，不提示。焦点在输入框中时不响应。编辑页连按两次 Esc 保存并回到阅读模式，单按先取消选区，没有选区时显示提示，见第 22 节。
-- **取消编辑：**
-  - 编辑页“完成”旁增加“取消”。没有修改时直接回到阅读页；有修改时先确认。
-  - 确认后，文档恢复成进入编辑时的标题、内容和修改时间，这次编辑期间记录的历史版本被删除，离开时也不再记录版本。
-  - 服务端接口 `POST /api/docs/{id}/discard`（`store.DiscardEdits`）核对编辑器最后保存的 revision，别处改过则报冲突；revision 仍然递增。
-  - 本次编辑保存过、之后别处又保存时，恢复原文会连带丢掉别处的修改，所以不再撤回。已显示保存冲突时，“取消”直接说明这一点；冲突在取消时才由服务端发现时，在一般确认之后再说明。用户确认后只丢弃本页未保存的修改，打开最新版本，不写服务端；不确认则留在编辑页，冲突提示、内容和本地暂存都保留。
-- **表格插入：** 使用外围行列分隔点上的加号，点击在该边界插入行或列。表格专用工具栏及其四个方向图标已移除（第 20 节）。
-- **表格尺寸：**
-  - 最右、最下边框的外侧同样参与约 8 px 的命中判断，不依赖事件必须落在单元格内；宽表格的滚动条下移，为底边留出完整的拖动范围。横向裁切的位置不视为真实列边界。
-  - 编辑器中鼠标在列边框或行边框附近约 8 px 内停留约 250 ms 后，高亮相应边框并显示无外框的 20 px 双向箭头光标；快速划过不触发。激活后保留到约 14 px 的范围，避免轻微偏移就失去拖动入口。高亮用 140 ms 淡入淡出，系统要求减少动态效果时取消动画。拖动列边框调整列宽，拖动行边框调整行高。拖动行高时一条线跟随鼠标，松开后生效，行不会矮于内容。入口集中在 `web/src/editor/tableResize.ts`，列宽计算继续使用 ProseMirror 的实现。
-  - 第一次拖动某张表时，先按当前宽度固定所有列，之后每列都能精确调宽调窄，表格可以超出页面宽度并横向滚动。已有宽度的表格插入新列时，新列取其他列的平均宽度。没拖过的表格不变。
-  - 拖动列边框越过表格可见区域的右边缘时，边框停在边缘，鼠标继续右移时整张表向左滚动，被拖动的边框始终看得见。
-  - **按内容适配列宽：** 编辑时点击表格内显示悬浮工具栏，双向箭头按钮将当前表格各列调整到容纳内容、不发生自动换行所需的宽度；顶部工具栏也提供同一操作。选择跨越多个表格的正文时，选区工具栏显示目标表格数，并一次调整所有与选区相交的表格，包括分栏、折叠块等容器内的表格；单元格或部分表格选区按整张表处理。
-  - 测量在编辑 DOM 外的不可见副本中进行，使用浏览器实际字体、文字格式、内边距和合并单元格布局，移除原有列宽与自动折行限制；手动换行、段落、内容与行高保留，空列沿用 25 px 最小宽度。收起内容也参与测量，代码使用完整源码而非 CodeMirror 可见片段。结果取整到像素并写回各行一致的 `colwidth`，超过正文宽度沿用横向滚动。操作保留选区，单表或批量均可一步撤销/重做；重复点击不累积增宽，之后内容变化时可再次点击重新适配。实现集中在 `web/src/editor/tableFit.ts`，不新增格式属性或 API。
-  - 这是文档格式的又一次扩展：单元格记录列宽（Tiptap 原有的 `colwidth`），行记录行高（`height`）。Go 渲染与编辑器的静态渲染同时更新，有列宽的表格带 Tiptap 的 `<colgroup>` 和宽度；一致性快照新增两个带宽度的表格。
-  - 导出（用户决定）：Markdown 表格表达不了的表格，即设置了列宽或行高、合并了单元格，或单元格里有段落以外的内容，导出为 HTML 表格。HTML 由编辑器的静态渲染器写出，每行一行；图片和链接像 Markdown 中一样换成导出后的路径。导入时用编辑器的解析规则读回，宽高和格式都不丢。浏览器外没有 DOMParser，由 happy-dom 提供，只用于导入工具。
-- **表格外围操作：** 鼠标进入表格时，外围边框和上方、左侧的小格子淡入，离开时短暂延迟后淡出。上方格子选中对应列，左侧格子选中对应行；按住选择格子沿边栏滑动可连续多选行或列，反向拖动缩小范围，越过起点后向另一侧选择。指针轻微偏离边栏、经过格子间隙或边拖边滚动时仍保持选择，松开后保留选区；窗口失焦或手势取消时结束拖动。行列之间和两端的点悬停后变为加号，同时显示插入位置线，点击在该位置插入。操作支持撤销，插入后仍按现有规则保持表头、列对齐和列宽。控件由 `web/src/editor/tableControls.ts` 放在编辑 DOM 外，跟随表格滚动与尺寸变化，不写入正文；选区工具栏与外围控件之间留出空间，避免重叠。
-  - 显示保持区域覆盖可见表格上方、左侧各 40 px，以及右侧、下方各 18 px，包含选择条、插入点及其间隙；从选择条直线移动到相邻插入点不会触发隐藏。该区域只用于保持显示，不覆盖正文或拦截点击。
-  - 外围边框与行操作条始终跟随真实的表格和行边界。顶部控件只按自身尺寸避让固定工具栏：插入点需要 32 px，选择条需要 14 px，分别在放不下时隐藏，滚回来再显示。不会为悬浮工具栏提前隐藏选择条，也不会把整个边框向下挪；悬浮工具栏上方空间不足时移到表格内侧。表格上下边缘不在可见区域时，不在被裁切的位置绘制横边框。列宽调整的高亮线也裁切在固定工具栏下方。
-- **菜单说明：** “含子文档”使用与菜单正文相同的字体；说明文字与快捷键分别渲染，快捷键仍使用等宽字体。
-- **宽表格（阅读页和编辑页相同，`web/src/shared/tableFrame.ts`）：**
-  - 表格左边与正文对齐。右边可以超出正文，一直到固定显示的大纲前 24 像素；没有固定显示的大纲时，到页面右边前 48 像素。再宽的部分隐藏，右侧有阴影提示。
-  - 向左滑动时，内容在左侧留白中照常显示，到页面边缘后隐藏，左侧同样有阴影。
-  - 横向滚动条由表格框自己绘制，只占正文宽度；滚动时或鼠标在表格上时出现，可以拖动，点击轨道翻页。
-  - Callout、列表里的表格不越出所在的块。
-
-## 19. 图片、段落与表格对齐
-
-2026-09-27 用户要求在工具栏增加对齐；确认表格同时支持整个表格的位置和所选单元格的内容，不扩展到标题。
-
-- 顶部工具栏使用一个对齐菜单，按当前选区显示左对齐、居中、右对齐，并勾选当前状态。多个目标的状态不同时不勾选。仅光标所在或选中的对象受影响，标题、代码块等不适用时禁用。
-- 普通段落可单独对齐，也可选中多个段落一起设置；列表、引用、提示块中的普通段落同样适用。属性为 `paragraph.textAlign`，不改变文字格式。
-- 选中图片后设置该图片的 `blockAlign`。显式对齐的图片单独占一行，已有尺寸保留；未设置对齐的图片继续使用原来的行内排版，不改写相邻图片和段落的属性。
-- 图片悬浮工具栏也提供相同的对齐菜单，并有独立“阴影边框”开关。开启后 `image.shadow=true`，关闭恢复为空；旧图片默认关闭。编辑与阅读共用细边框、柔和阴影和深色适配，显示不改变图片尺寸；操作可撤销和保存，历史摘要标记“调整图片边框”。共享渲染定义在 `web/src/schema/imageStyle.ts`，Go 图片渲染同步；HTML 导出带 `data-frame="shadow"` 和可独立显示的阴影样式，导入读回；普通图片继续输出 Markdown。不迁移既有正文。
-- 图片工具栏的“批量应用图片参数”支持选择大小、对齐、裁切和阴影边框，以及四种应用范围，见 19.2。仅设置宽度时各图片保持自身比例，“原始尺寸”对应清除固定宽高；整批操作独立撤销，保留原选区，并提示实际修改数量；设置已一致时不产生修改或撤销记录。
-- 图片对齐不添加空段落。编辑器通过占满一行的行内容器排版，避免 ProseMirror 的光标占位符在块级图片上下额外撑出两行；缩放手柄和图片工具栏仍以实际图片为定位基准，读取已有文档不改写结构。
-- 同一段落内相邻图片因显式对齐或宽度限制分行时，阅读与编辑均保留正文默认的 `0.75em` 纵向间距；普通行内图片并排时按顶部对齐，不添加自动横向间距，横向留白由用户手动输入空格控制，换行后行首与段落左侧对齐。不同段落沿用原有段间距。纵向间距仅由样式控制，不产生空段落或空格。
-- 行内图片随可用宽度自动换行，视觉上的第二排仍属于同一段落；输入在换行图片前的普通空格可能排在上一行末尾，不代表输入丢失，也不作为下一排的独立缩进。含普通行内图片的段落在阅读与编辑中均保留手动空格；需要固定换行点时使用 Shift+Enter，或用 Enter 分为两个段落。
-- 图片工具栏取消默认的位置更新等待；显示期间按动画帧跟踪实际图片的位置与尺寸，对齐切换、拖动缩放和滚动时同步跟随。切换选中图片时重新绑定，工具栏隐藏或离开编辑页时停止跟踪；位置更新不改正文，拖动尺寸仍在松开时写入。
-- 对齐图片边界的 Backspace/Delete 先选中图片，再按一次才删除；图片行向外的删除键只移动光标或移除相邻的真实空段落，不把图片段落与标题合并，也不改变相邻标题层级。普通行内图片和用户明确选中的内容仍按原来的方式删除；表格单元格边界不穿透。
-- 表格中提供两组菜单：`单元格内容`作用于当前单元格或所选行列中的单元格，`表格位置`作用于所在的整个表格。整个表格的 `blockAlign` 以正文宽度为基准；宽于正文的表格仍从左侧开始并保持原有横向滚动。
-- 单元格的 `cellAlign` 独立于现有 Markdown 列对齐 `align`，表格结构调整不会把单格设置传播到整列。选中整列后通过顶部对齐菜单设置该列各格的内容对齐；设置单元格对齐会清除该格段落的局部对齐。显式对齐的图片仍保留自身位置。
-- 对齐写入正文 JSON，可撤销、自动保存，重新打开和阅读时保持一致。新增属性默认为空，不迁移或改写现有文档；格式版本不变。
-- 共享定义在 `web/src/schema/alignment.ts`，Go 渲染器保持对应。含对齐的段落、图片和表格导出为 HTML，图片和链接仍走原来的路径转换；单元格 HTML 同时保留列默认值和局部覆盖，导入后仍可继续编辑。普通段落和只有列对齐的普通表格继续导出为 Markdown。
-
-### 19.1 图片换行提示
-
-- 编辑当前图片段落时，显示“自动折行”“手动换行”“段落结束”。自动折行随可用宽度变化；Shift+Enter 写入换行，Enter 拆分段落。显式对齐形成的独立图片行不标为自动折行。
-- 点击同一段落内自动折行之间的空白只定位光标，不自动拆段落；需要固定换行用 Shift+Enter，需要分段用 Enter。图片间距、原生光标、方向键、删除及缩放沿用此前行为。
-- 实现在 `web/src/editor/imageBreaks.ts`，提示放在编辑器 DOM 外，随选区、焦点、滚动与尺寸变化更新，离开编辑页时释放；不写入正文，不出现在阅读和导出中。
-
-### 19.2 图片裁切、切分与批量参数
-
-- 裁切在原图上拖动选框或八个边角手柄，支持自由比例、1:1、4:3、16:9、3:4 和百分比输入；可重置为完整原图。多选时以同一原图比例裁切所有选中图片。取消不写入正文；替换原图时清除旧裁切，并更新原图尺寸。
-- 切分对当前可见区域做互补裁切，支持左右、上下和 2–8 份；预览中每条切分线都可直接拖动，两份时与位置滑块同步，多份时各线独立调整且不能相互穿过。“均分”恢复等分，改变份数时重新等分；指针取消恢复本次拖动前的位置，确认切分前不写正文。各份共用原始素材，之后可以独立调整。普通图片左右切分仍行内排列，上下切分插入手动换行；组合内按原位置分配各份。
-- 阅读页放大查看图片时保留当前裁切范围，包含切分后的图片与组合内图片；同一原图的不同裁切按各自的位置显示，切换时不复用上一张的裁切。预览按可见区域的比例适配桌面、手机与窗口尺寸，“查看原图”仍可打开完整素材。只改预览，不写回正文或生成新图片。
-- 批量参数独立勾选大小、对齐、裁切、阴影边框。多选时可指定作为参数来源的图片；未勾选属性保持原样，裁切按每张原图自身的比例应用。对齐不改变组合内的自由位置，组合内大小与裁切同步调整其画板尺寸。
-- 范围为“当前选中的图片”“当前这一节（含子节）”“全文图片”“当前组合”；从组合内打开时提供最后一项。当前节从图片前最近的标题开始，到下一个同级或更高标题结束；首个标题前的内容属于“文档开头”。全文包括列表、引用、表格和组合中的图片。弹窗显示目标数量，文档在弹窗打开后发生变化时要求重新打开，避免误改旧位置。
-- 裁切只保存 `image.crop` 的 `{x,y,width,height}` 原图比例，`sourceWidth/sourceHeight` 保存原图尺寸；原始资源不可覆盖，不生成新素材。固定宽高表示可见框的大小。操作共用文档保存、revision 冲突检查、历史摘要与撤销；历史区分裁切、大小、位置和边框变化。
-
-### 19.3 图片组合画板
-
-- 选中图片后可“组合为图片画板”，初始按网格排列；混合选区只提取图片，保留正文、列表和表格结构。画板是独立块，可设置宽高和左/中/右对齐；点击图片选中，Shift/Cmd/Ctrl 点击多选，拖动空白框选。支持自由拖动、共同缩放、裁切、切分、批量参数、置顶/置底、删除和解除组合。
-- 调整画板边框或宽高输入只改容器大小，内部图片的像素位置与尺寸保持；超出部分暂时裁出画板，放大画板可重新显示。“整体缩放”同比例缩放画板与内部图片，达到尺寸上限时保持比例。拖动期间即时预览，松开才写入一次撤销记录，取消指针操作不改正文。
-- 网格排列支持列数和间距，选中部分图片时只排列所选，未选时排列全部；横向/纵向等距分布需至少三张图片。方向键微调 1 px，Shift 为 10 px。解除组合按图层顺序恢复独立图片段落，保留裁切、大小、阴影与链接。
-- 正文新增 `imageBoard` 块，包含一个或多个真实 `image` 节点；`image.placement` 保存相对于画板的矩形。图片计数、资源收集、复制、备份继续递归处理原节点。编辑、阅读按同一相对位置绘制，窄屏同比例缩小整个画板。
-- 几何定义在 `web/src/schema/imageGeometry.ts`，组合格式在 `imageBoard.ts`，事务在 `editor/imageOperations.ts`；节点视图、Go `internal/render/image_geometry.go` 与 Markdown 导入导出对应。裁切图片所在段落和组合导出为带内联样式与参数的 HTML，可在导入后继续编辑；普通图片仍导出 Markdown。格式版本维持 1，无数据库迁移；旧程序不认识组合节点，写入组合后不能直接回退到不支持该节点的程序。
-- 代码块和画板的子内容由组件负责显示，通过 `editor/managedNodeView.ts` 显式返回空的 `contentDOM` 引用，并忽略内部 DOM 变化；外层重新解析时保留文档模型中的内容。弹窗的 `aria-hidden` 等展示属性不应写回正文，也不应让裁切误报文档变化。对真实正文变更的过期位置检查继续保留。
-
-## 20. 统一选区移除
-
-2026-09-27 移除表格专用工具栏，把移除操作统一放在选区悬浮工具栏最右侧。
-
-- 文字选区删除选中的文字；图片和节点选区删除对应节点；跨段落或全篇选区删除该范围。代码文字同样支持移除。图片保留尺寸、替换等专用操作，最右侧复用同一个垃圾桶按钮。
-
-- 点击或按住滑动表格外围格子，以及拖动单元格形成整行、整列选区后，垃圾桶删除对应行或列，支持一次多行或多列；覆盖全部行和列时删除整表，包括只剩一行或一列的表格。局部矩形单元格选区只清空内容，保留行列结构；单元格内的普通文字选区只删除文字。
-
-- 按钮提示随选区变为“移除选中内容”“移除选中行”“移除选中列”“移除表格”或“清空选中单元格”。点击按钮保持编辑器选区，移除单独记录为一步撤销；撤销恢复内容、表头、列宽与对齐。
-
-- 文字和表格选区只显示一套悬浮工具栏，表格内只有光标时不显示；代码和整块选区不显示不适用的文字格式按钮。混合选中图片和文字时，文字格式与图片操作合并成同一浮层的两行；只框选图片时仅显示图片操作。图片行显示选中数量、尺寸和阴影边框，设置不同分别显示“多种尺寸”和部分开启状态；点击阴影开关统一开启，全部开启时统一关闭。尺寸按每张图片所在容器宽度计算，保持各自比例，原始尺寸清除固定宽高。裁切、批量参数与组合支持多选；切分、替换、下载、原图和替代文字只在单选图片时出现。
-- 普通图片支持 Shift 点击范围选择、Cmd/Ctrl 点击逐张加入或取消；范围按文档顺序只选图片，跳过组合画板与中间文字。选中图片各自高亮，复用批量图片工具栏、删除、复制与文档撤销。多选状态由 `editor/imageSelection.ts` 的独立选区范围表示，不写入正文；点击其他内容或按 Esc 退出多选。
-- 混合选区的文字格式、链接和清除格式只处理选中的文字，保留图片已有属性与链接，跳过代码块；正文/标题切换只处理选中文字所在的段落或标题，不把纯图片段落变成标题。对齐菜单可统一调整选中内容，也可分别调整段落/单元格内容、图片和表格位置。图片修改和文字格式批量操作保留原选区、独立撤销；表格矩形选区按实际选中的单元格处理，不越过未选中的单元格。
-- 靠近表头的行选区把工具栏放在整表上方，避免挡住插入列按钮；下方行选区仍跟随所选行。长表格整列选区的工具栏固定在可见范围内。窄屏压缩按钮间距，空间仍不足时允许换行，移除按钮保持在最右侧。
-
-- 移除实现在 `web/src/editor/removeSelection.ts` 和 `RemoveSelectionButton.vue`；`selectionContent.ts` 统一收集选中图片和文字，`ImageFormatControls.vue` 由 `BubbleToolbar.vue` 与 `ImageToolbar.vue` 共用。工具栏不改变文档格式或服务端接口。
-
-## 21. 代码块增强第一批
-
-2026-09-27 用户确认第一批能力，希望代码输入具备常用代码编辑器的体验；快捷键按用户习惯采用 JetBrains 默认方案，缩进统一为 4 个空格。
-
-- **输入：** 代码区使用 CodeMirror 6，支持语言高亮、当前行、括号匹配与成对补全、回车缩进、多行 Tab/Shift+Tab 缩进。输入、Tab 和格式化使用 4 个空格，不再提供缩进选项，旧的本机缩进设置失效。语言模块提供的基础补全按需启用；本批不接入语言服务器、运行器或调试器。
-- **JetBrains 快捷键：** 根据 macOS 或 Windows/Linux 显示及执行对应默认键位。复制行或选区为 Cmd/Ctrl+D，删除行为 Cmd+Backspace / Ctrl+Y，移动行为 Option/Alt+Shift+上下，选中下一个相同词为 Ctrl+G / Alt+J，格式化为 Cmd+Option+L / Ctrl+Alt+L；行注释、块注释、折叠和展开同样使用 JetBrains 方案。每个代码块的更多菜单提供“代码块快捷键”，阅读、编辑和放大视图均可查看；全局快捷键说明也从 `web/src/code/keymap.ts` 读取同一份列表。Cmd/Ctrl+Enter 保留为在代码块后继续正文的应用快捷键。
-- **快捷键面板：** 块内说明与全局说明共用 `web/src/ui/shortcutKeys.ts` 的按键解析、图标和样式，组合键拆成独立按键帽，可替代的组合用“或”分开。Command 键及其图例使用苹果系统字体的原生 `⌘` 字形。面板显示当前系统，保持统一字号、行距、关闭按钮与修饰键图例，阅读页独立加载时同样生效。
-- **格式化：** 编辑状态的更多菜单提供“格式化代码”，只改当前代码块，可一步撤销、重做并沿用文档保存。C/C++、C#、Java、Objective-C 和 Protobuf 使用 Clang Format；Python 使用 Ruff；Go 使用 gofmt，并仅转换字符串以外的行首 Tab，保留原始字符串内容；JavaScript/TypeScript、JSON/JSONC、HTML/Vue、CSS/Less/SCSS、YAML、Markdown/MDX 和 GraphQL 使用 Prettier。格式化工具按需加载到浏览器 Worker，不执行代码或向外部服务发送源码；不支持的语言禁用菜单项，语法错误保留原文并提示，加载期间继续输入或切换语言时丢弃过期结果。
-- **区域折叠：** 编辑页和阅读页使用同一语法解析器识别可折叠区域，覆盖 C++、Go、Python、JavaScript、JSON 等支持结构解析的语言，不把字符串中的大括号当作边界。行号旁可以折叠或展开，折叠处提示隐藏行数；更多菜单可折叠或展开全部区域。无法解析的语言保留普通代码显示。
-- **行号分隔：** 阅读、编辑及放大视图在行号与折叠按钮区右侧显示 1px 竖线，沿用代码块的低对比度灰蓝色 `--yy-codeblock-line`，与代码之间保留 6px 间距。行号区靠左收紧留白，统一为行号在前、折叠按钮在后；阅读页左内边距为 8px，编辑与放大视图行号左右内边距为 6px，保留折叠按钮空间。浅深主题保持一致，换行、折叠及横向滚动时随行号区显示。
-- **行选择：** 单击行号选中整行，Shift 扩选，按住拖动选择连续多行；折叠、换行后仍使用源代码行号。横向滚动时，阅读页与编辑页的行号和区域折叠按钮固定在左侧，只有代码文字滚动，短行也保持对齐。编辑页选区沿用统一的垃圾桶按钮，删除和撤销属于整篇文档的历史；阅读页的行选择用于复制代码，控件不混入复制内容。Cmd/Ctrl+A 在代码内先选整块，再向外扩到容器和全文。
-- **放大视图：** 代码块右侧增加放大和更多按钮。放大后独立滚动，支持查找、换行、复制；编辑状态下沿用标题、语言、格式化、快捷键说明和选区移除，直接编辑同一份文档，关闭后回到原阅读位置。Esc 先关闭查找等内部面板，再关闭放大视图。375 px 窄屏同样可用。
-- **块内查找替换：** 代码内 Cmd/Ctrl+F 只查当前代码块，Cmd/Ctrl+R 聚焦替换输入，可区分大小写、使用正则、逐项或全部替换；阅读状态只查找。按用户要求移除跳转到行；主工具栏的查找仍搜索整篇，并展开挡住匹配的代码区域。
-- **菜单滚动：** 更多和语言菜单随触发按钮移动，按钮滚出正文可见区域后关闭。在菜单里滚轮或触控板滚动只作用于菜单自身，到达上下边界或在不同菜单项之间移动鼠标都不会带动正文；语言选项的悬停不再主动滚动页面，键盘上下选择只滚动选项列表。
-- **状态与兼容：** 整块标题和收起状态继续保存在原来的文档属性及 Markdown 围栏信息串。区域折叠和换行保存在本机浏览器，按文档地址和代码块序号区分；折叠范围附带源码摘要，内容不匹配时不套用旧范围。本批不更改文档 schema、服务端渲染格式或 Markdown 语义。
-- **实现：** `web/src/code` 共用编辑器、语法加载、查找面板、快捷键说明、格式化与放大视图。编辑页的 Vue 节点视图把增量修改交给 ProseMirror，沿用保存、revision 冲突和文档撤销；格式化前后隔开历史记录，不与相邻输入合并。从代码回到正文时等待浏览器落定选区，避免旧代码光标抢回焦点。阅读页保留 Chroma 静态高亮，悬停、聚焦或恢复折叠时按需加载语法模块，放大时再加载 CodeMirror 视图。
-- **编辑页按需挂载：** 代码块进入窗口上下 1000 px 内才创建 CodeMirror，此前在同一框内显示纯文本源码和行号，字号、行高、内边距与换行规则与 CodeMirror 一致，挂载前后高度不变。点击纯文本、块操作（放大、复制、格式化等）、查找匹配、选区进入、阅读位置恢复和 `codeEditorIn()` 会立即挂载；折叠的节和收起的代码块展开后再挂载。CodeMirror 在窗口外只能估算未绘制行的高度，所以窗口外挂载的长块经 `--yy-code-held` 保持原高度，进入窗口并完成测量后释放；放大视图自行保持宿主的内联 `min-height`，两者互不覆盖。各代码块共用一个 IntersectionObserver，每个事务只查找一次选区和当前匹配所在的块。
-
-## 22. 快捷键与文档层级
-
-- **非编辑快捷键：** Cmd/Ctrl+B 开关左侧栏，宽屏切换固定侧栏，窄屏切换目录抽屉。阅读页的 ↑/↓ 按页面“上一篇/下一篇”顺序切换文档，到首尾停止。Option/Alt+N 新建文档并进入编辑：文档阅读页新建同级文档，分组页建在组内，知识库主页建在顶层；页面尚未就绪或请求尚未完成时不重复创建。输入框、菜单、弹窗和组合输入保留自身按键行为；编辑模式继续使用原来的粗体与光标移动。快捷键说明的常用页签同步列出阅读导航、新建与图片多选。
-- **逐层扩选：** 编辑正文时 Option/Alt+L 从光标或已有选区向外扩大：词语、句子、整个段落或内容块、所属标题下的内容、上级标题下的内容，直到全文。章节到下一个同级或更高级标题之前结束；从正文扩选时不额外加入所属标题本身，从标题文字扩选时保留该标题。容器内标题独立划分章节，外层章节包含整个容器；跨小节的已有选区直接进入能包含它的上级范围。表格内从单元格内容扩到单元格，再直接扩到整张表格，不经过当前行或跨单元格文字范围；1×1、空表格及合并后只剩一个单元格的表格也保留整表选择，单格选择即代表整表，不重复停留。其他范围相同的步骤跳过，到全文停止。章节选区保留完整块边界，复制、删除与格式操作不会漏掉边缘的代码、表格或图片。原生分词支持中英文和 emoji，单元格及图片多选计算全部实际范围；选区变化不改正文。Option/Alt+Shift+L 已移除，避免与 macOS“查找输入码”冲突，正文与代码均不再拦截，也不再显示于快捷键说明。
-- **代码中的扩选：** Option/Alt+L 按词语、语法节点、整行、整块代码、外层内容块与所属章节扩大；语法结构由现有语言解析器提供，纯文本或未支持的语言按词语、行与代码块扩展。放大代码时扩到外层会退出放大视图。独立阅读代码视图在整块范围内扩选。Cmd/Ctrl+Option/Alt+L 的格式化保持原行为。macOS 按物理字母键识别 Option 组合，避免特殊字符或死键影响；Windows 使用 Alt，输入法组合与 AltGr 不触发。
-- **大纲章节拖动：** 编辑大纲中拖动标题文字或其右侧拖柄，会连同下属标题、段落、代码、表格、图片及容器整体移动，标题级别保持不变。落点线区分目标章节之前或之后；之后指整节末尾，不插入目标标题与其正文之间。不能放进自身范围，松开才提交一次可撤销操作；Esc、指针取消或拖动期间正文变化会取消预览。跨容器移动先验证结构，搬空一栏等必需内容容器时留下空段落。桌面大纲预览在拖动中保持打开，靠近滚动区边缘会滚动。窄屏从顶栏“大纲”打开抽屉，标题文字用于点击与滚动，右侧拖柄支持触摸拖动；Esc、遮罩及关闭按钮关闭抽屉。
-- **全站 Tab 与焦点：** `web/src/shared/tabKey.ts` 在应用启动时统一拦截 Tab 与 Shift+Tab 的网页控件切换，覆盖阅读页、编辑页、标题、工具栏、侧栏、查找框与弹层。正文编辑仍保留列表缩进/取消缩进、表格前后单元格与末尾新增行、代码缩进/取消缩进；普通正文没有对应操作时保持光标和内容。放大的代码编辑区同样保留编辑操作；Ctrl/Command/Alt 组合和输入法组合输入不拦截。控件取消焦点轮廓、聚焦阴影与聚焦变色；内容选区、图片/表格选择、业务选中状态与代码高亮继续保留。遵循[共享网页键盘与焦点约定](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/conventions.md#网页键盘与焦点)，只有用户明确提出需求时才增加例外。
-- **保存并阅读：** 编辑页在 0.4 秒内连按两次 Esc，沿用“完成”的保存与路由流程，等待图片上传和最后一次保存后回到阅读位置。有选区时，第一次 Esc 取消选区并将光标放在文档顺序最前的位置，不显示提示；反向文字选区、章节/全文、表格单元格、图片多选、组合画板及代码多选共用此规则，标题输入框内的选区也回到开头。完整容器进入首个文字位置，原子块优先停在前方边界或前一段末尾，不插入空段落。没有选区时，单按约 0.4 秒后提示“连按两次 Esc 键保存并回到阅读模式”。取消选区的按键同样计入连按，两种情况下快速再按一次都保存退出；阅读页的两次 E 使用相同节奏。长按、输入法组合输入不触发；输入文字、其他按键、点击或窗口失焦会中断连按。菜单（含 `[[` 文档链接与代码补全）、弹窗、查找、格式刷和代码放大视图优先处理 Esc，关闭它们的按键不计入连按。冲突或保存失败沿用现有离开确认与本地草稿。
-- **全局快捷键面板：** 从编辑工具栏移到左下角外观菜单，保留独立页签及桌面/手机布局。Cmd/Ctrl + / 在首页、阅读页、编辑正文、标题输入框等位置均能打开；用户确认代码编辑区保留行注释。常用页签列出 E → E、Esc → Esc 和单次 Esc 取消选区，并说明连按时间和适用模式。面板从应用层按需加载，阅读页打开说明不加载编辑器。
-- **标题整批升降：** 格式工具栏的标题选择旁增加“提升标题等级”和“降低标题等级”。只改变选区内标题，每次整体升降一级；没有选区时作用于光标所在标题。只要包含 H1，提升整批禁用；只要包含 H6，降低整批禁用；无标题时两个按钮均禁用。正文、标题文字及行内格式保持，支持引用等嵌套块和表格内不连续的单元格选区，不改变选区外的标题；整批操作可一步撤销。
-- **列表层级：** 编辑与阅读共用内容样式。有序列表按 decimal → lower-alpha → lower-roman 循环，无序列表按 disc → circle → square 循环，第四层回到第一种；混合列表按实际嵌套层级计数。保留原起始序号，任务列表继续显示复选框。仅调整显示，不扩展正文 JSON 或 Markdown 格式。
-
-## 23. Markdown 之外的格式扩展：第一批
-
-2026-09-30 用户正式启动本阶段，并确认第一批为文字颜色、图片说明、合并/拆分单元格、单元格底色和可选表头。状态：已实现并发布。分栏与附件随后实现，分别见 23.7、23.8；通用画板已实现，见第 25 节；图片组合画板继续沿用第 19.3 节。
-
-### 23.1 交互与范围
-
-- **文字与背景颜色：** 顶部使用独立的文字颜色和文字背景色工具，选区悬浮栏合并为紧凑菜单，交互与色板见 23.4。作用于选中文字；只有光标时应用于后续输入。颜色可与加粗、链接、下划线等叠加，代码块与公式不提供此操作，混合选区只处理文字。清除格式同时清除颜色。常用语义色沿用浅深主题配色，完整纯色色板与自定义颜色保留选定值。
-- **图片说明：** 在选中图片的工具栏增加“图片说明”，编辑纯文本，允许换行；确定应用，取消不改，清空即移除。说明显示在图片下方、与图片同宽并自动换行；独立于加载失败时的替代文字，也不替换图片链接的标题。说明随图片保存、复制、移动、裁切和组合保留，裁切与缩放只作用于图片像素区域，说明不参与裁切。组合内说明随图片位置显示，画板边界仍由用户调整。
-- **表格结构：** 取消结构操作后强制恢复 Markdown 首行表头的行为，保留实际的 `tableHeader` / `tableCell` 与跨行跨列结构；原有列宽补齐、列对齐和单元格局部对齐继续有效。新建表格默认首行为表头，插入时可取消；表格工具提供首行表头开关。开关只转换首行单元格类型，不删文字、列宽、行高或底色。初始尺寸面板默认选择 1 行 × 1 列，鼠标与方向键共用同一右下角选中位置；上下调整行数、左右调整列数，范围为 1–8 行、1–10 列，Enter 插入、Esc 取消。鼠标离开网格保留尺寸，面板处理按键时保留正文选区，忽略输入法组合与修饰键组合。
-- **合并与拆分：** 表格工具出现在顶部栏及单元格选区工具栏。矩形多单元格选区可合并，按原顺序保留其中内容；单个跨行/跨列单元格可拆分，内容留在拆分后的第一个单元格，其余为空。无法执行时禁用对应操作，保留原生行列插入、删除、Tab 导航和宽高调整。
-- **单元格底色：** 与文字颜色共用色板交互，使用适合背景的浅深主题配色，也允许自定义颜色。应用到当前单元格或所选单元格，可恢复默认；不改文字颜色、对齐或表头类型。选区覆盖色与底色独立绘制，仍能判断所选范围。
-- 新控件沿用统一按钮提示、弹层和全站 Tab/焦点规则。各次操作可独立撤销，保持选区，正常自动保存；控件聚焦不增加轮廓或高亮。
-
-### 23.2 格式、渲染与导入导出
-
-- 正文仍保存为 Tiptap JSON：`textColor` 标记保存 `color` 与可选固定渐变名 `gradient`，文字背景色沿用 `highlight.color`，另有 `image.caption` 与单元格 `backgroundColor`。可选表头和合并使用已有节点类型与 `colspan` / `rowspan`，不增加第二份表格状态。颜色仅接受受支持的纯色值或固定渐变名，说明按文本转义，不允许注入任意 HTML 或样式。
-- 编辑器、Go 阅读渲染和 HTML 导入导出同步维护。普通内容继续导出 Markdown；含文字颜色或图片说明的内容、无表头/非标准表头/合并/带底色的表格使用可独立显示的 HTML，保留资源相对路径与链接转换。包含这些格式的列表、引用与提示块整体导出为 HTML，避免 Markdown 缩进改变嵌套结构或多行说明。导入读回属性与嵌套内容，避免说明被重复识别成正文。
-- 图片说明参与搜索文本，历史摘要分别记录图片说明与替代文字变化；表格底色与结构变化分开描述，文字颜色记为文字格式调整。
-- 不迁移或批量改写既有文档，不新增 API、数据库表或媒体目录；格式版本继续为 1。使用新标记后不能回退到不认识该标记的旧程序。发布前对正式实例运行只读 `roundtrip`，确认所有现有文档能被新 schema 接受。
-
-### 23.3 后续批次
-
-- **第二批：分栏。** 已实现 2–4 栏、栏宽调整、内容移动与窄屏展开，交互与格式见 23.7。
-- **第三批：附件。** 已实现上传/下载、文件卡片、导入导出及备份恢复，见 23.8。
-- **通用画板：** 与已有图片组合区分，先确定是否需要自由绘制、文字、形状、连线及导出格式，再选择实现方式；不在第一批引入另一套编辑器。
-
-### 23.4 颜色工具与顶部对齐
-
-用户提供飞书选区工具栏与语雀顶部工具栏作为参考，并要求顶部工具与正文对齐。
-
-- **顶部栏：** 文字颜色为带色条的 A，文字背景色为带色条的高亮笔，各有独立小箭头。顶部与选区栏的 A 均采用 17px 字号，与相邻工具图标协调。主按钮应用本浏览器上次使用的颜色，箭头悬停展开色板，也可点击；展开时箭头轻转 180°，减少动态效果时取消动画。顶部按钮区复用正文的列宽与左右留白，在同一位置居中；不随侧栏开关偏移，窄屏在正文宽度内横向滚动。
-- **选区悬浮栏：** 合并为带底色的 A 与箭头，菜单提供一行 8 个文字色入口、两行 16 个背景色入口及恢复默认。主按钮一次应用上次文字色和背景色，恢复默认只去除这两种格式，保留粗体、链接等；一次操作一个撤销步骤。混合颜色选区不误标为默认色。
-- **完整色板：** 10 列、7 行纯色色板，文字色额外提供青蓝、蓝紫、粉橙、橙红四种渐变；背景色不提供渐变。顶部和单元格底色色板均提供最近使用的自定义颜色（每类最多 10 个）与“更多颜色”，通过系统颜色选择器或 HEX 输入预览，按应用后才修改正文。最近颜色与上次颜色存在本浏览器，不写入文档。
-- **悬停与焦点：** 鼠标从箭头进入面板有短暂关闭缓冲，输入自定义颜色时移出面板也保持打开；颜色菜单之间互斥，点击外部或 Esc 关闭。悬停不夺取选区，悬浮栏面板留在其内部，触屏以点击打开。沿用普通 Tab 拦截、无焦点高亮与 IME 规则。
-- **格式契约：** 默认黄色高亮与原快捷键继续使用无色值的 `highlight`，仍导出 `==文字==`；指定背景色导出 `<mark>`。渐变保存固定名称与纯色回退值，HTML 带 `data-text-gradient` 和可独立显示的 CSS。文字色标记在高亮与链接内部，确保背景不会遮住渐变文字；编辑 DOM、Go 阅读渲染和导出保持相同层级。旧程序可能丢弃彩色高亮及渐变属性，回退前核对内容。
-
-### 23.5 格式刷与工具栏顺序
-
-- **入口与图标：** 顶部工具栏从左到右为插入、撤销、重做、格式刷、清除格式，再进入正文/标题和其余格式工具。插入入口采用 24px 绿色圆形加号，位于工具栏最左侧，不显示文字或下拉箭头，点击打开原有插入菜单；表格尺寸面板继续锚定此按钮。格式刷与清除格式按用户提供的语雀截图绘制滚筒、橡皮擦线性图标；选区悬浮栏的清除格式共用同一橡皮擦图标。
-- **快捷键：** 编辑正文时 `Cmd/Ctrl + Shift + S` 开关格式刷，启用时与单击按钮一样采样当前文字/段落格式并应用一次；再次按下或 Esc 取消。按钮提示与快捷键说明同步展示。
-- **使用：** 在源文字中放置光标或选择文字，单击格式刷使用一次，双击连续使用。随后拖选文字，在松开指针时应用；单击目标段落时应用整段。键盘选区可以按 Enter 应用；Esc 或再次单击格式刷退出，选择其他工具、离开编辑器或开始输入时也退出。启用期间按钮显示选中状态、正文使用复制光标，并隐藏选区工具栏，避免遮挡目标。
-- **复制范围：** 复制粗体、斜体、下划线、删除线、行内代码、文字颜色（含渐变）、文字背景色，以及正文/标题级别和段落对齐。混合格式的源选区取文档顺序中第一段选中文字的格式，光标使用当前位置或待输入的格式。刷入会替换目标文字的这些视觉格式，目标的链接地址继续保留；不复制链接地址、图片参数、单元格底色或容器结构。
-- **选区与结构：** 拖选仅改变选中的文字；正文/标题及对齐作用于涉及的段落，并遵守列表等父节点的结构要求。按表格实际选中的单元格范围处理，不把不连续选区的外围当成一整段；混合图片、代码块、公式和图片组合时只刷文字，保留相邻内容。空段落支持刷入样式后继续输入。
-- **保存与撤销：** 每次应用是独立的一步文档撤销，可重做并沿用自动保存。格式刷状态只存在于当前编辑器，退出或重开后清空；复用已有正文格式，不增加 schema、API 或数据库迁移。实现位于 `editor/formatPainter.ts`，复用 `selectionContent.ts` 的精确范围和撤销边界。
-
-### 23.6 折叠块与高亮块
-
-- **入口：** 顶部加号与 `/` 插入菜单提供“折叠块”“高亮块”；支持 `zhediekuai` / `zdk`、`gaoliangkuai` / `glk` 等拼音搜索。插入时将当前段落或选中的块放入容器，保留原来的文字格式、图片、列表、表格与代码，空段落直接成为空内容区。两种容器内均可通过顶部加号或斜杠菜单继续插入其他内容块、折叠块和高亮块；正文中的 H1–H6 标题保留层级与折叠按钮，整节拖动通过大纲完成，普通段落及容器本身不显示块旁工具。折叠块的专用标题行继续使用自身的展开/收起箭头。
-- **折叠块：** 无背景色，细灰边框、轻圆角，左侧小三角切换展开与收起，箭头有短旋转过渡。标题和正文分别编辑，空白时显示“请输入折叠块标题”“在此输入内容”。Tab 或 Enter 从标题进入正文开头，收起时同时展开；正文以代码、表格或图片开头时进入对应编辑位置或节点选区。Shift+Tab 不切换页面控件；正文中的列表缩进、代码缩进和表格单元格 Tab 保持各自行为。末尾空行再次 Enter 回到块外；标题开头 Backspace 将标题与正文展开为普通块。折叠前将正文内光标移到标题，方向键或查找定位进入隐藏正文时自动展开，避免在看不到的位置编辑。
-- **高亮块：** 没有标题和图标，使用整块柔和底色；光标或整块选区位于其中时，上方显示一排灰、蓝、青、薄荷、绿、黄、橙、红、粉、紫色块，勾号表示当前颜色。默认浅蓝，选择后立即生效，改色单独撤销；深色主题使用对应的低亮度底色。选中文字时仍使用原有文字格式工具栏。
-- **阅读：** 高亮块不显示色板；折叠块按保存状态展开或收起，阅读时切换仅影响当前页面。搜索或大纲跳转到折叠内容中时，先展开包含目标的折叠块。
-- **格式：** `foldBlock(collapsed)` 包含 `foldTitle` 和 `foldContent`，`highlightBlock(backgroundColor)` 包含普通块；支持相互嵌套。颜色使用 10 个固定预设，标题、内容、折叠状态和底色保存在正文 JSON，沿用 revision、快照与撤销机制。Markdown 导出用标准 `<details><summary>` 与带底色的 HTML 容器保留语义，导入和复制粘贴读回；容器位于列表或提示块内时整体使用 HTML，避免嵌套前缀改变内容。Go 渲染、纯文本搜索和历史摘要同步识别新节点。
-
-### 23.7 分栏
-
-状态：已实现并验证。本批补充分栏；附件见 23.8，通用画板见第 25 节。
-
-- **插入与编辑：** 顶部加号与斜杠菜单提供“分栏”，支持 `fenlan` / `fl` 搜索。默认两栏，将当前或选中的块原样放入第一栏，其余栏为空段落。每栏支持现有文字、图片、表格、代码、折叠、高亮以及嵌套分栏；栏内使用顶部或斜杠菜单插入内容，标题显示层级与折叠按钮，整节内容可从大纲跨栏移动；普通段落和分栏容器不显示块旁工具。
-- **布局：** 阅读与编辑共用浅灰绿细边框、轻圆角与栏间虚线，透明背景保持正文配色；空栏保留最小高度，即使没有输入内容也显示完整框架。光标位于分栏中时，顶部显示“分栏设置”，可选 2–4 栏、恢复等宽、两栏左右 1:2 / 2:1 比例，以及移动当前栏顺序。桌面悬停时栏间显示宽度拖柄，拖动调整相邻两栏宽度；拖动中仅预览，松开提交一次撤销，Esc、取消指针或期间正文发生变化则放弃预览。操作不添加额外 Tab 行为。
-- **指定位置插栏：** 编辑时在分栏顶边的两端和栏间显示与表格一致的小圆点，悬停变为加号并预览插入线；单击在对应位置加入空栏，光标进入新栏，支持单步撤销。已有内容顺序与各栏相对宽度保留，新栏采用原有栏宽权重的平均值；原来等宽则继续等宽。最多仍为四栏，达到上限后隐藏添加按钮。控件属于节点视图，不写入正文；嵌套分栏的桌面悬停只显示当前内层控件。
-- **内容保留：** 增加栏数在末尾加入空栏；减少栏数按文档顺序把移除栏的所有块并入最后一栏，并恢复等宽。“取消分栏，保留内容”按从左到右的顺序展开所有内容。布局调整单独撤销，保存沿用 revision 与快照；Cmd/Ctrl+A 直接选中全文；按当前栏、整组分栏与外层逐步扩选使用 Option/Alt+L。
-- **阅读与窄屏：** 阅读保留分栏边框与栏间分隔，不显示编辑工具。电脑按比例横排，720px 及以下按栏顺序纵向显示，编辑端也如此；手机保留布局设置，隐藏栏宽拖柄，添加按钮沿左边框随各栏上下排列，触屏上显示小加号。宽表格与代码在自身栏内滚动，代码标题与按钮随可用栏宽换行，保留标题显隐入口。
-- **格式：** `columns(widths)` 包含 2–4 个结构节点 `column`，每栏为 `block+`。可选 `widths` 是与栏数相同的 1–1000 正整数权重数组，null 为等宽，非像素宽度。HTML 使用 `data-columns`、`data-column-widths`、`data-column` 和可独立显示的 grid 内联样式；包含分栏的列表、引用、提示等整体导出 HTML，导入和剪贴板读回。Go 渲染、结构校验、搜索与历史摘要同步识别。无数据库迁移、新 API 或媒体目录；写入分栏后不能回退到不识别新节点的程序。
-
-### 23.8 附件
-
-- **插入：** 顶部“+”和斜杠菜单提供“附件”，支持名称、拼音、首字母及 PDF/file 等关键词。文件选择器可多选，也可直接拖入或粘贴文件；支持的图片仍按图片插入，从“附件”选择的图片则保留为文件卡片。附件不设上传大小上限，允许空文件；图片作为附件插入时也不受原 25 MiB 限制。批量按选择顺序上传和插入，显示文件名、进度、取消；失败可重试或移除。上传占位不写入正文，保存退出等待未完成上传。添加附件保留已有选区内容，失败或取消不会删除正文。
-- **卡片：** 使用主题内的细边框、文件类型标记、文件名与大小。阅读时点击卡片打开预览，右侧独立按钮下载；编辑时点击选中整个附件，支持复制、删除、撤销、重做、章节移动及模板/片段复用，右侧提供重命名与下载。重命名只修改当前卡片和下载文件名；同一文件在其他文档中的名称保持。支持表格、分栏、高亮块、折叠块等容器，长文件名与窄屏自动换行。沿用全站 Tab 和焦点约定。
-- **阅读预览：** 弹窗支持常见位图、PDF、UTF-8/带 BOM 的 UTF-16 文本与浏览器支持的音视频。PDF.js 按需加载并在本地 canvas 渲染，提供上/下一页与左右方向键；字体、CMap、解码资源随程序发布，不依赖第三方在线服务，不启用 PDF 脚本与表单交互。文本最多预览前 1 MiB，HTML/SVG/XML 以源码显示。无法预览、加密或损坏时显示原因并保留下载按钮，不自动下载；Esc 关闭并回到正文。桌面与窄屏共用主题弹窗。
-- **压缩包目录：** 支持 ZIP、7z、RAR、TAR、TAR.GZ/TGZ、TAR.BZ2/TBZ2、TAR.XZ/TXZ 与单文件 GZIP；展示目录展开/收起、完整路径搜索和文件大小。只读取目录，不解压落盘、不跟随符号链接或读取相邻分卷；名称作为纯文本。最多展示 5,000 项、路径总量 1 MiB，TAR/GZIP 流读取上限 64 MiB，读取检查 5 秒超时与请求取消；截断明确提示部分目录。Office 文件不因为内部为 ZIP 而冒充压缩包预览。
-- **格式与检索：** 新增块级原子节点 `attachment`，属性为 `src: /attachments/<32位内容ID>`、`name`、`size`、`mime`。文件名参与全文搜索和模板摘要，历史摘要识别附件增删、移动与信息修改。正文仍为格式版本 1，不迁移旧文档；使用附件后不能回退到不认识该节点和二进制素材的旧程序。
-- **文件生命周期：** 复用现有 assets 表与 data/assets/；图片沿用原扩展名，其余为 `<id>.bin`，按 SHA-256 去重并原子发布。服务启动及每分钟扫描所有正文（含回收站）、历史版本、模板/片段和媒体链接，覆盖嵌套块与图片画板；连续一小时没有任何引用才删除登记与文件。新上传从成功开始，已有未引用文件从首次扫描开始计时；重新引用或重复上传重置计时。删除卡片但历史仍引用时保留；上传成功后放弃编辑也按同一规则回收。计时与删除重试状态存于 meta 的 asset_gc:*，跨重启保持，无数据库迁移。正常取消/失败立即移除未完成临时文件，异常遗留 .upload-* 超过一小时且未被上传进程锁定后清理；未登记的孤立完整文件也观察一小时。
-- **回收一致性：** 写事务中统一检查引用并删除素材记录，解析失败停止整个清理。引用按行缓存：正文以 revision 与创建时间、模板以 revision 判断是否变化，历史快照不可变；每轮先在加锁前解析上次以来写入的内容，写事务内只复核其间又变化的行，因此扫描不会让保存等待整库解析；提交删除标记后再移除文件，异常退出可继续重试。保存/新建/取消编辑/模板写入与引用计时更新同一事务；已回收附件不能被保存成失效卡片，返回重新上传提示。备份和上传发布对既有 assets 目录持跨进程共享锁，回收持排他锁，保护快照与文件一致性。gc --dry-run 提供只读统计，普通 gc 遵守同样的一小时宽限期，不提供强制提前删除。
-- **接口与下载：** `POST /api/attachments` 接收仅包含一个 `file` 的 multipart 请求，边接收边写入 data/assets/.upload-* 并计算 SHA-256，内存不随文件大小增长；完整表单校验通过后原子发布并登记。应用与附件专属 Nginx location 均不设上传大小上限，Nginx 关闭请求体缓冲；附件改用读空闲超时，避免普通请求的两分钟总期限中断持续上传。返回素材信息及应用内地址；`GET/HEAD /attachments/{id}?name=<文件名>` 支持 Range，下载始终使用 attachment disposition、octet-stream 与 nosniff。`GET /api/attachments/{id}/preview?name=<文件名>` 返回预览类型、文本或目录；`GET/HEAD /attachments/{id}/content?name=<文件名>` 仅允许经内容识别的位图、PDF、音视频，设置 inline、nosniff 与 sandbox CSP，支持 Range，其余类型返回 415。二进制素材不能通过图片接口直接打开。继续受已有设备认证及写接口来源校验保护，不增加匿名例外。
-- **导入导出：** 卡片导出为可独立下载的 HTML 链接块，保留名称、大小和类型。网页 ZIP 与命令行导出把实际文件写入 `attachments/<id>-<安全文件名>`，正文使用相对路径；同名不同内容互不覆盖。导入读回卡片并上传本地文件、恢复路径，缺失文件明确记入报告。附件中的 Markdown 文件不当作笔记再次导入。导出含这些卡片的容器整体使用 HTML 保留结构。
-- **备份：** 原生快照覆盖快照时所有已登记的图片与附件，包括仅被历史或模板引用及仍在回收宽限期内的文件；清单版本 2 允许 .bin，逐文件核对 SHA-256，恢复仍兼容版本 1。备份与回收通过目录锁协调；已有快照的硬链接不随源文件删除，空间在最后一个备份链接删除后释放。不得让旧版备份程序与新版回收并行。数据根、数据库表与门户备份类型不变，门户继续收集原生快照。
-
-## 24. 文档链接、模板与内容片段
-
-### 24.1 文档与章节链接
-
-- 编辑时输入 `[[`，按文档/章节名称、拼音、首字母或名称片段匹配；上下键选择、Enter 插入、Esc 退出并保留输入。无查询时列出文档，右侧箭头或左右键展开/收起章节。代码块和行内代码中不触发。链接浮层提供“文档与章节”页签，已有选区保留原文字；斜杠菜单与顶部插入菜单的“文档”直接打开该页签并聚焦搜索，“链接”继续默认打开“网址”。
-- `GET /api/link-targets` 返回存活文档及 H1–H6 章节，Go 生成拼音，前端复用搜索面板匹配器；排除分组、回收站和已删除知识库。章节复用阅读渲染的锚点及重复标题后缀。
-- 服务端按文档版本缓存章节和拼音，只解析上次以来写过的正文。选择器再次打开时先显示上次的列表，同时向服务确认；没有变化时是 304，有变化时换成新列表，失败则保留旧列表。
-- 链接浮层宽 380 px，窄屏时缩到视口宽度减 16 px，保留两侧至少 8 px 边距。
-- 存储仍为普通 `link` 标记，地址 `/docs/<id>` 或 `/docs/<id>#<编码后的章节锚点>`。文档移动/改名不影响 ID；章节改名、同名章节顺序变化后可能需要重新选择，不增加稳定章节 ID。Markdown/HTML 导入导出沿用现有链接与资源路径改写。
-- 阅读正文、编辑正文和选择器结果中，鼠标悬停约 420 ms 显示文档/章节名称、知识库和最多 180 字摘要。`GET /api/docs/{id}/preview?heading=<锚点>` 提供摘要，章节到下一同级/上级标题为止；失效目标显示已删除或改名。移开、点击、滚动和离开页面清理预览；异步旧结果不会覆盖新目标。触屏直接操作链接。
-- 同篇章节跳转响应路由 hash 变化，滚动前展开目标所属折叠区。
-
-### 24.2 文档模板与内容片段
-
-- 阅读/编辑“更多操作”保存整篇为模板；选区工具栏或编辑“更多操作”保存选区为片段。命名后保存独立快照，原文修改/删除不影响模板；编辑页从当前编辑器取内容，不改正文或撤销历史。
-- 知识库新建菜单和目录节点菜单提供“从模板新建”，使用模板名作为初始文档名。顶部插入菜单与 `/模板` 打开模板库；`/` 可直接搜索模板/片段的名称、拼音或首字母并插入。模板库支持分类、内容预览、重命名和删除。
-- 保存完整 Tiptap JSON 及格式版本。局部嵌套选区补足外层必要的空标题/空栏；表格按实际单元格矩形、多选图片按真实选中图片保存，章节选区保留完整兄弟块。无法闭合的选区提示扩大到外层块，不静默展平。插入为一次正文事务，撤销与前后编辑隔开；异步期间正文变化则拒绝向旧位置写入。
-- 使用既有 `meta` 的 `template:<随机 ID>` 行，记录名称、类别、内容、`schemaVersion`、独立 revision 和时间，无数据库迁移。`GET/POST /api/templates` 列摘要/创建；`GET /api/templates/{id}` 取内容、预览和图片尺寸；`PATCH/DELETE /api/templates/{id}` 重命名/删除，携带 `baseRevision`，冲突返回 409。
-- 模板保留原有内容寻址图片和链接目标，插入补齐图片尺寸。源文档彻底删除后图片仍保留；删除模板不改变已插入的内容。原生备份覆盖整个数据库和登记图片，包含模板库；知识库 Markdown 导出只导出文档，模板复用后的正文沿用现有导入导出。
-- 模板库按需加载，不把编辑器引入阅读首屏。预览采用 Go 渲染，图片保留应用前缀，移除章节 DOM ID 避免与当前页面冲突。手机上下排列列表和预览，弹窗限制在屏幕内。
-
-### 24.3 文末反向链接
-
-- 文末“链接到此文档”默认收起，展开时请求 `GET /api/docs/{id}/backlinks`，显示来源文档、知识库和引用上下文，可跳转到来源章节；重新展开会刷新。
-- 从当前存活正文的 `link` 标记推导，同一来源只列一次；不计本文自身、模板、历史版本、回收站或已删除知识库。外部网站相似路径不计入。小规模语料直接读取后遍历，不设持久索引或迁移，保存/恢复/删除自然反映当前关系。
-- 先用 SQLite 筛出正文含 `/docs/<id>"`、`/docs/<id>#` 或 `/docs/<id>?` 的文档，只解析这些候选，再逐个核对链接目标；编辑器与导入写出的链接都是这几种形式。筛选先查共同前缀 `/docs/<id>`，不含它的多数正文只扫描一遍。目标文档本身在查询中排除，长文档链接自己的章节时不再扫描和解析自身正文；核对目标是否存活只查元数据，不读正文。
-
-## 25. 可编辑画板与后续事项
-
-Excalidraw 0.18.1 已接入独立 `drawing` 原子块，形状、文字、绑定连线与图片在弹窗内编辑，应用为一次正文事务。普通阅读仅使用静态预览；宽度、对齐、说明独立于场景。提供数据页、B+ 树、索引扫描和事务时间线模板。
-
-完整契约见 [WHITEBOARD.md](WHITEBOARD.md)：不可变包复用 assets，SVG/PNG 单份预览，派生检索文字，正文/历史/模板/备份中的包与图片依赖保护，旧客户端能力检查、未知版本预览与源下载、导出重导及 yuyan-doc 本机生成。无数据库迁移；旧图逐图重绘尚未执行，不能将嵌入位图计作空间节省。
-
-后续仍包括标签、收藏与自定义 CSS。代码块可继续讨论重点行、行链接和多文件分组，不属于第 21 节的第一批。
-
-## 26. 性能优化第二批
-
-2026-10-14 用户选定三项：数据库表布局（26.1）、超长文档分段阅读（26.2）、阅读页图片显示版本（26.3），要求注意通用性与扩展性。每项先在隔离副本上验证，再随常规发布上线。同日又选定全文搜索内存索引（26.4）、首次加载的菜单与浮层按需加载（26.5）和超大文档编辑提示（26.6）。
-
-### 26.1 数据库表布局与迁移
-
-- 问题：SQLite 按列顺序保存一行，放不下的部分接在溢出页链上，读某一列要沿链走到它的位置。原来的 `docs` 把 `content`、`plain_text` 放在 `revision`、`created_at`、`updated_at`、`deleted_at` 前面，目录树、最近列表、链接索引、字数统计和回收站只读这些小字段，也要走完整篇正文的溢出页；历史清理按 `doc_versions.created_at` 筛选，同样要穿过每份快照的正文。
-- 布局：`docs`、`doc_versions` 的大字段放在最后，`plain_text` 在 `content` 前。搜索每次查询扫描 `plain_text`，输入时频繁触发；反向链接筛选候选时读 `content`，只在展开文末“链接到此文档”时调用。因此让搜索少走正文的溢出页，反向链接多走一段纯文本的溢出页（正式数据副本上约慢 12%）。建表语句是 `store.go` 的共享常量，`init` 与迁移都用它，新库和迁移后的结构一致。
-- 版本：`meta.layout` 记录已应用到第几步，缺省为 1（最初的布局），与正文格式版本 `meta.schema` 分开。`meta.min_layout` 是还能使用此库的最旧程序布局：只有让旧程序无法运行的步骤才标记 `breaksOlder`，把它提高到本步；兼容的步骤不改它，发布失败时脚本放回的上一版程序照常运行。程序支持的布局低于 `min_layout` 时拒绝打开，并提示换新程序或使用升级前的备份；遇到更新但兼容的布局照常运行，也不降低版本。本功能之前的程序不读这两个键，只依靠 SQL 写明列名保持兼容；第 2 步对它们兼容。
-- 迁移（`internal/store/migrate.go`）：步骤按顺序执行，每步一个事务。迁移在固定的连接上关闭外键约束：重建表要先删除旧表，而这个设置在事务内不生效。每步提交前检查全库外键并写入新布局，失败或进程中断时整步回滚，数据和旧布局不变。开始前先检查一次外键，已有悬空引用时说明并拒绝迁移。完成后恢复外键约束并截断 WAL。表重建按 SQLite 文档的流程：按新定义建临时表，按列名复制（拒绝丢弃旧列，新增列取默认值），核对行数，删除旧表，改名，重建索引。ID 原样保留，历史 ID 高水位仍在 `meta.version_sequence`。
-- 时机：`serve`、`check`、`restore` 用 `Open` 打开，自动执行待迁移的步骤；`backup`、`daily` 用 `OpenAsIs` 原样复制，升级前的备份保持旧布局；`migrate [--dry-run]` 单独报告或执行。发布脚本停服后先用旧程序备份，再由新程序在 60 秒时限内 `check`，此时完成迁移；任何一步失败都放回旧程序，数据库停在迁移前或迁移后的兼容布局。
-- 空间：重建后旧表的页面进入 SQLite 空闲列表，文件变大（正式数据副本 179 → 308 MiB，其中空闲 129 MiB），之后的写入会复用；`VACUUM INTO` 生成的备份不含空闲页。迁移不执行 VACUUM：在正式数据副本上需要 14.6 秒，停服时间约为迁移本身的四倍，查询没有可测的改善。
-- 扩展：以后新增表、列或索引都写成新步骤，并同步共享的建表常量。SQL 继续写明列名，不用 `SELECT *` 或按位置的 INSERT，兼容的步骤才真正兼容旧程序。耗时较长的步骤先在正式备份的副本上计时，必须能在发布检查的时限内完成。
-
-### 26.2 超长文档分段阅读
-
-- 问题：阅读页一次取回整篇渲染结果。正式实例最长的文档正文 HTML 12.8 MB，`/view` 响应 13.9 MB，页面外壳内嵌同样的数据后 15 MB，压缩后 2.4 MB，按服务器约 0.5 MB/s 的出口要传约 5 秒；浏览器还要解析、排版并增强全部内容。正文超过 256 KiB 的文档目前只有 6 篇，但打开时间随长度线性增长，没有上限。
-- 切分：渲染器记录每个顶层块在 HTML 中的结束位置、到此为止的大纲条目数和代码块数，顶层标题另记级别和 ID（`render.Result.Blocks`）。服务端在顶层块之间切分整篇的渲染结果，不分别渲染各段：标题 ID 在整篇内去重，代码块按整篇编号，各段依次拼接与整篇 HTML 逐字节相同。HTML 不超过 256 KiB 不分段；超过时第一段约 64 KiB，之后每段约 128 KiB，单个超长的块独占一段。切分随渲染缓存保存，每个修订只算一次；阈值和段长是服务端常量，调整不需要改前端。
-- 接口：`GET /api/docs/{id}/view` 仍返回整篇，yuyan-doc 等脚本照常使用。网页请求 `?segments=1`，分段时 `html` 只含第一段，`images` 只含第一段的图片尺寸，另附 `segments`：版本标记，以及每段的顶层块数、字节数、图片数、代码块数、大纲条目数和顶层标题（段内块位置、级别、大纲序号或 ID、能否折叠）。页面外壳按同一地址预载，只内嵌第一段。`GET /api/docs/{id}/segments?version=&from=&to=` 返回第 from 到 to−1 段拼接的 HTML 及其中图片的尺寸；`GET /api/docs/{id}/segments/matches?version=&q=` 返回含有任一搜索词的段号，供从搜索结果打开时定位。版本标记是本进程对整篇 HTML 的哈希：文档修改或服务重启后旧标记得到 409，页面记下阅读位置后重新载入。分段响应由地址中的版本标记确定内容，按 `private, immutable` 长期缓存。
-- 服务端开销：阅读接口先读不含正文的元数据，修订和更新时间命中渲染缓存时不再解析正文；字数和图片 ID 随渲染缓存保存。同一篇文档的并发渲染合并为一次，避免两个请求同时解析超长正文、超出服务的内存上限。
-- 前端：未载入的段用占位块代替。占位块是正文容器的直接子元素，在首次绘制前插入，高度按第一段实测的每字节高度和图片数估计；它们登记自己代表的顶层块和其中的标题（`folds.ts` 的 `virtualBlocks`）。载入逻辑在按需加载的 `content/segments.ts`：占位块进入视口上下两屏的范围时载入，相邻的段合并为一个请求，最多同时两个请求，只取发请求时仍在范围内的段，快速拖动滚动条不会顺带载入途经的段。新段先放进占位块里一个不可见、与正文同宽的区域，准备附件卡片、图片占位、代码块（按全文编号，读者保存的代码折叠和换行设置不错位）、表格、公式和图表，全部完成后一次替换占位块：替换后不会再因绘制变高，跳到标题和恢复位置一次到位。准备中的内容不参与折叠、大纲当前节和搜索高亮。替换视口上方的占位块时，临时关闭浏览器的滚动锚定，按其后第一个元素移动的距离补偿滚动，各浏览器表现一致。已载入的段不再卸载；载入失败的占位块显示重试。文档修改后重新载入或切换主题时，正文从新的 HTML 重建，不沿用旧的段和占位块。
-- 各功能：
-  - 大纲跳转、页内锚点和地址中的 `#标题` 先载入目标所在的段，再展开折叠并滚动；载入后直接定位并短暂提示目标标题（12.4），不经过沿途占位块。
-  - 按标题折叠把占位块当作它代表的那些块：用其中的标题和已保存的折叠状态推算占位块是否整体隐藏，被折叠的占位块不会载入；保存时保留未载入标题的折叠状态，`reveal()` 也能展开占位块里的标题。
-  - 阅读位置（阅读与编辑互切）按全文顶层块计数，占位块计为它代表的块数；恢复前先载入目标块所在的段。
-  - 从搜索结果打开时，先请求含匹配的段号，载入第一个候选段后高亮并滚动到首个匹配；之后载入的段追加高亮。服务端按去掉标签的段文字粗筛，前端仍以页面文字为准，候选段里没有匹配时试下一个。
-  - 最近修改的比较需要全文：分段文档不自动比较，修改条说明原因并提供“载入全文后标记”。
-  - Ctrl/⌘+P 先载入全文再打印；Ctrl/⌘+F 照常打开浏览器的查找，同时在后台载入全文。从浏览器菜单直接打印无法等待：未载入的部分打印为一行提示，同时开始载入全文，载入后再打印即完整。
-  - 图片查看器只在已载入的图片之间切换。
-- 扩展：服务端的切分和版本标记只依赖渲染结果，前端的载入逻辑只依赖清单和取段函数，历史版本等其他长内容可以复用。新的阅读功能要定位正文内容时，通过 `DocContent` 暴露的 `show(id)`、`ensureBlock(i)` 和 `loadAll()`，不要假设整篇已在页面中。新的正文增强写进 `enhance()`，分段时同样在准备区按最终宽度执行；遍历整篇正文的功能要跳过占位块（`.yy-segment`），其中可能有准备中的内容。
-
-### 26.3 图片显示版本
-
-- 问题：原图保留不压缩（第 7 节）。正式实例 1716 张图片中 1061 张小于 128 KiB，其余多是整屏截图，宽度常在 1920–3840 像素。手机正文约 360 CSS 像素宽，3 倍屏也只用到约 1100 像素；桌面正文栏最宽 1100 像素。服务器出口约 0.5 MB/s，一张 3 MB 的截图要传 6 秒。
-- 版本：显示版本是原图派生的副本，只用于网页显示。包括比原图窄的版本（640、1280、1920 中小于原图宽度的档位）、照片类无损原图的同宽 JPEG，以及只提供给 2 倍及以上屏幕的截图 JPEG。文档只保存原图 ID；导出、备份、yuyan-doc 等脚本、图片查看器和“查看原图”都用原图。
-- 生成（`internal/variants/generate.go`）：
-  - 跳过：小于 128 KiB（节省有限）；GIF 与动画 PNG/WebP；调色板 PNG（缩小后颜色增多，通常反而更大）；CMYK；带 HDR 信息（cICP、mDCV、cLLI）的 PNG；PNG 或 WebP 自带 EXIF 方向；色彩配置无法读取或与像素不符；超过 6400 万像素或解码估计超过 40 MiB（服务内存上限 384 MiB，一次只处理一张）。跳过和出错的原因写进清单，不再重试，规则改变时随版本号重新处理。
-  - 无损原图（PNG、BMP、无损 WebP）不透明时，依次试 JPEG 质量 85 和 90：体积不超过最佳无损文件（BMP 先转 PNG）的 60%，并且与原图逐 8×8 窗口计算的 SSIM 均值不低于 0.97、最差 1% 的窗口不低于 0.85（取三个颜色通道中最低的；误差低于 PSNR 40 dB 的窗口算作一致），才把全部版本（含同宽）做成这一质量的 JPEG。界面截图有大片纯色和锐利的文字边缘，JPEG 会在文字周围产生振铃，正式数据抽样中多数达不到这个标准，只做无损缩小的 PNG。只有 gAMA、没有 sRGB 或 ICC 的 PNG 不转 JPEG。
-  - 高密度屏档位：2 倍及以上的屏幕用 2×2 个设备像素显示一个 CSS 像素，逐像素看得见的振铃在这样的密度下与相邻像素融合。通不过上一条标准的不透明无损原图（多为截图），把 JPEG 与参照各按 2×2 取平均，再用同一 SSIM 标准比较，通过的可以用于这些屏幕。它们另有一套档位，从全宽起逐档取较小者：
-    - 同宽 JPEG（先试质量 85，再试 90）通过半尺寸比较，且不超过该档无损版本的 60%（全宽时与原图比较）时替换无损版本；该档没有无损版本时，JPEG 不超过上一候选的 80% 才保留。
-    - 否则沿用该档的无损版本，但只在它小于上一候选时保留，不让窄档反而更大。
-    - 窄档的文字更小，更容易露出压缩痕迹，所以每档单独检查。逐档取较小者保证在任何显示宽度下，高密度屏载入的都不多于其他屏幕。
-    - 屏幕密度按设备像素比判断，它包含浏览器缩放：1 倍屏放大到 200% 及以上时同样使用这套档位，凑近看能看出轻微的压缩痕迹。阈值的校准数据见 VERIFICATION 26.3。
-  - 有损原图（JPEG、有损 WebP）只做缩小的 JPEG（质量 85）；带透明的原图只做缩小的 PNG。
-  - 档位逐级缩小（Catmull-Rom）。某一档的文件不小于上一档候选的 80% 时不保留，多一个文件省不了多少。缩放按行流式进行（`resize.go`，权重与 `x/image/draw` 相同，输出相差不超过 1 级），只保留当前输出行需要的几行源像素；`x/image` 的缩放会按新宽度保存整幅高度的 float64 副本，3600×2900 的原图约 170 MiB。限度内最大的原图（解码约 40 MiB）处理时进程峰值约 104 MiB（改用前 348 MiB）。
-  - 色彩：原图的 ICC 配置复制到版本中（PNG 的 iCCP 写入 JPEG 的 APP2，JPEG、WebP 的配置照搬），PNG 版本保留 iCCP、sRGB、gAMA、cHRM；JPEG 的 EXIF 方向直接应用到像素上；灰度原图生成灰度版本。
-- 存储（`internal/variants/cache.go`）：`data/derived/images/` 下每张处理过的原图一个清单 `<id>.json`（版本号、原图字节数和尺寸、版本列表或跳过原因），版本文件为 `<id>-<宽>.<jpg|png>`，只给高密度屏的 JPEG 为 `<id>-<宽>.hidpi.jpg`。清单中只属于一套档位的版本标明 `for`：`2x` 只给高密度屏，`1x` 是被高密度屏档位替换或略过的无损版本。先写版本文件再写清单，清单是提交点；每个文件先写临时文件再改名。派生目录可以整体删除：启动时只读取当前版本号且文件齐全的清单，其余内容（临时文件、旧版本、没有清单的文件）一律删除。改变生成规则时提高 `variants.Version`，旧版本在下次启动时清空并重新生成。
-- 生命周期：一个后台工作者逐张处理。新上传的图片和打开页面中尚未处理的图片优先；启动 1 分钟后，按从新到旧补齐其余图片。每张处理完休息同样长的时间，最多占用一个 CPU 的一半；解码超过约 400 万像素后把内存还给系统。每 10 分钟核对一次：原图已被素材回收删除的，删除其版本；还没有清单的图片（恢复、导入或其他进程上传的）排入补齐。写入失败的图片在本次运行内只显示原图，不在每次打开页面时重试。
-- 备份与回收：备份只复制清单中的 `assets/` 文件，不含 `derived/`，恢复后由补齐重新生成。`derived/` 在门户声明中登记为 cache，门户备份包同样不收集。素材回收只看 `assets/` 和引用，与派生目录无关；原图删除后，其版本在下次核对时删除。
-- 接口：
-  - 图片尺寸表（`images`）每项为 `[宽, 高]`，有显示版本时附第三项文件列表，由窄到宽，如 `[2600, 1700, ["640.jpg", "1280.jpg", "1920.jpg", "2600.jpg"]]`。高密度屏的档位与之不同时附第四项，如 `[2880, 1800, ["1280.png"], ["640.hidpi.jpg", "1280.hidpi.jpg", "1920.hidpi.jpg"]]`；第四项可以包含第三项中的文件，第三项可以为空列表。阅读、分段、编辑、历史版本和模板接口共用同一个查询（`internal/server/images.go`）。
-  - `GET /assets/<id>-<文件>` 返回版本文件，与原图同样一年 `immutable` 缓存；不在清单中或文件已丢失时，302 到原图（`no-store`）并忘记这张图片，下次打开页面时重新排队。
-  - `yuyan images [--data]` 只读汇总清单：处理数、有版本数、有高密度屏档位的数量（dense）、各跳过原因的计数、版本文件总大小，以及有版本的图片在 3 倍屏手机（约 1280 像素）和 2 倍屏桌面（约 2200 像素）上按高密度屏档位估计的传输量与原图对比。
-- 前端：`shared/images.ts` 的 `displayVersions` 生成 `srcset`（版本按宽度描述，原图作为最宽的候选，除非已有同宽版本）和 `sizes="auto, Npx"`。`auto` 让浏览器按实际排版宽度挑选，要求 `loading="lazy"`；不支持的浏览器用其后的估计值，取写入宽度、原图宽度与正文栏宽（窗口更窄时为窗口宽）中最小的。裁切和画板中的图片排版宽度可能超过外框，估计值取原图宽度，宁可多传也不模糊。阅读页在首次排版前设置，分段载入的内容在准备区插入的同一任务内设置；编辑器的图片、裁切和画板同样提供版本，只有存在版本时才延迟加载，没有尺寸的外链图片仍立即加载。显示较窄的版本后 `naturalWidth` 不再是原图尺寸，图片查看器改用尺寸表。设备像素比不低于 2（媒体查询 `min-resolution: 2dppx`）时取第四项，没有第四项时仍用第三项。窗口移到另一块屏幕或缩放跨过 200% 时，阅读页由一个监听统一刷新已登记图片的 `srcset`，编辑器的图片、裁切和画板读取响应式的 `denseImages`，浏览器随之改选候选。
-- 编辑器首次渲染：Tiptap 的 Vue 节点视图在 `<EditorContent>` 挂载前返回空对象，文档先按 `toDOM` 在未挂载的元素中渲染一遍，其中的 `<img>` 立即开始下载原图（此前每次进入编辑都多下载一遍全部原图）。编辑器的图片节点因此带 `loading="lazy"`：未挂载的元素进入不了视口，也就不会下载。
-- 缓存：分段响应按版本标记长期缓存，版本生成前取到的后续段不会改用新版本，直到文档修改或服务重启；首段、整篇和编辑接口按 ETag 校验，会立即更新。
-- 不做：WebP、AVIF 需要编码器，Go 标准库没有，cgo 或外部程序违背单文件部署；以后增加格式时作为文件列表的新项，前端改用 `<picture>` 按类型选择。高密度屏档位也可以用 `<picture>` 的 `media` 由浏览器自行切换，但要改动 Go 渲染、节点视图、外框与样式中的图片结构，因此由脚本按密度选择列表。
-- 扩展：新增档位、格式或调整阈值时提高 `variants.Version`（2026-10-14 增加高密度屏档位时升为 2，启动时清空旧清单并重新生成，补齐期间显示原图）；前端只依赖尺寸表中的列表和文件名中的宽度，不需要同步修改，新的屏幕类别同样作为尺寸表的新列表项。新的显示位置使用 `displayVersions`；需要原图尺寸时查尺寸表，不读 `naturalWidth`。
-
-### 26.4 全文搜索内存索引
-
-- 问题：全文搜索每次查询都在 SQLite 中对每篇文档执行 `instr(lower(plain_text), 词)`：读出全部纯文本，复制成小写再查找，多个词时每个词各复制一遍。正式实例 551 篇文档的纯文本共 16.6 MiB，最长的一篇 9.8 MiB；单次搜索服务端耗时 91–174 ms，没有结果的查询也要 91 ms，而其他常用接口为 2–18 ms。搜索面板在停止输入 200 ms 后请求，结果约在停顿后 0.3–0.4 秒出现。26.1 调整列顺序后列表查询大幅变快，搜索几乎不变：耗时在读取和转换全部文字，不在溢出页的位置。
-- 索引（`internal/store/search_index.go`）：服务进程在内存中保存每篇未删除文档的纯文本，ASCII 字母预先转为小写（与 `lower()` 相同，只改 A–Z，字节偏移不变），另用每字节 1 位的位图记下原文中的大写字母。二者可以逐字节还原原文，摘要直接从内存截取，不再读库。文字是否变化按 `revision || '/' || created_at` 判断，与素材引用、字数缓存相同：每次正文写入都推进 revision，彻底删除后复用的 ID 由创建时间区分。标题、所属知识库及其名称、删除状态和更新时间不进索引，每次查询从小字段读取（约 1 ms），移动、改名、删除与恢复立即生效。
-- 查询：先读一遍未删除文档的小字段，修订有变化的文档逐篇重读纯文本并替换，已删除或不存在的文档移出内存；然后在内存中逐篇查找每个词。匹配规则、排序（标题含词多的在前，再按更新时间从新到旧，相同时 ID 大的在前）、50 条上限和摘要的截取方式与原实现相同。查询期间持有索引的锁，并发的搜索依次执行。
-- 预热：`serve` 启动后统计字数，接着建立索引；其他命令不建立。预热完成前的第一次搜索顺带建立。
-- 内存：文字与位图约为纯文本的 1.13 倍，正式数据约 18 MiB。服务上限 384 MiB，程序平时占用约 50 MiB，渲染最长的文档时进程约 185 MiB，加上索引仍在 `GOMEMLIMIT`（320 MiB）以内。内存随纯文本线性增长；纯文本超过约 64 MiB 时重新评估，例如长文档只在内存中保留小写文字，摘要改从库中读取。
-- 前端：服务端变快后，搜索面板的请求延迟由 200 ms 缩短为 120 ms；过期的响应仍按查询文字丢弃。
-- 不做：SQLite FTS5 的三字切分（trigram）查不了一两个字的中文词，索引体积是文字的数倍，最长的文档每次保存都要重写大量索引条目；内存扫描已足够快，而且不改数据库。
-- 扩展：新的正文写入路径必须推进 revision 或插入新行，否则按修订缓存的素材引用、字数和搜索索引都会过期。以后扩大搜索范围（如附件名）时，作为索引中的新字段，按同一修订键更新。
-
-### 26.5 首次加载：菜单与浮层按需加载
-
-- 问题：阅读页首次加载的应用脚本 gzip 后 134.3 KiB（28 个分块），已到 12.3 预算上限。其中 reka-ui 的菜单、弹窗与焦点管理约 23 KiB，floating-ui 定位约 8 KiB，连同 aria-hidden 等依赖共约 33 KiB；首屏只显示它们的触发按钮，菜单和弹窗都在用户操作后才打开。目录每一行还各建一套右键菜单和下拉菜单，展开的长目录要创建数千个组件实例。
-- 原则：首屏只加载显示与导航需要的代码。菜单、弹窗、图片查看器、搜索面板和浮层定位在第一次使用时下载；首屏显示后浏览器空闲时（`requestIdleCallback`，Safari 没有时约 2 秒后）一并预取，之后的第一次使用通常不等网络。浏览器开启省流量（Save-Data）时不预取。登记与预取集中在 `shared/deferred.ts`：同一模块只请求一次；载入失败（含空闲预取）时沿用 12.3 的模块加载失败提示，请用户刷新，因为 Chrome 在同一页面内记住失败的模块，再次使用也不会重新下载。快捷键帮助、模板、接收文档等不常用的对话框仍只在打开时下载。
-- 下拉菜单：`ActionMenu` 的用法不变（默认插槽是触发按钮，`items`、`align`、`restoreFocus`、`open` 等照旧）。打开前只渲染触发按钮，带上 `aria-haspopup`、`aria-expanded` 与 `data-state`；按下时与 reka-ui 一样阻止默认行为，编辑器不失去焦点，并开始下载。第一次点击、按回车/空格/向下方向键或父组件把 `open` 设为 true 时，换成 reka-ui 的完整菜单并打开，之后完全由 reka-ui 处理。替换放在点击完成后，避免按下和松开落在不同元素上；代价是每个菜单的第一次在松开时打开，reka-ui 是按下时打开。键盘打开时把同一按键转交给 reka-ui 的触发器，与原来一样聚焦第一项；载入期间焦点已离开时不再打开，不抢回焦点。
-- 右键菜单：同一时间最多打开一个，改为全站一个按需加载的宿主（`ui/ContextMenuHost.vue`），在指针位置打开。`ContextActions` 只给子元素加上右键、触摸长按（与 reka-ui 相同，700 ms，移动、抬起或取消即作废）、`data-state` 和阻止 iOS 长按弹出系统菜单的样式，不再为每一行创建菜单组件；`disabled` 与 `open` 事件不变，宿主读取当前的菜单项，元素卸载时关闭它的菜单。宿主通过 reka-ui 触发器公开的右键行为定位：向一个不占位置的触发元素派发带坐标的 contextmenu 事件。每次请求使用独立的 reka-ui 菜单实例：reka-ui 稍后才报告上一个菜单外的按下或焦点移出，这些报告不能关闭下一次请求的菜单（例如菜单打开时右键另一行）。
-- 弹窗与查看器：确认/输入对话框、移动对话框和图片查看器在载入后挂载；载入前的请求在载入后立即显示。对话框载入失败时，等待中的请求按取消处理，调用方不会一直等待。
-- 浮层定位：站内链接预览和阅读页代码块的“更多操作”菜单在第一次显示时取得 floating-ui（`shared/floating.ts`）；代码块菜单取得后才创建，不会先在错误位置闪现。编辑器仍直接引用 floating-ui。
-- 预算：见 12.3。改后首次加载 105.1 KiB（29 个分块，原为 134.3 KiB）；空闲预取约 46 KiB（19 个分块，含原本打开时才下载的搜索面板）。发布前从构建清单确认 reka-ui 与 floating-ui 不在首次加载的分块中。
-- 不做：预取完成后不把页面上的触发按钮整体换成完整菜单（可能替换用户正在悬停或聚焦的元素）；不改用原生 `<dialog>` 或 popover（键盘、焦点与外观都要重做）；不换掉 Vue 运行时；不预取编辑器（体积大，只在进入编辑时下载）。
-- 扩展：新菜单与对话框沿用 `ActionMenu`、`ContextActions`、`confirm`/`prompt` 即自动按需加载；直接使用 reka-ui 或 floating-ui 的组件只能放在按需加载的页面、编辑器或经 `deferred` 登记的模块中。
-
-### 26.6 超大文档编辑提示
-
-- 问题：编辑器把整篇正文建成 ProseMirror 文档，为每个节点生成页面元素，代码块、图片等还各有一个 Vue 节点视图；打开耗时、内存和每次按键的处理都随文档变大而增长。按正式实例最大文档的结构合成的文档（约 4.3 万个节点、5580 个代码块、正文 13 MB）实测：桌面打开约 4.2 秒，JS 堆约 400 MB，每输入一个字约 0.4 秒才显示；按 4 倍降速模拟的手机打开约 18.6 秒，每个字约 1.7 秒（VERIFICATION 26.6）。正式实例 552 篇文档中只有这一篇达到这种规模；第二大的一篇（约 2.7 万个节点、23 万字，以列表和短文字为主）按同类结构合成文档的实测插值，桌面约 1 秒、手机约 4.3 秒打开。此前从任何入口进入编辑都没有提示，进入后页面长时间没有响应。
-- 度量：编辑负载 = 正文的节点数（含文字节点）+ 字数 ÷ 100。在表格为主、列表与短文字为主、代码与折叠为主三种结构、各四种规模的合成文档上，按编辑负载线性估计打开耗时，实测值在桌面为估计值的 0.7–1.7 倍、手机为 0.7–1.4 倍；只按正文字节数或只按节点数，偏差达 0.4–2.4 倍。代码块等 Vue 节点视图的数量能让桌面的估计更准，手机上没有改善，而且要在 Go 中维护一份随编辑器变化的节点视图清单，因此不计入。
-- 阈值：编辑负载达到 40,000 时提示，约为桌面 1.7 秒、手机（4 倍降速）7.5 秒打开。正式实例目前只有最大的一篇超过（约 12.4 万）；第二大的一篇约 2.9 万，不提示。阈值是 `store.HeavyEditLoad`，前端只读结果。
-- 计算：字数沿用 `docCounts`；节点数在原有统计图片数的同一次 `json_tree` 遍历中得到（`type` 键，不计 `marks` 与 `attrs` 内的同名键），同样按修订缓存，每个修订只算一次。目录树接口给达到阈值的文档加 `"heavy": true`。
-- 提示：站内所有进入编辑的方式（阅读页“编辑”按钮、连按两次 E、目录菜单、新建后进入、浏览器前进后退）都经过同一个路由守卫：守卫先刷新目标文档所在知识库的目录（已是最新时不发请求；保存后目录标记为过期，跨过阈值的文档下次进入即提示），文档标记为 heavy 时在当前页面上确认，取消则留在原页面。直接打开或刷新 `/docs/{id}/edit` 时，服务端对这类文档返回 302 到 `/docs/{id}?edit=1`，页面外壳不再内嵌整篇正文；阅读页载入后去掉 `edit` 参数再进入编辑，由同一个守卫在阅读页上确认。目录无法载入时不提示。
-- 不做：不阻止编辑，也不做只读编辑器或分段编辑（ProseMirror 需要整篇文档，分段编辑要另行设计合并、撤销与冲突处理）。不记住确认结果：每次进入都要重新付出打开的耗时，提示同时建议拆分文档。
-- 扩展：编辑器变快后（例如节点视图按需创建）重新校准并调整阈值；需要按设备区分时，目录接口改为返回编辑负载数值，由前端按设备选择阈值。
-
-## 27. 参考来源
-
-- [此前的 Obsidian 方案与笔记库调查](archive/obsidian-sync-design.md)。
-- [Tiptap 文档](https://tiptap.dev/docs)、[原付费扩展改为 MIT 开源的说明](https://tiptap.dev/blog/release-notes/were-open-sourcing-more-of-tiptap)、[Tiptap 3 发布说明](https://tiptap.dev/blog/release-notes/tiptap-3-0-is-stable)、[Tiptap Markdown](https://tiptap.dev/docs/editor/markdown)。
-- 曾比较的编辑器：[Milkdown](https://github.com/Milkdown/milkdown)、[Vditor](https://github.com/Vanessa219/vditor)、[BlockNote](https://github.com/TypeCellOS/BlockNote)。
-- 版本对比：[jsdiff](https://github.com/kpdecker/jsdiff)（BSD-3-Clause）。搜索：[go-pinyin](https://github.com/mozillazg/go-pinyin)（MIT）、[CSS Custom Highlight API](https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API)。
-- [Let's Encrypt：6 天与 IP 地址证书正式可用](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability.html)。
-- [服务器维护约定的来源](https://github.com/Crashmere/agent-config/tree/main/skills/server-operations)。
-
-外部项目的能力与接口可能变化，实施时固定版本并用实际文档验证。服务器实况以部署时的现场检查为准，本文不替代共享服务器清单或项目运维记录。
+### Phase C: First Version (Deployment and Formal Import Completed; See 11.2 for Results)
+
+- Install and deploy on ali: runtime identity, directories, systemd, Nginx location including compression and image caching, release script with compressed uploads, local release job, backups, and isolated restore verification.
+- Formally import all notes into an empty instance on ali, using the same overrides file as the trial run, then run the unchanged-save check.
+- After the user tries it, complete the first version's feature details based on feedback.
+
+### 11.2 Phase C Results (2026-09-26)
+
+- **Installation:** `/opt/yuyan`; the service listens on 127.0.0.1:18084 and is accessed through `/yuyan/` on the shared Nginx. The runtime identity is yuyan and the release identity is yuyan-deploy, which can execute only release commands; sudo permits only the root-managed release script. The release private key is stored on the maintenance computer, and the host public key matches the fingerprint recorded locally. See [OPERATIONS.md](OPERATIONS.md) for operational details.
+
+### Phase D: Interface and Editing-Experience Redesign (Completed; See Section 12 for the Design)
+
+- The export tool, D1 including web export, D2 editor interactions, and D3 content blocks were all released on 2026-09-26; see 12.10-12.12. At the user's direction, D2 and D3 were completed consecutively and released together, and the user finished production acceptance on 2026-09-26.
+
+### Phase E: Subsequent Work as Needed
+
+- First batch (Section 13): keyboard-driven search panel, historical-version diff comparison, and reserved image dimensions on the reading page. All were released on 2026-09-26 and accepted by the user on 2026-09-27.
+- Second batch (Section 14): searching knowledge bases and full Pinyin, locating matches from search results, hiding the reading-page outline, and menu scroll indicators. Released on 2026-09-27.
+- Third batch (Section 15): fixes for the mobile outline and code-copy button, stopping image loads after leaving a document, Monokai Pro code boxes for `[!code]`, folding body content by heading, and moving the outline to the right side of the page. Released on 2026-09-27.
+- Fourth batch (Section 16): Yuque-style code blocks using One Dark Pro, with title bars and collapsing; every `[!code]` item in production was converted back to a code block. Released and migrated on 2026-09-27.
+- Fifth batch (Section 17): collapsing the outline in the Yuque style, displaying it as a horizontal line when unpinned and temporarily expanding it when the pointer approaches. Released on 2026-09-27.
+- Sixth batch (Section 18): unified button tooltips, outline and directory collapsing, an edit-page outline, select-all within a structure, heading levels, pressing E twice, canceling edits, a table-insertion icon, drag-resizing table width and height, and scrolling wide tables. Released on 2026-09-27.
+- Other work as needed: tags, favorites, and custom CSS. Attachment upload has been implemented; see 23.8. Document templates, content snippets, the inter-document link picker (`[[`), and backlinks are covered in Section 24.
+- Format extensions beyond Markdown (see 12.1).
+- Service-wide HTTPS and unified ServerPortal device authentication have been enabled; see [OPERATIONS.md](OPERATIONS.md).
+
+### First-Version Acceptance Criteria
+
+1. Creation, editing, auto-save, historical-version restoration, and recycle-bin restoration all work; Chinese input is smooth and Markdown quick input works; pasted or dragged-in images upload successfully.
+2. All 13 knowledge bases and 314 notes are imported; ambiguities and broken links in the import report are either handled or explicitly recorded; sampled content displays correctly on both the reading page and in the editor; Callouts, formulas, code, and tables remain correct after Markdown export.
+3. The reading page supports syntax highlighting, formulas, Mermaid, collapsible Callouts, tables, and an article table of contents, and works normally on phones. Content covered by this phase appears consistently between editing and reading pages.
+4. Images are stored locally on the server and deduplicated by content, and long-term caching takes effect during reading.
+5. Backups include SQLite and images, isolated restore verification is complete, and all content can be exported.
+6. Editing the same document in two places does not silently overwrite content, and unsaved content is not lost during network outages.
+7. The new service does not change the access or runtime behavior of other applications on ali.
+
+## 12. Interface and Editing-Experience Redesign (Phase D)
+
+On 2026-09-26, the user reported that the existing interface was too rudimentary and that its editing capabilities fell far short of Yuque, prompting planning for a redesign. This section describes the proposed implementation for the scope confirmed by the user. D1, D2, and D3 have all been implemented and released; see 12.10-12.12 for the results.
+
+### 12.1 Scope
+
+- Model the interface and interactions after Yuque's web version, with visuals close to Yuque: green as the primary color, a light-gray sidebar, line icons, and compact interface text.
+- Follow the priority confirmed by the user: improve the overall appearance, directory management, editor operations, and content blocks in that order. Leave the keyboard-driven search panel and knowledge-management features (inter-document links and backlinks, historical-version comparison, templates, tags, and favorites) for Phase E.
+- Phase D optimizes only within what Markdown can express. At the user's request, Phase E added code-block titles and collapsing (Section 16), table dimensions (Section 18), and image, paragraph, and table alignment (Section 19); see Section 23 for text colors, image captions, and richer tables. Export anything Markdown can express as Markdown, preserve all other formats in HTML, and make them importable again. Columns and attachments have been implemented (Section 23), as has the general-purpose whiteboard (Section 25).
+- Code line numbers are always visible. Soft wrapping is toggled independently in each code block's title bar, affects only the current display, and is not written to the document. Preferences such as the theme are stored locally in the browser. All pages use the wide layout with a maximum width of 1100 px; width switching is no longer provided.
+- Phones remain reading-only; editing targets computers.
+
+### 12.2 Problems in the Previous State
+
+Results of a read-only inspection of the code and production pages on 2026-09-26:
+
+- **Basic components:** Creation, renaming, deletion, link insertion, and formula editing all used native browser dialogs; the interface had no icons, drop-down menus, context menus, or dialogs.
+- **Directory:** It could not collapse (all 75 nodes in 算法课 were expanded), had no hover or context-menu actions, and could not drag-sort or move items. The server had no move or sort API, and the recycle bin had no permanent-delete operation; all of these belong to 3.3 and had not yet been implemented.
+- **Pages:** Reading and editing pages used two separate layouts, and the directory was unavailable while editing. The knowledge-base page merely listed the sidebar directory a second time. On phones, the directory was stacked above the body and occupied up to 40% of the screen height.
+- **Editor:** There was no top toolbar, and the selection toolbar had only six buttons. A drag handle was the only control to the left of a block. The slash menu was a plain text list. Links and formulas were edited with browser dialogs. Rows and columns could not be added or removed through the interface after inserting a table. Images could not be resized, nor enlarged on the reading page. Code-block languages used a native select element. There was no find and replace, editing outline, or keyboard-shortcut reference.
+- **Export:** Neither the web export nor the export tool from Section 9 had been implemented; only Markdown conversion functions and tests existed. Therefore, "all content can be exported" in acceptance criterion 5 for the first version had not been achieved. The export tool was added later that day, and web export was implemented with D1.
+- **Data:** The import turned seven Obsidian folder notes into parallel "same-named group + same-named document" pairs; see 12.8.
+
+### 12.3 Page Architecture: Single-Page Application
+
+The user confirmed the change to a single-page application: switching documents and entering or leaving edit mode do not reload the full page; reading and editing share the sidebar and outline, whose persistent presence depends on window width.
+
+- Page addresses remain unchanged: `/`, `/books/{id}`, `/docs/{id}`, `/docs/{id}/edit`, `/docs/{id}/history`, `/versions/{id}`, `/search`, and `/trash`. Internal links in body content and existing bookmarks remain valid; clicking an internal link navigates within the application.
+- Go returns the same page shell for these addresses and embeds the initial data needed by the current address, so the initial view need not wait for another API request. A nonexistent ID returns HTTP 404, and the application displays the exact UI text `找不到内容` ("Content Not Found"). The existing Go page templates and reading-page entry script are deleted as a consequence.
+- Upon entering a knowledge-base home page, the body, sidebar, and breadcrumbs switch together according to the knowledge-base ID in the route; any existing cache displays immediately instead of delaying navigation until the detail request returns. The top progress indicator covers both knowledge-base detail and directory loading. Successful or failed requests that return after the page has been left can no longer modify the current page context or title, preventing the wrong knowledge base from appearing on slow networks or during rapid switching.
+  - The knowledge-base home page loads details, the knowledge-base list, and the directory in parallel through one unified flow; the sidebar reuses the same directory request.
+- The Go renderer continues to generate body content. A new API returns rendered HTML, the article outline, and previous/next articles, retaining revision-keyed caching. Enhancements for formulas, Mermaid, code copying, and Callout folding continue to use the existing scripts. The editor, KaTeX, and Mermaid remain loaded on demand; the editor is not downloaded while reading.
+- When the user clicks the exact `编辑` ("Edit") action on the reading page or presses E twice, the editing page continues at the current reading position, with the cursor placed near the visible content. Before leaving the reading page, the router records the body block and the offset within that block, then restores them after the editor body and node views mount, subtracting the height of the editing toolbar. Earlier collapsed sections, long code blocks, and tables do not displace the target. The position applies only to this transition within the same document; directly opening an edit URL or entering from the beginning still starts at the top.
+- When returning from the editing page to the same document through the exact `完成` ("Done") or `取消` ("Cancel") actions or the browser Back action, the reading page continues at the position occupied at the moment editing ended. It restores the position after body content, formulas, and diagrams finish rendering, first expanding any section hiding the target and any Callout or long code block containing the target. `取消` maps block-position changes made during editing back to the original document; if the newly added block occupied at exit is discarded, it targets the nearest position in the original. The position is restored only once, and later theme changes do not jump again.
+- Before leaving the edit view by clicking `完成`, switching documents, clicking the directory, or opening history, wait for both the body save and session snapshot to complete. If the snapshot fails, state that the body has been saved and remain on the editing page for a retry. On offline status, save failure, or conflict, show a message and retain unsaved content in the local draft. Saving invalidates the body cache, so returning to the reading view shows the latest content immediately; title changes synchronize to the directory.
+- Script budget: the application scripts initially loaded by the reading page must not exceed about 115 KB after gzip and are cached long-term by content hash. Only the reading page loads with the application entry point; the home, knowledge-base, edit, history, version, search, recycle-bin, and not-found pages load when opened. According to the address, the page shell lists all static chunks for the entry point plus that page's chunk, allowing the browser to download them all in parallel rather than discovering them layer by layer. The page's own chunk and styles use low priority, so large chunks such as the editor do not delay display of the application and placeholders. Any newly lazy-loaded page must also be registered in `routeViews` in `internal/server/app.go`; if the build and registration disagree, the service reports an error at startup. Before every release, follow static imports from the app entry in the build manifest `web/dist/manifest.json` and check the gzip size.
+  - Initial reading-page loading is about 107 KiB (2026-10-14, 30 chunks): Vue and vue-router account for about 50 KB; the rest is reading, the sidebar directory, icons, and shared logic. reka-ui menus and dialogs plus floating-ui positioning, about 33 KB, now download on first use and prefetch while idle after the initial view appears (26.5); entry code no longer imports them statically.
+- After a release, old tabs may reference chunks that no longer exist. Globally listen for Vite module-load failures and display a refresh prompt covering on-demand features such as the editor, Mermaid, and its diagram types; routing failures do not trigger automatic refresh loops. The exact `保存并刷新` ("Save and Refresh") action on the editing page first waits for uploads and all modifications to save; content entered while saving is saved again. Conflicts or failures retain the current page and local draft. The reading page can refresh directly. Network outages use the same recovery entry point.
+- When an edit address is opened directly, show the document title and several placeholder lines in their original positions while the editor chunk downloads. The toolbar height and body-column width match the editor, so the title does not move after loading. If chunk loading fails, annotate the placeholder and use the refresh prompt above. Entering edit mode from the reading page retains the reading page and top progress bar until the editor is ready. A failed document read on the editing page can be retried in place.
+- Mermaid distinguishes component-load failures, syntax errors, and other rendering failures in its messages. On failure, the editing page retains the last successful preview and the reading page retains the source. Clear a failed loading Promise, and prevent stale asynchronous preview results from overwriting the latest input. After a module failure, a full-page refresh obtains the current build and its complete dependencies so the browser does not keep reusing a failed module record.
+- Write APIs remain grouped behind the same middleware entry point under `/api/`, without affecting later login integration.
+
+### 12.4 Interface Foundations
+
+- **Design system:** Define colors, font sizes, spacing, corner radii, and shadows with CSS variables, with separate light and dark sets. Add a manual switch with the exact choices `跟随系统 / 浅色 / 深色` ("Follow System / Light / Dark"); the Mermaid theme changes with it.
+- **Body headings:** Place a thin divider below level-one headings, emphasizing the first 44 px in green; place a 3 px green vertical line to the left of level-two headings. Reading and editing pages share the styles, and light and dark modes use their respective theme colors. The decorations are not written into the document and do not occupy the folding indicator or editing-placeholder text. On the reading page, leave outward spacing for the level and fold controls to the left of headings: shift the whole group 6 px left on desktop (`left: -42 px`) and shift level-two headings 3 px left on mobile (`left: -19 px`), keeping the icon inside the viewport.
+- **Components:** Continue using Vue 3, adding Reka UI, which provides unstyled, accessible components with keyboard support for menus, dialogs, popovers, context menus, tooltips, and similar controls under the MIT license, plus Lucide icons under the ISC license, bundling only the icons in use. Write the styles in-house. Tiptap's official interface components are React-only and serve solely as interaction references.
+- **Immediate positioning and heading cues:** Reading/editing outlines, body anchors, search matches, recent changes, sidebar positioning, column browsing, and horizontal table paging share `shared/scroll.ts`; regardless of distance, they jump directly in one step with no smooth-scrolling animation. When the outline, a heading link, or a URL anchor targets a body heading, the entire target-heading row displays a soft, rounded Yuyan-green background, reusing the theme's `--yy-primary-soft`: #e8f7ef in light mode, #173826 in dark mode, with a 6 px radius. Its total duration remains 2.2 seconds: 500 ms fade-in, 1.2 seconds held, and 500 ms fade-out. Repeated clicks restart the timer; jumping elsewhere or changing pages clears the old cue. Under reduced motion, display it statically for about two seconds, then restore it immediately without a fade. The cue uses Web Animations and writes no DOM style/attribute, body formatting, or editing history. It preserves heading layout, existing text colors, and the caret, restoring the original background when finished. Content positioning retains the heading scroll margin and moves only the body page; sidebar and horizontal positioning each move only their own container. When the outline updates the URL anchor, the outline action and body-anchor listener must result in only one positioning operation.
+- **Menu scrolling:** Drop-down and context menus isolate scroll propagation. While the pointer is inside a menu, subsequent wheel input does not pass to the body even after reaching the top or bottom or moving between items. The body scrolls normally once the menu is closed.
+- Replace all native browser dialogs (`prompt`, `confirm`, and `alert`) with in-application dialogs, popovers, and toasts.
+- First create a clickable local prototype using synthetic data, covering the home page, knowledge-base home page, reading-page and editing-page shells, and directory operations. Implement the full version only after the user confirms the visuals and interactions. The user tried and confirmed the local version and approved release on 2026-09-26.
+
+### 12.5 Shell, Directory, and Export (D1)
+
+- **Top bar:** Breadcrumbs (knowledge base / parent document / current document), search entry point, create action, and theme switcher.
+- **Body position:** The reading and editing pages both use the previous wide page, with a maximum width of 1100 px, positioned relative to the whole window using the sidebar-collapsed position as the baseline. Opening, closing, or resizing the sidebar and switching Focus Mode do not push the body; the old standard-page preference no longer applies.
+- **Sidebar:** There are two forms: workspace (home, knowledge-base list, recycle bin) and knowledge base (name and directory). Above 1700 px window width, it is fixed in the whitespace to the left of the body; it can be drag-resized and collapsed, its state is stored locally, and its actual width cannot exceed the available whitespace. Only the top bar and editing toolbar make room for the sidebar. At 1700 px or narrower, the top bar opens a directory drawer; clicking the body or finishing document selection collapses it, including when the current document is selected, while expanding a group keeps the drawer open. Both sidebar forms use an approximately 180 ms slide plus fade transition while the body remains stationary; animations are removed when the system requests reduced motion.
+- **Knowledge-base creation entry points:** The `+` beside the current knowledge-base name and the exact `新建` ("New") action in the knowledge-base home page's top bar share a menu containing the exact actions `新建文档` ("New Document") and `新建分组` ("New Group"); both create at the root of the current knowledge base's directory. Creating a document enters its editing page. Creating a group first requests a name, then updates the directory while retaining the current page after confirmation; canceling creates nothing.
+- **Directory tree:**
+  - Supports collapsing and expanding, remembering expanded state per knowledge base. Opening a document automatically expands the path to the current document and scrolls it into view.
+  - The document list consistently uses the ordinary arrow cursor; titles, expand buttons, checkboxes, and hover action buttons inherit the whole row's cursor, avoiding alternation between arrow and hand cursors during slow movement in Chrome. Rename inputs retain the text cursor, while disabled states and native dragging retain their respective feedback. A directory row uses its full rectangle for pointer input; rounded corners are drawn only on a background layer that does not receive pointer events. Hover, current-document, batch-selection, and drag-over highlighting share that background layer, while the drop insertion line is drawn separately.
+  - To the right of the exact heading `目录` ("Directory") and left of the collapse-all button is the exact action `定位当前文档` ("Locate Current Document"). Its icon is an outer circle with four short ticks crossing the circumference and an empty center. It expands parent nodes and scrolls the corresponding row to the middle of the sidebar's visible region, scrolling only the directory without changing the body position. It is disabled when there is no current document or the current object is not in the tree, and follows the system reduced-motion setting.
+  - Directory groups in the sidebar and on the knowledge-base home page share a section marker: a 2 x 12 px short gray-green vertical line to the left of the title, backed by a pale green background fading to the right, while retaining a semibold secondary text color. Openable documents retain ordinary text. The decoration adapts to light and dark themes, remains confined to the title area, and adds no icon placeholder or animation. Long titles retain ellipsis; drop indicators, batch selection, and expansion arrows display independently. Hover shows `+` for creating a child document and `…`. The `…` and context menu provide the exact operations `新建子文档`, `新建分组`, `重命名` (edited in place), `移动到`, `复制链接`, `导出`, and `删除`.
+  - Items can be dragged before, after, or inside a node, with a drop-location indicator. A green insertion line extends rightward from the title start at the actual target level, becoming 16 px shorter with each deeper directory indentation. Dropping at the lower edge of an expanded node places the item before its first child, with the indicator indented to the child level; same-level ordering uses that level's indentation. Whitespace below the directory list provides the exact `放到最顶层末尾` ("Place at End of Top Level") drop target, with an insertion line at top-level indentation. Even if the final item is an expanded group, a document or entire group can be placed at the end of the top level, with its children moving with it; if already last, it is not saved again. An item cannot be dragged into its own descendant. Holding a drag within the top or bottom 80 px edge of the directory scroll area continuously auto-scrolls the directory, faster nearer the edge (120-900 px/s); it recalculates the current row and drop position even when the pointer does not move. Scrolling stops upon moving to the middle, leaving the directory, or reaching a boundary; tracking is cleaned up when dropping, canceling, or unmounting the directory. Listen to both `dragenter` and `dragover` to accommodate WebKit not immediately dispatching `dragover` after entering a new element. The exact `移动到` ("Move To") dialog can select another knowledge base; child documents move with the item.
+  - A batch-operation entry point appears to the right of `目录`, with an icon of two hollow circles and two horizontal lines. After entering it, a select-all checkbox and the exact action `退出` ("Exit") appear beside the knowledge-base title, tree nodes show checkboxes, and a fixed action card at the bottom shows the exact text `批量操作 / 已选 N 项` ("Batch Operations / N Items Selected") plus five buttons: copy, move, export, copy link, and move to recycle bin. Operations are disabled when nothing is selected. The directory scrolls independently, and the bottom buttons remain visible in the mobile drawer.
+  - Selecting a parent includes all descendants, including collapsed children. Deselecting a child makes ancestors indeterminate, and those ancestors are not operated on. Counts include documents, groups, and descendants; the actual operation removes duplicate subtrees in directory order. Shift selects a continuous range among currently visible items. In batch mode, clicking a row only toggles selection; collapse and expansion still work, item menus are hidden, and dragging is disabled. Exiting or switching knowledge bases clears selection; Esc exits batch mode when focus is inside the sidebar.
+  - Copy and move can target another knowledge base and place items at the end of the target position. The dialog's leftmost area follows home-page knowledge-base groups and their internal order, listing knowledge bases under group names, placing ungrouped bases last, and omitting empty groups. Without configured groups, it remains a plain knowledge-base list. All selectable bases are expanded directly, unaffected by the home page's collapsed state. Copying preserves content, hierarchy, and child order; the root item receives a unique `（副本）` suffix, and copies share the original non-overwritable images. Document links within the copied range are rewritten to the new copies, each of which receives an initial historical snapshot. Moving into the selected subtree is prohibited. Export retains the Markdown/ZIP format; copy link includes documents only; deletion confirmation states the selected count explicitly and moves the items into the existing recycle bin.
+  - After deleting the currently open document, navigate to its parent document or parent group; if it has no parent, return to the current knowledge-base home page. When deleting a subtree containing the current document or performing a batch deletion, navigate to the nearest ancestor not being deleted, or to the knowledge base if none exists. If the current document is being edited, first wait for uploads, saving, and the session snapshot to complete and leave the editor before submitting the deletion, preventing auto-save or the leave guard from continuing to write deleted content. On save or snapshot failure, stay on the editing page and do not send the deletion request. Deleting other documents retains the current editing page. If deletion succeeds but directory refresh fails, still complete navigation and prompt for refresh; if deletion fails, retain the document and show the reason.
+  - `POST /api/docs/batch` accepts `bookId`, `ids`, and `action` (`copy` / `move` / `trash`); copy and move additionally send `targetBookId` and `parentId`. A request contains at most 5,000 items and is validated and committed in one transaction. Selecting a parent requires submitting all of its live descendants at the same time; return 409 and ask the user to reselect if an item has been deleted or an unselected child was added to the directory. Copy returns new IDs; other operations return the original IDs. If the document currently being edited is selected, finish saving first; leave that editing page before moving or deleting it. After moving, navigate to the target knowledge base; after deletion, follow the rules below. A successful write clears the selection; cancel, export, and copy link preserve it.
+  - The directory-group menu provides the exact `解散分组` ("Dissolve Group") action. After confirmation, place direct children in their original order at the group's former sibling position, preserve each child's internal hierarchy, and move only the now-empty group to the recycle bin. Direct children already in the recycle bin also move to the sibling level while remaining deleted, so later restoration no longer depends on the dissolved group; restoring the empty group does not reverse dissolution. `POST /api/docs/{id}/dissolve` submits `bookId`, `parentId`, and the ordered `childIds` of current live direct children, then validates the structure, promotes the children, and deletes the empty group in one transaction. Return 409 if ownership, parent, or direct-child order changed; roll back everything on failure. Document IDs, body content, revisions, and history remain unchanged. A child document currently being read or edited stays on the same page; if the dissolved group itself is being viewed, navigate to its parent or the knowledge-base home page.
+  - The directory-group menu provides the exact `提取为知识库` ("Extract as Knowledge Base") action. Create a knowledge base using the group's name, place its direct children at the new base's root in their original order, preserve all internal hierarchy, and move only the original now-empty group to the recycle bin. The new base joins the home-page group currently containing the source knowledge base and is appended to that group's end; if the source is ungrouped, the new base is likewise ungrouped. A same-named knowledge base is neither merged nor overwritten, and an empty group can be extracted as an empty knowledge base. After confirmation, first wait for the current edit save and session snapshot to complete and exit the editor; do not send the extraction request on failure. Open the new knowledge base on success, but do not force navigation back if the user has already changed pages. A refresh failure must still report successful extraction, preventing duplicate creation.
+  - `POST /api/docs/{id}/extract` explicitly submits the current `bookId`, `parentId` (null for the root), `title`, and ordered `childIds` of live direct children; an empty group uses `[]`. In one transaction, validate the name and position, create and group the knowledge base, move all descendants, make direct children root items, and delete the empty group. On success, return 201 with `{book, bookGroups}` and increment the group revision when there is home-page membership. Return 409 when the name, source, parent, or direct-child order changed; return 400 for invalid arguments or a non-group; return 404 for a deleted group or knowledge base. Roll back everything on failure. Descendants in the recycle bin also become owned by the new base while retaining deleted status; restoring the original empty group does not reverse extraction. Document IDs, body content, revisions, update times, and history remain unchanged, with no database migration.
+  - Add a server-side move API that reorders siblings within one transaction and verifies that no cycle can be created. Renaming within the directory likewise checks the revision number and prompts on conflict with an open editing page.
+- **Knowledge bases:** A knowledge-base home page shows its name, editable description, document count, most recent update, and complete directory. Knowledge-base cards on the home page can be drag-sorted. Statistics for each document in the directory appear in this order: image count, omitted when there are no images; character count; and most recent edit time. On desktop they appear to the right of the title; on mobile they appear below it. Each of the three occupies a fixed-width column, is right-aligned, and uses tabular numerals. The image column's space is retained even without images, preventing digit-count changes from misaligning adjacent columns. Very deeply nested directories contract to the available width on narrow screens. Character counts use the same whitespace-excluding measure as the reading page. Images are counted by occurrences in the body, so the same image appearing twice counts as two images. Directory groups show no statistics. The tree API reads directly from existing `plain_text` and body JSON, with no new database field. Saving or canceling an edit invalidates the directory cache so the next directory visit reflects updates.
+  - The knowledge-base More menu provides the exact action `转为分组…` ("Convert to Group..."). Choose another live knowledge base through home-page groups and knowledge bases; create a group with the source's name at the end of the target root directory and place all source root items inside it, preserving their original order and internal hierarchy. An empty knowledge base becomes an empty group. A same-named group is neither merged nor overwritten. The original empty knowledge base moves to the recycle bin while retaining its name, description, and home-page membership; restoring it does not reverse the conversion. Before confirmation, load the latest source name, directory, and knowledge-base list. After confirmation, wait for the current edit save and session snapshot to complete and exit the editor; do not convert on save failure. Open the new group on success, but do not jump back if the user has already changed pages. Even if refresh fails, report explicitly that conversion succeeded.
+  - `POST /api/books/{id}/to-group` submits the source's current `name`, target `targetBookId`, and complete ordered live root-item `rootIds`; an empty knowledge base explicitly uses `[]`. Within one transaction, validate, create the group and its snapshot, migrate all documents, and move the original empty knowledge base to the recycle bin. HTTP 201 returns `{group: DocMeta, book: target Book}`. A mismatched name or root-item order returns 409; invalid arguments or selecting the source itself as target returns 400; a deleted or nonexistent source or target returns 404. Every failure rolls back the operation as a whole. Deleted items retain deleted status but become owned by the target. Existing body content, IDs, revisions, timestamps, history, links, and assets remain unchanged; home-page grouping is not changed and there is no database migration.
+  - At the top of the home-page card menu, place the exact actions `从其他知识库移入` ("Move In from Another Knowledge Base") followed by `转为分组…` in the same separator group. Remove the exact entries `新建文档`, `从模板新建`, and `新建目录分组`; action menus inside a knowledge base retain those three entries. The entry used to choose a home-page group in knowledge-base menus is uniformly named `移动到`.
+- **Knowledge-base groups:** The home page, workspace sidebar, and knowledge-base switcher share one level of categorization; every knowledge base belongs either to one group or to the reserved group `未分组` ("Ungrouped"). On the home page, groups can be created, renamed, moved up or down, collapsed, and deleted. The menu at the top-right of a card and the knowledge-base action menu can choose the target group, and cards can also be dragged directly to a group title or empty area. Cards within a group can still be drag-sorted; on phones they can be moved through the menu. Deleting a group only moves its knowledge bases to `未分组` and does not delete documents. A knowledge base retains its membership when moved to the recycle bin and returns to its original group when restored; permanent deletion clears membership in the same transaction, preventing ID reuse.
+  - When dragging a card to another group, the entire target area gradually shows a green background and outline with the exact prompt `松开以移入此分组` ("Release to Move into This Group"). Titles, cards, whitespace, and collapsed groups use the same cue, without flicker while moving within a group. Sorting within and across groups shares drop positions: hovering over a card's left half inserts before it, while the right half inserts after it, with a green insertion line on the corresponding side. Dropping on a group title or whitespace places the card at the end of the group. On release, update final membership and order immediately without waiting for the save response. The settling animation is always centered on the target position; the card does not return to its original group or enter again from its old position. Leaving the target, releasing, or canceling a drag clears the cue; a collapsed group remains collapsed. When the system requests reduced motion, retain only color and drop-position feedback.
+  - Drag animation is coordinated between `app/bookDragMotion.ts` and home-page styles. At drag start, the original card scales down slightly to 97% and fades; the native drag preview scales to 103.5%, tilts slightly by 1.2 degrees, and gains a shadow. When passing a card, that card yields 4 px opposite the drop position, and the insertion line appears within 140-180 ms. After release, the card settles at its final position with 260 ms of slight scaling and shadow fade-out; neighboring cards, the group title, and content below return smoothly over 220 ms. Do not translate the entire group containing the target card. Canceling restores the original card. Dropping into a collapsed group gives only a subtle count cue. Animations and drag previews are cleaned up on completion, on the next drag, or when leaving the home page. Under reduced motion, skip translation, rotation, and scaling.
+  - A group title has a drag affordance and can move the entire group before or after another group. A green insertion line marks the destination. On release, save the group-array order and move content with a short transition; the sidebar and switcher adopt the same order. `未分组` remains fixed at the end. Phones can still use the group's move-up and move-down menu actions.
+  - Retain the existing grid layout while dragging and do not insert an extra placeholder card for "place at the end of the group." Dropping on the right half of the final card, the group title, or whitespace within the group can all move an item to the end; if it is already last, do not save again. Moving through a menu to another group also appends to the end. Clicking the currently selected group does not change order.
+  - The top of a group title's `…` menu provides the exact action `新建知识库` ("New Knowledge Base"); the dialog identifies the target group. After successful creation, append it to the end of that group and remain on the home page rather than opening the knowledge base automatically. Empty and collapsed groups support the same action, and collapsed state is retained. The global creation entry points at the top of the home page, in the ungrouped grid, and in the sidebar still create under `未分组`. `POST /api/books` accepts optional `groupId`, where omission or an empty string means ungrouped. Creation and membership append occur in one transaction, preserving other groups, existing order, and recycle-bin membership while incrementing the group revision. Append only to the latest configuration; do not require the complete groups or `baseRevision` to be submitted. If the target group does not exist, return 404 without creating a knowledge base. A subsequent attempt to save the complete group configuration with the old revision still returns 409.
+  - Home-page and sidebar groups share expanded state and a 180 ms content-height transition; toggling in either location synchronizes the animation in both. Subsequent groups and the recently viewed region move smoothly with the height, preventing the recently viewed section from jumping suddenly. Collapsed content remains rendered but is set to inert, so it cannot be clicked or receive keyboard focus. Under reduced motion, switch immediately.
+  - The exact `新建分组` and `新建知识库` buttons in the home-page sidebar sit side by side aligned to the right. Book icons are no longer displayed before the sidebar knowledge-base list or current knowledge-base name.
+  - The `…` menu on home-page knowledge-base cards, the knowledge-base page action menu, and the sidebar knowledge-base context menu share rename, edit description, move to, convert to group, copy link, export, and delete knowledge-base actions. The knowledge-base page and sidebar menus additionally retain entry points for creating a document, template-based document, or directory group; home-page cards do not provide those three. The sidebar title of the current knowledge base also supports a context menu. Group selection uses a submenu and marks current membership. Delete appears separated at the bottom and, after confirmation, moves the knowledge base and all its documents to the recycle bin, where they can be restored together.
+  - The home-page knowledge-base card menu provides the exact action `从其他知识库移入` ("Move In from Another Knowledge Base"). The dialog browses by columns through knowledge-base groups, a source knowledge base, and successive document-directory levels, excluding the target knowledge base. One operation selects from one source knowledge base. A single click replaces the selection, Command/Ctrl toggles selection, Shift selects a contiguous range in the current column, and checkboxes preserve selections across different directories; arrows only enter directories. Selecting a parent includes every descendant; deselecting a child makes its ancestor indeterminate. The dialog supports selecting all in the current column and clearing the selection, and displays document and group counts. A phone shows one column at a time and can swipe horizontally or return through the path. Reuse the atomic move in `POST /api/docs/batch`, with at most 5,000 items at once, appending them to the target root in source-directory order while preserving IDs, body content, history, and internal hierarchy. Canceling does not modify data; conflicts prompt reselection; after success, remain on the home page.
+  - `GET /api/book-groups` returns `{ revision, groups: [{ id, name, bookIds }] }`. `PUT` accepts `{ baseRevision, groups, bookOrder? }`, returns 409 on conflict for the page to refresh and retry, and validates group names, IDs, and unique knowledge-base membership. Optional `bookOrder` must contain exactly every live knowledge-base ID, including bases in other groups and ungrouped bases, excluding the recycle bin. Membership, complete order, and the new revision commit in one transaction. Invalid order returns 400 and rolls back everything; omission preserves existing order. The interface updates membership and position first and saves in the background. On failure, it restores the last confirmed configuration and order together and attempts a refresh; even after repeated failures while offline, it does not retain unsaved results. `未分组` is a reserved name. Configuration displays in group-array order and is stored in the existing `meta.book_groups` JSON. With no configuration, return empty groups and write nothing. Add no database table and migrate no existing data. Within-group order continues to use `books.position`; `bookIds` represents membership only. Collapsed state is stored only locally. Group configuration is preserved by consistent database backups.
+- **Home page:** After creating a knowledge base on the home page through the global entry point or a group menu, remain in place and preserve scroll and group-collapse state. Creation initiated from another page retains the behavior of opening the new knowledge base. Show recently viewed items, recorded locally; recently edited items; knowledge-base cards; and a creation entry point. At the lower right below the knowledge-base list, display the total body character count of all live documents, for example the exact UI text `共 1,234,567 字`; at the bottom-right of every knowledge-base card, display that base's character count, for example `123,456 字`, with an empty base showing `0 字`; retain the document count at the lower left of the card. Align counts to the right on both desktop and mobile; when a narrow card lacks space, wrap the character count while keeping it right-aligned. The site-wide total is unaffected by collapsing knowledge-base groups. Use the same non-whitespace-character definition as the reading page and directory; do not count document titles, directory groups, recycled documents or knowledge bases, history, or templates. `GET /api/stats` returns `{chars: number, bookChars: {[bookId: string]: number}}`, including every live knowledge base with zero for empty bases. Sum per-document cached character counts (see 3.1), reading existing `plain_text` only for documents written since the preceding count; add no database field. Preload this API only on the home page. Returning home or modifying the knowledge-base list while there updates per-base and site-wide counts together.
+- **Recycle bin:** Restore, permanently delete with a second confirmation, and empty the recycle bin. Image files are not deleted along with these operations, consistent with Section 7.
+- **Search:** Retain the existing search and migrate it into an in-application page.
+- **Export:** Complete the export from Section 9. The web interface can export one article as Markdown and an entire knowledge base as an archive containing Markdown and images arranged by directory structure with relative image paths. Export all content using the tool on the development computer, which is implemented and documented in OPERATIONS.md. Web export and the export tool share the same file layout and link-rewriting rules in `web/src/shared/export.ts`.
+- **Mobile:** Convert the directory and outline to drawers and make the body full-width.
+
+### 12.6 Editor Interactions (D2)
+
+- **Layout:** The editing and reading views share the shell from 12.5. The outline on the right can be toggled, and a fixed toolbar sits above the body. Focus Mode can hide the persistent sidebar; narrow windows can still open the directory drawer.
+- **Top toolbar:** The exact UI actions `撤销`, `重做`; body text and headings 1-6; bold, italic, strikethrough, underline, inline code, and highlight; links; alignment (Section 19); unordered, ordered, and task lists; an Insert menu containing block quote, Callout, code block, Mermaid, formula, table, image, and horizontal rule; and clear formatting. Beside heading selection are buttons to promote or demote a whole batch of headings (Section 22); find and replace and Focus Mode are on the right.
+- **Selection toolbar:** Text and cell selections share common formatting, link, convert-to-heading-or-body, and clear-format controls, with a trash can at the far right. See Section 20 for removal rules: remove text, nodes, whole rows, or whole columns according to the selection; partial cells only have their content cleared. Code-text and whole-code-block selections show only the remove and content-snippet buttons; the image toolbar also shares the remove button. The toolbar does not appear for a caret alone in ordinary text, while a caret in a table retains table tools. Position the toolbar according to its actual rendered dimensions. For selected text, prefer placing it above the selection with an 8 px gap, flipping below when there is insufficient space above. Recalculate after first display, tool changes, and narrow-screen wrapping, avoiding placement based on the empty-box dimensions before buttons have rendered, which would cover the selection. Tables continue to use separate cell anchors and control-bar spacing.
+- **Heading controls:** Reading and editing share H1-H6 level indicators and folding arrows; drag icons, block menus, and plus signs no longer appear to the left of the body. Content from one heading through the next heading at the same or a higher level forms a section. Headings inside columns, highlight blocks, fold blocks, block quotes, and tables calculate their ranges within their own content containers. Controls appear on hover, remain visible while collapsed, and are always visible on touchscreens; preserve a traversable area between the control and heading. While editing, decorations hide an entire section without writing to the body or occupying content undo history. If the caret or an outline target enters hidden content, expand it first. Collapsed state shares the reading page's local record keyed by heading anchor. Insert using the top `＋` or `/`; move sections through the outline instead (Section 22).
+- **Whitespace between blocks:** Clicking whitespace above, below, or between an image paragraph, table, code block, block formula, Callout, horizontal rule, or adjacent content, within 28 px of a block edge, inserts an ordinary empty paragraph and places the caret there; use an adjacent empty paragraph directly if one exists. Track the origin of a newly inserted paragraph only for the current edit. If unused, automatically remove it when the caret moves away, it changes into a heading, or editing ends. Retain it after text is typed or pasted, Enter splits it, formatting is applied, or image upload begins; even if later emptied, it is no longer removed automatically. Existing empty paragraphs and intentionally added empty columns are unaffected. Preserve the operation position while a formatting or insertion popover temporarily takes focus; cleanup does not enter undo history. Support the beginning of a document, adjacent non-text blocks, and blocks inside lists, Callouts, and cells. Whitespace between images that auto-wrap within one paragraph only positions the caret; use Enter or Shift+Enter to create an explicit paragraph or line break (Section 19.1). Insertion is undoable, preserves an active table-resize operation in preference, and leaves modifier keys and text-selection behavior unchanged. This is implemented in `web/src/editor/blockSpaces.ts` without changing the document format.
+- **End-of-document whitespace:** Clicking whitespace below the last visible block and within the body-column width inserts an ordinary empty paragraph at the end of the document and focuses its caret. This covers whitespace inside a short-document editing area and at the bottom of the body column, without depending on block type or the 28 px distance limit. Use an existing final empty paragraph directly, and do not create another on repeated clicks. After focusing, check the caret's visible range and, if necessary, jump-scroll it below the top toolbar so that clicking distant whitespace does not leave the typing position off-screen. Reuse the temporary-paragraph tracking, usage detection, leave-time cleanup, and undo rules for whitespace between blocks. Clicks on body content, nested content, tool controls, or outside the body column retain their original behavior.
+- **Horizontal rule:** Preserve its thin-line appearance while editing, but increase its click hit area to 20 px high. Clicking selects the entire rule so it can then be deleted or operated on through the selection toolbar; reading styles remain unchanged.
+- **Slash menu:** Includes icons, groups, descriptions, and corresponding Markdown syntax; opens when `/` or the Chinese-IME character `、` is entered. Search shares the `Cmd/Ctrl + K` matcher and supports partial Chinese and English keywords, full Pinyin, initials, mixed full Pinyin and initials, and matching from the middle of a name. Spaces and the syllable-separating apostrophe `'` in Pinyin are ignored. For example, `daimakuai`, `dmk`, `daimk`, and `makuai` all find the exact Chinese item `代码块`. Character-by-character Pinyin for fixed menu labels is maintained explicitly, with no browser-side dictionary.
+  - Markdown forms and aliases are searchable too: one or more backticks or tildes find an ordinary code block, titled code block, and Mermaid; `#`/`##`/`###` find headings; `-`/`*`/`+` find an unordered list; `1.` finds an ordered list; `[ ]`/`- [ ]` find a task list; `>` finds block quotes and Callouts; `|` finds tables; `![]` finds images; `[]()` finds links; `---`/`***`/`___` find horizontal rules; `$`/`$$` find formulas; and forms such as `[!note]` find Callouts.
+  - Exact syntax matches take priority; other results are sorted by name/keyword containment and Pinyin matching, with prefix matches ahead of middle matches. Menu order breaks equal scores. When no query is entered, recently used items appear first. Arrow keys select, Enter inserts, and Esc exits; insertion does not occur during Chinese IME composition. Table insertion continues to use a grid to choose row and column counts.
+  - The exact `文档` ("Document") item directly opens the exact `文档与章节` ("Documents and Sections") tab of the link popover and focuses its search box; it can be found with `wendang`, `wd`, `document`, and `[[`. The existing `链接` ("Link") item still opens the exact `网址` ("URL") tab by default. The top Insert menu shares both entry points.
+- **Links:** `Cmd/Ctrl + K` or the toolbar opens the link popover. When the caret is on a link, a link card appears with the exact actions `打开`, `编辑`, and `取消链接`. Starting in Phase E, `Cmd/Ctrl + K` instead opens the search panel; see 13.1.
+- **Formulas:** Clicking a formula or inserting one through quick input opens a popover for entering LaTeX with a live preview; Enter confirms and Esc cancels.
+- **Other:** The editing outline highlights according to scrolling and navigates on click. `Cmd/Ctrl + F` opens find and replace, supporting case sensitivity and replace all. `Cmd/Ctrl + /` opens the site-wide keyboard-shortcut reference, while the code-editing area retains line comments; its entry point is in the appearance menu at the lower left (Section 22).
+- **Keyboard-shortcut reference:** Organize Common, Text, Paragraph, Code Block, and Markdown into tabs switchable with arrow keys. Two columns on desktop and one on phones align operations with keys. Display every key separately. Mac modifiers use consistent icons with a name legend, while Windows/Linux use textual key names. Keep the title, categories, and close button fixed so only the content area of a long list scrolls. Under Markdown, distinguish input symbols from subsequent keystrokes.
+- Change save status to an icon plus text. The auto-save, conflict-detection, and local-draft mechanisms remain unchanged.
+- The character count beside save status uses the same definition as the reading page and directory (Go `PlainText` and `CountChars`): body text, formula source, image alt text and captions, attachment names, code-block titles, and whiteboard text, excluding whitespace. `editor/characters.ts` caches results per node, so editing recounts only changed blocks rather than traversing an entire long document after every keystroke.
+
+### 12.7 Content Blocks (D3)
+
+- **Tables:** Select rows and columns through the outer grid and insert them at divider points (Section 18); use the top alignment menu for alignment (Section 19); use the removal button at the far right of the selection toolbar for deletion (Section 20). Do not show a table-specific toolbar anymore.
+- **Images:** Once selected, an image shows a toolbar with the exact operations `适应宽度`, `原始尺寸`, common widths, `替换`, `下载`, `查看原图`, `编辑替代文字`, and `删除`. Drag a corner to adjust width, writing to the existing width attribute; export with Obsidian's `|宽度` form. During upload, first show a placeholder and progress, with retry on failure. Clicking an image on the reading page opens an enlarged view and allows switching among images on the same page.
+- **Code blocks:** Searchable language selection, copy, and Tab/Shift+Tab indentation. Line numbers are always visible. Soft wrapping is toggled independently in each code block's title bar, beside copy, and both have icons. When the title bar is hidden, copy in the upper-right shows only its icon. Long code on the reading page can be collapsed.
+- **Callouts:** A type-selection panel with colors and icons, plus a folding-mode switch. In the editor, an empty title displays the same default title as the reading page.
+- **Mermaid:** Source and preview side by side; syntax errors show a message while retaining the last successful preview.
+
+### 12.8 Merging Same-Named Groups and Documents
+
+The user confirmed the merge. After D1's move feature went live, the following seven occurrences were handled through the API: documents under a group were moved below the same-named document, then the now-empty group was deleted into the recoverable recycle bin. Only directory structure was adjusted; document content was not changed. A backup was taken before the operation, and the directory was checked and presented to the user for confirmation afterward.
+
+- `设计模式`: `创建型模式` (five documents under the group), `结构型模式` (four), and `行为型模式` (four).
+- `Spring`: `组件注册` (two documents).
+- `开发手册 / 文件处理`: `操作本地文件`, `获取文件信息`, and `文件加工` (one each).
+
+### 12.9 Implementation and Acceptance
+
+- **Sequence:** Export tool -> D1 shell, directory, and export -> D2 editor interactions -> D3 content blocks; all are complete. The original plan was to release each step separately and proceed only after user verification. D1 followed that plan: a local prototype was delivered and released after user confirmation. The user then directed that the remaining work be completed continuously, leaving commit timing to the implementer and performing final acceptance in production after everything was finished; D2 and D3 were therefore released together.
+- **Verification as needed:**
+  - D2 and D3 change editor configuration, so before release, run the unchanged-save check with the new editor against every production document; this check is read-only.
+  - For changes affecting editing performance, use a synthetic long document of about 3,800 blocks as needed to check opening and input latency; see verification archive 12.11 for the baseline.
+- **Acceptance:**
+  1. D1: All existing capabilities—creation, editing, auto-save, conflict prompts, history and restoration, recycle bin, and search—work in the new interface, with no native browser dialogs. Directory dragging and moving are correct and persist after refresh. One article, one knowledge base, and all content can be exported, and the exports open in Obsidian. Mobile reading works normally. Reading scripts meet the budget in 12.3.
+  2. D2: The interactions in 12.6 work. Under a Chinese IME, the toolbar, slash menu, and Markdown quick input work normally. Editing the longest document, about 3,800 blocks, remains responsive.
+  3. D3: The operations in 12.7 work. Tables, image dimensions, code blocks, and Callouts remain correct after Markdown export.
+
+### 12.10 D1 Results (2026-09-26)
+
+- **Page architecture:** Go retains only one page shell, `internal/server/templates/shell.html`. `internal/server/app.go` preloads initial-view API data for every address; the frontend uses it directly on its first request for the same path and requests the server again thereafter. A nonexistent ID makes the page return HTTP 404. The old Go page templates and reading-page scripts have been deleted.
+- **Frontend:** `web/src/app` contains routing, layout, the directory tree, and individual pages; `web/src/ui` contains dialogs, prompts, menus, and icon buttons; `web/src/editor` contains the editor and loads on demand. The stack is Vue 3 + Vue Router + Reka UI + Lucide. Colors are defined with CSS `light-dark()` and support the exact modes `跟随系统`, `浅色`, and `深色`; syntax highlighting and Mermaid switch with them.
+- **Implemented:** Everything in 12.5 except web export. Editing and reading pages share the shell; the application saves before leaving an edit and prompts on save failure. Renaming the currently edited document in the directory saves the title through the editor, avoiding a version conflict. Link and formula input in the editor also use in-application dialogs. Entering edit mode shows a top progress bar; hovering over the exact `编辑` button pre-downloads the editor. After a new version is released, an old tab automatically reloads the page if it cannot retrieve a deleted script.
+- **Server:** Added document view, version view, recently edited, and recycle-bin list APIs, plus APIs for move, rename, knowledge-base sorting, permanent deletion, and emptying the recycle bin. Knowledge-base modification now updates only supplied fields, fixing the loss of descriptions when renaming a knowledge base. No production knowledge base previously had a description, so no data was lost.
+- **Completed later (2026-09-26):** Web export: the exact `导出` action on a directory node and `导出知识库` in the knowledge-base menu. A single article with no images or child documents downloads directly as Markdown; everything else downloads as an archive containing Markdown plus `attachments/`, using the same layout as the export tool and preserving images unchanged. Links to documents outside the export scope are converted to web addresses. Same-named groups and documents were merged according to 12.8.
+
+### 12.11 D2 Results (2026-09-26)
+
+- **Layout:** The editing toolbar is fixed below the top bar. The editing outline on the right can be toggled, highlights the current heading while scrolling, and navigates on click. Focus Mode hides the sidebar. Reading and editing pages share a wide page with a maximum width of 1100 px, and the sidebar does not affect body position (12.5). Code line numbers are always visible and wrapping is toggled in the code-block title bar (12.7); the global menu no longer provides either option.
+- **Toolbars:** The top toolbar is implemented according to 12.6. Formatting buttons show current state and shortcuts and are disabled inside code blocks. The Insert menu lists corresponding Markdown forms, and a grid chooses table row and column counts; the first row is a header by default, which can be disabled. The selection toolbar has body and heading levels 1-6, six text formats, text color, link, clear formatting, and a unified remove button (Section 20); see Section 23 for table tools.
+- **Heading controls:** Beside the body, only the same heading-level and folding buttons as the reading page remain; section dragging moved to the editing outline. Tools for ordinary content blocks and the plus sign beside a block were both removed. Controls are reused by heading level and collapsed state, so typing above does not rebuild heading controls for the entire document. On click, the corresponding heading is found using the control's current position (`editor/headingFolds.ts`).
+- **Slash menu:** Grouped into Basics, Lists, Insert, and Callouts, with icons, descriptions, and Markdown forms. See 12.6 for the name, keyword, Pinyin, and syntax search rules. Recently used items appear first. Both `/` and the Chinese-IME character `、` open it.
+- **Links and formulas:** `Cmd/Ctrl + K` or the toolbar opens the link popover; when no text is selected, the text is entered at the same time. Starting in Phase E, the shortcut instead opens the search panel; links are inserted from the toolbar, selection toolbar, or slash menu—see 13.1. Addresses on this site automatically become internal links, while addresses without a protocol receive `https://`. When the caret is inside a link, a link card displays the exact actions `打开`, `编辑`, `复制`, and `取消链接`. Clicking a formula, using `$$` quick input, or inserting a formula from the menu opens the formula popover with a live KaTeX preview. Enter confirms, Shift+Enter inserts a line break, Esc cancels, and canceling a newly inserted empty formula deletes it.
+- **Find and replace and keyboard shortcuts:** `Cmd/Ctrl + F` opens find and replace, with case sensitivity, previous, next, replace, and replace-all functions, and highlights matches in the body. `Cmd/Ctrl + /` opens the site-wide keyboard-shortcut reference, which separately lists Markdown quick input; the code-editing area retains line comments. Both shortcuts also work in the title input. Following Yuque's conventions, strikethrough `⌘⇧X` and list indentation `⌘]` / `⌘[` were added.
+
+### 12.12 D3 Results (2026-09-26)
+
+- **Tables:** Row/column insertion, alignment, and deletion use outer controls, the top alignment menu, and the unified selection toolbar respectively (Sections 18-20). Headers, merged cells, and background colors preserve the actual structure according to Section 23 and do not add a header automatically. Markdown column-default alignment and independent per-cell overrides are retained; a row added at the end with Tab inherits each column's default alignment and width.
+- **Images:** Selection displays a toolbar with the exact actions and values for size (`原始尺寸`, `适应宽度`, `75%`, `50%`, `25%`), `替换`, `下载`, `查看原图`, `替代文字`, and `删除`. Drag the lower-left or lower-right corner to adjust width while displaying the pixel value. On release, write the width and clear the height; export it in Obsidian's exact `![说明|宽度](路径)` form. Pasted, dragged-in, or selected images first show a preview placeholder and upload progress. Failure shows the reason and permits retry or removal. Wait for uploads to finish before leaving the editing page. Clicking an image on the reading page opens the viewer, where arrow keys or buttons switch among images on the same page and the original can also be opened.
+- **Code blocks:** Searchable language selection by name or common alias, with arbitrary languages outside the list also accepted; copy; Tab and Shift+Tab indent by four spaces. Line numbers and soft wrapping apply in both the editor and reading page, with line numbers remaining aligned to every visual line when wrapping. On the reading page, code longer than 35 lines is collapsed to 30 lines by default and can be expanded and collapsed.
+- **Callouts:** A type panel with colors and icons, plus folding modes: not collapsible, expanded by default, and collapsed by default. When the title is empty in the editor, display the same default title as the reading page, such as Note or Tip, instead of the exact placeholder `标题（可留空）`.
+- **Mermaid:** Source and preview are side by side, stacking vertically on narrow screens. The source background fills its region, and preview height follows its content; no white background or fixed empty height appears below a single line of code. Syntax errors show the error location and retain the last successful preview in a muted style.
+- **Code colors:** Production inspection after release found that punctuation such as parentheses in reading-page code was nearly the same color as the background in dark mode, a problem present since D1. The cause was that the GitHub light style assigned punctuation colors while the dark style did not, so light-mode rules remained active in dark mode. The two rule sets now apply only in their respective modes.
+- **Unchanged-save check:** The `roundtrip` tool gained a check that counts existing tables whose headers or column alignment would be adjusted during editing. The logic that preserves table shape also handles tables whose rows contain unequal cell counts, as some imported notes already do.
+
+## 13. Phase E, First Batch
+
+After accepting Phase D on 2026-09-26, the user selected the following four items from the proposals. Sections 13.1-13.5 describe the user-confirmed design, which was implemented and released that day; see 13.6 for the results. User acceptance finished on 2026-09-27. None of the four items changes the document format or the editing/reading consistency snapshots.
+
+### 13.1 Search Panel and Quick Navigation
+
+Previously, search was available only by entering the search page from the sidebar. Change it to a pop-up panel that can be opened at any time for navigation:
+
+- **Entry points:** The sidebar Search button now opens the panel; the user-selected shortcut `Cmd/Ctrl + K` works on both reading and editing pages. The editor's former `Cmd/Ctrl + K` link-insertion shortcut is removed; links are inserted from the toolbar, selection toolbar, or exact `链接` ("Link") item in the slash menu. The original search page remains and is entered through the exact `查看全部结果` ("View All Results") action at the bottom of the panel.
+- **Before input:** Show recently viewed items, recorded locally, and recently edited items.
+- **After input:**
+  - Titles: when the panel opens, fetch the title index for all documents once through a new API, returning approximately 300 entries with title, containing knowledge base, and parent document, then match locally and immediately. Support Pinyin initials; for example, `zs` finds the exact title `装饰`. Initials are inferred using the browser's built-in Chinese collation rules without adding a Pinyin dictionary; the second batch changed this to a server-side dictionary with full-Pinyin support—see Section 14.
+  - Full text: retain the existing search API, requested about 120 ms after typing stops; this was shortened from 200 ms when an in-memory index was adopted on 2026-10-14—see 26.4. Results include highlighted context. Later, support was added for separating multiple terms with spaces, including full-width spaces: every term must appear in the title or body, at most the first 10 distinct terms are used, and titles containing more terms rank first. Context begins at the earliest-occurring term, each term is highlighted separately, and a document opened from a result likewise highlights every term separately. A title match also accepts all terms being present in the title. Queries containing letters only can still match space-separated Pinyin. When search-page results reach the limit of 50, state that only the first 50 are shown and that more terms can narrow the results.
+  - Title matches appear before full-text results. Every item displays its containing knowledge base and parent document.
+- **Operations:** `↑` and `↓` select, Enter opens, and Esc closes. On phones, display the panel full-screen.
+- **Size:** Panel code loads on demand and does not increase the scripts for initial page opening, currently about 104 KB.
+
+### 13.2 Historical-Version Comparison
+
+- **Snapshot semantics:** Snapshots store complete content and are ordered from newest to oldest by ID. An ordinary snapshot contains post-change content; additional snapshots labeled exactly `编辑前` ("Before Edit") and `恢复前` ("Before Restore") are recorded before editing and restoration. The revision, displayed as rN, is used for concurrency control. Auto-save and canceling edits can also increment it, so it is not the historical snapshot sequence number. Current content is displayed separately. A snapshot is judged `与当前内容一致` ("Identical to Current Content") from its title and normalized JSON, not from revision alone. Saved content with no new snapshot separately displays a summary relative to the latest snapshot.
+- **Retention period:** Retain every historical snapshot for 30 x 24 hours from creation and clean records reaching that age daily at 03:00 Beijing time. Retain no minimum number of versions; a document unchanged for a long time may have no history. The service checks every minute whether the task is due, catches up at startup after downtime, and does not repeat it on multiple starts during the same day; successful execution time is stored in existing meta. Current body content, body content in the recycle bin, templates, and snippets are unaffected by history cleanup. Historical snapshots in the recycle bin follow the same retention period. Existing backups follow their own retention policy.
+- **Edit and restore protection:** On the first successful save of an editing session, record a new `编辑前` snapshot first in the same transaction, protecting the original text and media needed to cancel editing even if old history has been cleared. Canceling editing deletes the current session's snapshots and this baseline. If the latest snapshot already has the same revision, title, and body and is labeled `编辑结束` ("Editing Ended"), `恢复` ("Restore"), or `新建` ("Created"), and has more than one week until expiration, use it as the baseline instead of recording another `编辑前` with `内容无变化` ("No Content Changes"). `自动保存` ("Auto-save") is not a session boundary, so an additional `编辑前` is still recorded, allowing `最近修改` ("Recent Changes") to find the current session's starting point. A session reusing a baseline takes automatic snapshots every 10 minutes from the start of editing; one may occur early after a service restart. When a session's net change is zero, `最近修改` shows the preceding session that did make changes. When restoring history, validate the target version against the current revision, record `恢复前`, update the body, and record the restoration result in one transaction; any conflict or failure rolls back everything. Both types of protective snapshot also expire after 30 days and create no permanent-retention exception. The historical-ID high-water mark is stored in meta, so old links are not reused after cleanup.
+- **Attachment integration:** Expired-history cleanup and reset of its media-reclamation timers happen in the same transaction. Images and attachments referenced only by that history restart their one-hour grace period after the last reference disappears; they are not deleted immediately according to upload date. They remain preserved if still referenced by body content, remaining history, the recycle bin, templates, or snippets. If reference parsing fails, do not delete the entire batch of history.
+- **Save sequencing:** When normally leaving the editing page, wait for the body flush, then save the session snapshot through a request with a confirmable result before entering the target page. On failure, retain the editing page and allow retry. Closing the tab still uses a beacon for a best-effort record. Previously, a beacon was sent only while unmounting the component, so immediately entering the history page could read the old list first; storage itself held the post-change content and was not one version behind.
+- **Change summaries:** When reading history, the server compares adjacent snapshots and returns labels, counts, and affected heading paths. Old records receive summaries automatically, without a new database field or an external model call. Headings distinguish text from level; body changes distinguish content, formatting, and structure; images distinguish addition/deletion, size, alignment, caption, and relative order; tables distinguish addition/deletion, content, dimensions, cell alignment, structure, and whole-table alignment; code blocks, Mermaid diagrams, formulas, and horizontal rules are also distinguished. Repeated types have combined counts. Three affected locations display by default, and the remaining locations can be expanded.
+- **Read cost:** The history list, version preview, and reading-page recent changes first read version information without body content. Snapshots are parsed only for comparison or rendering, with at most two parsed bodies retained at once. Snapshots are immutable and IDs are never reused, so adjacent summaries, snapshot-content hashes, and version previews are cached in memory by snapshot ID. `此后改动` ("Subsequent Changes") and `与当前内容一致` are additionally distinguished by the current body's revision, update time, and title, so they naturally invalidate after body changes. Caches have entry-count limits, are recomputed after restart, and are not written to the database.
+- **Matching boundaries:** Prefer matching blocks with identical content, then match by image source, heading text, and same type within the same section. Movement is determined from the relative order of matched blocks, so inserted content before a block does not falsely report every later block as moved. Repeated identical blocks and major rewrites without stable node IDs are approximately matched by structure; summaries support navigation, while exact content is authoritative in the diff and snapshots. Replacing an image source appears as deletion plus addition. Empty lines or formatting not further classified use a generic description. Ignore differences between explicit and omitted default attributes in JSON. Body content is not falsely marked as changed when only image size or table column width is adjusted.
+- **Interface:** The history list uses ordinary page width. On desktop, it has three columns for time and version information, title and change summary, and action buttons, with actions aligned right. At medium widths, actions sit below the summary; phones use a single sequential column. The current-content card likewise places actions on the right, and long titles and section paths wrap naturally. Both list and preview pages display summaries. The exact tab `本次改动` ("Changes in This Version") explicitly means preceding snapshot -> this snapshot, while `此后改动` ("Subsequent Changes") means this snapshot -> current content; the top of the diff displays both endpoint revisions. Preview shows the snapshot's complete content. The earliest retained record has no `本次改动`; only the initial snapshot at creation is called `初始内容` ("Initial Content"). A snapshot identical to current content has neither `此后改动` nor a restore button. The history page explains the 30-day limit, an empty list displays the exact message `最近 30 天没有历史版本`, and an old version link says it has expired or does not exist. Reading or restoring a missing version returns 404 / `version_not_found`.
+- Convert both versions to Markdown using the same conversion as export, then compare line by line: mark added lines green and deleted lines red, and mark the exact changed text within modified lines. Collapse large unchanged spans, showing only several lines around changes. Display title modifications separately.
+- Use the mature diff library jsdiff, under the BSD license, loading it only when a comparison is opened. Comparison is read-only and does not modify version data.
+
+#### Recent Changes in Reading Mode
+
+- The top bar provides an exact `最近修改` ("Recent Changes") toggle to the left of the Edit button. It can be toggled at any scroll position, defaults to off, and remembers the choice in the current browser. Once enabled, a floating capsule bar appears at the bottom of the body. During long-document reading and at the document end, it stays 16 px above the viewport bottom plus the device safe area; trailing page whitespace matches this gap so the body does not lift it when scrolled to the end. On short documents it still stops after the page-navigation card. The exact `修改` ("Changes") and `删除` ("Deletions") toggles each include a count and can be shown separately or together, with at least one retained. If the current document contains only one kind, the other cannot be selected. If the remembered combination has nothing displayable in the current document, temporarily display both kinds. Next come cyclic previous/next controls, the exact status `第几处 / 共几处`, the exact `完整差异` ("Full Diff") action, and Close. Positioning at a change automatically expands its containing heading, fold block, and code block. Show a summary when there is a baseline but no displayable addition or deletion; state clearly that history is insufficient when no baseline remains.
+- `GET /api/docs/{id}/recent-changes?revision=N` reads on demand and returns `{revision, baseline, summary?}`; `baseline` is `{id, revision, title, html}` or null. Prefer walking back to the before-edit/before-restore record from the most recent editing/restoration session, skipping auto-saves and same-result snapshots from that session; old writes lacking session boundaries fall back to the most recent different snapshot. `revision` is optional; when supplied but mismatched, return 409. Groups and deleted documents return 404. The query considers only history no newer than the body revision being read and changes neither snapshots nor the 30-day limit.
+- The frontend loads `content/recentChanges.ts`, with comparison in `recentDiff.ts` and deleted-content copies in `recentGhosts.ts`, plus the diff library only when enabled. `DocContent` supplies the formula, diagram, table-frame, and attachment-card enhancements needed by copies; on-demand modules do not import reading-page modules directly, avoiding fragmentation of the initial-view chunks. Compare raw reading HTML from both endpoints, first matching identical blocks and then pairing by text similarity and structure; compare text by character and inline formatting. Headings, table cells, code, images, formulas, whiteboards, attachments, and container formatting can all be located. Major rewrites, repeated content, and reordering without stable IDs use approximate structural matching; the full diff is authoritative for exact content. Diff calculation has a time limit, and complex blocks fall back to whole-block cues.
+- Draw the effect as exact `补丁` ("patches") in a separate overlay outside the body content. Each change is a rounded patch with a pale purple background and inset dashed "stitches," spanning the full horizontal lane containing it: extend 12 px on both sides of the main body column, but remain within the containing cell, column, Callout, highlight block, or fold block. Changes adjacent in document order and in the same lane merge into one patch, including the gaps between blocks; counts and previous/next navigation count patches. When only part of a patch changed, place a slightly darker background under the changed characters; a whole-paragraph addition or formatting-only change displays only the patch. Images, formulas, whiteboards, attachments, Mermaid, and code blocks are not colored; the patch wraps them as a ring. The currently targeted patch uses a darker background and stitches. The overlay uses multiply blending in the light theme and screen blending in the dark theme. It does not cover or replace body colors, fonts, or backgrounds; does not affect existing highlights, links, syntax colors, selection, or copying; and does not modify document JSON or HTML.
+- Lay out the overlay in page coordinates from the document's upper-left corner so it scrolls with the page. Page scrolling causes no redraw or layout read, and during a fast swipe the patches and text move in the same frame. Its width is the viewport width and is clipped horizontally, without widening the page. WebKit blends colors only within the overlay itself, so set the height through the lowest patch. The overlay always remains within the body and never makes the page taller; the page becomes shorter normally after folding. Draw changed characters together with text through the CSS Custom Highlight API (`::highlight(yy-recent)`, or `yy-recent-code` inside code), requiring no redraw when code scrolls horizontally. Browsers without this API display patches only. Reposition on content changes, size changes, window resizing, and horizontal scrolling of a changed wide table. Clip patches inside a wide table to the visible portion of its table frame. The overlay does not respond to pointer input and is hidden for printing. Code and Mermaid enhancements preserve correspondence with their original elements. Clean up observers and the overlay when leaving the document, disabling the toggle, or redrawing.
+- Display deleted content as exact `剪下的旧内容` ("cut-out old content"): copy its former rendering from baseline HTML and return it to its original location, enclosed in a rounded magenta dashed box with a small exact `已删除` ("Deleted") or `修改前` ("Before Modification") label straddling the border. Use a pale background and demote text to the secondary color, distinguishing it from the pale purple patch for changes. Old content retains its original formatting so its pre-deletion appearance is immediately apparent.
+  - Whole-block deletion (`已删除`): place it beside the retained neighbor sharing its nearest container—the same column, cell, list, or fold block—and combine consecutive deletions into one box. When placed after the neighbor, move past the exact `展开全部 N 行` ("Expand All N Lines") button and diagram-error prompt appended to that block so they remain immediately after their original block. Display list items, table rows, and cells as their respective copies. An ordered-list copy draws its original number itself without disrupting current numbering. Partial content from code blocks and Callouts returns beside the containing block as a whole. Deleted empty lines appear only with other deletions.
+  - Partial deletion (`修改前`): for a block that lost text, an image, an attachment, a formula, or a diagram in the modified version, display the old version before the new one. Mark deleted characters with a pale red background and strikethrough; characters with their own colors, highlights, or links retain those original colors. Mark deleted inline formulas and images with a red background or outline. Compare code by line, listing only lost lines while preserving original line numbers and syntax colors. For a line rewritten in place, mark only deleted characters; do not show a line with additions only; separate noncontiguous spans with `⋯`. Atomic blocks such as Mermaid or formulas with only added content do not count as deletions. An old heading version folds with its heading; when characters are deleted from the document title, show the old title before it.
+  - Combine a deletion with a change at the same location into one occurrence: counts, previous/next navigation, and current state treat a replacement as one item. A patch stops at the edge of an old-content box instead of covering it.
+  - Do not interfere with the original: copies cannot be selected, and Select All plus Copy excludes old content. They do not participate in heading folding tools, the outline, reading-position memory, search highlighting, the image lightbox, or clicks that collapse headings. Remove IDs from copies, show details blocks expanded, render formulas, diagrams, table frames, and attachment cards as on the reading page, and keep code static. When inserting or removing copies, keep content at the reading line from jumping and suspend the browser's own scroll anchoring during the operation. If a collapsed fold block or Callout contains a deletion, change its border to magenta dashes and expand it automatically when targeted. After disabling `删除` or leaving the document, restore the body HTML exactly; hide copies when printing.
+
+### 13.3 Reserved Image Dimensions
+
+- **Problem:** In production, 93 documents contain more than three images, with as many as 114 in one document. Most imported images have no explicit dimensions and occupy no height before lazy loading; loading pushes later content downward, displacing the position reached through the outline or an in-page link.
+- **Approach:** The server already records original width and height when an image is uploaded. The document-view and version-view APIs additionally return original dimensions for images in the current document. After inserting body content, the frontend adds `width` and `height` attributes to images lacking dimensions, calculating proportional height where only width was specified, allowing the browser to reserve space. The editor's image node view likewise uses these dimensions for display only and does not write them into the document.
+- Renderer output remains unchanged. Images whose dimensions cannot be obtained display normally. After release, measure dimension coverage for production images.
+
+### 13.4 Local Release
+
+The current process verifies and builds locally as needed; GitHub backs up source code only. See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete process.
+
+### 13.5 Verification and Release
+
+Select local sample checks according to the current changes; see [DEPLOYMENT.md](DEPLOYMENT.md) for the release entry point. Do not retain historical automated-test counts or full-regression requirements.
+
+### 13.6 Results (2026-09-26)
+
+- **Reserved image dimensions (`79c6278`):**
+  - The document-view, full-document, and version-view APIs additionally return `images`: original width and height for uploaded images in the current document, indexed by image ID.
+  - After inserting the body into the reading and version pages, images without explicit dimensions receive CSS `aspect-ratio` and original width; images specifying only width receive only `aspect-ratio`. The editor's image node view handles them in the same way, without writing into the document.
+  - Contrary to the design in 13.3, `width` and `height` attributes are not added: in body styles, an image with `height` has auto width and would distort when width-constrained.
+- **Search panel (`6472296`):**
+  - `Cmd/Ctrl + K` opens the panel on both reading and editing pages; the sidebar Search button also opens it.
+  - With no input, list six recently viewed and six recently edited documents. After input, match titles first: titles starting with or containing the query come first, followed by Pinyin initials for letter-only queries. Every item displays its containing knowledge base and parent document. About 200 ms later, append full-text results with highlighted context, without repeating documents already in title results.
+  - `↑` and `↓` cycle through the selection. Enter opens; with no result, Enter enters the search page. Do not respond during Chinese IME composition. Display full-screen on phones.
+  - The title index comes from the new `GET /api/titles` API. The panel chunk downloads only when first opened.
+  - The editor's slash and Insert menus gained the exact `链接` item, filterable by the Pinyin initials `lj`; in the keyboard-shortcut reference, `Cmd/Ctrl + K` changed to the exact description `搜索文档`.
+- **Version comparison (`757a07f`):**
+  - The top of the version-preview page has three exact tabs: `预览`, `本次改动`, and `此后改动`. The URL retains `?compare=previous` or `?compare=current` and can be opened directly. List/content identity determination, summaries, and button rules follow 13.2. The version-view API returns information for the preceding snapshot.
+  - Convert both sides to Markdown using the same conversion as export, except do not pad table column widths; otherwise, lengthening one cell would make every row of the entire table appear modified.
+  - Use jsdiff 9 for line-by-line comparison. A changed old line is displayed paired with a new line, greedily pairing the most similar lines in order. For example, after deleting list item 2, old item 3 pairs with renumbered item 2. Within paired lines, mark changes by Chinese character and by English word or number. When only one character, such as `的` or a comma, separates two changes, include it in the change. Lines with less than 30% identical content are not paired and display as whole-line deletion and addition.
+  - Collapse unchanged content, retaining two nonempty lines before and after each change, expandable on click. Display title modifications separately at the top. The top also displays added- and deleted-line counts, excluding empty lines.
+  - For two very long and very different versions, such as restoring completely different content, allow at most about one second for line-by-line comparison and about 0.5 second for pairing. After timeout, display the entire span as deletion and addition rather than freezing the page.
+  - The comparison-view interface (`versions/DiffBody.vue`) loads on demand with the version page (12.3); the editing page's save-conflict comparison also reuses it. jsdiff and the comparison logic, about 4.4 KB after gzip, download when comparison opens and reuse the Markdown chunks already used by the editor and exporter.
+
+## 14. Phase E, Second Batch: Small Features
+
+After accepting the first batch on 2026-09-27, the user requested the following items for direct implementation and release. None changes the document format or consistency snapshots.
+
+- **Menu scroll indicator:** Retain the menu height limit of 420 px, or the available height in a short window. When content does not fit, shorten the menu slightly so only the upper half of its final item is exposed, making additional scrollable content immediately apparent because macOS normally hides scrollbars. Apply this to drop-down menus, submenus, and context menus.
+- **Opening documents from search results:**
+  - When the exact `正文` ("Body") results in the search panel or results on the search page open a document, the URL contains the exact matching form `?hl=关键词`. Highlight every match in the body and scroll to the first. If the first occurrence is inside collapsed long code or a Callout collapsed by default, expand it before scrolling.
+  - Highlight through the browser's CSS Custom Highlight API without modifying body content. Formula and diagram source does not participate in matching.
+  - Title-match results continue to open from the beginning of the document.
+- **Search panel:**
+  - While typing, list knowledge bases whose names match at the top, at most five, showing their document counts. Enter opens the knowledge base.
+  - Titles and knowledge-base names accept full Pinyin (`zuiduanlu`), initials (`zdl`), or a mixture (`zuidl`), and matching may begin from a character in the middle. Ignore spaces and the syllable-separating apostrophe `'`.
+  - Ranking remains unchanged: names containing the entered content come first, with names beginning with it first among those; Pinyin matches follow, with matches starting from the first character first.
+  - Pinyin is now supplied by the server: `/api/titles` and `/api/books` additionally return a `pinyin` field generated by the dictionary in [go-pinyin](https://github.com/mozillazg/go-pinyin), under the MIT license. It includes every pronunciation of polyphonic characters, and ü is represented by both v and u. The frontend's previous approach of inferring initials through browser Chinese collation (13.6) is removed. The dictionary increases the program by about 1.3 MB.
+- **Reading-page outline:** Add an eye button beside the exact outline title `大纲`. Clicking hides the outline list, leaving only `大纲` and the crossed-out eye, without moving the body; clicking again shows it. Store the choice in the local browser. On narrow screens, open the outline from the top-bar button and do not show the eye button. The editing-page outline continues to use its toolbar toggle. The third batch changed the hidden outline to collapse into the top-bar button; see Section 15.
+
+## 15. Phase E, Third Batch: Feedback Fixes and Reading Improvements
+
+While accepting the second batch on 2026-09-27, the user reported the following items, which were implemented and released directly. None changes the document format or consistency snapshots.
+
+- **Mobile outline cannot scroll:** On narrow screens the outline is a fixed drawer on the right and inherited `align-self: start` from the wide-screen sticky outline. On a fixed-position element, this property makes it expand to its content rather than the window height, so the drawer becomes taller than the screen and can never scroll; finger movement scrolls the body behind it instead. Reset this property inside the drawer and prevent reaching a scroll boundary from moving the body.
+- **Code-copy button moves with horizontal scrolling:** The copy button sat at a corner of `pre`, while `pre` itself was the horizontal scroller, so long lines scrolled the button away, most visibly on phones. On the reading page, make the inner `code` scroll horizontally instead, leaving the button stationary.
+- **Leaving a document with many images:** Measurement showed that images still loading continued to download after the page was left. The site uses HTTP/1.1 and a browser opens only a few connections to one server, so these downloads blocked the next document's request and made the entire application appear frozen. The reading page, version page, and editor now cancel incomplete image downloads by removing `src` when leaving, aborting those requests.
+- **Obsidian code-box style:** In the 算法课 Obsidian vault, the user had written `.obsidian/snippets/custom-callouts.css` to make `[!code]` Callouts into code boxes with title bars. The reading page and editor now display them accordingly: a 2 px accent-color border using theme green; a dark title bar joined to the code area; and Monokai Pro colors, with pink keywords, yellow-green strings, orange numbers, cyan-blue functions, yellow types, and gray comments and punctuation. The reading page uses Chroma highlight classes and the editor uses highlight.js classes, with consistent colors between them. The copy button, fold button, and line numbers are also dark. Ordinary code blocks remain unchanged. The fourth batch converted to Yuque-style code blocks and changed `[!code]` back into code blocks; see Section 16.
+- **Fold body content by heading:**
+  - On the reading page, hovering over a heading makes the level marker and arrow appear together on its left; they are always visible on phones. Clicking collapses the section, hiding everything up to the next heading at the same or a higher level and displaying the exact marker `⋯` after the heading. See Section 18 for level-marker styles.
+  - Collapsed state is stored per document in the local browser.
+  - Clicking a collapsed heading in the outline, opening a link to it, or opening from a search result whose match lies in a collapsed section expands it before scrolling.
+  - The editing page does not fold sections.
+- **Move the outline to the right:** Following Yuque, attach the outline to the right side of the page on wide screens. Its column remains reserved when hidden, so body position does not change and the body remains centered on wide screens. The eye button beside the outline title collapses the outline into the outline button at the far right of the top bar; clicking that button expands it again, and the button appears selected while expanded. On narrow screens the same button continues to open the drawer. The editing-page outline remains unchanged. The fifth batch changed this to Yuque's collapse behavior; see Section 17.
+
+## 16. Phase E, Fourth Batch: Yuque-Style Code Blocks and `[!code]` Migration
+
+On 2026-09-27, the user explained that `[!code]` was a necessary workaround adopted when documents were migrated from Yuque to Obsidian to imitate Yuque's collapsible code blocks with title bars. Native code blocks should now directly adopt the Yuque appearance, and every `[!code]` in existing documents should be converted back to a code block while preserving its title and expanded state. The user's choices:
+
+- All code blocks use One Dark Pro, with dark code even in light mode.
+- A `[!code]` with neither a title nor a fold marker becomes an ordinary code block without a title bar.
+- A collapsed code block is likewise collapsed in the editor.
+- Syntax folding within a block will subsequently be implemented according to Section 21.
+
+Implementation details:
+
+- **Document format:** Code-block titles and collapsed state are the first extension to the document format. Section 12.1 specified optimization only within Markdown's capabilities; this batch extends the format at the user's request while remaining expressible in Markdown.
+  - `title` stores title text; null means no title has been set, while an empty string means an empty title. `titleHidden` defaults to false; hiding the title bar sets only this field to true and preserves the title text. `collapsed` means collapsed by default and takes effect only when the title bar is visible.
+  - Store these values in the code fence info string in Markdown, for example the exact source ```` ```cpp title="家谱树" collapsed ````; use `title="家谱树" title-hidden` for a hidden title bar. HTML preserves the text through `.code-block.no-title` and a title element carrying `hidden`; the editor and Go renderer correspond to it, and copy/paste can read it back. Obsidian reads only the language and displays an ordinary code block. If a title contains double quotes, use single quotes; if it contains both kinds, write `&quot;`. Backslashes and entity-like `&` also round-trip unchanged.
+  - Read this form during import. Convert Obsidian `[!code]` Callouts directly according to the migration rules below.
+  - Update the Go renderer and editor static rendering together, and add code blocks with a title and an empty title to the consistency snapshot. Code-block titles participate in full-text search.
+- **Styles:**
+  - Code blocks on both the reading page and in the editor use the One Dark Pro dark background `#282c34`, identically in light and dark modes.
+  - Reading-page highlighting uses Chroma's onedark palette, adjusted to Yuque: types and preprocessor lines are cyan, header names are green, and function names are not bold. Call sites such as `q.push(i)` and `f(x)` are marked as functions; variable declarations with arguments, such as `vector<int> a(n)` and `vector d(n, 0)`, remain variables; common C++ containers such as `vector` and `queue` are marked as types.
+  - The editor maps highlight.js classes to the same colors. highlight.js does not tag ordinary variable names, so variables in the editor retain the body-text color; on the reading page they are red, matching Yuque.
+  - With a title bar, the collapse arrow and title are on the left, followed on the right by language, soft wrap, and copy; both wrap and copy have icons. Each code block controls wrapping independently. The selection persists after hiding the title bar and switching between reading and editing and is stored locally according to Section 21. On the reading page, clicking another area of the title bar collapses or expands the block for the current browsing session only. These blocks no longer auto-collapse according to the 35-line rule.
+  - Without a title bar, the copy button sits at the upper right and displays only an icon; long code auto-collapses. Every code block always displays line numbers, which remain aligned with original source lines when long lines wrap. The old global line-number and wrapping preferences no longer apply.
+  - As in Yuque, hovering over a code block displays a 10 px-high button centered on the upper edge of the code area. Without a title bar it sits flush against the code-block top with no gap, its arrow points downward, and clicking shows the title bar. With a title bar it straddles the title bar's lower border at center, its arrow points upward, and clicking hides the bar. The button hides together with collapsed code. Per the user's choice, toggling on the reading page affects only the current browsing session and does not modify the document. A temporarily shown title bar can also collapse code; after hiding it, the copy button returns to the upper right.
+- **Editor:**
+  - With a title bar, its title can be entered directly. Under a Chinese IME, text is written only after composition finishes. Tab enters the start of the code, automatically expands a collapsed block, and Enter still returns to the original code-caret position. Permit this editing command only for the code-title input. Shift+Tab does not switch page controls; IME and modified-key combinations retain their original behavior. On a narrow phone screen, the title occupies a row by itself, with language and action buttons on the next row so the input is not squeezed away. The arrow collapses or expands and saves the state into the document.
+  - The small show/hide-title-bar button matches the reading page, but toggling in the editor saves to the document. Hiding the bar preserves title text and expands the code. Showing it restores the original text and puts the caret in the title input; saving and reopening preserves it. Show and hide are each one undo step and do not simultaneously undo a title just typed. The history summary records a code-block settings change. Showing a title saved as hidden on the reading page likewise restores its original text for the current browsing session only. Add the exact item `带标题的代码块` ("Titled Code Block") to both the slash menu and toolbar Insert menu.
+  - If the caret enters a collapsed code block for any reason, such as a find operation locating a match inside it or an undo, expand the code block automatically. If the caret is inside when the block collapses, move it after the code block.
+  - Remove the exact `代码` ("Code") type from the Callout type menu, slash menu, and Insert menu, and delete the Monokai Pro styling for `[!code]` from Section 15. In historical versions, `[!code]` displays as an ordinary Callout whose code uses One Dark.
+- **Migration (`web/tools/migrate/code-callouts.ts`; see OPERATIONS.md for usage):**
+  - Rules: the title becomes the code-block title; `-` means collapsed; `+` or no marker means expanded; no title with `-` means a collapsed empty title bar; no title and no marker means an ordinary code block. Convert only a `[!code]` containing exactly one code block; report all other cases without modifying them.
+  - For every changed document, first save one version so history retains the original Callout, then save against the revision read. Skip and report any document modified in the interim. Repeated runs make no further changes. Saving updates the document's modification time.
+
+## 17. Phase E, Fifth Batch: Collapsing the Outline in the Yuque Style
+
+On 2026-09-27, the user pointed out that Yuque collapses its outline differently from the approach in Section 15 and requested matching Yuque. This changes only the wide-screen layout of the reading page:
+
+- The eye beside the outline title controls only whether the outline is pinned; the choice is stored in the local browser.
+- When unpinned, the outline column displays one short gray horizontal line per heading, right-aligned. Higher-level headings have longer lines: 24, 16, and 10 px; the line for the current section uses a darker color. Distribute the lines within the window height. With many headings, reduce line spacing from 28 px to a minimum of 4 px; omit any that still do not fit.
+- When the pointer moves near the lines, temporarily expand the full outline as an overlay over them without pushing the body. Retract it about 0.2 second after the pointer leaves. Entries in the overlay exactly overlap their pinned positions, so the outline does not move when the eye toggles it; the eye inside the overlay can pin it again.
+- The top-bar outline button previously restored a hidden outline on wide screens; it now appears only on narrow screens to open the drawer. The narrow-screen drawer and editing-page outline are unchanged. The sixth batch also applied this outline to the editing page; see Section 18.
+- **Current-section determination, revised after the user reported erratic bold movement:**
+  - Previous approach: make a heading bold when it enters the band from 64 px below the top to 30% of the window height. During click navigation, headings passed by smooth scrolling and headings immediately below the target both stole the bold state; when scrolling upward, bold also failed to return to the preceding section.
+  - The current approach takes the last heading to cross the "line 8 px below the navigation landing point"; skip headings inside collapsed sections. On the final screenful, that line moves down toward the window bottom with scrolling, allowing the ending sections to become current in sequence.
+  - After click navigation from the outline, the clicked item remains bold until scrolling occurs again after the page settles. Thus, even headings near the end that cannot scroll to the top do not lose bold to another section after a click.
+  - Headings are ordered by document order and their positions only increase, so determination uses binary search and measures only a few headings. When encountering a collapsed heading with no box, search forward for the nearest visible heading. The editing page retains heading elements and entries, updates them in place when a keystroke changes only positions, and rerenders the outline only when heading text, level, or count changes. Keystrokes in a long document with hundreds of headings no longer measure and reorder every outline item.
+- **Current-item following:** When an outline is long enough to scroll and the current item leaves the outline's visible range after excluding the top title bar, the outline scrolls itself to place the item in the middle and reveal several following sections; it does not move while the item remains in range. Scroll only the outline's own container—the sidebar for a pinned outline or the overlay for an unpinned outline, whose position is retained even while hidden so it is visible upon expansion—not the page. Do not follow while the pointer rests over the outline, avoiding movement of the list beneath it. When a narrow-screen drawer opens, likewise position the current item. The reading and editing pages share these rules through `OutlinePanel.vue`.
+
+## 18. Phase E, Sixth Batch: A Set of Editing and Reading Improvements
+
+On 2026-09-27, the user proposed the following ten items for implementation and release together.
+
+- **Unified button tooltips:** Use the same tooltip (`web/src/ui/tooltip.ts`) for buttons throughout the site.
+  - Buttons provide tooltip text through `data-tip`, appearing after a pointer rests for about 0.3 second. Previously, icon buttons waited 0.5 second, while other buttons used browser-native tooltips that took more than a second and had different styling.
+  - Moving to an adjacent button while a tooltip is visible switches immediately. Keyboard focus also displays tooltips; touchscreens do not. Every button whose purpose is explained only by tooltip text now has an `aria-label`.
+  - When text in directory items, breadcrumbs, and similar elements is truncated, the full-name tooltip remains browser-native, avoiding constant popups as the pointer moves.
+- **Outline:**
+  - Make the editing-page outline match the reading page: attach it to the right of the page, let the eye toggle whether it is pinned, display horizontal lines when unpinned and expand on pointer approach, and use the same current-section determination. Remove the editing toolbar's outline toggle accordingly. Both locations share `OutlinePanel.vue` and `outline.ts`.
+  - The outline can collapse. An item with lower-level headings has an arrow on the left, shown when the pointer is over the outline and always shown for a collapsed item. A single button beside the title toggles collapse-all or expand-all according to current state, using the same rules as the file directory. When the current section is hidden inside a collapsed section, bold its nearest visible ancestor item.
+  - When a long outline scrolls independently, keep the exact top title `大纲`, pin button, and collapse-all/expand-all button visible. The title bar covers directory items and folding arrows scrolling beneath it, avoiding overlapping text or obscured buttons. Pinned and floating outlines on reading and editing pages, plus the mobile reading drawer, share this rule.
+  - Fix a flash when the pointer moves quickly toward the scrollbar: extend the horizontal-line region rightward to the page edge and wait about 0.15 second before expansion. When the macOS scrollbar is hidden, moving the pointer to the edge expands the outline. During scrolling, the scrollbar appears over the edge; if the pointer lands on it, the outline does not expand, matching Yuque.
+- **File directory:** Put the exact heading `目录` on a separate row above the directory, with one collapse-all/expand-all button on the right so it does not occupy the knowledge-base name's space. The reading outline, editing outline, and file directory share `web/src/ui/FoldAllButton.vue`, whose icon follows Yuque's horizontal-line and triangle style. When any visible level is expanded, show the exact action `全部折叠`; after everything is collapsed, switch to `全部展开`. Manual collapse/expand and automatic directory positioning also update the button. Expanded state hidden under an already collapsed node does not participate in the determination. Hide the button when no collapsible level exists.
+- **Select All:** While editing body content, Cmd/Ctrl+A directly selects the entire document, including fold-block titles and content, columns, highlight blocks, Callouts, tables, images, and composite whiteboards—not only visible plain text. The code-editing area retains an exception: first select the entire code block, then press it again to select the whole document; when code is enlarged, the second press also closes the enlarged view. Use Option/Alt+L for progressive selection within containers.
+- **Heading levels:**
+  - On heading hover in both reading and editing, consistently show a green level marker such as `H₂` and a folding arrow on the left. Section dragging is performed through the editing-page outline.
+  - Level-one through level-six headings in reading-page body content use the same markers, fading in together with existing folding arrows as the pointer approaches and fading out together when it leaves. Collapsed headings keep them visible. A heading with no collapsible content shows only its level and adds no ineffective button.
+  - Place markers in the whitespace to the heading's left, stacking them vertically with the arrow on narrow screens and keeping them always visible on touchscreens. CSS generates the markers; they do not move body content, mix into copied heading text, or affect the outline, search, or reading-position restoration.
+- **Press E twice:** On the reading page, pressing E once shows the exact prompt `连按两次 E 键进入编辑模式` about 0.4 second later. Pressing it twice within 0.4 second enters the editing page directly without the prompt. Do not respond when focus is in an input. On the editing page, pressing Esc twice saves and returns to reading mode. One press first cancels the selection; when there is no selection, it shows a prompt. See Section 22.
+- **Cancel editing:**
+  - Add the exact `取消` action beside `完成` on the editing page. With no changes, return directly to the reading page; with changes, ask for confirmation first.
+  - After confirmation, restore the document's title, content, and modification time from when editing began, delete historical versions recorded during this editing session, and do not record a version while leaving.
+  - The server API `POST /api/docs/{id}/discard` (`store.DiscardEdits`) checks the revision most recently saved by the editor and reports a conflict if something else modified it; the revision still increments.
+  - If this editing session saved and another source then saved, restoring the original would also discard the other source's modifications, so do not roll back. If a save conflict is already displayed, the exact `取消` action explains this directly. If the server discovers the conflict only during cancellation, explain it after the ordinary confirmation. After user confirmation, discard only this page's unsaved modifications, open the latest version, and write nothing to the server. If the user does not confirm, remain on the editing page and retain the conflict prompt, content, and local draft.
+- **Table insertion:** Use plus signs at the outer row and column divider points; clicking inserts a row or column at that boundary. The table-specific toolbar and its four directional icons have been removed (Section 20).
+- **Table dimensions:**
+  - The outside of the rightmost and bottommost borders also participates in the approximately 8 px hit test, without requiring the event to land inside a cell. Move a wide table's scrollbar downward to leave the full drag range for the bottom edge. Do not treat a horizontal clipping location as a real column boundary.
+  - In the editor, after the pointer remains within about 8 px of a column or row border for approximately 250 ms, highlight that border and show a borderless 20 px bidirectional-arrow cursor; quickly crossing it does not activate the control. Once active, retain it within an approximately 14 px range so slight movement does not lose the drag entry point. Highlighting fades in and out over 140 ms, with no animation when the system requests reduced motion. Drag a column border to adjust column width and a row border to adjust row height. While adjusting row height, a line follows the pointer and takes effect on release; a row cannot become shorter than its content. The entry point is centralized in `web/src/editor/tableResize.ts`, while column-width calculation continues to use ProseMirror's implementation.
+  - The first time a given table is dragged, fix all columns at their current widths; afterward every column can be widened or narrowed precisely, and the table can exceed page width and scroll horizontally. When inserting a column into a table that already has widths, give the new column the mean width of the others. Tables never dragged remain unchanged.
+  - When a dragged column border crosses the right edge of the table's visible area, keep the border at that edge. As the pointer continues right, scroll the entire table left so the dragged border remains visible.
+  - **Fit column widths to content:** Clicking inside a table while editing displays a floating toolbar. Its bidirectional-arrow button adjusts every column of the current table to the width needed to contain its content without automatic wrapping; the top toolbar provides the same operation. When a body selection crosses multiple tables, the selection toolbar displays the number of target tables and adjusts all tables intersecting the selection at once, including tables inside containers such as columns and fold blocks. A cell or partial-table selection is treated as the entire table.
+  - Measure using an invisible copy outside the editing DOM, with the browser's actual fonts, text formatting, padding, and merged-cell layout, removing existing column widths and automatic-wrapping constraints. Preserve manual line breaks, paragraphs, content, and row heights; empty columns retain a minimum width of 25 px. Collapsed content also participates in measurement, and code uses its complete source rather than the CodeMirror-visible fragment. Round results to whole pixels and write consistent `colwidth` values across rows; when the result exceeds body width, retain horizontal scrolling. The operation preserves the selection and can be undone or redone in one step for either one table or a batch. Repeated clicks do not accumulate width; after content changes, it can be clicked again to refit. Implementation is centralized in `web/src/editor/tableFit.ts`, adding no format attribute or API.
+  - This is another extension to the document format: cells record column width using Tiptap's existing `colwidth`, and rows record height using `height`. Update Go rendering and editor static rendering together. A table with column widths includes Tiptap's `<colgroup>` and widths. Add two tables with explicit widths to the consistency snapshot.
+  - Export, as decided by the user: export as an HTML table any table that Markdown tables cannot express—one with column widths or row heights, merged cells, or content other than paragraphs inside cells. The editor's static renderer writes the HTML, one source line per row; images and links are rewritten to exported paths as they are in Markdown. On import, read it back with the editor's parsing rules without losing widths, heights, or formatting. Outside a browser, happy-dom supplies the unavailable DOMParser and is used only by the import tool.
+- **Outer table operations:** When the pointer enters a table, fade in the outer border and small cells above and to the left; fade them out after a short delay when it leaves. A top cell selects the corresponding column, and a left cell selects the corresponding row. Holding a selection cell and sliding along the rail continuously selects multiple rows or columns. Dragging in reverse shrinks the range; crossing the start selects toward the other side. Retain selection when the pointer deviates slightly from the rail, crosses gaps between cells, or scrolls while dragging, and preserve the selection on release. End the drag if the window loses focus or the gesture is canceled. Points between rows/columns and at both ends become plus signs on hover while showing an insertion-position line; clicking inserts there. Operations support undo, and inserted content retains headers, column alignment, and column widths according to existing rules. `web/src/editor/tableControls.ts` places the controls outside the editing DOM. They follow table scrolling and dimension changes without being written into the body. Leave space between the selection toolbar and outer controls to avoid overlap.
+  - The display-retention region covers 40 px above and left of the visible table plus 18 px to its right and below, including selection rails, insertion points, and their gaps. Moving directly from a selection rail to an adjacent insertion point does not trigger hiding. This region only keeps controls visible; it neither covers body content nor intercepts clicks.
+  - The outer border and row-operation rails always follow real table and row boundaries. Top controls avoid the fixed toolbar according only to their own dimensions: insertion points need 32 px and selection rails need 14 px; hide each independently when it does not fit, and show it again after scrolling back. Do not hide a selection rail early for the floating toolbar or shift the entire border downward. If there is insufficient room above, move the floating toolbar inside the table. When a table's top or bottom edge is outside the visible region, do not draw a horizontal border at the clipped location. The column-resize highlight line is likewise clipped below the fixed toolbar.
+- **Menu descriptions:** The exact text `含子文档` uses the same font as menu body text. Description text and shortcuts render separately, and shortcuts continue to use a monospace font.
+- **Wide tables, identical on reading and editing pages (`web/src/shared/tableFrame.ts`):**
+  - Align the table's left edge with the body. Its right edge can extend beyond the body to 24 px before a pinned outline, or to 48 px before the page's right edge when no outline is pinned. Hide any additional width and show a shadow cue on the right.
+  - When swiping left, content displays normally through the left whitespace and hides after reaching the page edge; show a shadow cue on the left as well.
+  - The table frame draws its own horizontal scrollbar, occupying only the body width. It appears while scrolling or while the pointer is over the table, can be dragged, and pages when its track is clicked.
+  - Tables inside Callouts and lists do not extend beyond their containing block.
+
+## 19. Image, Paragraph, and Table Alignment
+
+On 2026-09-27, the user requested alignment controls in the toolbar and confirmed that tables should support both whole-table positioning and selected-cell content alignment, without extending alignment to headings.
+
+- The top toolbar uses one alignment menu that shows left, center, and right alignment according to the current selection and checks the current state. When multiple targets have different states, none is checked. Only objects containing the caret or included in the current selection are affected; disable the menu when it does not apply, such as for headings or code blocks.
+- Ordinary paragraphs can be aligned individually or selected in groups and aligned together; ordinary paragraphs in lists, block quotes, and Callouts behave the same way. The attribute is `paragraph.textAlign` and does not change text formatting.
+- After selecting an image, set that image's `blockAlign`. An explicitly aligned image occupies its own line and retains existing dimensions. An image with no alignment setting continues using the original inline layout without rewriting attributes on adjacent images or paragraphs.
+- The floating image toolbar provides the same alignment menu plus a separate exact `阴影边框` ("Shadow Border") toggle. Enabling it sets `image.shadow=true`; disabling it restores the value to empty. Existing images default to disabled. Editing and reading share a thin border, soft shadow, and dark-mode adaptation; display does not change image dimensions. The operation can be undone and saved, and history summaries mark the exact event `调整图片边框`. Shared rendering is defined in `web/src/schema/imageStyle.ts`, with synchronized Go image rendering. HTML export includes `data-frame="shadow"` and independently displayable shadow styles, which import reads back. Ordinary images continue to export as Markdown. Existing body content is not migrated.
+- The exact `批量应用图片参数` ("Apply Image Parameters in Batch") action in the image toolbar supports choosing size, alignment, crop, and shadow border, plus four application scopes; see 19.2. When only width is set, each image retains its own aspect ratio. The exact `原始尺寸` ("Original Size") choice clears fixed width and height. The whole batch operation is independently undoable, retains the original selection, and reports the number actually modified. If settings already match, it creates neither a modification nor an undo record.
+- Image alignment adds no empty paragraph. The editor lays it out through a line container occupying the full row, preventing ProseMirror's caret placeholder from adding two extra lines above and below a block-level image. Resize handles and the image toolbar remain positioned relative to the actual image. Reading an existing document does not rewrite its structure.
+- When adjacent images in the same paragraph wrap into separate rows because of explicit alignment or width constraints, reading and editing both retain the body's default `0.75em` vertical gap. Ordinary inline images aligned side by side use top alignment and gain no automatic horizontal spacing; the user controls horizontal whitespace by entering spaces manually. After wrapping, the row start aligns with the paragraph's left edge. Separate paragraphs retain their existing paragraph spacing. Vertical gaps are purely stylistic and produce neither empty paragraphs nor spaces.
+- Inline images wrap automatically according to available width, and a visually second row still belongs to the same paragraph. An ordinary space entered before a wrapped image may be laid out at the end of the preceding row; this does not mean input was lost and does not become a separate indent on the next row. Paragraphs containing ordinary inline images preserve manually entered spaces in both reading and editing. Use Shift+Enter for a fixed line-break location or Enter to split into two paragraphs.
+- Remove the image toolbar's default position-update delay. While visible, track the actual image position and dimensions on every animation frame, following alignment changes, drag-resizing, and scrolling synchronously. Rebind when the selected image changes and stop tracking when the toolbar hides or the editing page is left. Position updates do not modify body content; drag-resized dimensions are still written on release.
+- Backspace/Delete at the boundary of an aligned image selects the image first; pressing again deletes it. A deletion key directed outward from an image row only moves the caret or removes an adjacent real empty paragraph; it does not merge the image paragraph with a heading or change an adjacent heading's level. Ordinary inline images and explicitly selected content retain their original deletion behavior. Table-cell boundaries are not crossed.
+- Tables provide two menu groups: exact `单元格内容` ("Cell Content") applies to the current cell or cells in selected rows/columns, while exact `表格位置` ("Table Position") applies to the containing table as a whole. Whole-table `blockAlign` uses body width as its baseline. A table wider than the body still begins at the left and retains its existing horizontal scrolling.
+- A cell's `cellAlign` is independent of the existing Markdown column alignment `align`; table-structure adjustments do not propagate a single-cell setting to an entire column. After selecting a whole column, use the top alignment menu to set content alignment for every cell in that column. Setting cell alignment clears local paragraph alignment in that cell. Explicitly aligned images retain their own positions.
+- Alignment is written into body JSON, can be undone and auto-saved, and remains consistent after reopening and while reading. New attributes default to empty; existing documents are neither migrated nor rewritten. The format version remains unchanged.
+- Shared definitions live in `web/src/schema/alignment.ts`, and the Go renderer implements the corresponding behavior. Paragraphs, images, and tables with alignment export as HTML, while images and links continue through their existing path conversion. Cell HTML preserves both column defaults and local overrides and remains editable after import. Ordinary paragraphs and ordinary tables with only column alignment continue to export as Markdown.
+
+### 19.1 Image-Wrapping Cues
+
+- While editing the current image paragraph, display the exact cues `自动折行` ("Automatic Wrap"), `手动换行` ("Manual Line Break"), and `段落结束` ("Paragraph End"). Automatic wrapping changes with available width; Shift+Enter writes a line break and Enter splits the paragraph. A standalone image row formed by explicit alignment is not labeled as automatic wrapping.
+- Clicking whitespace between automatically wrapped rows in the same paragraph only positions the caret and does not split the paragraph automatically. Use Shift+Enter for a fixed line break and Enter for a paragraph break. Image spacing, the native caret, arrow keys, deletion, and resizing retain their previous behavior.
+- Implemented in `web/src/editor/imageBreaks.ts`. Cues are placed outside the editor DOM, update with selection, focus, scrolling, and size changes, and are released when leaving the editing page. They are not written into body content and do not appear in reading or export.
+
+### 19.2 Image Cropping, Splitting, and Batch Parameters
+
+- Cropping drags a selection rectangle or eight edge/corner handles over the original image. It supports free ratio, 1:1, 4:3, 16:9, 3:4, and percentage input, and can reset to the complete original. With multiple images selected, crop every selected image using the same proportions relative to its own original. Canceling does not write to the body. Replacing the original clears the previous crop and updates original dimensions.
+- Splitting applies complementary crops to the currently visible region and supports left/right, top/bottom, and 2-8 pieces. Every split line in the preview can be dragged directly; with two pieces it stays synchronized with the position slider, while multiple lines are adjusted independently and cannot cross one another. The exact `均分` ("Divide Evenly") action restores equal divisions; changing the piece count divides equally again. Pointer cancellation restores positions from before the current drag, and nothing is written to the body before split confirmation. All pieces share the original asset and can be adjusted independently afterward. Left/right splits of ordinary images remain arranged inline; top/bottom splits insert manual line breaks. Within a composite, pieces are distributed around the original position.
+- Enlarged image viewing on the reading page preserves the current crop, including split images and images inside a composite. Different crops of the same original display at their respective positions rather than reusing the preceding image's crop when switching. The preview fits desktop, phone, and window dimensions according to the visible region's aspect ratio; the exact `查看原图` action still opens the complete asset. This changes only the preview and neither writes back to the body nor generates a new image.
+- Batch parameters independently select size, alignment, crop, and shadow border. With multiple images selected, one can be designated as the parameter source. Unchecked properties remain unchanged; crop is applied proportionally to each image's own original. Alignment does not change free positioning inside a composite. Size and crop inside a composite also adjust its whiteboard dimensions.
+- Scopes are the exact choices `当前选中的图片`, `当前这一节（含子节）`, `全文图片`, and `当前组合`; the final choice is available when opened from within a composite. The current section begins at the nearest heading before the image and ends before the next heading at the same or a higher level; content before the first heading belongs to exact `文档开头`. The whole document includes images in lists, block quotes, tables, and composites. The dialog displays the target count. If the document changes after the dialog opens, require reopening it to avoid modifying stale positions.
+- Crop stores only original-image proportions `{x,y,width,height}` in `image.crop`; `sourceWidth/sourceHeight` stores original dimensions. Original assets are immutable and no new asset is generated. Fixed width and height represent the visible frame's size. Operations share document saving, revision conflict checks, history summaries, and undo. History distinguishes changes to crop, size, position, and border.
+
+### 19.3 Image-Composition Board
+
+- After selecting images, the exact `组合为图片画板` ("Combine into Image Board") action arranges them initially in a grid. From a mixed selection, extract only images and preserve body, list, and table structure. The board is an independent block with configurable width, height, and left/center/right alignment. Click an image to select it, Shift/Command/Ctrl-click for multiple selection, and drag through whitespace to marquee-select. Support free dragging, shared scaling, cropping, splitting, batch parameters, bring to front/send to back, deletion, and ungrouping.
+- Adjusting the board border or width/height inputs changes only the container size; pixel positions and dimensions of internal images remain unchanged. Overflowing parts are temporarily clipped from the board and can reappear if the board is enlarged. Exact `整体缩放` ("Scale All") proportionally scales both the board and internal images, preserving proportions when a dimension limit is reached. Preview immediately during dragging and write one undo record only on release; canceling the pointer operation does not modify body content.
+- Grid layout supports column count and spacing. When some images are selected, arrange only those; with none selected, arrange all. Equal horizontal or vertical distribution requires at least three images. Arrow keys nudge by 1 px, or 10 px with Shift. Ungrouping restores independent image paragraphs in layer order, preserving crop, size, shadow, and links.
+- Add an `imageBoard` body block containing one or more real `image` nodes; `image.placement` stores a rectangle relative to the board. Image counting, asset collection, copying, and backup continue to recurse through the original nodes. Editing and reading draw the same relative positions; narrow screens scale the entire board down proportionally.
+- Geometry is defined in `web/src/schema/imageGeometry.ts`, the composite format in `imageBoard.ts`, and transactions in `editor/imageOperations.ts`; the node view, Go's `internal/render/image_geometry.go`, and Markdown import/export correspond. A paragraph containing a cropped image and a composite export as HTML with inline styles and parameters and remain editable after import; ordinary images still export as Markdown. The format version remains 1, with no database migration. Old programs do not recognize composite nodes, so after writing a composite the system cannot directly roll back to a program that does not support that node.
+- Components are responsible for displaying child content of code blocks and boards. Through `editor/managedNodeView.ts`, they explicitly return a null `contentDOM` reference and ignore internal DOM changes; outer reparsing preserves content in the document model. Display attributes such as a dialog's `aria-hidden` must not be written back into body content or cause cropping to be falsely reported as a document change. Keep stale-position checks for real body changes.
+
+## 20. Unified Selection Removal
+
+On 2026-09-27, the table-specific toolbar was removed and removal operations were consolidated at the far right of the floating selection toolbar.
+
+- A text selection deletes selected text; image and node selections delete the corresponding nodes; selections across paragraphs or the whole document delete that range. Code text likewise supports removal. Images retain specialized operations such as size and replace, with the same trash-can button reused at the far right.
+
+- After clicking or holding and sliding over outer table cells, or dragging across cells to form a whole-row or whole-column selection, the trash can deletes the corresponding rows or columns, including multiple rows or columns at once. A selection covering all rows and columns deletes the entire table, including a table with only one row or one column remaining. A partial rectangular cell selection clears only content while retaining the row/column structure; an ordinary text selection inside a cell deletes only text.
+
+- The button tooltip changes with the selection to the exact label `移除选中内容`, `移除选中行`, `移除选中列`, `移除表格`, or `清空选中单元格`. Clicking the button preserves the editor selection, and removal is recorded separately as one undo step; undo restores content, headers, column widths, and alignment.
+
+- Text and table selections display only one floating toolbar; it does not appear for a caret alone inside a table. Code and whole-block selections omit inapplicable text-format buttons. When a mixed selection contains images and text, merge text formatting and image operations into two rows in the same popover; when only images are marquee-selected, show image operations only. The image row displays selected count, size, and shadow border. Different settings respectively display the exact `多种尺寸` state and a partially enabled state. Clicking the shadow toggle enables it uniformly; when all are enabled, clicking disables it uniformly. Dimensions are calculated relative to each image's containing width while retaining its aspect ratio; Original Size clears fixed width and height. Cropping, batch parameters, and combining support multiple selection. Split, replace, download, original image, and alt text appear only when one image is selected.
+- Ordinary images support Shift-click range selection and Command/Ctrl-click to add or remove individual images. A range follows document order and selects only images, skipping composite boards and intervening text. Each selected image is highlighted and reuses the batch-image toolbar, deletion, copying, and document undo. `editor/imageSelection.ts` represents multiple-selection state as a separate selection range that is not written into body content. Clicking other content or pressing Esc exits multiple selection.
+- Text formatting, links, and clear formatting in a mixed selection process only selected text, preserve existing image attributes and links, and skip code blocks. Switching body/heading type processes only paragraphs or headings containing selected text and does not turn an image-only paragraph into a heading. The alignment menu can adjust selected content uniformly or separately adjust paragraph/cell content, images, and table position. Image changes and batch text-formatting operations preserve the original selection and have independent undo steps. A rectangular table selection processes the cells actually selected and does not cross unselected cells.
+- For a row selection near the header, place the toolbar above the whole table to avoid covering the insert-column button; lower row selections continue to follow the selected rows. For a whole-column selection in a long table, keep the toolbar within the visible range. On narrow screens, reduce button spacing and allow wrapping if space is still insufficient; keep the remove button at the far right.
+
+- Removal is implemented in `web/src/editor/removeSelection.ts` and `RemoveSelectionButton.vue`. `selectionContent.ts` centrally collects selected images and text. `BubbleToolbar.vue` and `ImageToolbar.vue` share `ImageFormatControls.vue`. The toolbar changes neither the document format nor server APIs.
+
+## 21. First Batch of Code-Block Enhancements
+
+On 2026-09-27, the user confirmed the first batch of capabilities, requesting the experience of a typical code editor for code input. Shortcuts follow JetBrains defaults according to the user's habits, and indentation is uniformly four spaces.
+
+- **Input:** The code area uses CodeMirror 6, supporting language highlighting, current-line indication, bracket matching and pair completion, Enter indentation, and multiline Tab/Shift+Tab indentation. Input, Tab, and formatting use four spaces. No indentation option is provided anymore, and the old local indentation setting no longer applies. Basic completion supplied by language modules is enabled on demand. This batch does not integrate a language server, runner, or debugger.
+- **JetBrains shortcuts:** Display and execute the corresponding default keys for macOS or Windows/Linux. Duplicate line or selection uses Cmd/Ctrl+D; delete line uses Cmd+Backspace / Ctrl+Y; move line uses Option/Alt+Shift+Up/Down; select the next occurrence uses Ctrl+G / Alt+J; format uses Cmd+Option+L / Ctrl+Alt+L. Line comment, block comment, fold, and unfold likewise use JetBrains mappings. Each code block's More menu provides the exact `代码块快捷键` ("Code-Block Shortcuts") action, available in reading, editing, and enlarged views. The global keyboard-shortcut reference also reads the same list from `web/src/code/keymap.ts`. Cmd/Ctrl+Enter remains the application shortcut for continuing body content after the code block.
+- **Shortcut panel:** In-block and global references share key parsing, icons, and styles from `web/src/ui/shortcutKeys.ts`. Combinations are split into individual keycaps, and alternatives are separated by the exact word `或`. The Command key and its legend use the native `⌘` glyph from the Apple system font. The panel displays the current operating system and uses consistent font size, line spacing, close button, and modifier-key legend. These also apply when the reading page loads independently.
+- **Formatting:** In editing state, the More menu provides the exact `格式化代码` ("Format Code") action. It changes only the current code block, can be undone and redone in one step, and uses the ordinary document-saving flow. C/C++, C#, Java, Objective-C, and Protobuf use Clang Format; Python uses Ruff; Go uses gofmt and converts only leading Tabs outside strings, preserving raw-string content; JavaScript/TypeScript, JSON/JSONC, HTML/Vue, CSS/Less/SCSS, YAML, Markdown/MDX, and GraphQL use Prettier. Formatting tools load on demand into a browser Worker and neither execute code nor send source to an external service. Disable the menu item for unsupported languages. On syntax errors, retain the original source and show a message. If the user continues typing or switches languages while loading, discard the stale result.
+- **Region folding:** Editing and reading pages use the same syntax parser to recognize foldable regions across languages supporting structural parsing, including C++, Go, Python, JavaScript, and JSON, without treating braces inside strings as boundaries. Regions can be folded or unfolded beside line numbers, with the folded location indicating the number of hidden lines. The More menu can fold or unfold every region. Languages that cannot be parsed retain ordinary code display.
+- **Line-number divider:** Reading, editing, and enlarged views display a 1 px vertical line to the right of the line-number and fold-button area, using the code block's low-contrast gray-blue `--yy-codeblock-line`, with a 6 px gap before code. Tighten left-side whitespace in the line-number area and consistently place line numbers before fold buttons. Reading-page left padding is 8 px; in editing and enlarged views, line numbers have 6 px left and right padding, retaining room for fold buttons. Light and dark themes remain consistent. The divider stays with the line-number area during wrapping, folding, and horizontal scrolling.
+- **Line selection:** Clicking a line number selects the whole line, Shift extends the selection, and holding and dragging selects contiguous lines. Source-code line numbers remain in use after folding or wrapping. During horizontal scrolling on reading and editing pages, line numbers and region-fold buttons remain fixed on the left while only code text scrolls; short lines retain alignment. Editing-page selections use the unified trash-can button, and deletion and undo belong to whole-document history. Reading-page line selection is for copying code, and controls are excluded from copied content. Inside code, Cmd/Ctrl+A first selects the whole block, then expands outward to the container and full document.
+- **Enlarged view:** Add enlarge and More buttons to the right side of a code block. The enlarged view scrolls independently and supports find, wrapping, and copy. In editing state it retains title, language, formatting, shortcut reference, and selection removal, directly editing the same document and returning to the original reading position when closed. Esc first closes internal panels such as Find, then closes the enlarged view. It also works at a narrow width of 375 px.
+- **In-block find and replace:** Within code, Cmd/Ctrl+F searches only the current code block, and Cmd/Ctrl+R focuses the replace input. It supports case sensitivity, regular expressions, and replacing one or all matches; reading state supports find only. At the user's request, Go to Line is removed. Find in the main toolbar still searches the entire document and expands any code region hiding a match.
+- **Menu scrolling:** More and language menus move with their trigger button and close after the button scrolls out of the body's visible region. Wheel or trackpad scrolling inside a menu affects only that menu; reaching either boundary or moving the pointer among menu items does not move the body. Hovering over a language option no longer scrolls the page proactively, and keyboard up/down selection scrolls only the option list.
+- **State and compatibility:** Whole-block title and collapsed state continue to be stored in the original document attributes and Markdown fence info string. Region folding and wrapping are stored in the local browser, distinguished by document address and code-block sequence number. A folded range carries a source summary, and an old range is not applied when content does not match. This batch changes neither the document schema, server-rendering format, nor Markdown semantics.
+- **Implementation:** `web/src/code` is shared by the editor, syntax loading, find panel, shortcut reference, formatting, and enlarged view. The Vue node view on the editing page passes incremental changes to ProseMirror and retains saving, revision conflicts, and document undo. History boundaries are inserted before and after formatting so it does not merge with adjacent typing. When returning from code to body content, wait for the browser to settle the selection so the old code caret does not steal focus back. The reading page retains Chroma static highlighting, loads syntax modules on demand on hover, focus, or restored folding, and loads the CodeMirror view only when enlarged.
+- **On-demand mounting on the editing page:** Create CodeMirror only when a code block enters a 1000 px margin above or below the window. Before then, display plain-text source and line numbers in the same box, using the same font size, line height, padding, and wrapping rules as CodeMirror so height does not change after mounting. Clicking the plain text; invoking a block operation such as enlarge, copy, or format; finding a match; moving selection into it; restoring a reading position; or calling `codeEditorIn()` mounts immediately. A folded section or collapsed code block mounts only after expansion. CodeMirror can only estimate the height of unrendered lines outside the window, so a long block mounted off-screen retains its original height through `--yy-code-held` until it enters the window and measurement finishes. The enlarged view independently retains its host's inline `min-height`, and the two mechanisms do not overwrite each other. All code blocks share one IntersectionObserver, and each transaction finds the block containing the selection and current match only once.
+
+## 22. Keyboard Shortcuts and Document Hierarchy
+
+- **Non-editing shortcuts:** Cmd/Ctrl+B toggles the left sidebar: a pinned sidebar on wide screens and the directory drawer on narrow screens. On the reading page, Up/Down switches documents in the page's exact `上一篇`/`下一篇` order and stops at either end. Option/Alt+N creates a document and enters editing: create a sibling from a document reading page, create inside the group from a group page, and create at the top level from a knowledge-base home page. Do not create again while the page is not ready or a request remains incomplete. Inputs, menus, dialogs, and composition input retain their own key behavior; editing mode continues to use its existing bold and caret-movement shortcuts. The Common tab in the shortcut reference likewise lists reading navigation, creation, and image multiple selection.
+- **Progressive selection expansion:** While editing body content, Option/Alt+L expands outward from the caret or existing selection through word, sentence, whole paragraph or content block, content under the containing heading, content under parent headings, and finally the entire document. A section ends before the next heading at the same or a higher level. Expanding from body content does not additionally include the containing heading itself; expanding from heading text retains that heading. Headings inside containers divide independent sections, while an outer section includes the complete container. An existing selection crossing subsections moves directly to the parent range that can contain it. Within a table, expand from cell content to the cell, then directly to the whole table, without stopping at the current row or at a text range spanning cells. A 1 x 1 table, empty table, or table left with one cell after merging still retains whole-table selection; a single-cell selection already represents the entire table and is not repeated. Skip any other step whose range is identical and stop at the full document. Section selections retain complete block boundaries, so copy, deletion, and formatting operations do not omit code, tables, or images at an edge. Native word segmentation supports Chinese, English, and emoji; cell and image multiple selections calculate every actual range. Selection changes do not modify body content. Option/Alt+Shift+L was removed to avoid conflict with the macOS exact command `查找输入码`; neither body nor code intercepts it anymore, and it no longer appears in the shortcut reference.
+- **Selection expansion in code:** Option/Alt+L expands through word, syntax node, whole line, whole code block, outer content block, and containing section. The existing language parser supplies syntax structure; plain text and unsupported languages expand through word, line, and code block. In the enlarged code view, expanding outward exits that view. The standalone reading code view expands within the whole-block range. Formatting via Cmd/Ctrl+Option/Alt+L retains its original behavior. macOS recognizes Option combinations by physical letter key, avoiding effects from special characters or dead keys; Windows uses Alt, and IME combinations and AltGr do not trigger it.
+- **Dragging outline sections:** In the editing outline, dragging heading text or its right-side handle moves the heading together with all subordinate headings, paragraphs, code, tables, images, and containers, preserving heading levels. The drop line distinguishes placement before or after the target section; after means the end of the entire section, not between the target heading and its body. A section cannot be placed inside its own range. Release submits one undoable operation; Esc, pointer cancellation, or a body change during dragging cancels the preview. Validate structure before moving across containers, and leave an empty paragraph when emptying a required content container such as a column. The desktop outline preview remains open during dragging and scrolls near the edges of its scroll region. On narrow screens, exact `大纲` in the top bar opens the drawer; heading text is used for clicking and scrolling, while a handle on the right supports touch dragging. Esc, the backdrop, and the close button close the drawer.
+- **Site-wide Tab and focus:** `web/src/shared/tabKey.ts` centrally intercepts Tab and Shift+Tab page-control traversal at application startup across reading and editing pages, titles, toolbars, sidebars, find fields, and popovers. Body editing still retains list indent/outdent, preceding/following table cells and row creation at the end, and code indent/outdent. In ordinary body text with no corresponding operation, preserve caret and content. The enlarged code editor likewise retains editing operations. Do not intercept Ctrl/Command/Alt combinations or IME composition input. Controls have no focus outlines, focus shadows, or focus-only color changes; content selections, image/table selections, business selected states, and code highlighting remain. Follow the [shared web keyboard and focus conventions](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/conventions.md#网页键盘与焦点), adding exceptions only when explicitly requested by the user.
+- **Save and read:** Press Esc twice within 0.4 second on the editing page to reuse the exact `完成` save and routing flow, wait for image uploads and the final save, and return to the reading position. When a selection exists, the first Esc cancels it and places the caret at the earliest document-order position without a prompt. Reverse text selections, section/full-document selections, table-cell selections, image multiple selections, composite boards, and code multiple selections all follow this rule; a selection inside the title input likewise returns to its start. A complete container enters its first text position, while an atomic block prefers the boundary before it or the end of the preceding paragraph and does not insert an empty paragraph. With no selection, one press shows the exact prompt `连按两次 Esc 键保存并回到阅读模式` about 0.4 second later. The keypress that cancels a selection also counts toward the double press; in either case, pressing again quickly saves and exits. The two E presses on the reading page use the same timing. Key repeat and IME composition do not trigger it; text input, another key, a click, or window blur interrupts the sequence. Menus including `[[` document links and code completion, dialogs, find, the format painter, and the enlarged code view process Esc first; a keypress that closes one does not count toward the sequence. Conflicts and save failures retain the existing leave confirmation and local draft.
+- **Global shortcut panel:** Move it from the editing toolbar to the appearance menu at the lower left, retaining separate tabs and desktop/mobile layouts. Cmd/Ctrl + / opens it on the home page, reading page, body editor, title input, and elsewhere; the user confirmed that the code editor retains line comments. The Common tab lists E -> E, Esc -> Esc, and single-Esc selection cancellation, and explains timing and applicable modes. The panel loads on demand from the application layer; opening the reference on the reading page does not load the editor.
+- **Batch heading promotion and demotion:** Add the exact actions `提升标题等级` ("Promote Heading Level") and `降低标题等级` ("Demote Heading Level") beside heading selection in the formatting toolbar. Change only headings within the selection, shifting the whole batch one level per operation. With no selection, apply to the heading containing the caret. If the selection contains any H1, disable batch promotion; if it contains any H6, disable batch demotion; with no heading, disable both buttons. Preserve body content, heading text, and inline formatting. Support nested blocks such as block quotes and noncontiguous cell selections inside tables without changing headings outside the selection. A batch operation is undoable in one step.
+- **List levels:** Editing and reading share content styles. Ordered lists cycle through decimal -> lower-alpha -> lower-roman, while unordered lists cycle through disc -> circle -> square; the fourth level returns to the first style. Mixed lists count by actual nesting depth. Preserve the original starting number, and task lists continue to show checkboxes. This adjusts display only and does not extend body JSON or the Markdown format.
+
+## 23. First Batch of Format Extensions Beyond Markdown
+
+On 2026-09-30, the user formally started this phase and confirmed that the first batch would cover text color, image captions, merging and splitting cells, cell background colors, and optional table headers. Status: implemented and released. Columns and attachments were implemented afterward; see 23.7 and 23.8, respectively. The general-purpose whiteboard has been implemented; see Section 25. The image-composition board continues to follow Section 19.3.
+
+### 23.1 Interaction and Scope
+
+- **Text and background colors:** The top toolbar uses separate text-color and text-background-color tools, while the selection toolbar combines them into a compact menu; see 23.4 for the interaction and palette. They apply to selected text; with only a caret, they apply to subsequent input. Colors can be combined with bold, links, underlining, and other formatting. This operation is unavailable in code blocks and formulas, and processes only text in a mixed selection. Clearing formatting also clears colors. Common semantic colors use light- and dark-theme palettes, while the complete solid-color palette and custom colors retain the selected value.
+- **Image captions:** Add the exact `图片说明` ("Image Caption") action to the toolbar shown for a selected image. It edits plain text and allows line breaks; confirming applies the caption, canceling makes no change, and clearing removes it. The caption appears below the image, uses the same width, and wraps automatically. It is independent of the alternative text shown when loading fails and does not replace the image link's title. The caption stays with the image when it is saved, copied, moved, cropped, or placed in a composition. Cropping and scaling apply only to the image's pixel area; the caption is not cropped. Within a composition, the caption is displayed at the image's position, while the user still adjusts the board boundary.
+- **Table structure:** Remove the behavior that forcibly restores a Markdown-style first-row header after structural operations, preserving the actual `tableHeader` / `tableCell` nodes and row-spanning and column-spanning structure. Existing column-width completion, column alignment, and per-cell alignment continue to work. A new table uses its first row as a header by default, but this can be disabled during insertion; the table tools provide a first-row-header toggle. The toggle only converts the first row's cell types and does not delete text, column widths, row heights, or background colors. The initial-size panel selects 1 row × 1 column by default. The pointer and arrow keys share the same selected bottom-right position: Up and Down adjust the row count, Left and Right adjust the column count, within a range of 1–8 rows and 1–10 columns; Enter inserts and Esc cancels. Moving the pointer out of the grid retains the dimensions. While the panel handles keys, it preserves the body selection and ignores IME composition and modified-key combinations.
+- **Merge and split:** Table tools appear in both the top toolbar and the cell-selection toolbar. A rectangular multi-cell selection can be merged, retaining its content in the original order. A single cell spanning rows or columns can be split; its content remains in the first resulting cell and the others are empty. Disable the corresponding operation when it cannot be performed. Preserve native row and column insertion and deletion, Tab navigation, and width and height adjustment.
+- **Cell background color:** This shares the palette interaction used for text color, with light- and dark-theme colors suited to backgrounds, and also permits custom colors. It applies to the current cell or selected cells and can be restored to the default. It does not change text color, alignment, or header type. The selection overlay and background color are drawn independently, so the selected range remains discernible.
+- New controls follow the unified button-tooltip, overlay, and site-wide Tab/focus rules. Each operation can be undone independently, preserves the selection, and participates in normal autosave. Focusing a control adds no outline or highlight.
+
+### 23.2 Format, Rendering, Import, and Export
+
+- Body content remains stored as Tiptap JSON: the `textColor` mark stores `color` and an optional fixed gradient name in `gradient`; text background color continues to use `highlight.color`; there are also `image.caption` and the cell attribute `backgroundColor`. Optional headers and merged cells use the existing node types and `colspan` / `rowspan`, without introducing a second copy of table state. Colors accept only supported solid-color values or fixed gradient names. Captions are escaped as text and cannot inject arbitrary HTML or styles.
+- Keep the editor, Go reading renderer, and HTML import/export synchronized. Ordinary content continues to export as Markdown. Content with text color or image captions, and tables with no header, a nonstandard header, merged cells, or background colors use independently displayable HTML, preserving relative resource paths and link conversion. Lists, block quotes, and Callouts containing these formats are exported wholly as HTML so Markdown indentation does not alter nested structure or multiline captions. Import reads the attributes and nested content back without recognizing captions a second time as body text.
+- Image captions participate in search text. History summaries record changes to image captions and alternative text separately; table background-color and structural changes are described separately; text-color changes are recorded as text-format adjustments.
+- Do not migrate or batch-rewrite existing documents, and do not add an API, database table, or media directory. The format version remains 1. After the new marks are used, the data cannot be rolled back to an older program that does not recognize them. Before release, run read-only `roundtrip` against the production instance to confirm that the new schema accepts every existing document.
+
+### 23.3 Subsequent Batches
+
+- **Second batch: columns.** Two to four columns, column-width adjustment, content movement, and narrow-screen expansion have been implemented; see 23.7 for the interaction and format.
+- **Third batch: attachments.** Uploading and downloading, file cards, import and export, and backup and restoration have been implemented; see 23.8.
+- **General-purpose whiteboard:** Distinguish it from the existing image composition. First determine whether free drawing, text, shapes, connectors, and export formats are needed, then choose an implementation. Do not introduce another editor in the first batch.
+
+### 23.4 Color Tools and Top Alignment
+
+The user provided Feishu's selection toolbar and Yuque's top toolbar as references and required the top tools to align with the body content.
+
+- **Top toolbar:** Text color is represented by an A with a color bar, and text background color by a highlighter with a color bar; each has its own small arrow. The A in both the top toolbar and selection toolbar uses a 17 px font size to coordinate with adjacent tool icons. The main button applies the color most recently used in this browser. Hovering over the arrow expands the palette, and the arrow can also be clicked. While expanded, the arrow rotates gently by 180°; disable the animation when reduced motion is requested. The top button area reuses the body column's width and horizontal whitespace and is centered in the same position. It does not shift when the sidebar is toggled; on narrow screens it scrolls horizontally within the body width.
+- **Floating selection toolbar:** Combine the controls into an A with a background color and an arrow. Its menu provides one row of eight text-color entries, two rows of sixteen background-color entries, and an option to restore defaults. The main button applies both the most recent text color and background color in one action. Restoring defaults removes only those two formats and retains bold, links, and other formatting; one action is one undo step. A selection containing mixed colors is not incorrectly marked as using the default color.
+- **Complete palette:** Use a solid-color palette of 10 columns by 7 rows. Text color additionally offers four gradients: cyan-blue, blue-purple, pink-orange, and orange-red; background color offers no gradients. The top and cell-background palettes both provide recently used custom colors, up to 10 per category, and the exact `更多颜色` ("More Colors") action. Preview through the system color picker or HEX input, and modify the body only after Apply is pressed. Recent colors and the last-used color are stored in this browser, not written into the document.
+- **Hover and focus:** A short closing grace period lets the pointer move from the arrow into the panel. The panel also remains open if the pointer leaves while a custom color is being entered. Color menus are mutually exclusive and close on an outside click or Esc. Hovering does not steal the selection; a floating-toolbar panel stays within that toolbar, and touchscreens open it by clicking. Retain ordinary Tab interception, the absence of focus highlighting, and the IME rules.
+- **Format contract:** The default yellow highlight and existing shortcut continue to use `highlight` without a color value and still export the exact example `==文字==`. A specified background color exports as `<mark>`. A gradient stores a fixed name and solid-color fallback; HTML includes `data-text-gradient` and CSS that works independently. The text-color mark is nested inside highlights and links so the background does not cover gradient text. The editing DOM, Go reading renderer, and export use the same hierarchy. Older programs may discard colored-highlight and gradient attributes; verify content before rolling back.
+
+### 23.5 Format Painter and Toolbar Order
+
+- **Entry points and icons:** From left to right, the top toolbar contains Insert, Undo, Redo, Format Painter, and Clear Formatting, followed by Body/Heading and the remaining formatting tools. The Insert entry point is a 24 px green circular plus sign at the far left of the toolbar, displays neither text nor a dropdown arrow, and opens the existing insertion menu when clicked. The table-dimension panel remains anchored to this button. Draw the Format Painter and Clear Formatting icons as linear paint-roller and eraser icons following the Yuque screenshot provided by the user. Clear Formatting in the floating selection toolbar shares the same eraser icon.
+- **Shortcut:** While editing body content, `Cmd/Ctrl + Shift + S` toggles Format Painter. Enabling it samples the current text and paragraph formatting and applies it once, just like a single click on the button. Pressing the shortcut again or Esc cancels it. Button tooltips and shortcut help display the shortcut consistently.
+- **Use:** Place the caret in source text or select text, then click Format Painter once for one use or double-click for continuous use. Next, drag to select target text; apply the formatting when the pointer is released. Clicking a target paragraph applies it to the entire paragraph. A keyboard selection can be applied with Enter. Esc or another single click on Format Painter exits; choosing another tool, leaving the editor, or beginning to type also exits. While enabled, the button displays a selected state, the body uses a copy cursor, and the selection toolbar is hidden so it does not obscure the target.
+- **Copied scope:** Copy bold, italic, underline, strikethrough, inline code, text color including gradients, text background color, body/heading level, and paragraph alignment. For a source selection with mixed formatting, use the formatting of the first selected text in document order. With a caret, use the formatting at the current location or pending input formatting. Applying the painter replaces these visual formats on the target text while preserving the target's link destination. Do not copy link destinations, image parameters, cell background colors, or container structure.
+- **Selections and structure:** A dragged selection changes only the selected text. Body/heading style and alignment apply to the paragraphs involved and obey the structural requirements of parent nodes such as lists. Process the cells actually selected in a table rather than treating the bounding perimeter of a discontinuous selection as one whole segment. In mixed image, code-block, formula, and image-composition content, paint only text and preserve adjacent content. An empty paragraph can receive the style and then accept further input.
+- **Saving and undo:** Each application is a separate document-undo step, can be redone, and participates in autosave. Format Painter state exists only in the current editor and is cleared on exit or reopen. It reuses existing body formats and adds no schema, API, or database migration. The implementation is in `editor/formatPainter.ts` and reuses the exact ranges and undo boundaries from `selectionContent.ts`.
+
+### 23.6 Fold Blocks and Highlight Blocks
+
+- **Entry points:** The top plus sign and `/` insertion menu provide the exact `折叠块` ("Fold Block") and `高亮块` ("Highlight Block") items. Pinyin search supports `zhediekuai` / `zdk`, `gaoliangkuai` / `glk`, and similar terms. On insertion, place the current paragraph or selected blocks inside the container, retaining their original text formatting, images, lists, tables, and code; an empty paragraph becomes an empty content area directly. Within either container, the top plus sign or slash menu can still insert other content blocks, fold blocks, and highlight blocks. H1–H6 headings in the body retain their level and fold button; whole-section dragging is done through the outline. Ordinary paragraphs and the containers themselves display no beside-block tools. A fold block's dedicated title row continues to use its own expand/collapse arrow.
+- **Fold blocks:** Use no background color, a thin gray border, and lightly rounded corners. A small triangle on the left toggles expansion and collapse, with a short rotation transition. The title and body are edited separately. When empty, they display the exact placeholders `请输入折叠块标题` ("Enter a fold-block title") and `在此输入内容` ("Enter content here"). Tab or Enter moves from the title to the start of the body and also expands the block if collapsed. If the body begins with code, a table, or an image, enter the corresponding editing position or node selection. Shift+Tab does not move among page controls; list indentation, code indentation, and table-cell Tab behavior inside the body remain unchanged. Pressing Enter again on a trailing empty line exits the block. Backspace at the start of the title expands the title and body into ordinary blocks. Before collapsing, move a body caret into the title. If arrow-key movement or Find enters hidden body content, expand automatically to avoid editing at an invisible location.
+- **Highlight blocks:** These have no title or icon and use a soft background across the entire block. When the caret or whole-block selection is inside one, display a row above it with gray, blue, cyan, mint, green, yellow, orange, red, pink, and purple swatches; a check mark identifies the current color. The default is light blue. A selection applies immediately, and a color change can be undone independently. The dark theme uses corresponding low-luminance backgrounds. When text is selected, continue to use the existing text-formatting toolbar.
+- **Reading:** Highlight blocks do not display the palette. Fold blocks expand or collapse according to their saved state, and toggling while reading affects only the current page. When search or an outline jump targets folded content, first expand the fold block containing the target.
+- **Format:** `foldBlock(collapsed)` contains `foldTitle` and `foldContent`; `highlightBlock(backgroundColor)` contains ordinary blocks. They can nest within each other. Colors use 10 fixed presets. The title, content, collapsed state, and background color are stored in body JSON and use the existing revision, snapshot, and undo mechanisms. Markdown export preserves semantics with standard `<details><summary>` and a background-colored HTML container; import and copy/paste read them back. When a container is inside a list or Callout, export it wholly as HTML so nesting prefixes do not alter the content. Go rendering, plain-text search, and history summaries all recognize the new nodes.
+
+### 23.7 Columns
+
+Status: implemented and verified. This batch added columns; see 23.8 for attachments and Section 25 for the general-purpose whiteboard.
+
+- **Insertion and editing:** The top plus sign and slash menu provide the exact `分栏` ("Columns") item, searchable with `fenlan` / `fl`. The default is two columns. Place the current or selected blocks unchanged into the first column, with an empty paragraph in each remaining column. Every column supports existing text, images, tables, code, fold blocks, highlight blocks, and nested columns. Use the top or slash menu to insert content inside a column. Headings display their level and fold button, and an entire section can be moved across columns from the outline. Ordinary paragraphs and the columns container display no beside-block tools.
+- **Layout:** Reading and editing share a thin pale gray-green border, lightly rounded corners, and dotted dividers between columns; a transparent background retains the body color scheme. Empty columns retain a minimum height so the complete frame remains visible even when no content has been entered. When the caret is inside columns, show the exact `分栏设置` ("Column Settings") control above them. It offers two to four columns, restoration of equal widths, 1:2 and 2:1 proportions for two columns, and reordering of the current column. On desktop hover, a width handle appears between columns; dragging it adjusts the widths of the two adjacent columns. A drag only previews the result, and release commits it as one undo step. Esc, pointer cancellation, or a body-content change during the drag discards the preview. The operation adds no additional Tab behavior.
+- **Insert a column at a specified position:** While editing, show small dots matching the table controls at both ends of the columns' top edge and between columns. On hover, a dot becomes a plus sign and previews an insertion line. Clicking adds an empty column at that position, moves the caret into it, and supports single-step undo. Preserve existing content order and the relative widths of the existing columns. Give the new column the mean of the existing column-width weights; if the columns were equally wide, keep them equally wide. The maximum remains four columns, after which the add buttons are hidden. These controls belong to the node view and are not written into body content. On desktop hover over nested columns, show only the controls for the current inner container.
+- **Content preservation:** Increasing the column count appends empty columns. Decreasing it merges every block from the removed columns into the last remaining column in document order and restores equal widths. The exact `取消分栏，保留内容` ("Remove Columns and Keep Content") action expands all content from left to right. A layout adjustment is independently undoable; saving uses the existing revision and snapshots. Cmd/Ctrl+A selects the whole document directly. Option/Alt+L progressively expands selection through the current column, the entire columns group, and the outer level.
+- **Reading and narrow screens:** Reading retains the columns border and dividers but does not display editing tools. Desktop lays columns out horizontally according to their proportions. At 720 px and below, both reading and editing display them vertically in column order. Mobile retains layout settings but hides width handles. Add buttons run vertically along the left border with the columns and appear as small plus signs on touchscreens. Wide tables and code scroll within their own column. Code titles and buttons wrap according to the available column width while retaining the title-visibility entry point.
+- **Format:** `columns(widths)` contains two to four structural `column` nodes, each with `block+` content. Optional `widths` is an array of positive integer weights from 1 through 1000, with the same length as the column count. `null` means equal widths; these are not pixel widths. HTML uses `data-columns`, `data-column-widths`, `data-column`, and independently displayable inline grid styles. Lists, block quotes, Callouts, and similar containers that contain columns are exported wholly as HTML; import and the clipboard read them back. Go rendering, structural validation, search, and history summaries all recognize the new nodes. There is no database migration, new API, or media directory. After columns are written, the data cannot be rolled back to a program that does not recognize the new nodes.
+
+### 23.8 Attachments
+
+- **Insertion:** The top `+` and slash menu provide the exact `附件` ("Attachment") item, searchable by its name, pinyin, initials, and keywords such as PDF/file. The file picker supports multiple selection, and files can also be dragged or pasted directly. Supported images are still inserted as images, while images chosen through `附件` remain file cards. Attachments have no upload-size limit and empty files are allowed. An image inserted as an attachment is likewise not subject to the original 25 MiB limit. Batch uploads and insertions follow selection order and display the filename, progress, and cancellation control; a failed item can be retried or removed. Upload placeholders are not written into body content, and saving and exiting wait for unfinished uploads. Adding an attachment preserves existing selected content; failure or cancellation does not delete body content.
+- **Cards:** Use a thin theme-appropriate border, a file-type marker, filename, and size. While reading, clicking the card opens a preview and a separate button on the right downloads it. While editing, clicking selects the entire attachment; copying, deletion, undo, redo, section movement, and reuse through templates or snippets are supported, with rename and download actions on the right. Renaming changes only the current card and downloaded filename; the same file's names in other documents remain unchanged. Cards work inside tables, columns, highlight blocks, fold blocks, and other containers. Long filenames and narrow screens wrap automatically. Follow the site-wide Tab and focus conventions.
+- **Reading preview:** The dialog supports common bitmap formats, PDF, UTF-8 and BOM-bearing UTF-16 text, and browser-supported audio and video. PDF.js loads on demand and renders locally to a canvas, providing previous/next-page controls and the Left and Right arrow keys. Fonts, CMaps, and decoding resources ship with the program, with no dependency on third-party online services; PDF scripts and form interaction are disabled. Preview at most the first 1 MiB of text. Display HTML/SVG/XML as source code. If a file cannot be previewed or is encrypted or damaged, show the reason and retain the download button without starting a download automatically. Esc closes the dialog and returns to the body. Desktop and narrow screens share the themed dialog.
+- **Archive directory:** Support ZIP, 7z, RAR, TAR, TAR.GZ/TGZ, TAR.BZ2/TBZ2, TAR.XZ/TXZ, and single-file GZIP. Show directory expansion/collapse, full-path search, and file sizes. Read only the directory; do not extract files to disk, follow symbolic links, or read adjacent split volumes. Treat names as plain text. Display at most 5,000 entries and 1 MiB of total paths. TAR/GZIP streaming reads are limited to 64 MiB, and reading checks a 5-second timeout and request cancellation. When truncated, explicitly indicate that the directory is partial. Do not present Office files as archive previews merely because they are ZIP files internally.
+- **Format and search:** Add the block-level atom node `attachment` with attributes `src: /attachments/<32-character-content-ID>`, `name`, `size`, and `mime`. The filename participates in full-text search and template summaries. History summaries recognize attachment addition, deletion, movement, and information changes. Body content remains at format version 1, and old documents are not migrated. After attachments are used, the data cannot be rolled back to an older program that does not recognize the node and binary assets.
+- **File lifecycle:** Reuse the existing `assets` table and `data/assets/`. Images retain their original extensions; all other files use `<id>.bin`. Deduplicate by SHA-256 and publish atomically. At service startup and every minute, scan all body content including the recycle bin, historical versions, templates/snippets, and media links, covering nested blocks and image boards. Delete a registration and file only after one continuous hour without any reference. For a new upload, timing begins on success; for an existing unreferenced file, it begins at the first scan. A new reference or duplicate upload resets the timer. Retain a file when its card is deleted but history still references it. Abandoning an edit after a successful upload is collected under the same rule. Store timing and deletion-retry state in `asset_gc:*` entries in `meta`, retaining them across restarts, with no database migration. Normal cancellation or failure immediately removes unfinished temporary files. Clean up abnormally leftover `.upload-*` files after one hour if no upload process holds their lock. Observe unregistered, orphaned complete files for one hour as well.
+- **Collection consistency:** In a write transaction, check references uniformly and delete asset records; a parsing failure stops the entire cleanup. Cache references by row: detect body changes by revision and creation time, template changes by revision, and treat historical snapshots as immutable. Before acquiring the lock, each pass parses content written since the previous pass. Inside the write transaction, it rechecks only rows that changed again in the meantime, so a save never waits for the entire database to be parsed. Remove files only after committing their deletion markers, allowing retries after an abnormal exit. Save, create, discard-edit, template-write, and reference-timer updates share a transaction. A collected attachment cannot be saved as a broken card; instead, return a prompt to upload it again. Backup and upload publication hold a cross-process shared lock on the existing `assets` directory, while collection holds an exclusive lock, protecting consistency between snapshots and files. `gc --dry-run` provides read-only statistics. Ordinary `gc` observes the same one-hour grace period and offers no option to force early deletion.
+- **API and downloads:** `POST /api/attachments` accepts a multipart request containing exactly one `file`. As bytes arrive, write them to `data/assets/.upload-*` and calculate SHA-256, so memory use does not grow with file size. Publish and register atomically after validating the complete form. Neither the application nor the attachment-specific Nginx location sets an upload-size limit, and Nginx request-body buffering is disabled. Attachments use a read-idle timeout so the two-minute total limit for ordinary requests does not interrupt an upload that continues to make progress. Return asset information and an in-app address. `GET/HEAD /attachments/{id}?name=<filename>` supports Range; downloads always use attachment disposition, octet-stream, and nosniff. `GET /api/attachments/{id}/preview?name=<filename>` returns a preview type, text, or directory. `GET/HEAD /attachments/{id}/content?name=<filename>` permits only content-identified bitmaps, PDFs, audio, and video; it sets inline, nosniff, and a sandbox CSP, supports Range, and returns 415 for all other types. Binary assets cannot be opened directly through the image API. Existing device authentication and write-API origin checks continue to protect these endpoints; add no anonymous exception.
+- **Import and export:** Export a card as an independently downloadable HTML link block, retaining its name, size, and type. Web ZIP and command-line export write the actual file to `attachments/<id>-<safe-filename>`, and body content uses a relative path; same-named files with different contents do not overwrite each other. Import reads cards back, uploads local files, and restores paths; missing files are explicitly recorded in the report. Do not import Markdown files inside attachments again as notes. Export a container containing these cards wholly as HTML to preserve its structure.
+- **Backup:** A native snapshot covers all images and attachments registered when the snapshot is taken, including files referenced only by history or templates and files still within the collection grace period. Manifest version 2 permits `.bin` and verifies each file's SHA-256; restore remains compatible with version 1. Backup and collection coordinate through a directory lock. Hard links in an existing snapshot remain after the source file is deleted; space is released when the last backup link is deleted. Do not run an old backup program concurrently with the new collection implementation. The data root, database tables, and portal backup type remain unchanged; the portal continues to collect native snapshots.
+
+## 24. Document Links, Templates, and Content Snippets
+
+### 24.1 Document and Section Links
+
+- While editing, typing `[[` matches document or section names by name, pinyin, initials, or a name fragment. Use Up and Down to select, Enter to insert, and Esc to exit while retaining the input. With no query, list documents; use the right-side arrow or Left and Right keys to expand and collapse sections. Do not trigger this inside code blocks or inline code. The link overlay provides the exact `文档与章节` ("Documents and Sections") tab, preserving existing selected text. The exact `文档` ("Document") item in the slash menu and top insertion menu opens that tab directly and focuses search; the exact `链接` ("Link") item continues to open `网址` ("Web Address") by default.
+- `GET /api/link-targets` returns live documents and H1–H6 sections. Go generates pinyin, and the frontend reuses the search-panel matcher. Exclude groups, the recycle bin, and deleted knowledge bases. Sections reuse the anchors and duplicate-heading suffixes from reading-page rendering.
+- The server caches sections and pinyin by document version and parses only body content written since the previous pass. When reopened, the selector first displays its previous list while confirming with the service. An unchanged list returns 304; replace it when changed, and retain the old list on failure.
+- The link overlay is 380 px wide. On narrow screens, reduce it to viewport width minus 16 px, retaining margins of at least 8 px on both sides.
+- Storage remains an ordinary `link` mark with address `/docs/<id>` or `/docs/<id>#<encoded-section-anchor>`. Moving or renaming a document does not affect its ID. Renaming a section or changing the order of same-named sections may require selecting it again; do not add stable section IDs. Markdown/HTML import and export continue to use the existing rewriting of links and resource paths.
+- In reading body content, editing body content, and selector results, hovering for about 420 ms displays the document/section name, knowledge base, and a summary of at most 180 characters. `GET /api/docs/{id}/preview?heading=<anchor>` provides the summary, with a section ending at the next heading of the same or a higher level. An invalid target indicates that it was deleted or renamed. Moving away, clicking, scrolling, or leaving the page clears the preview; a stale asynchronous result never replaces a newer target. On touchscreens, operate the link directly.
+- A same-document section jump responds to route-hash changes and expands the folding region containing the target before scrolling.
+
+### 24.2 Document Templates and Content Snippets
+
+- The exact `更多操作` ("More Actions") menu in reading and editing can save the entire document as a template. The selection toolbar or editing `更多操作` menu can save a selection as a snippet. After naming it, save an independent snapshot; modification or deletion of the source does not affect the template. The editing page takes content from the current editor without changing body content or undo history.
+- The knowledge-base creation menu and directory-node menu provide the exact `从模板新建` ("Create from Template") action and use the template name as the initial document name. The top insertion menu and exact `/模板` command open the template library. `/` can directly search and insert templates/snippets by name, pinyin, or initials. The template library supports categories, content previews, renaming, and deletion.
+- Save complete Tiptap JSON and its format version. For a partially nested selection, supply any outer empty title or column required for validity. Save a table according to the actual rectangle of selected cells, multiple selected images according to the images actually selected, and a section selection with complete sibling blocks. If a selection cannot be closed structurally, prompt to expand it to the outer block rather than silently flattening it. Insertion is one body transaction, separated from preceding and subsequent edits in undo history. If body content changes during the asynchronous operation, refuse to write to the stale position.
+- Use rows in the existing `meta` table named `template:<random ID>`, recording name, category, content, `schemaVersion`, an independent revision, and timestamps, with no database migration. `GET/POST /api/templates` lists summaries or creates a template. `GET /api/templates/{id}` gets content, a preview, and image dimensions. `PATCH/DELETE /api/templates/{id}` renames or deletes, carries `baseRevision`, and returns 409 on conflict.
+- Templates retain original content-addressed images and link targets, and insertion supplies image dimensions. Images remain after permanent deletion of the source document. Deleting a template does not change already inserted content. Native backup covers the entire database and registered images, including the template library. Knowledge-base Markdown export exports only documents; body content reused from a template follows existing import and export behavior.
+- Load the template library on demand without adding the editor to the reading page's initial load. Previews use Go rendering, retain the application prefix on images, and remove section DOM IDs to avoid conflicts with the current page. On mobile, stack the list and preview vertically and keep the dialog within the screen.
+
+### 24.3 End-of-Document Backlinks
+
+- The exact `链接到此文档` ("Links to This Document") section at the end of the document is collapsed by default. Expanding it requests `GET /api/docs/{id}/backlinks` and displays the source document, knowledge base, and citation context, with navigation to the source section. Expanding it again refreshes the data.
+- Derive backlinks from `link` marks in current live body content, listing each source only once. Exclude the current document itself, templates, historical versions, the recycle bin, and deleted knowledge bases. Similar paths on external websites do not count. For the small corpus, read and traverse content directly without a persistent index or migration; save, restore, and delete operations naturally reflect the current relationships.
+- First use SQLite to filter documents whose body contains `/docs/<id>"`, `/docs/<id>#`, or `/docs/<id>?`; parse only those candidates, then verify each link target. Links written by the editor and import use these forms. Filtering first checks the common `/docs/<id>` prefix, so the majority of bodies that do not contain it are scanned only once. Exclude the target document itself from the query so a long document linking to its own sections does not scan and parse its own body. Verify target liveness from metadata only, without reading body content.
+
+## 25. Editable Whiteboards and Follow-up Items
+
+Excalidraw 0.18.1 is integrated as a separate atomic `drawing` block. Shapes, text, bound connectors, and images are edited in a dialog, and applying the result is one body transaction. Ordinary reading uses only a static preview; width, alignment, and caption are independent of the scene. Templates are provided for data pages, B+ trees, index scans, and transaction timelines.
+
+See [WHITEBOARD.md](WHITEBOARD.md) for the complete contract: immutable packages reuse `assets`; there is one SVG/PNG preview; searchable text is derived; package and image dependencies in body content, history, templates, and backups are protected; and old-client capability checks, unknown-version preview and source download, export and re-import, and local generation through yuyan-doc are supported. There is no database migration. Existing drawings have not yet been redrawn one by one, and embedded bitmaps cannot be counted as space savings.
+
+Follow-up work still includes tags, favorites, and custom CSS. Code blocks can continue to consider emphasized lines, line links, and multi-file groups; these are not part of the first batch in Section 21.
+
+## 26. Second Batch of Performance Optimizations
+
+On 2026-10-14, the user selected three items: database table layout (26.1), segmented reading for very long documents (26.2), and reading-page image display variants (26.3), with a requirement to consider generality and extensibility. Validate each item first on an isolated copy, then put it into production through the normal release process. On the same day, the user also selected an in-memory full-text-search index (26.4), on-demand loading for first-load menus and overlays (26.5), and a warning when editing extremely large documents (26.6).
+
+### 26.1 Database Table Layout and Migration
+
+- **Problem:** SQLite stores a row in column order, chaining the portion that does not fit onto overflow pages; reading a column requires following the chain to its position. The original `docs` table placed `content` and `plain_text` before `revision`, `created_at`, `updated_at`, and `deleted_at`. The directory tree, recent list, link index, word-count statistics, and recycle bin read only these small fields but still had to traverse overflow pages for the entire body. History cleanup filters on `doc_versions.created_at` and likewise had to pass through each snapshot's body.
+- **Layout:** Put the large fields of `docs` and `doc_versions` last, with `plain_text` before `content`. Search scans `plain_text` on every query and is triggered frequently while typing. Backlink candidate filtering reads `content` and is invoked only when the exact `链接到此文档` ("Links to This Document") section is expanded. Thus search traverses fewer body overflow pages, while backlinks traverse an additional stretch of plain-text overflow pages, making them about 12% slower on a copy of production data. The table-creation statement is a shared constant in `store.go`; both `init` and migration use it, so new and migrated databases have the same structure.
+- **Versions:** `meta.layout` records the latest applied step and defaults to 1, the original layout; it is separate from body format version `meta.schema`. `meta.min_layout` is the oldest program layout that can still use this database. Only a step that prevents an older program from running is marked `breaksOlder` and raises it to that step; compatible steps leave it unchanged, allowing the release script to restore and run the previous program after a failed release. If the program's supported layout is below `min_layout`, refuse to open the database and instruct the user to use a newer program or a pre-upgrade backup. A newer but compatible layout runs normally and is not downgraded. Programs predating this feature do not read either key and rely only on explicit SQL column names for compatibility; step 2 is compatible with them.
+- **Migration (`internal/store/migrate.go`):** Execute steps in order, one transaction per step. Disable foreign-key constraints on a fixed connection because rebuilding a table requires dropping the old table first, and that setting does not take effect inside a transaction. Before committing each step, check foreign keys across the database and write the new layout. Failure or interruption rolls back the whole step, leaving data and the old layout unchanged. Check foreign keys once before starting; if dangling references already exist, explain them and refuse migration. Restore foreign-key constraints and truncate the WAL afterward. Follow SQLite's documented table-rebuild process: create a temporary table from the new definition, copy by column name while refusing to discard old columns and using defaults for new columns, verify row counts, drop the old table, rename the new one, and rebuild indexes. Preserve IDs exactly; the high-water mark for historical IDs remains in `meta.version_sequence`.
+- **Timing:** `serve`, `check`, and `restore` open with `Open` and automatically execute pending steps. `backup` and `daily` use `OpenAsIs` to copy the database unchanged, so a pre-upgrade backup retains the old layout. `migrate [--dry-run]` separately reports or executes migration. After stopping the service, the release script first backs up with the old program, then runs `check` with the new program under a 60-second limit, completing migration then. If any step fails, restore the old program; the database remains either on the pre-migration layout or on a compatible migrated layout.
+- **Space:** After rebuilding, pages from the old tables enter SQLite's freelist and the file grows: the production-data copy grew from 179 to 308 MiB, of which 129 MiB was free, and subsequent writes reuse that space. Backups generated by `VACUUM INTO` omit free pages. Migration does not run VACUUM: it took 14.6 seconds on the production-data copy, making downtime about four times the migration itself, with no measurable query improvement.
+- **Extension:** Add each future table, column, or index as a new step and update the shared table-creation constant. Continue naming columns explicitly in SQL; do not use `SELECT *` or positional INSERT, so steps described as compatible truly remain compatible with old programs. Time long-running steps first on a copy of a production backup; they must finish within the release-check limit.
+
+### 26.2 Segmented Reading for Very Long Documents
+
+- **Problem:** The reading page used to fetch the complete rendered result at once. The longest document in the production instance has 12.8 MB of body HTML; its `/view` response is 13.9 MB, embedding the same data in the page shell makes it 15 MB, and compression reduces it to 2.4 MB. At the server's approximately 0.5 MB/s outbound bandwidth, transfer takes about 5 seconds; the browser must then parse, lay out, and enhance all content. Only six documents currently exceed 256 KiB of body content, but opening time grows linearly with length and has no upper bound.
+- **Segmentation:** The renderer records each top-level block's ending position in HTML, the cumulative outline-item and code-block counts, and, separately for top-level headings, level and ID (`render.Result.Blocks`). The server splits the complete rendered result between top-level blocks rather than rendering each segment independently: heading IDs are deduplicated across the whole document, code blocks are numbered across the whole document, and concatenating the segments in order is byte-for-byte identical to the complete HTML. Do not segment HTML at or below 256 KiB. Above that threshold, make the first segment approximately 64 KiB and each later segment approximately 128 KiB; a single oversized block occupies its own segment. Store segmentation with the render cache and calculate it once per revision. Thresholds and segment lengths are server constants, so adjusting them does not require frontend changes.
+- **API:** `GET /api/docs/{id}/view` continues to return the complete document, so scripts such as yuyan-doc work unchanged. Web requests use `?segments=1`. For a segmented document, `html` contains only the first segment and `images` only that segment's image dimensions. An additional `segments` field contains a version marker and, for every segment, its top-level block count, byte count, image count, code-block count, outline-item count, and top-level headings, including block position within the segment, level, outline index or ID, and whether it can fold. The page shell preloads from the same address and embeds only the first segment. `GET /api/docs/{id}/segments?version=&from=&to=` returns concatenated HTML for segments `from` through `to−1` and dimensions for their images. `GET /api/docs/{id}/segments/matches?version=&q=` returns segment numbers containing any search term for positioning when opening a search result. The version marker is this process's hash of the complete HTML. After document modification or service restart, an old marker receives 409; the page records its reading position and reloads. The version marker in the address determines segmented-response content, allowing long-term `private, immutable` caching.
+- **Server cost:** The reading API first reads metadata without body content. When revision and update time hit the render cache, it does not parse the body again. Word counts and image IDs are stored with the render cache. Concurrent renders of the same document are combined into one, preventing two requests from parsing a very long body simultaneously and exceeding the service memory limit.
+- **Frontend:** Replace unloaded segments with placeholder blocks. A placeholder is a direct child of the body container, inserted before first paint. Estimate its height from the measured height per byte of the first segment and its image count. Placeholders register the top-level blocks and headings they represent in `virtualBlocks` in `folds.ts`. Loading logic lives in on-demand `content/segments.ts`: load a placeholder when it enters a range two screenfuls above or below the viewport; combine adjacent segments into one request; allow at most two concurrent requests; and request only segments still in range when the request is issued, so quickly dragging the scrollbar does not load every segment passed along the way. First place a new segment into an invisible, body-width area inside its placeholder and prepare attachment cards, image placeholders, code blocks numbered across the complete document so saved fold and wrap settings stay aligned, tables, formulas, and charts. Once all preparation is complete, replace the placeholder in one operation. It will not grow from later painting, so heading jumps and position restoration land correctly in one step. Content being prepared does not participate in folding, current-outline-section determination, or search highlighting. When replacing a placeholder above the viewport, temporarily disable browser scroll anchoring and compensate scroll by the movement of the first following element, producing consistent behavior across browsers. Never unload a loaded segment. A failed placeholder displays Retry. After a document modification triggers reload or the theme changes, rebuild body content from the new HTML without reusing old segments or placeholders.
+- **Feature behavior:**
+  - Outline jumps, in-page anchors, and the exact address example `#标题` first load the target segment, then expand folding and scroll. After loading, position directly and briefly cue the target heading as in 12.4, without passing through intervening placeholders.
+  - Heading folding treats a placeholder as the blocks it represents: use its headings and saved fold states to determine whether the entire placeholder is hidden. A folded placeholder is not loaded. Saving preserves fold state for unloaded headings, and `reveal()` can expand headings inside a placeholder.
+  - Reading position when switching between reading and editing is counted in top-level blocks across the document, with a placeholder counting as the number of blocks it represents. Before restoration, load the segment containing the target block.
+  - When opening from search results, first request the segment numbers containing matches. After loading the first candidate segment, highlight and scroll to the first match; segments loaded later add their highlights. The server coarsely filters on segment text with tags removed, while the frontend still uses page text as authoritative. If a candidate segment contains no match, try the next one.
+  - Comparing recent modifications requires the complete document. Do not compare segmented documents automatically; the modification bar explains why and provides the exact `载入全文后标记` ("Load the Full Document, Then Mark") action.
+  - Ctrl/⌘+P loads the complete document before printing. Ctrl/⌘+F opens browser Find normally while loading the complete document in the background. Printing directly from the browser menu cannot wait: print unloaded content as a one-line notice and begin loading the complete document; once loading is complete, a subsequent print includes all content.
+  - The image viewer moves only among loaded images.
+- **Extension:** Server-side segmentation and the version marker depend only on the rendered result, while frontend loading depends only on the manifest and segment-fetch function, so other long content such as historical versions can reuse them. New reading features that need to locate body content must use `show(id)`, `ensureBlock(i)`, and `loadAll()` exposed by `DocContent` rather than assuming the entire document is in the page. Put new body enhancement in `enhance()` so segmented content runs it in the preparation area at final width as well. Features that traverse the whole body must skip placeholders (`.yy-segment`), which may contain content still being prepared.
+
+### 26.3 Image Display Variants
+
+- **Problem:** Original images are preserved without compression (Section 7). Of the 1,716 images in the production instance, 1,061 are smaller than 128 KiB; most of the rest are full-screen screenshots, commonly 1,920–3,840 pixels wide. Mobile body content is about 360 CSS pixels wide, requiring only about 1,100 pixels even on a 3x display; the desktop body column is at most 1,100 pixels wide. With server outbound bandwidth of approximately 0.5 MB/s, transferring a 3 MB screenshot takes 6 seconds.
+- **Variants:** Display variants are copies derived from the original image and used only for display on the web. They include variants narrower than the original (the 640, 1,280, and 1,920 tiers that are below the original width), same-width JPEGs for photographic lossless originals, and screenshot JPEGs provided only to displays at 2x density or above. Documents store only the original image ID. Exports, backups, scripts such as yuyan-doc, the image viewer, and the exact `查看原图` ("View Original") action all use the original image.
+- **Generation (`internal/variants/generate.go`):**
+  - **Skip:** Images smaller than 128 KiB, where the savings would be limited; GIFs and animated PNGs or WebPs; palette-based PNGs, because downscaling them can increase their color count and usually increases their file size; CMYK images; PNGs containing HDR metadata (`cICP`, `mDCV`, or `cLLI`); PNGs or WebPs with their own EXIF orientation; images whose color profile cannot be read or does not match their pixels; and images over 64 megapixels or with an estimated decoded size over 40 MiB. The service memory limit is 384 MiB, and only one image is processed at a time. Record skip and error reasons in the manifest and do not retry them; process them again under a new version when the rules change.
+  - For opaque lossless originals (PNG, BMP, or lossless WebP), try JPEG quality 85 and then 90. Only generate every variant, including the same-width variant, as JPEG at that quality when its size is no more than 60% of the best lossless file (converting BMP to PNG first), the mean SSIM over 8×8 windows against the original is at least 0.97, and the worst 1% of windows score at least 0.85. Use the lowest score among the three color channels, and treat windows with PSNR of at least 40 dB as identical. Interface screenshots have large solid-color areas and sharp text edges; JPEG introduces ringing around text, and most production-data samples fail this standard, so they receive only losslessly downscaled PNG variants. Do not convert a PNG that has only gAMA, without sRGB or ICC, to JPEG.
+  - **High-density display tiers:** Displays at 2x density or above use 2×2 device pixels for one CSS pixel, so ringing visible at the individual-pixel level blends with adjacent pixels at that density. For opaque lossless originals, mostly screenshots, that fail the preceding standard, average both the JPEG and reference image over 2×2 blocks and compare them with the same SSIM standard; variants that pass may be used on these displays. They have a separate set of tiers, selecting the smaller candidate at each step down from full width:
+    - Replace the lossless variant with a same-width JPEG, trying quality 85 and then 90, when it passes the half-size comparison and is no more than 60% of that tier's lossless variant; at full width, compare it with the original. If the tier has no lossless variant, retain the JPEG only when it is no more than 80% of the preceding candidate's size.
+    - Otherwise, keep that tier's lossless variant, but only when it is smaller than the preceding candidate, so a narrower tier is never larger.
+    - Text is smaller in narrower tiers, making compression artifacts easier to see, so evaluate each tier independently. Choosing the smaller candidate at every tier guarantees that high-density displays never load more data than other displays at any display width.
+    - Determine display density from the device pixel ratio, which includes browser zoom. A 1x display zoomed to 200% or above uses these tiers as well; slight compression artifacts may be visible when viewed closely. See VERIFICATION 26.3 for the threshold-calibration data.
+  - For lossy originals (JPEG or lossy WebP), generate only downscaled JPEGs at quality 85. For originals with transparency, generate only downscaled PNGs.
+  - Tiers progressively decrease in size using Catmull-Rom scaling. Do not retain a tier whose file is at least 80% of the preceding candidate's size, because an additional file would save little. Scaling streams row by row (`resize.go`, with the same weights as `x/image/draw` and output channel values differing by at most one level), retaining only the few source rows needed for the current output row. The `x/image` scaler instead retains a full-height float64 copy at the new width, which uses about 170 MiB for a 3600×2900 original. Processing the largest original allowed by the limits, about 40 MiB decoded, gives a process peak of approximately 104 MiB, down from 348 MiB before this change.
+  - **Color:** Copy the original ICC profile into each variant: write a PNG's iCCP into a JPEG's APP2, and copy JPEG and WebP profiles unchanged. PNG variants retain iCCP, sRGB, gAMA, and cHRM. Apply JPEG EXIF orientation directly to the pixels. Generate grayscale variants from grayscale originals.
+- **Storage (`internal/variants/cache.go`):** Under `data/derived/images/`, each processed original has one `<id>.json` manifest containing the version number, original byte size and dimensions, and either a variant list or a skip reason. Variant files are named `<id>-<width>.<jpg|png>`; JPEGs only for high-density displays are named `<id>-<width>.hidpi.jpg`. In the manifest, variants belonging to only one tier set have a `for` value: `2x` is only for high-density displays, while `1x` identifies a lossless variant replaced or omitted by the high-density tiers. Write variant files before the manifest, which is the commit point; write every file to a temporary file before renaming it. The entire derived directory is disposable. At startup, read only complete manifests at the current version and delete everything else, including temporary files, old versions, and files without a manifest. When generation rules change, increment `variants.Version`; the next startup clears and regenerates old variants.
+- **Lifecycle:** One background worker processes images sequentially. Newly uploaded images and unprocessed images on an opened page take priority. Starting one minute after service startup, backfill the rest from newest to oldest. After processing each image, pause for the same amount of time, limiting use to half of one CPU. After processing an image whose decoded size exceeds approximately 4 megapixels, return memory to the operating system. Every 10 minutes, reconcile state: remove variants whose originals have been deleted by asset collection, and queue images without manifests, including images restored, imported, or uploaded by another process, for backfill. If writing an image fails, show only the original for the rest of the current run rather than retrying whenever a page opens.
+- **Backup and collection:** Backups copy only the files under `assets/` recorded in the backup manifest, not `derived/`; backfill regenerates variants after restoration. The portal declaration marks `derived/` as a cache, so portal backup packages omit it as well. Asset collection considers only `assets/` and references, independently of the derived directory. After deletion of an original, remove its variants during the next reconciliation.
+- **API:**
+  - Each entry in the image-dimensions table (`images`) has the form `[width, height]`. When display variants exist, append a third item containing their file list from narrowest to widest, for example `[2600, 1700, ["640.jpg", "1280.jpg", "1920.jpg", "2600.jpg"]]`. When the high-density tiers differ, append a fourth item, for example `[2880, 1800, ["1280.png"], ["640.hidpi.jpg", "1280.hidpi.jpg", "1920.hidpi.jpg"]]`. The fourth item may include files from the third, and the third may be an empty list. The reading, segmentation, editing, historical-version, and template APIs share one query (`internal/server/images.go`).
+  - `GET /assets/<id>-<file>` returns a variant file with the same one-year `immutable` caching as the original. If the file is absent from the manifest or missing on disk, respond with a 302 redirect to the original using `no-store`, discard the image's cached variant state, and queue it again the next time a page opens.
+  - `yuyan images [--data]` provides a read-only manifest summary: the number processed, the number with variants, the number with high-density tiers (`dense`), counts by skip reason, total variant-file size, and, for images with variants, estimated transfer size through high-density tiers on a 3x mobile display at approximately 1,280 pixels and a 2x desktop display at approximately 2,200 pixels, compared with the originals.
+- **Frontend:** `displayVersions` in `shared/images.ts` generates `srcset`, describing variants by width and using the original as the widest candidate unless a same-width variant exists, and `sizes="auto, Npx"`. `auto` lets the browser choose according to actual layout width and requires `loading="lazy"`. Browsers without support use the following estimate: the smallest of the stored width, original width, and body-column width, or viewport width when the window is narrower. Images in crops and boards may have a layout width larger than their frame, so use original width as the estimate, preferring extra transfer over blurring. Configure the reading page before its first layout; configure segmented content in the same task that inserts it into the preparation area. Editor images, crops, and boards also expose variants. Lazy-load them only when variants exist; external images without dimensions still load immediately. After a narrower variant is displayed, `naturalWidth` no longer gives original dimensions, so the image viewer uses the dimensions table instead. At a device pixel ratio of at least 2, selected by the `min-resolution: 2dppx` media query, use the fourth item; if no fourth item exists, continue using the third. When the window moves to another display or zoom crosses 200%, one reading-page listener refreshes the `srcset` of all registered images. Editor images, crops, and boards read the reactive `denseImages` value, causing the browser to select a new candidate.
+- **Initial editor render:** Tiptap's Vue node views return an empty object before `<EditorContent>` mounts. The document is first rendered through `toDOM` in an unmounted element, where each `<img>` immediately begins downloading the original; previously, entering edit mode downloaded every original one extra time. Editor image nodes therefore use `loading="lazy"`: the unmounted element cannot enter the viewport, so it does not download them.
+- **Caching:** Segmented responses are cached long-term under their version marker. Later segments fetched before variant generation do not switch to new variants until the document changes or the service restarts. The first segment, complete-document, and editing APIs validate with ETags and update immediately.
+- **Out of scope:** WebP and AVIF require encoders that the Go standard library does not provide, while cgo or an external program would violate single-binary deployment. If formats are added later, represent them as new items in the file list and let the frontend choose by type with `<picture>`. High-density tiers could likewise use `<picture>` `media` conditions and let the browser switch, but that would require changing image structure in Go rendering, node views, frames, and styles, so a script selects the list by density instead.
+- **Extension:** Increment `variants.Version` when adding tiers or formats or adjusting thresholds. It was raised to 2 when high-density tiers were added on 2026-10-14, causing startup to clear old manifests and regenerate them while showing originals during backfill. The frontend depends only on the lists in the dimensions table and widths in filenames, so it does not require a corresponding change; add new screen classes as new lists in the dimensions table in the same way. New display locations use `displayVersions`. Look up original dimensions in the dimensions table rather than reading `naturalWidth`.
+
+### 26.4 In-Memory Full-Text Search Index
+
+- **Problem:** For every full-text search, SQLite executed `instr(lower(plain_text), term)` against each document: it read all plain text, copied it to lowercase, and searched the copy, creating a separate copy for each term in a multi-term query. The 551 documents in the production instance contain 16.6 MiB of plain text in total, with 9.8 MiB in the longest document. A single server-side search took 91–174 ms, including 91 ms for a query with no results, while other common APIs took 2–18 ms. The search panel sends a request 200 ms after typing stops, so results appeared approximately 0.3–0.4 seconds after the pause. Reordering columns in 26.1 made list queries much faster but barely changed search: the cost was reading and converting all text, not the location of overflow pages.
+- **Index (`internal/store/search_index.go`):** The service process stores the plain text of every nondeleted document in memory, with ASCII letters converted to lowercase in advance, matching `lower()` by changing only A–Z and preserving byte offsets. A separate one-bit-per-byte bitmap records uppercase letters from the original. Together they can reconstruct the original byte by byte, allowing snippets to be sliced directly from memory without another database read. Detect text changes with `revision || '/' || created_at`, the same key used for asset references and the word-count cache: every body write advances the revision, while creation time distinguishes an ID reused after permanent deletion. Titles, owning knowledge-base IDs and names, deletion state, and update times are not indexed; read them from the small fields for each query, which takes about 1 ms, so moves, renames, deletions, and restorations take effect immediately.
+- **Query:** First read the small fields of nondeleted documents. For each document with a changed revision, reread and replace its plain text; remove deleted or nonexistent documents from memory. Then search each document in memory for every term. Preserve the original matching rules, ordering, 50-result limit, and snippet extraction. Sort first by the number of terms in the title, then by update time from newest to oldest, and finally by descending ID when times are equal. Hold the index lock for the duration of the query, serializing concurrent searches.
+- **Warm-up:** After `serve` starts, it calculates word counts and then builds the index. Other commands do not build it. If warm-up has not finished, the first search builds it as part of the request.
+- **Memory:** Text plus bitmaps consumes approximately 1.13 times the plain-text size, about 18 MiB for production data. The service limit is 384 MiB; the program normally uses about 50 MiB and reaches approximately 185 MiB while rendering the longest document, so adding the index remains within `GOMEMLIMIT` at 320 MiB. Memory use grows linearly with plain text. Reassess the design once plain text exceeds approximately 64 MiB; for example, retain only lowercase text for long documents and read snippets from the database.
+- **Frontend:** After the server became faster, the search panel's request delay was reduced from 200 ms to 120 ms. Responses for stale query text are still discarded.
+- **Out of scope:** SQLite FTS5 trigram tokenization cannot search one- or two-character Chinese terms, creates an index several times larger than the text, and must rewrite many index entries whenever the longest document is saved. An in-memory scan is already fast enough and does not change the database.
+- **Extension:** Any new body-write path must advance the revision or insert a new row; otherwise, revision-keyed asset references, word counts, and the search index all become stale. If search scope later expands, for example to attachment names, add each source as another index field and update it under the same revision key.
+
+### 26.5 Initial Load: Menus and Overlays on Demand
+
+- **Problem:** The reading page's initial application scripts totaled 134.3 KiB after gzip across 28 chunks, reaching the budget limit in 12.3. Of that, reka-ui's menus, dialogs, and focus management accounted for approximately 23 KiB, floating-ui positioning for approximately 8 KiB, and dependencies such as aria-hidden brought the combined cost to approximately 33 KiB. The first screen displays only their trigger buttons; menus and dialogs open only after user interaction. Each directory row also created its own context-menu and dropdown-menu components, so an expanded long directory could instantiate thousands of components.
+- **Principle:** Load only the code needed for display and navigation on the first screen. Download menus, dialogs, the image viewer, the search panel, and overlay positioning on first use. After the first screen appears, prefetch them together while the browser is idle, using `requestIdleCallback` or, when Safari does not provide it, after approximately two seconds, so the first later use usually does not wait for the network. Do not prefetch when the browser has Save-Data enabled. Centralize registration and prefetching in `shared/deferred.ts`, and request each module only once. If loading fails, including during idle prefetch, reuse the module-load failure message from 12.3 and ask the user to refresh, because Chrome remembers a failed module for the rest of the page session and will not download it again on another use. Infrequent dialogs, including shortcut help, templates, and document receiving, are still downloaded only when opened.
+- **Dropdown menus:** The `ActionMenu` interface remains unchanged: the default slot is the trigger button, and `items`, `align`, `restoreFocus`, `open`, and other behavior remain the same. Before opening, render only the trigger button with `aria-haspopup`, `aria-expanded`, and `data-state`. On pointer down, prevent the default action as reka-ui does so the editor retains focus, and begin downloading. On the first click, Enter, Space, or Arrow Down, or when the parent sets `open` to true, replace the trigger with the complete reka-ui menu and open it; reka-ui handles all subsequent behavior. Perform the replacement after the click finishes so pointer down and pointer up do not land on different elements. Consequently, the first opening of each menu occurs on pointer up, while reka-ui ordinarily opens on pointer down. For keyboard opening, forward the same key to the reka-ui trigger so the first item receives focus as before. If focus leaves while loading, do not open or take focus back.
+- **Context menus:** Allow at most one to be open at a time, using one site-wide, on-demand host (`ui/ContextMenuHost.vue`) positioned at the pointer. `ContextActions` adds only right-click and touch long-press handling to its child, using the same 700 ms delay as reka-ui and canceling on movement, release, or cancellation, plus `data-state` and styling that prevents the iOS system menu from opening on long press. It no longer creates a menu component for every row. The `disabled` and `open` events remain unchanged. The host reads the current menu items and closes the menu when its element unmounts. It positions through the context-menu behavior exposed by reka-ui's trigger, dispatching a contextmenu event with coordinates to a trigger element that occupies no space. Use an independent reka-ui menu instance for each request: reka-ui reports a pointer-down or focus-outside event for the previous menu later, and those reports must not close the next requested menu, such as when another row is right-clicked while a menu is open.
+- **Dialogs and viewer:** Mount confirmation and input dialogs, the move dialog, and the image viewer after loading. Requests made before loading display immediately once loading completes. If a dialog fails to load, treat pending requests as canceled so callers do not wait indefinitely.
+- **Overlay positioning:** The internal-link preview and the reading-page code block's exact `更多操作` ("More Actions") menu obtain floating-ui on first display through `shared/floating.ts`. Create the code-block menu only after floating-ui is available so it does not flash at the wrong position. The editor continues to reference floating-ui directly.
+- **Budget:** See 12.3. After the change, the initial load is 105.1 KiB across 29 chunks, down from 134.3 KiB; idle prefetch is approximately 46 KiB across 19 chunks, including the search panel that was previously downloaded only when opened. Before release, use the build manifest to confirm that reka-ui and floating-ui are absent from initial-load chunks.
+- **Out of scope:** Do not replace all page trigger buttons with complete menus after prefetch, because that could replace an element currently hovered or focused. Do not switch to the native `<dialog>` or popover, which would require reimplementing keyboard behavior, focus, and appearance. Do not replace the Vue runtime or prefetch the editor, which is large and downloaded only on entry to editing.
+- **Extension:** New menus and dialogs automatically load on demand when they use `ActionMenu`, `ContextActions`, or `confirm`/`prompt`. Components that use reka-ui or floating-ui directly may appear only on on-demand pages, in the editor, or in modules registered through `deferred`.
+
+### 26.6 Very Large Document Edit Warning
+
+- **Problem:** The editor constructs the complete body as a ProseMirror document and creates a page element for every node; code blocks, images, and similar content also each have a Vue node view. Opening time, memory use, and per-keystroke processing all grow with document size. Measurements on a synthetic document matching the structure of the largest production document, with approximately 43,000 nodes, 5,580 code blocks, and a 13 MB body, showed approximately 4.2 seconds to open on desktop, a JS heap of about 400 MB, and approximately 0.4 seconds before each typed character appeared. On a simulated mobile device at 4x slowdown, opening took about 18.6 seconds and each character took approximately 1.7 seconds (VERIFICATION 26.6). Only one of the 552 production documents reaches this scale. Interpolating measurements from a similarly structured synthetic document to the second-largest production document, which has approximately 27,000 nodes and 230,000 characters and consists mostly of lists and short text, gives an estimated opening time of about 1 second on desktop and 4.3 seconds on mobile. Previously, no entry path warned the user before editing, leaving the page unresponsive for an extended period after entry.
+- **Metric:** Edit load = number of body nodes, including text nodes, + character count ÷ 100. Across synthetic documents covering three structures, dominated respectively by tables, lists and short text, and code and folds, at four sizes each, measured opening times were 0.7–1.7 times the edit-load estimate on desktop and 0.7–1.4 times the estimate on mobile. Estimating from body bytes alone or node count alone produced ratios as far as 0.4–2.4 times the measured values. The number of Vue node views, such as those for code blocks, improves the desktop estimate but not the mobile estimate and would require maintaining a list in Go that changes with the editor, so it is excluded.
+- **Threshold:** Warn when edit load reaches 40,000, corresponding to approximately 1.7 seconds to open on desktop and 7.5 seconds on a mobile device at 4x slowdown. Currently only the largest production document exceeds it, at approximately 124,000; the second-largest is approximately 29,000 and does not trigger a warning. The threshold is `store.HeavyEditLoad`; the frontend only reads the result.
+- **Calculation:** Reuse `docCounts` for character count. Obtain node count during the existing `json_tree` traversal that counts images, by counting `type` keys except those with the same name inside `marks` or `attrs`. Cache it by revision as well, calculating it only once per revision. The directory-tree API adds `"heavy": true` to documents at or above the threshold.
+- **Warning:** Every path into editing within the site—the reading page's exact `编辑` ("Edit") button, pressing E twice, the directory menu, entry after creating a document, and browser back or forward—passes through the same route guard. The guard first refreshes the directory of the target document's knowledge base, without sending a request if it is already current; saving marks the directory stale, so a document that crosses the threshold prompts on the next entry. When a document is marked `heavy`, confirm on the current page and remain there if the user cancels. When `/docs/{id}/edit` is opened directly or refreshed, the server responds for such documents with a 302 redirect to `/docs/{id}?edit=1`, and the page shell no longer embeds the complete body. After the reading page loads, remove the `edit` parameter and enter editing through the same guard, confirming on the reading page. Do not warn when the directory cannot be loaded.
+- **Out of scope:** Do not prevent editing or implement a read-only or segmented editor. ProseMirror requires the complete document, and segmented editing would need a separate design for merging, undo, and conflict handling. Do not persist the confirmation choice: every entry again incurs the opening cost, and the warning also recommends splitting the document.
+- **Extension:** After editor performance improves, for example by creating node views on demand, recalibrate and adjust the threshold. If thresholds need to vary by device, have the directory API return the numeric edit load and let the frontend select a device-specific threshold.
+
+## 27. References
+
+- [Previous Obsidian Design and Note-Vault Survey](archive/obsidian-sync-design.md).
+- [Tiptap documentation](https://tiptap.dev/docs), [announcement that formerly paid extensions are now open source under MIT](https://tiptap.dev/blog/release-notes/were-open-sourcing-more-of-tiptap), [Tiptap 3 release announcement](https://tiptap.dev/blog/release-notes/tiptap-3-0-is-stable), and [Tiptap Markdown](https://tiptap.dev/docs/editor/markdown).
+- Editors previously compared: [Milkdown](https://github.com/Milkdown/milkdown), [Vditor](https://github.com/Vanessa219/vditor), and [BlockNote](https://github.com/TypeCellOS/BlockNote).
+- Version comparison: [jsdiff](https://github.com/kpdecker/jsdiff) (BSD-3-Clause). Search: [go-pinyin](https://github.com/mozillazg/go-pinyin) (MIT) and the [CSS Custom Highlight API](https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API).
+- [Let's Encrypt: 6-Day and IP Address Certificates Are Generally Available](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability.html).
+- [Source of the Server Maintenance Conventions](https://github.com/Crashmere/agent-config/tree/main/skills/server-operations).
+
+External projects' capabilities and interfaces may change. Pin versions during implementation and verify them against the actual documentation. Treat on-server inspection at deployment time as authoritative; this document does not replace the shared server inventory or project operations records.
