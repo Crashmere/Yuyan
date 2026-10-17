@@ -98,7 +98,7 @@ yuyan migrate --data /path/to/data             # Execute and report elapsed time
 
 Step 2, which moves large fields to the end of `docs` and `doc_versions`, ran with the 2026-10-14 release. Earlier programs can still run against the new layout, so rollback is unaffected. After migration, the file grows by roughly the size of the rebuilt tables. Later writes reuse those free pages, backups do not include them, and no manual VACUUM is needed. For each future step, first time it as `yuyan` against a server copy of the latest before-deploy backup; it must finish within the deployment check's 60-second limit. Delete the copy after use. If `min_layout` exceeds the layout supported by a program, that program refuses to open the database; before rollback, confirm with `migrate --dry-run` or the error message.
 
-Step 3 adds `calendar_periods` and its ordering index without rebuilding existing tables or raising `min_layout`. Programs that support only layout 2 ignore the new table and continue to pass `check`; they do not expose or modify calendar periods. Program rollback therefore preserves the data but temporarily hides the calendar until a supporting version runs again.
+Step 3 adds `calendar_periods` and its ordering index without rebuilding existing tables or raising `min_layout`. It was completed by the 2026-10-17 release in 15 milliseconds. Programs that support only layout 2 ignore the new table and continue to pass `check`; they do not expose or modify calendar periods. Program rollback therefore preserves the data but temporarily hides the calendar until a supporting version runs again.
 
 ## Deployment and Rollback
 
