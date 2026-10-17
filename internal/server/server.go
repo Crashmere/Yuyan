@@ -156,6 +156,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.HandleFunc("GET /versions/{id}", s.appPage(routeVersion))
 	mux.HandleFunc("GET /search", s.appPage(routeSearch))
 	mux.HandleFunc("GET /trash", s.appPage(routeTrash))
+	mux.HandleFunc("GET /calendar", s.appPage(routeCalendar))
 	mux.HandleFunc("GET /", s.appPage(routeNotFound))
 
 	mux.HandleFunc("GET /assets/{file}", s.assetFile)
@@ -219,6 +220,10 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("POST /api/attachments", s.write(s.apiUploadAttachment))
 	mux.Handle("GET /api/attachments/{id}/preview", s.get(s.attachmentPreview))
 	mux.Handle("GET /api/search", s.read(s.apiSearch))
+	mux.Handle("GET /api/calendar/periods", s.get(s.calendarPeriods))
+	mux.Handle("POST /api/calendar/periods", s.write(s.apiCreateCalendarPeriod))
+	mux.Handle("PUT /api/calendar/periods/{id}", s.write(s.apiUpdateCalendarPeriod))
+	mux.Handle("DELETE /api/calendar/periods/{id}", s.write(s.apiDeleteCalendarPeriod))
 	mux.Handle("GET /api/trash", s.get(s.trash))
 	mux.Handle("DELETE /api/trash", s.write(s.apiEmptyTrash))
 	mux.Handle("DELETE /api/trash/docs/{id}", s.write(s.apiPurgeDoc))
@@ -368,7 +373,7 @@ func errorResponse(err error) (int, apiError) {
 	var maxBytes *http.MaxBytesError
 	switch {
 	case errors.As(err, &conflict):
-		return http.StatusConflict, apiError{Error: "conflict", Message: "文档已在别处修改", Revision: conflict.revision}
+		return http.StatusConflict, apiError{Error: "conflict", Message: "内容已在别处修改", Revision: conflict.revision}
 	case errors.Is(err, store.ErrMissingAsset):
 		return http.StatusUnprocessableEntity, apiError{Error: "missing_asset", Message: err.Error()}
 	case errors.Is(err, store.ErrVersionNotFound):

@@ -1,7 +1,7 @@
 {
   "id": "yuyan",
   "name": "Yuyan",
-  "description": "个人知识库、文档、可编辑画板、图片与附件。",
+  "description": "个人知识库、文档、状态日历、可编辑画板、图片与附件。",
   "icon": "/portal/static/icons/yuyan.svg",
   "url": "/yuyan/",
   "repo": "https://github.com/Crashmere/Yuyan",
@@ -20,7 +20,7 @@
       "id": "data",
       "name": "业务数据",
       "path": "/opt/yuyan/data",
-      "purpose": "数据库（文档、保留 30 天的历史、模板与内容片段）、内容寻址的图片与附件、历史迁移材料；历史每天北京时间 03:00 清理且不保底保留，当前及回收站正文保持；图片与附件失去所有正文、历史、回收站或模板引用后连续一小时由应用自动回收，临时文件不属于恢复数据。 画板包复用 assets，预览保存在包内；回收展开图片依赖，包宽限期内也保护图片，未知或损坏包使当轮回收停止。 其中 derived 为派生缓存，单独登记。",
+      "purpose": "数据库（文档、状态日历区间、保留 30 天的历史、模板与内容片段）、内容寻址的图片与附件、历史迁移材料；历史每天北京时间 03:00 清理且不保底保留，当前及回收站正文保持；图片与附件失去所有正文、历史、回收站或模板引用后连续一小时由应用自动回收，临时文件不属于恢复数据。 画板包复用 assets，预览保存在包内；回收展开图片依赖，包宽限期内也保护图片，未知或损坏包使当轮回收停止。 其中 derived 为派生缓存，单独登记。",
       "kind": "data",
       "browse": true,
       "cleanup": false
@@ -160,6 +160,26 @@
       "method": "GET",
       "path": "/api/stats",
       "description": "所有存活文档的正文总字数及各知识库字数，排除空白、目录分组、回收站知识库与文档"
+    },
+    {
+      "method": "GET",
+      "path": "/api/calendar/periods",
+      "description": "按时间列出全局状态日历区间"
+    },
+    {
+      "method": "POST",
+      "path": "/api/calendar/periods",
+      "description": "创建年度、月度或日粒度的状态区间"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/calendar/periods/{id}",
+      "description": "按 baseRevision 更新完整状态区间并检测冲突"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/calendar/periods/{id}",
+      "description": "按 baseRevision 删除状态区间并检测冲突"
     },
     {
       "method": "GET",

@@ -14,7 +14,7 @@ interface Crumb {
   to?: string
 }
 
-const pageTitles: Record<string, string> = { home: '首页', search: '搜索', trash: '回收站', notfound: '找不到内容' }
+const pageTitles: Record<string, string> = { home: '首页', search: '搜索', trash: '回收站', calendar: '日历', notfound: '找不到内容' }
 
 // Pages put their own buttons into #yy-topbar-actions; the breadcrumb comes from the current
 // knowledge base and document.

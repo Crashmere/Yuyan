@@ -30,6 +30,7 @@ export const router = createRouter({
     { path: '/versions/:id', name: 'version', component: () => import('./views/VersionView.vue'), meta: { sidebar: 'book' } },
     { path: '/search', name: 'search', component: () => import('./views/SearchView.vue'), meta: { sidebar: 'workspace' } },
     { path: '/trash', name: 'trash', component: () => import('./views/TrashView.vue'), meta: { sidebar: 'workspace' } },
+    { path: '/calendar', name: 'calendar', component: () => import('./views/CalendarView.vue'), meta: { sidebar: 'workspace' } },
     { path: '/:pathMatch(.*)*', name: 'notfound', component: () => import('./views/NotFoundView.vue'), meta: { sidebar: 'workspace' } },
   ],
   // Views handle heading anchors and reading positions after their content has mounted.
