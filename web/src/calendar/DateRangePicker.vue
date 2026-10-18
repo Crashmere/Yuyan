@@ -27,7 +27,7 @@ onMounted(() => {
     if (!presented) {
       presented = true
       await nextTick()
-      if (!disposed) animateCalendar(element, [{ opacity: 0, clipPath: 'inset(3px 0 round 12px)' }, { opacity: 1, clipPath: 'inset(0 round 12px)' }], 140)
+      if (!disposed) animateCalendar(element, [{ opacity: 0 }, { opacity: 1 }], 140)
     }
   })
 })

@@ -960,8 +960,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-window-enter-active { transition: opacity .16s ease; }
 .yy-calendar-window-leave-active { pointer-events: none; transition: opacity .1s ease; }
 .yy-calendar-window-enter-from, .yy-calendar-window-leave-to { opacity: 0; }
-.yy-calendar-window-enter-active .yy-calendar-inspector { animation: yy-calendar-window-in .16s cubic-bezier(.22, .8, .25, 1); }
-@keyframes yy-calendar-window-in { from { clip-path: inset(5px 0 round 16px); } to { clip-path: inset(0 round 16px); } }
 .yy-calendar-inspector { display: flex; flex-direction: column; width: min(460px, 100%); min-width: 0; max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--yy-border); border-radius: 16px; background: var(--yy-bg); box-shadow: 0 20px 70px #0003, 0 4px 16px #0001; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
 .yy-calendar-inspector-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 20px 18px; }
 .yy-calendar-inspector-body > .yy-calendar-field:first-child { margin-top: 16px; }
