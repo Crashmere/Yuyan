@@ -272,7 +272,7 @@ This project is for personal use: local verification of the current change is su
 
 See [Local Deployment and Rollback](DEPLOYMENT.md) for the complete process. GitHub stores source code only; local `make release` builds the artifact, `make deploy` updates production, and documentation is synchronized separately.
 
-The first-open table-settings correction changes only shared menu trigger events. It requires the normal frontend/program release and a page refresh in existing tabs, with no data migration or server configuration change. See VERIFICATION 26.5.1 for the focused desktop/mobile checks and release receipt.
+The table-header control is now a direct button in both top and floating table tool sets; the empty `表格设置` entry remains visible but disabled. This is a frontend-only interaction change with no data migration, document-format, API, portal-declaration, or server-configuration change. Existing tabs require a page refresh. See VERIFICATION 26.5.2 for the focused desktop/mobile checks and release receipt.
 
 ## Automatic Cleanup of Release Materials
 
