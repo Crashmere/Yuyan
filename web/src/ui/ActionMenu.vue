@@ -41,11 +41,14 @@ export default defineComponent({
       'aria-haspopup': 'menu',
       'aria-expanded': 'false',
       'data-state': 'closed',
-      // As with reka-ui's trigger, a press neither takes focus from the editor nor selects text.
       onPointerdown(e: PointerEvent) {
         if (e.button !== 0 || e.ctrlKey) return
-        e.preventDefault()
         impl.load().catch(() => {})
+      },
+      // Keep editor focus without suppressing mousedown: the selection toolbar uses its
+      // capture handler to stay mounted when the opened menu takes focus.
+      onMousedown(e: MouseEvent) {
+        if (e.button === 0 && !e.ctrlKey) e.preventDefault()
       },
       onClick(e: MouseEvent) {
         if (!e.ctrlKey) activate()

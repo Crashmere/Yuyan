@@ -272,6 +272,8 @@ This project is for personal use: local verification of the current change is su
 
 See [Local Deployment and Rollback](DEPLOYMENT.md) for the complete process. GitHub stores source code only; local `make release` builds the artifact, `make deploy` updates production, and documentation is synchronized separately.
 
+The first-open table-settings correction changes only shared menu trigger events. It requires the normal frontend/program release and a page refresh in existing tabs, with no data migration or server configuration change. See VERIFICATION 26.5.1 for the focused desktop/mobile checks and release receipt.
+
 ## Automatic Cleanup of Release Materials
 
 Every day at 05:00 Asia/Shanghai, the server follows [Automatic Retention of Release Materials](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/retention.md), retaining the most recent 3 successful releases and the most recent 5 complete before-deploy backups while protecting the current version, its corresponding backup, and failed batches awaiting review. server-operations maintains the shared implementation, lock, receipts, preview, and disable command; this project's deployment retains the deployment script's `recovery` marker and the daily backup's `flock` entry point. During initial installation, create `/run/lock/ali-release-retention.lock` according to the shared documentation before enabling the backup timer. Daily and manual backups, business data, portal exports, and build materials on the maintenance computer are outside this automatic cleanup scope.
