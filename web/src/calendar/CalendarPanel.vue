@@ -748,9 +748,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                 <span v-for="cell in cells" :key="cell.start" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }"></span>
               </div>
               <div v-if="todayGeometry" class="yy-calendar-today-line" :style="{ left: `${todayGeometry.left + todayGeometry.width / 2}%` }" aria-hidden="true"><span>今天</span></div>
-              <div v-if="creatingGeometry" class="yy-calendar-selection" :style="{ left: `${creatingGeometry.left}%`, width: `${creatingGeometry.width}%` }">
-                <span>{{ periodRangeLabel({ startDate: creatingRange!.start, endDate: creatingRange!.end, precision: grain }) }} · 松开创建</span>
-              </div>
+              <div v-if="creatingGeometry" class="yy-calendar-selection" :style="{ left: `${creatingGeometry.left}%`, width: `${creatingGeometry.width}%` }" aria-hidden="true"></div>
               <button
                 v-for="entry in visiblePeriods"
                 :key="entry.period.id"
@@ -776,7 +774,10 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                   @pointerdown.stop="beginBar($event, entry.period, 'end')"
                 ></span>
               </button>
-              <div v-if="dragging && draft && !creatingRange" class="yy-calendar-drag-feedback" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">{{ periodRangeLabel(draft) }} · {{ periodDays(draft) }} 天</div>
+              <div v-if="creatingRange || (dragging && draft)" class="yy-calendar-drag-feedback" :class="{ creating: !!creatingRange }" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
+                <template v-if="creatingRange">{{ periodRangeLabel({ startDate: creatingRange.start, endDate: creatingRange.end, precision: grain }) }} · 松开创建</template>
+                <template v-else-if="draft">{{ periodRangeLabel(draft) }} · {{ periodDays(draft) }} 天</template>
+              </div>
               <div v-if="!periods.length" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
                 <CalendarDays :size="28" /><strong>从一段时间开始记录</strong><span>{{ readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
               </div>
@@ -890,7 +891,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-period-text small { flex: none; opacity: .72; font-size: 10px; font-variant-numeric: tabular-nums; }
 .yy-calendar-today-line { position: absolute; z-index: 1; top: 58px; bottom: 0; width: 1px; background: color-mix(in srgb, var(--yy-primary) 45%, transparent); pointer-events: none; }
 .yy-calendar-today-line span { position: absolute; left: 0; bottom: 5px; padding: 1px 6px; border-radius: 8px; background: var(--yy-primary-soft); color: var(--yy-primary); font-size: 10px; white-space: nowrap; transform: translateX(-50%); }
-.yy-calendar-drag-feedback { position: absolute; z-index: 6; bottom: 6px; padding: 5px 12px; border: 1px solid var(--yy-border); border-radius: 20px; background: var(--yy-bg); box-shadow: 0 3px 12px #0002; color: var(--yy-text); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
+.yy-calendar-drag-feedback { position: absolute; z-index: 7; bottom: 6px; padding: 5px 12px; border: 1px solid var(--yy-border); border-radius: 20px; background: var(--yy-bg); box-shadow: 0 3px 12px #0002; color: var(--yy-text); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
+.yy-calendar-drag-feedback.creating { border-color: var(--yy-primary); background: var(--yy-primary); color: #fff; }
 .dragging .yy-calendar-period { transition: none; }
 .yy-calendar-list { border-top: 1px solid var(--yy-border); }
 .yy-calendar-list-head { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--yy-bg-muted); }
@@ -923,8 +925,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-resize.start { left: 2px; }
 .yy-calendar-resize.end { right: 2px; }
 .yy-calendar-period:hover .yy-calendar-resize::after, .yy-calendar-period.selected .yy-calendar-resize::after { content: ''; position: absolute; left: 3px; top: 5px; bottom: 5px; width: 2px; border-radius: 1px; background: var(--period); opacity: .55; }
-.yy-calendar-selection { position: absolute; z-index: 1; top: 58px; bottom: 0; border: 1px dashed var(--yy-primary); background: color-mix(in srgb, var(--yy-primary-soft) 60%, transparent); pointer-events: none; }
-.yy-calendar-selection span { position: absolute; top: 8px; left: 50%; padding: 2px 7px; border-radius: 10px; background: var(--yy-primary); color: #fff; font-size: 10px; white-space: nowrap; transform: translateX(-50%); }
+.yy-calendar-selection { position: absolute; z-index: 6; top: 58px; bottom: 0; border: 1px dashed var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 8%, transparent); pointer-events: none; }
 .yy-calendar-empty { position: absolute; z-index: 1; left: 50%; top: 84px; display: flex; flex-direction: column; align-items: center; color: var(--yy-text-3); transform: translateX(-50%); pointer-events: none; }
 .yy-calendar-empty strong { margin-top: 5px; color: var(--yy-text-2); }
 .yy-calendar-empty span { font-size: 12px; }
