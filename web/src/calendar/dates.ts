@@ -74,10 +74,10 @@ export function addUnits(value: string, grain: CalendarPrecision, amount: number
   return formatCalendarDate(date)
 }
 
-export function windowCells(center: string, grain: CalendarPrecision): CalendarCell[] {
-  const count = grain === 'year' ? 12 : grain === 'month' ? 18 : 42
-  const before = grain === 'year' ? 5 : grain === 'month' ? 8 : 20
-  const start = [addUnits(center, grain, -before), '1000-01-01'].sort().at(-1)!
+export function windowCells(center: string, grain: CalendarPrecision, count = 96): CalendarCell[] {
+  const before = Math.floor(count / 2)
+  const latestStart = addUnits('9999-12-31', grain, 1 - count)
+  const start = [addUnits(center, grain, -before), '1000-01-01', latestStart].sort()[1]!
   const today = todayDate()
   const cells: CalendarCell[] = []
   for (let index = 0; index < count; index++) {

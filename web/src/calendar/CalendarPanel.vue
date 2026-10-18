@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
-  CalendarDays, Check, ChevronLeft, ChevronRight, LocateFixed,
+  CalendarDays, Check, ChevronRight,
   Plus, Save, Trash2, X, Maximize2, Minimize2, Copy, ClipboardPaste, ListFilter, Search,
 } from 'lucide-vue-next'
 import { errorMessage } from '../shared/api'
@@ -130,6 +130,7 @@ const colors = [
 
 const grain = ref<CalendarPrecision>(props.model.grain)
 const center = ref(props.model.center || todayDate())
+const axisCenter = ref(center.value)
 const periods = ref<CalendarEntry[]>(props.model.periods.map(p => ({ ...p })))
 const timelineScroll = ref<HTMLElement | null>(null)
 const timeline = ref<HTMLElement | null>(null)
@@ -150,12 +151,13 @@ interface Draft extends Omit<CalendarEntry, 'id'> {
 const draft = ref<Draft | null>(null)
 const draftBaseline = ref('')
 
-const cells = computed(() => windowCells(center.value, grain.value))
+const unitWidth = computed(() => grain.value === 'year' ? 88 : grain.value === 'month' ? 80 : 48)
+const cells = computed(() => windowCells(axisCenter.value, grain.value, 192))
 const cellWidth = computed(() => axisWidth.value / cells.value.length || 1)
 const visibleStart = computed(() => dateAtPosition(scrollLeft.value / cellWidth.value, cells.value))
 const visibleEnd = computed(() => dateAtPosition((scrollLeft.value + viewportWidth.value - 1) / cellWidth.value, cells.value))
 const windowLabel = computed(() => periodRangeLabel({ startDate: visibleStart.value, endDate: visibleEnd.value, precision: grain.value }))
-const timelineMinWidth = computed(() => cells.value.length * (grain.value === 'year' ? 88 : grain.value === 'month' ? 80 : 48))
+const timelineMinWidth = computed(() => cells.value.length * unitWidth.value)
 const todayGeometry = computed(() => periodGeometry({ startDate: today, endDate: today }, cells.value))
 const listPeriods = computed(() => {
   const query = listQuery.value.trim().toLocaleLowerCase()
@@ -354,20 +356,52 @@ function changeBoundary(side: 'start' | 'end', event: Event) {
   else draft.value.endDate = date
 }
 
-function shiftWindow(direction: -1 | 1) {
-  const amount = Math.max(1, Math.floor(viewportWidth.value / cellWidth.value) - 1)
-  const next = addUnits(viewportDate(), grain.value, direction * amount)
-  center.value = next.length > 10 || next > '9999-12-31' ? '9999-12-31' : next < '1000-01-01' ? '1000-01-01' : next
-  publish()
-  void centerTimeline()
-}
-
 function syncViewport() {
   const element = timelineScroll.value
   if (!element) return
   scrollLeft.value = element.scrollLeft
   viewportWidth.value = element.clientWidth
   axisWidth.value = timeline.value?.offsetWidth ?? 0
+}
+
+let rebasing = false
+async function scrollTimeline() {
+  syncViewport()
+  const element = timelineScroll.value
+  if (!element || rebasing || relocating) return
+  if (barGesture?.moved) updateBar(edgeX)
+  if (createGesture) updateCreate(edgeX)
+  const buffer = Math.max(viewportWidth.value * 2, unitWidth.value * 48)
+  const left = element.scrollLeft < buffer && cells.value[0].start > '1000-01-01'
+  const right = element.scrollWidth - element.clientWidth - element.scrollLeft < buffer && cells.value.at(-1)!.end < '9999-12-31'
+  if (!left && !right) return
+  rebasing = true
+  const oldScroll = element.scrollLeft
+  const oldCells = cells.value
+  const oldStart = oldCells[0].start
+  axisCenter.value = viewportDate()
+  const newStart = cells.value[0].start
+  const units = newStart >= oldStart ? dayPosition(newStart, oldCells) : -dayPosition(oldStart, cells.value)
+  const offset = units * unitWidth.value
+  await nextTick()
+  if (disposed) return
+  // Recycle offscreen cells while keeping every visible date at the same pixel.
+  element.scrollLeft = oldScroll - offset
+  if (barGesture) barGesture.startScroll -= offset
+  syncViewport()
+  rebasing = false
+}
+
+function wheelTimeline(event: WheelEvent) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return
+  const element = timelineScroll.value
+  if (!element) return
+  const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+  if (!delta) return
+  event.preventDefault()
+  const amount = delta * (event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? element.clientWidth : 1)
+  element.scrollLeft += amount
+  void scrollTimeline()
 }
 
 function viewportDate(sync = true) {
@@ -393,6 +427,7 @@ function drillCell(date: string) {
 }
 
 async function centerTimeline(date = center.value) {
+  axisCenter.value = date
   await nextTick()
   const element = timelineScroll.value
   if (element) {
@@ -408,8 +443,7 @@ watch(center, () => void centerTimeline())
 
 interface CreateGesture {
   pointerId: number
-  startIndex: number
-  index: number
+  startDate: string
 }
 let createGesture: CreateGesture | null = null
 const creatingRange = ref<{ start: string; end: string } | null>(null)
@@ -430,7 +464,7 @@ function beginCreate(event: PointerEvent) {
     return
   }
   const index = cellIndex(event.clientX)
-  createGesture = { pointerId: event.pointerId, startIndex: index, index }
+  createGesture = { pointerId: event.pointerId, startDate: cells.value[index].start }
   gestureHadInspector.value = !!draft.value
   dragging.value = true
   creatingRange.value = { start: cells.value[index].start, end: cells.value[index].end }
@@ -442,12 +476,7 @@ function beginCreate(event: PointerEvent) {
 function moveCreate(event: PointerEvent) {
   if (!createGesture || event.pointerId !== createGesture.pointerId) return
   edgeScroll(event.clientX)
-  const index = cellIndex(event.clientX)
-  if (index === createGesture.index) return
-  createGesture.index = index
-  const first = Math.min(index, createGesture.startIndex)
-  const last = Math.max(index, createGesture.startIndex)
-  creatingRange.value = { start: cells.value[first].start, end: cells.value[last].end }
+  updateCreate(event.clientX)
 }
 
 function endCreate(event: PointerEvent) {
@@ -486,6 +515,7 @@ function edgeScroll(clientX: number) {
     edgeFrame = 0
     const element = timelineScroll.value
     if (!element || (!barGesture && !createGesture)) return
+    if (rebasing) { edgeFrame = requestAnimationFrame(step); return }
     const rect = element.getBoundingClientRect()
     const speed = edgeX < rect.left + 40 ? -Math.min(14, (rect.left + 40 - edgeX) / 3)
       : edgeX > rect.right - 40 ? Math.min(14, (edgeX - rect.right + 40) / 3) : 0
@@ -496,6 +526,7 @@ function edgeScroll(clientX: number) {
     syncViewport()
     if (barGesture) updateBar(edgeX)
     else if (createGesture) updateCreate(edgeX)
+    void scrollTimeline()
     edgeFrame = requestAnimationFrame(step)
   }
   edgeFrame = requestAnimationFrame(step)
@@ -503,9 +534,9 @@ function edgeScroll(clientX: number) {
 
 function updateCreate(clientX: number) {
   if (!createGesture) return
-  const index = cellIndex(clientX)
-  createGesture.index = index
-  creatingRange.value = { start: cells.value[Math.min(index, createGesture.startIndex)].start, end: cells.value[Math.max(index, createGesture.startIndex)].end }
+  const cell = cells.value[cellIndex(clientX)]
+  const range = canonicalRange(createGesture.startDate, cell.start, grain.value)
+  creatingRange.value = { start: range.startDate, end: range.endDate }
 }
 
 function beginBar(event: PointerEvent, period: CalendarEntry, mode: BarMode) {
@@ -603,7 +634,7 @@ let resizeObserver: ResizeObserver | undefined
 onMounted(() => {
   void centerTimeline()
   resizeObserver = new ResizeObserver(() => {
-    if (relocating) return
+    if (relocating || rebasing) return
     if (dragging.value) { syncViewport(); return }
     const anchor = viewportDate(false)
     syncViewport()
@@ -667,21 +698,13 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
           <div class="yy-calendar-segments" aria-label="时间粒度">
             <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
           </div>
-          <div class="yy-calendar-navigate">
-            <IconButton label="上一段时间" @click="shiftWindow(-1)"><ChevronLeft :size="17" /></IconButton>
-            <span class="yy-calendar-window">{{ windowLabel }}</span>
-            <IconButton label="下一段时间" @click="shiftWindow(1)"><ChevronRight :size="17" /></IconButton>
-          </div>
-          <label class="yy-calendar-locate">
-            <LocateFixed :size="15" />
-            <input :value="center" @change="locate(($event.target as HTMLInputElement).value)" type="date" min="1000-01-01" max="9999-12-31" aria-label="定位日期" />
-          </label>
+          <span class="yy-calendar-window">{{ windowLabel }}</span>
           <button type="button" class="yy-btn small" @click="locate(todayDate())">今天</button>
           <button type="button" class="yy-btn small yy-calendar-list-toggle" :class="{ active: showList }" :aria-expanded="showList" @click="showList = !showList"><ListFilter :size="15" />状态列表</button>
         </div>
 
         <div class="yy-calendar-frame">
-          <div ref="timelineScroll" class="yy-calendar-scroll" @scroll="syncViewport">
+          <div ref="timelineScroll" class="yy-calendar-scroll" @scroll="scrollTimeline" @wheel="wheelTimeline">
             <div
               ref="timeline"
               class="yy-calendar-timeline"
@@ -692,7 +715,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
               @pointercancel="endCreate"
             >
               <div class="yy-calendar-ruler">
-                <button v-for="cell in cells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }" :data-tip="grain === 'day' ? `定位到 ${cell.start}` : `查看 ${cell.primary}${cell.secondary}的${grain === 'year' ? '月份' : '日期'}`" @click="grain === 'day' ? locate(cell.start) : drillCell(cell.start)">
+                <button v-for="cell in cells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }" :data-date="cell.start" :data-tip="grain === 'day' ? `定位到 ${cell.start}` : `查看 ${cell.primary}${cell.secondary}的${grain === 'year' ? '月份' : '日期'}`" @click="grain === 'day' ? locate(cell.start) : drillCell(cell.start)">
                   <strong>{{ cell.primary }}</strong><span>{{ cell.secondary }}</span>
                 </button>
               </div>
@@ -834,12 +857,9 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
 .yy-calendar-segments button { min-width: 40px; height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
 .yy-calendar-segments button.active { background: var(--yy-bg); color: var(--yy-text); box-shadow: 0 1px 4px #00000012; font-weight: 600; }
 .yy-calendar-segments.wide { display: grid; grid-template-columns: repeat(3, 1fr); }
-.yy-calendar-navigate { display: flex; align-items: center; margin-left: auto; }
-.yy-calendar-window { width: 198px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
-.yy-calendar-locate { display: flex; align-items: center; gap: 5px; height: 32px; padding: 0 8px; border: 1px solid var(--yy-border-strong); border-radius: var(--yy-radius); color: var(--yy-text-3); }
-.yy-calendar-locate input { width: 118px; border: 0; outline: 0; background: transparent; color: var(--yy-text); font: inherit; }
+.yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .yy-calendar-frame { overflow: hidden; border-radius: 0 0 12px 12px; }
-.yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-gutter: stable; }
+.yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-gutter: stable; overflow-anchor: none; }
 .yy-calendar-timeline { position: relative; isolation: isolate; overflow: clip; touch-action: pan-x pan-y; user-select: none; cursor: crosshair; }
 .yy-calendar-ruler, .yy-calendar-grid { display: grid; grid-template-columns: repeat(var(--calendar-columns), minmax(0, 1fr)); }
 .yy-calendar-ruler { position: relative; z-index: 4; height: 58px; border-bottom: 1px solid var(--yy-border); background: var(--yy-bg-muted); }
@@ -936,10 +956,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
 @media (max-width: 650px) {
   .yy-calendar-main, .yy-calendar-inspector { border-radius: 10px; }
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
-  .yy-calendar-navigate { order: 3; flex: 1 0 100%; justify-content: center; border-top: 1px solid var(--yy-border); padding-top: 5px; }
-  .yy-calendar-window { flex: 1; }
-  .yy-calendar-locate { flex: 1; min-width: 0; margin-left: 0; }
-  .yy-calendar-locate input { width: 100%; min-width: 0; }
+  .yy-calendar-window { order: 3; flex: 1 0 100%; padding-top: 5px; }
   .yy-calendar-caption { display: none; }
   .yy-calendar-inspector { padding: 14px; }
   .yy-calendar-boundaries { grid-template-columns: 1fr; gap: 0; }
@@ -964,16 +981,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
   .yy-calendar-period-text small { display: none; }
 }
 @container (max-width: 680px) {
-  .yy-calendar-navigate { order: 4; flex: 1 0 100%; justify-content: center; }
-  .yy-calendar-window { flex: 1; }
+  .yy-calendar-window { order: 4; flex: 1 0 100%; }
   .yy-calendar-block-count { display: none; }
-  .yy-calendar-locate { flex: 1; }
   .yy-calendar-caption { display: none; }
 }
 @container (max-width: 420px) {
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
-  .yy-calendar-locate { order: 2; flex: 1 0 145px; }
-  .yy-calendar-locate input { flex: 1; min-width: 110px; }
   .yy-calendar-list-toggle { margin-left: auto; }
   .yy-calendar-current-count { display: none; }
 }
