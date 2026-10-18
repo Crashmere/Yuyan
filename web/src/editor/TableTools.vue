@@ -4,8 +4,8 @@ import { findParentNode, type ChainedCommands } from '@tiptap/core'
 import { closeHistory } from '@tiptap/pm/history'
 import { CellSelection } from '@tiptap/pm/tables'
 import { Columns2, Merge, TableProperties, ArrowLeftRight } from 'lucide-vue-next'
-import ActionMenu from '../ui/ActionMenu.vue'
 import ColorPicker from './ColorPicker.vue'
+import TableHeaderIcon from './TableHeaderIcon.vue'
 import { useEditorContext } from './context'
 import { fitTableColumns, tablesInSelection } from './tableFit'
 
@@ -30,11 +30,7 @@ const state = computed(() => {
   const headers: boolean[] = []
   table?.firstChild?.forEach(n => headers.push(n.type.name === 'tableHeader'))
   const backgroundMixed = !selected.every(c => c === selected[0])
-  return { merge: e.can().mergeCells(), split: e.can().splitCell(), header: headers.length > 0 && headers.every(Boolean), background: backgroundMixed ? null : selected[0], backgroundMixed }
-})
-const items = computed(() => {
-  const e = editor.value
-  return [{ label: '首行为表头', checked: !!state.value?.header, disabled: !e?.can().toggleHeaderRow(), run: () => apply(chain => chain.toggleHeaderRow()) }]
+  return { merge: e.can().mergeCells(), split: e.can().splitCell(), header: headers.length > 0 && headers.every(Boolean), canToggleHeader: e.can().toggleHeaderRow(), background: backgroundMixed ? null : selected[0], backgroundMixed }
 })
 </script>
 
@@ -46,9 +42,8 @@ const items = computed(() => {
       <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="合并单元格" data-tip="合并单元格" :disabled="!state.merge" @mousedown.prevent @click="apply(chain => chain.mergeCells())"><Merge :size="17" /></button>
       <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="拆分单元格" data-tip="拆分单元格" :disabled="!state.split" @mousedown.prevent @click="apply(chain => chain.splitCell())"><Columns2 :size="17" /></button>
       <ColorPicker kind="cell" :compact="compact" :value="state.background" :mixed="state.backgroundMixed" @pick="color => apply(chain => chain.setCellAttribute('backgroundColor', color))" />
-      <ActionMenu :items="items" :restore-focus="false">
-        <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="表格设置" data-tip="表格设置" @mousedown.prevent><TableProperties :size="17" /></button>
-      </ActionMenu>
+      <button type="button" :class="[compact ? 'yy-bubble-btn' : 'yy-icon-btn', { active: state.header }]" aria-label="首行为表头" :aria-pressed="state.header" :data-tip="state.header ? '取消首行为表头' : '首行为表头'" :disabled="!state.canToggleHeader" @mousedown.prevent @click="apply(chain => chain.toggleHeaderRow())"><TableHeaderIcon /></button>
+      <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="表格设置" data-tip="表格设置" disabled><TableProperties :size="17" /></button>
     </template>
   </template>
 </template>

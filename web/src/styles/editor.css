@@ -559,6 +559,12 @@ body.yy-row-dragging * {
   background: var(--yy-bg-hover);
   color: var(--yy-text);
 }
+.yy-bubble-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+  color: var(--yy-text-2);
+}
 .yy-bubble-btn.active {
   background: var(--yy-primary-soft);
   color: var(--yy-primary);
