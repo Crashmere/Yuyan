@@ -2,13 +2,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   CalendarDays, Check, ChevronLeft, ChevronRight, CircleHelp, LocateFixed,
-  Plus, Save, Trash2, X, Maximize2, Minimize2,
+  Plus, Save, Trash2, X, Maximize2, Minimize2, Copy, ClipboardPaste,
 } from 'lucide-vue-next'
 import {
   api, ApiError, errorMessage, type CalendarPeriod, type CalendarPeriodInput,
   type CalendarPrecision,
 } from '../shared/api'
-import { confirm } from '../ui/dialog'
+import { confirm, prompt } from '../ui/dialog'
+import { copyText } from '../shared/clipboard'
+import { decodeCalendar, encodeCalendar } from './transfer'
 import IconButton from '../ui/IconButton.vue'
 import { toast } from '../ui/toast'
 import {
@@ -24,10 +26,68 @@ const embedded = computed(() => !!props.model)
 const root = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const calendarTitle = ref(props.model?.title ?? '日历')
+function calendarData(): CalendarData {
+  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value,
+    periods: periods.value.map(({ id, title, note, startDate, endDate, precision, color }) => ({ id, title, note, startDate, endDate, precision, color })) }
+}
 function publish() {
   if (!props.model || props.readonly) return
-  emit('change', { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value,
-    periods: periods.value.map(({ id, title, note, startDate, endDate, precision, color }) => ({ id, title, note, startDate, endDate, precision, color })) })
+  emit('change', calendarData())
+}
+const transferring = ref(false)
+let disposed = false
+async function copyCalendar() {
+  if (transferring.value || !loaded.value) return
+  transferring.value = true
+  try {
+    const data = calendarData()
+    if (draftDirty.value && draft.value && !props.readonly) {
+      if (rangeError.value) { await flush(); return }
+      const value = draft.value
+      const period = { ...draftPayload(value), title: value.title.trim(), note: value.note.trim(), id: value.id ?? Math.max(0, ...data.periods.map(p => p.id)) + 1 }
+      const index = data.periods.findIndex(p => p.id === period.id)
+      if (index < 0) data.periods.push(period)
+      else data.periods[index] = period
+    }
+    const text = encodeCalendar(data)
+    const copied = await copyText(text)
+    if (disposed) return
+    if (copied) toast('日历已复制，可在另一个日历中导入', 'success')
+    else await prompt({ title: '未能自动复制，请手动复制以下内容', value: text, multiline: true, confirmText: '完成' })
+  } catch (error) { if (!disposed) toast(errorMessage(error), 'error') }
+  finally { transferring.value = false }
+}
+async function importCalendar() {
+  if (transferring.value || !loaded.value || props.readonly || !embedded.value) return
+  transferring.value = true
+  let text = '', reason = ''
+  try {
+    // Read during the click gesture, before opening any lazy dialog or awaiting a save.
+    try { text = await navigator.clipboard.readText() }
+    catch { reason = '浏览器未能读取剪贴板，请在下方粘贴日历字符串' }
+    while (!disposed) {
+      if (reason) {
+        const value = await prompt({ title: '导入日历', label: reason, value: text, placeholder: '粘贴 YYCAL1: 开头的完整字符串', multiline: true, confirmText: '导入' })
+        if (value === null || disposed) return
+        text = value
+      }
+      let data: CalendarData
+      try { data = decodeCalendar(text) }
+      catch (error) { reason = errorMessage(error); continue }
+      // Preserve a valid pending edit as the state restored by document undo.
+      if (!await flush() || disposed) return
+      calendarTitle.value = data.title
+      grain.value = data.grain
+      center.value = data.center || todayDate()
+      periods.value = data.periods.map(p => ({ ...p, revision: 1, createdAt: '', updatedAt: '' }))
+      draft.value = null
+      conflict.value = false
+      emit('change', data)
+      await centerTimeline()
+      if (!disposed) toast(`已导入 ${data.periods.length} 个状态，可撤销恢复原日历`, 'success')
+      return
+    }
+  } finally { transferring.value = false }
 }
 function syncModel() {
   if (!props.model) return
@@ -461,6 +521,7 @@ onMounted(() => {
   void load().then(centerTimeline)
 })
 onBeforeUnmount(() => {
+  disposed = true
   window.removeEventListener('keydown', onKey)
   if (barGesture) {
     barGesture.target.removeEventListener('pointermove', moveBar)
@@ -500,8 +561,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
       <strong v-if="readonly">{{ calendarTitle || '日历' }}</strong>
       <input v-else v-model="calendarTitle" class="yy-calendar-title" maxlength="120" aria-label="日历名称" placeholder="日历名称" @change="publish" />
       <span class="yy-calendar-block-count">{{ periods.length }} 个状态</span>
-      <button v-if="!readonly" type="button" class="yy-btn small primary" @click="newAtCenter"><Plus :size="15" />新建状态</button>
-      <IconButton :label="expanded ? '收起日历' : '展开日历'" @click="expanded = !expanded"><Minimize2 v-if="expanded" :size="17" /><Maximize2 v-else :size="17" /></IconButton>
+      <div class="yy-calendar-block-actions">
+        <IconButton label="复制日历" :disabled="transferring || !loaded" @click="copyCalendar"><Copy :size="16" /></IconButton>
+        <IconButton v-if="!readonly" label="从剪贴板导入（替换当前日历，可撤销）" :disabled="transferring || saving || !loaded" @click="importCalendar"><ClipboardPaste :size="16" /></IconButton>
+        <button v-if="!readonly" type="button" class="yy-btn small primary" @click="newAtCenter"><Plus :size="15" />新建状态</button>
+        <IconButton :label="expanded ? '收起日历' : '展开日历'" @click="expanded = !expanded"><Minimize2 v-if="expanded" :size="17" /><Maximize2 v-else :size="17" /></IconButton>
+      </div>
     </div>
     <header v-if="!embedded" class="yy-calendar-heading">
       <div>
@@ -807,17 +872,18 @@ defineExpose({ flush, isDirty: () => draftDirty.value })
 .yy-calendar-page.embedded { width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
 .embedded .yy-calendar-workspace { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .embedded .yy-calendar-inspector { position: static; }
-.yy-calendar-block-head { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--yy-border); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--yy-bg); }
+.yy-calendar-block-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--yy-border); border-bottom: 0; border-radius: 12px 12px 0 0; background: var(--yy-bg); }
+.yy-calendar-block-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .yy-calendar-block-head > .lucide { color: var(--yy-primary); flex: none; }
-.yy-calendar-block-head > strong { margin-right: auto; }
-.yy-calendar-title { flex: 1; min-width: 40px; padding: 4px 0; border: 0; background: transparent; color: var(--yy-text); font: inherit; font-weight: 650; }
+.yy-calendar-block-head > strong { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.yy-calendar-title { flex: 1; min-width: 60px; width: 0; padding: 4px 0; border: 0; background: transparent; color: var(--yy-text); font: inherit; font-weight: 650; }
 .yy-calendar-block-count { color: var(--yy-text-3); font-size: 11px; white-space: nowrap; }
 .embedded .yy-calendar-main { border-radius: 0 0 12px 12px; box-shadow: none; }
 .embedded .yy-calendar-toolbar { flex-wrap: wrap; }
 .embedded .yy-calendar-navigate { margin-left: auto; }
 .embedded .yy-calendar-note { white-space: pre-wrap; overflow-wrap: anywhere; }
 .readonly .yy-calendar-timeline, .readonly .yy-calendar-period { cursor: default; }
-.yy-calendar-page.expanded { position: fixed; z-index: 180; inset: 16px; width: auto; overflow: auto; padding: 20px; background: var(--yy-bg); border: 1px solid var(--yy-border); border-radius: 16px; box-shadow: 0 0 0 100vmax #0008; }
+.yy-calendar-page.expanded { position: fixed; z-index: 80; inset: 16px; width: auto; overflow: auto; padding: 20px; background: var(--yy-bg); border: 1px solid var(--yy-border); border-radius: 16px; box-shadow: 0 0 0 100vmax #0008; }
 @container (max-width: 160px) {
   .yy-calendar-period-text small { display: none; }
 }
