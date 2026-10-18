@@ -12,6 +12,7 @@ import { withTitles } from './codeBlock'
 import { AlignmentAttributes, blockAlignment, withCellAlignment } from './alignment'
 import { imageFrame } from './imageStyle'
 import { cropImageStyle, imageFrameStyle, parseRect, rect, rectText, storedCrop } from './imageGeometry'
+import { Calendar } from './calendar'
 import { Drawing } from './drawing'
 import { Attachment } from './attachment'
 import { Columns, Column } from './columns'
@@ -133,6 +134,7 @@ export interface SchemaOverrides {
   blockMath?: AnyExtension
   callout?: AnyExtension
   table?: AnyExtension
+  calendar?: AnyExtension
   drawing?: AnyExtension
   attachment?: AnyExtension
   imageBoard?: AnyExtension
@@ -165,6 +167,7 @@ export function schemaExtensions(o: SchemaOverrides = {}): Extensions {
     o.imageBoard ?? ImageBoard,
     o.attachment ?? Attachment,
     o.drawing ?? Drawing,
+    o.calendar ?? Calendar,
     TextHighlight,
     TaskList,
     TaskItem.configure({ nested: true }),

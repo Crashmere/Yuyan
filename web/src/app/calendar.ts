@@ -77,11 +77,12 @@ export function addUnits(value: string, grain: CalendarPrecision, amount: number
 export function windowCells(center: string, grain: CalendarPrecision): CalendarCell[] {
   const count = grain === 'year' ? 12 : grain === 'month' ? 18 : 42
   const before = grain === 'year' ? 5 : grain === 'month' ? 8 : 20
-  const start = addUnits(center, grain, -before)
+  const start = [addUnits(center, grain, -before), '1000-01-01'].sort().at(-1)!
   const today = todayDate()
   const cells: CalendarCell[] = []
   for (let index = 0; index < count; index++) {
     const value = addUnits(start, grain, index)
+    if (value.length > 10 || value > '9999-12-31') break
     const bounds = unitBounds(value, grain)
     const date = parseCalendarDate(bounds.start)
     let primary = ''
@@ -114,7 +115,7 @@ function dayPosition(value: string, cells: CalendarCell[]): number {
     const cell = cells[index]
     if (value > cell.end) continue
     const cellStart = parseCalendarDate(cell.start).getTime()
-    const span = (parseCalendarDate(addDays(cell.end, 1)).getTime() - cellStart) / DAY
+    const span = ((parseCalendarDate(cell.end).getTime() + DAY) - cellStart) / DAY
     const offset = (parseCalendarDate(value).getTime() - cellStart) / DAY
     return index + offset / span
   }
@@ -124,7 +125,7 @@ function dayPosition(value: string, cells: CalendarCell[]): number {
 export function periodGeometry(period: Pick<CalendarPeriod, 'startDate' | 'endDate'>, cells: CalendarCell[]): PeriodGeometry | null {
   if (!cells.length || period.endDate < cells[0].start || period.startDate > cells.at(-1)!.end) return null
   const start = dayPosition(period.startDate, cells)
-  const end = dayPosition(addDays(period.endDate, 1), cells)
+  const end = period.endDate >= cells.at(-1)!.end ? cells.length : dayPosition(addDays(period.endDate, 1), cells)
   return {
     left: start / cells.length * 100,
     width: Math.max(0.18, (end - start) / cells.length * 100),
@@ -133,7 +134,7 @@ export function periodGeometry(period: Pick<CalendarPeriod, 'startDate' | 'endDa
   }
 }
 
-export function assignPeriodLanes(periods: CalendarPeriod[]): { lanes: Map<number, number>; count: number } {
+export function assignPeriodLanes(periods: Pick<CalendarPeriod, 'id' | 'startDate' | 'endDate'>[]): { lanes: Map<number, number>; count: number } {
   const sorted = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id - b.id)
   const ends: string[] = []
   const lanes = new Map<number, number>()

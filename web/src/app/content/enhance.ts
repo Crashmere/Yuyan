@@ -1,3 +1,4 @@
+import { deferred } from '../../shared/deferred'
 import { languages } from '../../editor/languages'
 import type { ImageSizes } from '../../shared/api'
 import { copyText } from '../../shared/clipboard'
@@ -8,6 +9,8 @@ import { mermaidError, renderMermaid } from '../../shared/mermaid'
 import { frameTable } from '../../shared/tableFrame'
 import { codeActions, type CodeAction } from '../../code/actions'
 import { codeKey, readCodePreferences, saveCodePreferences } from '../../code/preferences'
+
+const calendarReader = deferred(() => import('../../calendar/reading'))
 
 const cleanups = new WeakMap<HTMLElement, (() => void)[]>()
 export function cleanupCode(root: HTMLElement) { cleanups.get(root)?.forEach(cleanup => cleanup()); cleanups.delete(root) }
@@ -20,9 +23,17 @@ export function cleanupCode(root: HTMLElement) { cleanups.get(root)?.forEach(cle
 export async function enhance(root: HTMLElement, options: { math: boolean; mermaid: boolean; images?: ImageSizes }, scope = root, firstCode = 0) {
   if (scope === root) cleanupCode(root)
   if (options.images) reserveImageSpace(scope, options.images)
+  let disposed = false
+  let calendarCleanup: (() => void) | undefined
+  const cleanup = cleanups.get(root) ?? []
+  cleanups.set(root, cleanup)
+  cleanup.push(() => { disposed = true; calendarCleanup?.() })
+  const calendarReady = scope.querySelector('[data-calendar]') ? calendarReader.load().then(module => {
+    if (!disposed) calendarCleanup = module.enhanceCalendars(scope)
+  }) : undefined
   const codeReady = enhanceCode(root, scope, firstCode)
   frameTables(scope)
-  await Promise.all([codeReady, options.math && renderMath(scope), options.mermaid && renderDiagrams(scope)])
+  await Promise.all([calendarReady, codeReady, options.math && renderMath(scope), options.mermaid && renderDiagrams(scope)])
 }
 
 // Copies of earlier content (recentGhosts.ts) draw like the page but keep their code static:
@@ -35,6 +46,7 @@ export async function enhanceCopy(root: HTMLElement) {
 // Wide tables scroll sideways in a frame (shared/tableFrame.ts).
 function frameTables(root: HTMLElement) {
   for (const table of root.querySelectorAll('table')) {
+    if (table.closest('[data-calendar]')) continue
     const frame = Object.assign(document.createElement('div'), { className: 'yy-table-frame' })
     const scroller = frame.appendChild(Object.assign(document.createElement('div'), { className: 'yy-table-scroll' }))
     table.replaceWith(frame)

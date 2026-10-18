@@ -112,7 +112,7 @@ async function cancel() {
 onBeforeRouteLeave(async (to) => {
   if (pane.value && !(await pane.value.finish())) {
     // A snapshot failure leaves the saved document intact. Stay here so 完成 can retry it.
-    if (status.value === 'saved') return false
+    if (status.value === 'saved' || pane.value.hasUnfinishedBlocks()) return false
     const leave = await confirm({
       title: '还有修改没有保存到服务器',
       message: '内容已暂存在这个浏览器里，下次打开这篇文档时可以恢复。仍要离开吗？',

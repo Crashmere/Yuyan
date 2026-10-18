@@ -946,3 +946,11 @@ pre:hover > .yy-copy {
 .yy-drawing-caption-input { width: 180px; max-width: 100%; }
 
 .yy-drawing-match { outline: 2px solid #e8b931; outline-offset: 5px; }
+
+/* Calendar controls are document atoms, independent of surrounding prose typography. */
+.yy-calendar-node, .yy-calendar-block { display: block; min-width: 0; margin: 20px 0; }
+.yy-calendar-source { overflow: auto; max-height: 440px; }
+.yy-calendar-source td { white-space: pre-wrap; min-width: 90px; }
+.yy-calendar-records { margin-top: 8px; font-size: 12px; color: var(--yy-text-2); }
+.yy-calendar-records summary { cursor: pointer; padding: 4px 0; }
+.yy-calendar-node input, .yy-calendar-node button, .yy-calendar-block input, .yy-calendar-block button { font-family: inherit; }

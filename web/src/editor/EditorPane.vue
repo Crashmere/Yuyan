@@ -30,6 +30,7 @@ import ConflictDiff from './ConflictDiff.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
 import { cancelSelection } from './cancelSelection'
+import { flushPendingBlocks, hasPendingBlocks } from './pendingBlocks'
 import { insertImages, insertAttachments, pendingUploads } from './uploads'
 import { clearUnusedBlockSpaces } from './blockSpaces'
 import { openTemplates, saveEditorTemplate } from './templates'
@@ -216,6 +217,7 @@ async function save() {
 // uploading are waited for first, so they are part of what gets saved.
 async function flush(): Promise<boolean> {
   if (discarded) return true
+  if (editor.value && !await flushPendingBlocks(editor.value)) return false
   if (editor.value) clearUnusedBlockSpaces(editor.value.view)
   while (editor.value && pendingUploads(editor.value) > 0) await new Promise((r) => setTimeout(r, 100))
   clearTimeout(saveTimer)
@@ -234,7 +236,7 @@ function setTitle(value: string) {
 
 // Whether anything was edited since the editor opened.
 function touched(): boolean {
-  return revision.value !== props.doc.revision || status.value !== 'saved' || (!!editor.value && pendingUploads(editor.value) > 0)
+  return (!!editor.value && hasPendingBlocks(editor.value)) || revision.value !== props.doc.revision || status.value !== 'saved' || (!!editor.value && pendingUploads(editor.value) > 0)
 }
 
 // Whether this session has saved anything that cancelling would have to take back.
@@ -307,7 +309,7 @@ async function finish(): Promise<boolean> {
   }
 }
 
-defineExpose({ flush, finish, setTitle, touched, savedChanges, discard, abandon, capturePosition, cancelSelection: (event: KeyboardEvent) => !!editor.value && cancelSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
+defineExpose({ hasUnfinishedBlocks: () => !!editor.value && hasPendingBlocks(editor.value), flush, finish, setTitle, touched, savedChanges, discard, abandon, capturePosition, cancelSelection: (event: KeyboardEvent) => !!editor.value && cancelSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {
@@ -368,7 +370,7 @@ function autosizeTitle() {
 function beforeUnload(e: BeforeUnloadEvent) {
   if (discarded) return
   const uploading = !!editor.value && pendingUploads(editor.value) > 0
-  if (uploading || ['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
+  if ((editor.value && hasPendingBlocks(editor.value)) || uploading || ['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
     writeDraft()
     e.preventDefault()
   }

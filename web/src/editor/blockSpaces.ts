@@ -34,7 +34,7 @@ export function clearUnusedBlockSpaces(view: EditorView) {
 }
 
 function needsSpace(node: PMNode): boolean {
-  if (['attachment', 'table', 'horizontalRule', 'codeBlock', 'blockMath', 'callout', 'imageBoard', 'foldBlock', 'highlightBlock', 'columns'].includes(node.type.name)) return true
+  if (['calendar', 'attachment', 'table', 'horizontalRule', 'codeBlock', 'blockMath', 'callout', 'imageBoard', 'foldBlock', 'highlightBlock', 'columns'].includes(node.type.name)) return true
   if (!node.isTextblock || !node.childCount) return false
   let image = false, other = false
   node.forEach((child) => {

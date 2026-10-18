@@ -37,7 +37,7 @@ function ranges(change: Change): Range[] {
 // A patch spans its lane: the text column, or the cell/column/container holding the
 // change. Media and code keep their own pixels and get a ring instead of a tint.
 const lanes = 'td,th,.yy-column,.callout,.yy-highlight-block,.yy-fold-block'
-const ringed = 'img,.yy-mermaid,.yy-drawing,[data-attachment],[data-image-board],[data-type="block-math"]'
+const ringed = '[data-calendar],img,.yy-mermaid,.yy-drawing,[data-attachment],[data-image-board],[data-type="block-math"]'
 const padX = 12, padY = 6
 interface Box { left: number; top: number; right: number; bottom: number }
 interface Block { changes: number[]; patch: number; target: Element; rect: DOMRect; lane: Element | null; ring: boolean; code: boolean; folded: boolean }

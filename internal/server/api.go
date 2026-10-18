@@ -330,7 +330,7 @@ func (s *Server) apiMeta(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"schemaVersion": doc.SchemaVersion, "stats": stats, "features": []string{"drawing-v1"}, "drawingTool": map[string]any{"module": s.entries["drawing-tool"].JS, "css": s.entries["drawing-tool"].CSS}})
+	writeJSON(w, http.StatusOK, map[string]any{"schemaVersion": doc.SchemaVersion, "stats": stats, "features": []string{"drawing-v1", "calendar-v1"}, "drawingTool": map[string]any{"module": s.entries["drawing-tool"].JS, "css": s.entries["drawing-tool"].CSS}})
 	return nil
 }
 
@@ -460,7 +460,7 @@ func (s *Server) apiSaveDoc(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := requireDrawingClient(r, current.Content); err != nil {
+	if err := requireDocumentClient(r, current.Content); err != nil {
 		return err
 	}
 	var in saveDocInput
@@ -494,7 +494,7 @@ func (s *Server) apiDiscardEdits(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if err := requireDrawingClient(r, current.Content); err != nil {
+	if err := requireDocumentClient(r, current.Content); err != nil {
 		return err
 	}
 	var in struct {

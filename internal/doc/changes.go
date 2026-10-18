@@ -77,7 +77,7 @@ func changeBlocks(root Node) []changeBlock {
 	stripMedia = func(n Node) Node {
 		children := []Node(nil)
 		for _, c := range n.Content {
-			if c.Type != "drawing" && c.Type != "attachment" && c.Type != "image" && c.Type != "inlineMath" && c.Type != "blockMath" {
+			if c.Type != "calendar" && c.Type != "drawing" && c.Type != "attachment" && c.Type != "image" && c.Type != "inlineMath" && c.Type != "blockMath" {
 				children = append(children, stripMedia(c))
 			}
 		}
@@ -89,7 +89,7 @@ func changeBlocks(root Node) []changeBlock {
 	}
 	var media func(Node, string)
 	media = func(n Node, context string) {
-		if n.Type == "drawing" || n.Type == "attachment" || n.Type == "image" || n.Type == "inlineMath" || n.Type == "blockMath" {
+		if n.Type == "calendar" || n.Type == "drawing" || n.Type == "attachment" || n.Type == "image" || n.Type == "inlineMath" || n.Type == "blockMath" {
 			add(n, context)
 			return
 		}
@@ -118,7 +118,7 @@ func changeBlocks(root Node) []changeBlock {
 				add(clean, context)
 			}
 			media(n, context)
-		case "drawing", "attachment", "image", "inlineMath", "blockMath":
+		case "calendar", "drawing", "attachment", "image", "inlineMath", "blockMath":
 			add(n, context)
 		case "imageBoard":
 			add(Node{Type: n.Type, Attrs: n.Attrs}, context)
@@ -238,6 +238,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 	}
 	name := func(n Node) string {
 		switch n.Type {
+		case "calendar":
+			return "日历"
 		case "drawing":
 			return "画板"
 		case "attachment":
@@ -313,6 +315,8 @@ func SummarizeChanges(beforeTitle string, before Node, afterTitle string, after 
 			} else {
 				add("调整折叠块标题格式", places...)
 			}
+		case "calendar":
+			add("修改日历", places...)
 		case "drawing":
 			add("修改画板", places...)
 		case "attachment":

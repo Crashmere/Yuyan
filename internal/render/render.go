@@ -124,6 +124,8 @@ func (r *renderer) open(tag string, attrs [][2]string) {
 
 func (r *renderer) node(n doc.Node) {
 	switch n.Type {
+	case "calendar":
+		r.calendar(n)
 	case "drawing":
 		r.drawing(n)
 	case "paragraph":

@@ -1,3 +1,4 @@
+import { calendarText, type CalendarData } from '../schema/calendar'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 // Counts like the reading page and the directory (doc.PlainText and doc.CountChars in Go):
@@ -23,6 +24,7 @@ export function countCharacters(node: PMNode): number {
   switch (node.type.name) {
     case 'inlineMath':
     case 'blockMath': n = visible(a.latex); break
+    case 'calendar': n = visible(calendarText(a as CalendarData)); break
     case 'drawing': n = visible(a.text) + visible(a.caption); break
     case 'attachment': n = visible(a.name); break
     case 'image': n = visible(a.alt) + visible(a.caption); break

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Crashmere/Yuyan/internal/doc"
 	"github.com/Crashmere/Yuyan/internal/drawing"
 	"github.com/Crashmere/Yuyan/internal/store"
 )
@@ -65,13 +64,4 @@ func (s *Server) drawingFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", drawing.Mime)
 	w.Header().Set("Content-Disposition", `attachment; filename="drawing.yuyan.json"`)
 	http.ServeFile(w, r, s.store.AssetPath(a.ID, a.Ext))
-}
-
-// Old tabs silently drop unknown Tiptap nodes. Refuse a destructive resave until
-// a client that explicitly understands drawing-v1 reads and edits the document.
-func requireDrawingClient(r *http.Request, n doc.Node) error {
-	if doc.HasDrawing(n) && r.Header.Get("X-Yuyan-Features") != "drawing-v1" {
-		return fmt.Errorf("%w: 文档包含画板，请刷新页面或更新 yuyan-doc 后再保存", errBadRequest)
-	}
-	return nil
 }

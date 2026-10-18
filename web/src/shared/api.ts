@@ -237,7 +237,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     return body as T
   }
   const headers = new Headers(init.headers)
-  headers.set('X-Yuyan-Features', 'drawing-v1')
+  headers.set('X-Yuyan-Features', 'drawing-v1,calendar-v1')
   let body = init.body
   if (init.json !== undefined) {
     headers.set('Content-Type', 'application/json')

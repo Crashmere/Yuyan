@@ -3,8 +3,8 @@ import { diffArrays } from 'diff'
 // Work against the original renderer output. Page controls, line numbers, search
 // markers and diagram rendering must never become edits. Live elements are kept by
 // DocContent before enhancement so no DOM paths depend on its generated wrappers.
-export const units = 'p,h1,h2,h3,h4,h5,h6,pre,hr,img,.code-title,.callout-title,.yy-fold-title,[data-type="block-math"],.yy-drawing,[data-attachment],[data-image-board]'
-export const atomic = 'pre,.yy-drawing,[data-attachment],[data-image-board],[data-type="block-math"]'
+export const units = '[data-calendar],p,h1,h2,h3,h4,h5,h6,pre,hr,img,.code-title,.callout-title,.yy-fold-title,[data-type="block-math"],.yy-drawing,[data-attachment],[data-image-board]'
+export const atomic = '[data-calendar],pre,.yy-drawing,[data-attachment],[data-image-board],[data-type="block-math"]'
 export const skipped = 'button,.code-lang,.yy-code-gutter,.yy-heading-tools,.yy-drawing-source,.yy-drawing-text'
 export interface Unit { element: Element; index: number; key: string; kind: string; context: string; text: string; tokens: string[] }
 // order is the unit position in the current document: consecutive changes form one patch.

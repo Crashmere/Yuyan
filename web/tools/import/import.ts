@@ -55,7 +55,7 @@ class Client {
     if (this.dry) return { id: ++this.fakeId, url: `/assets/dry${this.fakeId}.png`, stats: { books: 0 } } as T
     const res = await fetch(this.base + 'api/' + path, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json', 'X-Yuyan-Features': 'drawing-v1' },
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json', 'X-Yuyan-Features': 'drawing-v1,calendar-v1' },
       body: body === undefined ? undefined : JSON.stringify(body),
     })
     const data = await res.json().catch(() => ({}))

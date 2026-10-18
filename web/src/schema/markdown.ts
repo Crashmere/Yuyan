@@ -212,7 +212,7 @@ class Converter {
   }
 
   private htmlBlock(n: Html): JSONContent[] {
-    const blocks = /^\s*<(?:table|p|div|span|h[1-6]|ul|ol|blockquote|figure|details)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
+    const blocks = /^\s*<(?:table|p|div|span|h[1-6]|ul|ol|blockquote|figure|details|section)[\s>]/i.test(n.value) ? this.htmlBlocks(n.value) : null
     if (blocks?.length) return blocks
     const inline = this.inlineHtml(n.value)
     if (inline) return inline.length ? [{ type: 'paragraph', content: inline }] : []
@@ -653,7 +653,7 @@ function containsRichTable(n: JSONContent): boolean {
 }
 
 function containsBlockContainer(n: JSONContent): boolean {
-  return n.type === 'drawing' || n.type === 'attachment' || n.type === 'foldBlock' || n.type === 'highlightBlock' || n.type === 'columns' || !!n.content?.some(containsBlockContainer)
+  return n.type === 'calendar' || n.type === 'drawing' || n.type === 'attachment' || n.type === 'foldBlock' || n.type === 'highlightBlock' || n.type === 'columns' || !!n.content?.some(containsBlockContainer)
 }
 
 function tableNeedsHtml(n: JSONContent): boolean {

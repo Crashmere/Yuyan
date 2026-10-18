@@ -33,6 +33,8 @@ import { insertFiles, UploadPlaceholders } from './uploads'
 import CalloutView from './views/CalloutView.vue'
 import { Attachment } from '../schema/attachment'
 import { Drawing } from '../schema/drawing'
+import { Calendar } from '../schema/calendar'
+import CalendarView from './views/CalendarView.vue'
 import DrawingView from './views/DrawingView.vue'
 import AttachmentView from './views/AttachmentView.vue'
 import ImageView from './views/ImageView.vue'
@@ -51,6 +53,9 @@ export function editorExtensions(ui: EditorUi, foldKey?: string, drawingRevision
   const onMathClick = (_node: PMNode, pos: number) => ui.openMath(pos)
   return [
     ...schemaExtensions({
+      calendar: Calendar.extend({
+        addNodeView() { return props => managedNodeView(VueNodeViewRenderer(CalendarView)(props)) },
+      }),
       drawing: Drawing.extend({
         addOptions() { return { ...this.parent?.(), draftScope: () => `${foldKey}:${drawingRevision()}` } },
         addNodeView() { return props => managedNodeView(VueNodeViewRenderer(DrawingView)(props)) },
