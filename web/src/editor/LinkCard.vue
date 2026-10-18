@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
 import type { EditorView } from '@tiptap/pm/view'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
@@ -9,10 +9,13 @@ import { copyText } from '../shared/clipboard'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
 import { openHref } from './links'
+import { toolbarMotion } from './toolbarMotion'
 
 // Shown when the cursor stands in a link: open, edit, copy or remove it.
 const props = defineProps<{ hidden: boolean }>()
 const { editor, tick, ui } = useEditorContext()
+const menu = ref<InstanceType<typeof BubbleMenu> | null>(null)
+const options = { ...toolbarMotion(() => menu.value?.$el), placement: 'bottom-start' as const, offset: 8 }
 
 const href = computed(() => {
   void tick.value
@@ -44,7 +47,7 @@ function unlink() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor" :editor="editor" plugin-key="linkCard" :should-show="shouldShow" :options="{ placement: 'bottom-start', offset: 8 }" class="yy-link-card">
+  <BubbleMenu v-if="editor" ref="menu" :editor="editor" plugin-key="linkCard" :should-show="shouldShow" :options="options" class="yy-link-card">
     <button type="button" class="yy-link-card-url" :data-tip="href" @mousedown.prevent @click="openHref(href)">
       <ExternalLink :size="14" /><span>{{ href }}</span>
     </button>

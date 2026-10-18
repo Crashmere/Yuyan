@@ -17,16 +17,19 @@ import RemoveSelectionButton from './RemoveSelectionButton.vue'
 import AlignmentMenu from './AlignmentMenu.vue'
 import ImageFormatControls from './ImageFormatControls.vue'
 import ImageCaptionForm from './ImageCaptionForm.vue'
+import { toolbarMotion } from './toolbarMotion'
 
 // Shown while an image is selected: size, replace, download, open, alternative text, delete.
 const { editor, tick } = useEditorContext()
 const menu = ref<InstanceType<typeof BubbleMenu> | null>(null)
 const menuVisible = ref(false)
+const motion = toolbarMotion(() => menu.value?.$el)
 const positionOptions = {
+  ...motion,
   placement: 'top' as const,
   offset: 8,
-  onShow: () => { menuVisible.value = true },
-  onHide: () => { menuVisible.value = false },
+  onShow: () => { motion.onShow(); menuVisible.value = true },
+  onHide: () => { motion.onHide(); menuVisible.value = false },
 }
 const altOpen = ref(false)
 const captionOpen = ref(false)

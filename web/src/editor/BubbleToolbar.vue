@@ -20,14 +20,17 @@ import TextColorMenu from './TextColorMenu.vue'
 import TableTools from './TableTools.vue'
 import FormatIcon from './FormatIcon.vue'
 import { formatPainterState } from './formatPainter'
+import { toolbarMotion } from './toolbarMotion'
 
 // The toolbar over selected content. Its style list lives inside the bubble, since a menu in a
 // separate layer would take focus away from the editor and hide the bubble.
 const props = defineProps<{ hidden: boolean }>()
 const { editor, tick, ui } = useEditorContext()
 const stylesOpen = ref(false)
+const menu = ref<InstanceType<typeof BubbleMenu> | null>(null)
 const pluginKey = new PluginKey('bubbleMenu')
 const options = {
+  ...toolbarMotion(() => menu.value?.$el),
   offset: () => editor.value?.state.selection instanceof CellSelection || editor.value?.state.selection.empty ? 40 : 8,
   flip: () => ({ padding: { top: (document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0) + 8, left: 8, right: 8, bottom: 8 } }),
   shift: { padding: 8 },
@@ -138,7 +141,7 @@ function anchor() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor && state" :plugin-key="pluginKey" :editor="editor" :update-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar" :class="{ 'has-images': state.images, 'is-mixed': state.images && state.text }" role="toolbar" aria-label="选中内容">
+  <BubbleMenu v-if="editor && state" ref="menu" :plugin-key="pluginKey" :editor="editor" :update-delay="0" :should-show="shouldShow" :get-referenced-virtual-element="anchor" :append-to="bubbleParent" :options="options" class="yy-bubble yy-selection-toolbar" :class="{ 'has-images': state.images, 'is-mixed': state.images && state.text }" role="toolbar" aria-label="选中内容">
     <div v-if="state.text" class="yy-selection-text-tools" role="group" aria-label="文字格式">
       <div class="yy-bubble-styles">
         <button type="button" class="yy-bubble-select" @mousedown.prevent @click="stylesOpen = !stylesOpen">{{ state.style }}<ChevronDown :size="13" /></button>

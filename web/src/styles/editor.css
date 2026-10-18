@@ -523,6 +523,14 @@ body.yy-row-dragging * {
 
 /* Bubbles ------------------------------------------------------------------------------------ */
 
+@media (prefers-reduced-motion: no-preference) {
+  .yy-bubble.yy-toolbar-following,
+  .yy-link-card.yy-toolbar-following,
+  .yy-block-palette {
+    transition: left 120ms cubic-bezier(.2, .8, .2, 1), top 120ms cubic-bezier(.2, .8, .2, 1);
+  }
+}
+
 .yy-bubble,
 .yy-link-card {
   display: flex;
