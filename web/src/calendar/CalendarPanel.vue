@@ -20,6 +20,7 @@ import type { CalendarData, CalendarEntry, CalendarPrecision } from '../schema/c
 const props = defineProps<{ model: CalendarData; readonly?: boolean }>()
 const emit = defineEmits<{ change: [value: CalendarData]; undo: [redo: boolean] }>()
 const root = ref<HTMLElement | null>(null)
+const inspector = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const collapsed = ref(!!props.model.collapsed)
 const titleInput = ref<HTMLInputElement | null>(null)
@@ -126,7 +127,7 @@ function syncModel() {
 watch(() => props.model, () => {
   const previous = JSON.stringify(periods.value)
   syncModel()
-  // Undo or external document updates replace the state inspector as well.
+  // Undo or external document updates replace the event draft as well.
   if (previous !== JSON.stringify(props.model.periods)) draft.value = null
 })
 
@@ -160,7 +161,6 @@ const listQuery = ref('')
 const showValidation = ref(false)
 const today = todayDate()
 const dragging = ref(false)
-const gestureHadInspector = ref(false)
 const gestureLanes = ref<ReturnType<typeof assignPeriodLanes> | null>(null)
 
 interface Draft extends Omit<CalendarEntry, 'id'> {
@@ -196,6 +196,8 @@ function draftAsPeriod(): CalendarEntry | null {
 }
 
 const renderedPeriods = computed(() => {
+  // Form edits never affect the calendar. Only an active bar gesture has a live preview.
+  if (!dragging.value) return periods.value
   const preview = draftAsPeriod()
   if (!preview) return periods.value
   if (preview.id === -1) return [...periods.value, preview]
@@ -208,7 +210,21 @@ const visiblePeriods = computed(() => renderedPeriods.value.flatMap((period) => 
 }))
 const laneCount = computed(() => Math.max(0, ...visiblePeriods.value.map(p => p.lane + 1)))
 const timelineHeight = computed(() => Math.max(164, 58 + laneCount.value * 48 + 14))
-const selectedID = computed(() => draft.value?.id ?? (draft.value ? -1 : null))
+const selectedID = computed(() => dragging.value ? draft.value?.id ?? null : null)
+const inspectorOpen = computed(() => !!draft.value && !dragging.value)
+watch(inspectorOpen, async (open) => {
+  await nextTick()
+  if (disposed) return
+  if (open) focusInspector()
+  else if (!dragging.value) root.value?.focus({ preventScroll: true })
+})
+function focusInspector() {
+  const first = inspector.value?.querySelector<HTMLInputElement>('[name="calendar-title"]') ?? inspector.value
+  first?.focus({ preventScroll: true })
+}
+function containInspectorScroll(event: WheelEvent | TouchEvent) {
+  if (!(event.target as Element).closest('.yy-calendar-inspector-body')) event.preventDefault()
+}
 const draftDirty = computed(() => !!draft.value && JSON.stringify(draftPayload(draft.value)) !== draftBaseline.value)
 const rangeError = computed(() => {
   const value = draft.value
@@ -266,15 +282,14 @@ function openNew(start: string, end: string, precision = grain.value) {
   }
   draft.value = value
   draftBaseline.value = JSON.stringify(draftPayload(value))
-  void nextTick(() => root.value?.querySelector<HTMLInputElement>('.yy-calendar-inspector input[name="calendar-title"]')?.focus())
+  void nextTick(focusInspector)
 }
 
 async function newAtCenter() {
   if (props.readonly) return
   if (periods.value.length >= 2000) { toast('单个日历最多保存 2,000 个事件', 'info'); return }
   if (!await flush() || disposed) return
-  if (collapsed.value) { collapsed.value = false; await centerTimeline(collapsedAnchor) }
-  const anchor = viewportDate()
+  const anchor = collapsed.value ? collapsedAnchor : viewportDate()
   const range = unitBounds(anchor, grain.value)
   openNew(range.start, range.end)
 }
@@ -283,7 +298,7 @@ async function closeDraft(force = false) {
   if (!draft.value) return
   if (!force && draftDirty.value) {
     const ok = await confirm({ title: '放弃未保存的修改？', message: '时间、名称或标注的修改还没有保存。', confirmText: '放弃修改', danger: true })
-    if (!ok) return
+    if (!ok) { focusInspector(); return }
   }
   draft.value = null
 }
@@ -296,7 +311,7 @@ function saveDraft(notify = true) {
     toast(rangeError.value, 'error')
     return
   }
-  if (value.id != null && !draftDirty.value) return
+  if (value.id != null && !draftDirty.value) { draft.value = null; return }
   const saved: CalendarEntry = {
     ...draftPayload(value), title: value.title.trim(), note: value.note.trim(),
     id: value.id ?? Math.max(0, ...periods.value.map(p => p.id)) + 1,
@@ -305,28 +320,29 @@ function saveDraft(notify = true) {
   if (index >= 0) periods.value.splice(index, 1, saved)
   else periods.value.push(saved)
   periods.value.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id - b.id)
-  openPeriod(saved)
+  draft.value = null
   publish()
   if (notify) toast('事件已应用到文档', 'success', { key: 'calendar-applied' })
 }
 
-async function selectPeriod(period: CalendarEntry, locatePeriod = false) {
+async function selectPeriod(period: CalendarEntry) {
   if (draft.value?.id !== period.id && !await flush()) return
   if (disposed) return
-  collapsed.value = false
   if (draft.value?.id !== period.id) openPeriod(period)
-  if (locatePeriod) {
-    const days = periodDays(period)
-    grain.value = days <= 42 ? 'day' : days <= 730 ? 'month' : 'year'
-    center.value = addDays(period.startDate, Math.floor((days - 1) / 2))
-    publish()
-    await centerTimeline()
-  }
 }
 
-async function duplicateDraft() {
-  if (!draft.value || !await flush() || disposed) return
+async function locateEvent(period: CalendarEntry) {
+  const days = periodDays(period)
+  grain.value = days <= 42 ? 'day' : days <= 730 ? 'month' : 'year'
+  center.value = addDays(period.startDate, Math.floor((days - 1) / 2))
+  publish()
+  await centerTimeline()
+}
+
+function duplicateDraft() {
+  if (!draft.value) return
   if (periods.value.length >= 2000) { toast('单个日历最多保存 2,000 个事件', 'info'); return }
+  if (rangeError.value) { showValidation.value = true; toast(rangeError.value, 'error'); return }
   const value = { ...draft.value }
   openNew(value.startDate, value.endDate, value.precision)
   Object.assign(draft.value!, { title: `${[...value.title].slice(0, 116).join('')}（副本）`, note: value.note, color: value.color })
@@ -485,7 +501,6 @@ function beginCreate(event: PointerEvent) {
   }
   const index = cellIndex(event.clientX)
   createGesture = { pointerId: event.pointerId, startDate: cells.value[index].start }
-  gestureHadInspector.value = !!draft.value
   dragging.value = true
   creatingRange.value = { start: cells.value[index].start, end: cells.value[index].end }
   root.value?.focus({ preventScroll: true })
@@ -572,7 +587,6 @@ function beginBar(event: PointerEvent, period: CalendarEntry, mode: BarMode) {
     return
   }
   const target = event.currentTarget as HTMLElement
-  gestureHadInspector.value = !!draft.value
   root.value?.focus({ preventScroll: true })
   target.setPointerCapture(event.pointerId)
   barGesture = { pointerId: event.pointerId, startX: event.clientX, period: { ...period }, mode, moved: false, target,
@@ -686,11 +700,9 @@ async function flush(): Promise<boolean> {
   if (!draftDirty.value || props.readonly) return true
   if (rangeError.value) {
     showValidation.value = true
-    collapsed.value = false
     await nextTick()
     toast(`日历还有未完成的事件：${rangeError.value}`, 'error')
-    root.value?.scrollIntoView({ block: 'center' })
-    root.value?.querySelector<HTMLInputElement>('[name="calendar-title"]')?.focus()
+    focusInspector()
     return false
   }
   saveDraft(false)
@@ -702,7 +714,7 @@ async function revealMatch(query: string): Promise<HTMLElement | null> {
   listQuery.value = query
   await nextTick()
   const period = listPeriods.value[0]
-  if (period) await selectPeriod(period, true)
+  if (period) await locateEvent(period)
   return root.value?.querySelector<HTMLElement>('.yy-calendar-list-text') ?? root.value
 }
 defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !== props.model.title, revealMatch })
@@ -725,7 +737,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
         <IconButton :label="expanded ? '收起日历' : '展开日历'" @click="toggleExpanded"><Minimize2 v-if="expanded" :size="17" /><Maximize2 v-else :size="17" /></IconButton>
       </div>
     </div>
-    <section v-show="!collapsed" class="yy-calendar-workspace" :class="{ 'has-inspector': draft && (!dragging || gestureHadInspector) }">
+    <section v-show="!collapsed" class="yy-calendar-workspace">
       <div class="yy-calendar-main">
         <div class="yy-calendar-toolbar">
           <div class="yy-calendar-segments" aria-label="时间粒度">
@@ -785,7 +797,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
                 ></span>
               </button>
               <div v-if="dragging && draft && !creatingRange" class="yy-calendar-drag-feedback" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">{{ periodRangeLabel(draft) }} · {{ periodDays(draft) }} 天</div>
-              <div v-if="!periods.length && !draft" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
+              <div v-if="!periods.length" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
                 <CalendarDays :size="28" /><strong>从一段时间开始记录</strong><span>{{ readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
               </div>
             </div>
@@ -795,7 +807,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
         <div v-if="showList" class="yy-calendar-list">
           <div class="yy-calendar-list-head"><label><Search :size="15" /><input v-model="listQuery" placeholder="搜索事件或标注" aria-label="搜索日历事件" /><button v-if="listQuery" type="button" aria-label="清空事件搜索" @click="listQuery = ''"><X :size="14" /></button></label><span>{{ listPeriods.length }} 个事件</span></div>
           <div class="yy-calendar-list-rows">
-            <button v-for="period in listPeriods" :key="period.id" type="button" class="yy-calendar-list-row" :class="[`color-${period.color}`, { selected: selectedID === period.id }]" @click="period.id !== -1 && selectPeriod(period, true)">
+            <button v-for="period in listPeriods" :key="period.id" type="button" class="yy-calendar-list-row" :class="[`color-${period.color}`, { selected: selectedID === period.id }]" @click="selectPeriod(period)">
               <span class="yy-calendar-dot"></span><span class="yy-calendar-list-text"><strong>{{ period.title || '未命名事件' }}</strong><small>{{ periodRangeLabel(period) }} · {{ periodDays(period) }} 天</small><span v-if="period.note">{{ period.note }}</span></span><span class="yy-calendar-status" :class="{ current: periodStatus(period) === '进行中' }">{{ periodStatus(period) }}</span><ChevronRight :size="15" />
             </button>
             <p v-if="!listPeriods.length" class="yy-calendar-list-empty">{{ listQuery ? '没有匹配的事件，试试其他关键词。' : '添加事件后，可以在这里快速查找和定位。' }}</p>
@@ -803,70 +815,78 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
         </div>
       </div>
 
-      <aside v-if="draft && readonly" class="yy-calendar-inspector yy-calendar-details">
+    </section>
+  </section>
+  </Teleport>
+  <Teleport to="body">
+    <div v-if="draft && !dragging" class="yy-calendar-inspector-layer" @pointerdown.self="closeDraft()" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
+      <aside v-if="readonly" ref="inspector" class="yy-calendar-inspector yy-calendar-details" role="dialog" aria-modal="true" aria-label="事件详情" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head"><strong>{{ draft.title }}</strong><IconButton label="关闭详情" @click="closeDraft(true)"><X :size="17" /></IconButton></div>
-        <div class="yy-calendar-detail-meta"><span class="yy-calendar-status" :class="{ current: periodStatus(draft) === '进行中' }">{{ periodStatus(draft) }}</span><span>{{ periodDays(draft) }} 天</span></div>
-        <p>{{ periodRangeLabel(draft) }}</p><p class="yy-calendar-note">{{ draft.note || '暂无标注' }}</p>
+        <div class="yy-calendar-inspector-body">
+          <div class="yy-calendar-detail-meta"><span class="yy-calendar-status" :class="{ current: periodStatus(draft) === '进行中' }">{{ periodStatus(draft) }}</span><span>{{ periodDays(draft) }} 天</span></div>
+          <p>{{ periodRangeLabel(draft) }}</p><p class="yy-calendar-note">{{ draft.note || '暂无标注' }}</p>
+        </div>
       </aside>
-      <aside v-else-if="draft && (!dragging || gestureHadInspector)" class="yy-calendar-inspector" aria-label="事件编辑器">
+      <aside v-else ref="inspector" class="yy-calendar-inspector" role="dialog" aria-modal="true" :aria-label="draft.id == null ? '新建事件' : '编辑事件'" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head">
-          <div><span>{{ draft.id == null ? '新事件' : '事件详情' }} <em>{{ draftDirty ? '待应用' : draft.id == null ? '' : '已应用' }}</em></span><small>{{ periodRangeLabel(draftAsPeriod()!) }} · {{ rangeError ? '' : `${periodDays(draft)} 天` }}</small></div>
+          <div><span>{{ draft.id == null ? '新建事件' : '编辑事件' }} <em>{{ draftDirty ? '待应用' : draft.id == null ? '' : '已应用' }}</em></span><small>{{ periodRangeLabel(draftAsPeriod()!) }} · {{ rangeError ? '' : `${periodDays(draft)} 天` }}</small></div>
           <IconButton label="关闭" @click="closeDraft()"><X :size="17" /></IconButton>
         </div>
 
-        <label class="yy-calendar-field">
-          <span>事件名称 <small>{{ [...draft.title].length }}/120</small></span>
-          <input v-model="draft.title" name="calendar-title" class="yy-input" maxlength="120" placeholder="例如：专注学习、项目冲刺、休整" />
-        </label>
-
-        <div class="yy-calendar-field">
-          <span>时间粒度</span>
-          <div class="yy-calendar-segments wide" aria-label="事件时间粒度">
-            <button v-for="item in grains" :key="item.value" type="button" :class="{ active: draft.precision === item.value }" @click="setDraftPrecision(item.value)">{{ item.label }}</button>
-          </div>
-        </div>
-
-        <div class="yy-calendar-boundaries">
+        <div class="yy-calendar-inspector-body">
           <label class="yy-calendar-field">
-            <span>开始</span>
-            <input
-              class="yy-input"
-              :type="draft.precision === 'year' ? 'number' : draft.precision === 'month' ? 'month' : 'date'"
-              :min="draft.precision === 'year' ? 1000 : draft.precision === 'month' ? '1000-01' : '1000-01-01'"
-              :max="draft.precision === 'year' ? 9999 : draft.precision === 'month' ? '9999-12' : '9999-12-31'"
-              :value="boundaryValue('start')"
-              @input="changeBoundary('start', $event)"
-            />
+            <span>事件名称 <small>{{ [...draft.title].length }}/120</small></span>
+            <input v-model="draft.title" name="calendar-title" class="yy-input" maxlength="120" placeholder="例如：专注学习、项目冲刺、休整" />
           </label>
-          <label class="yy-calendar-field">
-            <span>结束 <small>包含当天</small></span>
-            <input
-              class="yy-input"
-              :type="draft.precision === 'year' ? 'number' : draft.precision === 'month' ? 'month' : 'date'"
-              :min="draft.precision === 'year' ? 1000 : draft.precision === 'month' ? '1000-01' : '1000-01-01'"
-              :max="draft.precision === 'year' ? 9999 : draft.precision === 'month' ? '9999-12' : '9999-12-31'"
-              :value="boundaryValue('end')"
-              @input="changeBoundary('end', $event)"
-            />
-          </label>
-        </div>
-        <div class="yy-calendar-duration"><span>快捷时长</span><button v-for="amount in (draft.precision === 'day' ? [1, 7, 14, 30] : [1, 3, 6, 12])" :key="amount" type="button" @click="setDuration(amount)">{{ amount }}{{ draft.precision === 'year' ? '年' : draft.precision === 'month' ? '个月' : '天' }}</button></div>
-        <p v-if="rangeError && (showValidation || draft.title.trim())" class="yy-calendar-field-error" role="status">{{ rangeError }}</p>
 
-        <div class="yy-calendar-field">
-          <span>颜色</span>
-          <div class="yy-calendar-colors">
-            <button v-for="color in colors" :key="color.value" type="button" :class="[`color-${color.value}`, { active: draft.color === color.value }]" :aria-label="color.label" :data-tip="color.label" @click="draft.color = color.value">
-              <Check v-if="draft.color === color.value" :size="14" />
-            </button>
+          <div class="yy-calendar-field">
+            <span>时间粒度</span>
+            <div class="yy-calendar-segments wide" aria-label="事件时间粒度">
+              <button v-for="item in grains" :key="item.value" type="button" :class="{ active: draft.precision === item.value }" @click="setDraftPrecision(item.value)">{{ item.label }}</button>
+            </div>
           </div>
+
+          <div class="yy-calendar-boundaries">
+            <label class="yy-calendar-field">
+              <span>开始</span>
+              <input
+                class="yy-input"
+                :type="draft.precision === 'year' ? 'number' : draft.precision === 'month' ? 'month' : 'date'"
+                :min="draft.precision === 'year' ? 1000 : draft.precision === 'month' ? '1000-01' : '1000-01-01'"
+                :max="draft.precision === 'year' ? 9999 : draft.precision === 'month' ? '9999-12' : '9999-12-31'"
+                :value="boundaryValue('start')"
+                @input="changeBoundary('start', $event)"
+              />
+            </label>
+            <label class="yy-calendar-field">
+              <span>结束 <small>包含当天</small></span>
+              <input
+                class="yy-input"
+                :type="draft.precision === 'year' ? 'number' : draft.precision === 'month' ? 'month' : 'date'"
+                :min="draft.precision === 'year' ? 1000 : draft.precision === 'month' ? '1000-01' : '1000-01-01'"
+                :max="draft.precision === 'year' ? 9999 : draft.precision === 'month' ? '9999-12' : '9999-12-31'"
+                :value="boundaryValue('end')"
+                @input="changeBoundary('end', $event)"
+              />
+            </label>
+          </div>
+          <div class="yy-calendar-duration"><span>快捷时长</span><button v-for="amount in (draft.precision === 'day' ? [1, 7, 14, 30] : [1, 3, 6, 12])" :key="amount" type="button" @click="setDuration(amount)">{{ amount }}{{ draft.precision === 'year' ? '年' : draft.precision === 'month' ? '个月' : '天' }}</button></div>
+          <p v-if="rangeError && (showValidation || draft.title.trim())" class="yy-calendar-field-error" role="status">{{ rangeError }}</p>
+
+          <div class="yy-calendar-field">
+            <span>颜色</span>
+            <div class="yy-calendar-colors">
+              <button v-for="color in colors" :key="color.value" type="button" :class="[`color-${color.value}`, { active: draft.color === color.value }]" :aria-label="color.label" :data-tip="color.label" @click="draft.color = color.value">
+                <Check v-if="draft.color === color.value" :size="14" />
+              </button>
+            </div>
+          </div>
+
+          <label class="yy-calendar-field grow">
+            <span>简单标注 <small>{{ [...draft.note].length }}/2000</small></span>
+            <textarea v-model="draft.note" class="yy-input yy-textarea" maxlength="2000" rows="4" placeholder="记录这一阶段的重点、感受或背景。"></textarea>
+          </label>
         </div>
-
-        <label class="yy-calendar-field grow">
-          <span>简单标注 <small>{{ [...draft.note].length }}/2000</small></span>
-          <textarea v-model="draft.note" class="yy-input yy-textarea" maxlength="2000" rows="5" placeholder="记录这一阶段的重点、感受或背景。"></textarea>
-        </label>
-
         <div class="yy-calendar-inspector-actions">
           <button v-if="draft.id != null" type="button" class="yy-btn danger-text" @click="removeDraft"><Trash2 :size="15" />删除</button>
           <span class="yy-spacer"></span>
@@ -876,14 +896,13 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
         </div>
         <p class="yy-calendar-shortcut">⌘/Ctrl + Enter 应用 · Esc 关闭</p>
       </aside>
-    </section>
-  </section>
+    </div>
   </Teleport>
 </template>
 
 <style scoped>
 .yy-calendar-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
-.yy-calendar-main, .yy-calendar-inspector { min-width: 0; border: 1px solid var(--yy-border); border-radius: 12px; background: var(--yy-bg); box-shadow: 0 5px 20px color-mix(in srgb, #000 4%, transparent); }
+.yy-calendar-main { min-width: 0; border: 1px solid var(--yy-border); border-radius: 12px; background: var(--yy-bg); }
 .yy-calendar-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 58px; padding: 10px 12px; border-bottom: 1px solid var(--yy-border); }
 .yy-calendar-segments { display: inline-flex; flex: none; padding: 3px; border-radius: 8px; background: var(--yy-bg-muted); }
 .yy-calendar-segments button { min-width: 40px; height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
@@ -960,8 +979,11 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
 .yy-calendar-empty { position: absolute; z-index: 1; left: 50%; top: 84px; display: flex; flex-direction: column; align-items: center; color: var(--yy-text-3); transform: translateX(-50%); pointer-events: none; }
 .yy-calendar-empty strong { margin-top: 5px; color: var(--yy-text-2); }
 .yy-calendar-empty span { font-size: 12px; }
-.yy-calendar-inspector { position: static; display: flex; flex-direction: column; padding: 16px; }
-.yy-calendar-inspector-head { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 13px; border-bottom: 1px solid var(--yy-border); }
+.yy-calendar-inspector-layer { position: fixed; z-index: 84; inset: 0; display: grid; place-items: center; padding: 16px; }
+.yy-calendar-inspector { display: flex; flex-direction: column; width: min(460px, 100%); min-width: 0; max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--yy-border); border-radius: 16px; background: var(--yy-bg); box-shadow: 0 20px 70px #0003, 0 4px 16px #0001; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
+.yy-calendar-inspector-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 20px 18px; }
+.yy-calendar-inspector-body > .yy-calendar-field:first-child { margin-top: 16px; }
+.yy-calendar-inspector-head { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 20px 13px; border-bottom: 1px solid var(--yy-border); }
 .yy-calendar-inspector-head > div { min-width: 0; }
 .yy-calendar-inspector-head span, .yy-calendar-inspector-head small { display: block; }
 .yy-calendar-inspector-head span { font-weight: 650; }
@@ -983,13 +1005,17 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
 .color-slate { --period: #69747d !important; --period-soft: #e9edef !important; }
 .color-lime { --period: #6d9418 !important; --period-soft: #edf6d8 !important; }
 .yy-calendar-field.grow textarea { min-height: 110px; max-height: 260px; }
-.yy-calendar-inspector-actions { display: flex; align-items: center; gap: 7px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--yy-border); }
-.yy-calendar-shortcut { margin: 8px 0 -4px; color: var(--yy-text-4); font-size: 10px; text-align: right; }
+.yy-calendar-inspector-actions { display: flex; flex: none; align-items: center; gap: 7px; padding: 14px 20px 0; border-top: 1px solid var(--yy-border); }
+.yy-calendar-shortcut { flex: none; margin: 8px 20px 14px; color: var(--yy-text-4); font-size: 10px; text-align: right; }
 @media (max-width: 650px) {
-  .yy-calendar-main, .yy-calendar-inspector { border-radius: 10px; }
+  .yy-calendar-main { border-radius: 10px; }
+  .yy-calendar-inspector-layer { padding: 12px; }
+  .yy-calendar-inspector { max-height: calc(100dvh - 24px); }
+  .yy-calendar-inspector-head { padding: 14px 16px 12px; }
+  .yy-calendar-inspector-body { padding: 0 16px 16px; }
+  .yy-calendar-inspector-actions { padding: 12px 16px; }
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
   .yy-calendar-window { order: 3; flex: 1 0 100%; padding-top: 5px; }
-  .yy-calendar-inspector { padding: 14px; }
   .yy-calendar-boundaries { grid-template-columns: 1fr; gap: 0; }
   .yy-calendar-period-text small { display: none; }
   .yy-calendar-shortcut { display: none; }
@@ -1024,8 +1050,5 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
   .yy-calendar-list-toggle { margin-left: auto; }
   .yy-calendar-current-count { display: none; }
-}
-@container (min-width: 980px) {
-  .yy-calendar-workspace.has-inspector { grid-template-columns: minmax(0, 1fr) 300px; }
 }
 </style>
