@@ -398,6 +398,7 @@ async function scrollTimeline() {
   const right = element.scrollWidth - element.clientWidth - element.scrollLeft < buffer && cells.value.at(-1)!.end < '9999-12-31'
   if (!left && !right) return
   rebasing = true
+  selectionMotionPaused.value = true
   const oldScroll = element.scrollLeft
   const oldCells = cells.value
   const oldStart = oldCells[0].start
@@ -411,6 +412,9 @@ async function scrollTimeline() {
   element.scrollLeft = oldScroll - offset
   if (barGesture) barGesture.startScroll -= offset
   syncViewport()
+  // Recycled axis coordinates must snap before restoring range interpolation.
+  creatingSelection.value?.getBoundingClientRect()
+  selectionMotionPaused.value = false
   rebasing = false
 }
 
@@ -469,6 +473,8 @@ interface CreateGesture {
 }
 let createGesture: CreateGesture | null = null
 const creatingRange = ref<{ start: string; end: string } | null>(null)
+const creatingSelection = ref<HTMLElement | null>(null)
+const selectionMotionPaused = ref(false)
 const creatingGeometry = computed(() => creatingRange.value ? periodGeometry({ startDate: creatingRange.value.start, endDate: creatingRange.value.end }, cells.value) : null)
 
 function cellIndex(clientX: number): number {
@@ -756,7 +762,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                 <span v-for="cell in cells" :key="cell.start" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }"></span>
               </div>
               <div v-if="todayGeometry" class="yy-calendar-today-line" :style="{ left: `${todayGeometry.left + todayGeometry.width / 2}%` }" aria-hidden="true"><span>今天</span></div>
-              <div v-if="creatingGeometry" class="yy-calendar-selection" :style="{ left: `${creatingGeometry.left}%`, width: `${creatingGeometry.width}%` }" aria-hidden="true"></div>
+              <div v-if="creatingGeometry" ref="creatingSelection" class="yy-calendar-selection" :class="{ 'motion-paused': selectionMotionPaused }" :style="{ left: `${creatingGeometry.left}%`, width: `${creatingGeometry.width}%` }" aria-hidden="true"></div>
               <button
                 v-for="entry in visiblePeriods"
                 :key="entry.period.id"
@@ -952,7 +958,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-resize.start { left: 2px; }
 .yy-calendar-resize.end { right: 2px; }
 .yy-calendar-period:hover .yy-calendar-resize::after, .yy-calendar-period.selected .yy-calendar-resize::after { content: ''; position: absolute; left: 3px; top: 5px; bottom: 5px; width: 2px; border-radius: 1px; background: var(--period); opacity: .55; }
-.yy-calendar-selection { position: absolute; z-index: 6; top: 58px; bottom: 0; border: 1px dashed var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 8%, transparent); pointer-events: none; }
+.yy-calendar-selection { position: absolute; z-index: 6; top: 58px; bottom: 0; border: 1px dashed var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 8%, transparent); pointer-events: none; transition: left .09s cubic-bezier(.22, .8, .25, 1), width .09s cubic-bezier(.22, .8, .25, 1); }
+.yy-calendar-selection.motion-paused { transition: none; }
 .yy-calendar-empty { position: absolute; z-index: 1; left: 50%; top: 84px; display: flex; flex-direction: column; align-items: center; color: var(--yy-text-3); transform: translateX(-50%); pointer-events: none; }
 .yy-calendar-empty strong { margin-top: 5px; color: var(--yy-text-2); }
 .yy-calendar-empty span { font-size: 12px; }
