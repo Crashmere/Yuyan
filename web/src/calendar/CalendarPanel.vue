@@ -207,7 +207,7 @@ const visiblePeriods = computed(() => renderedPeriods.value.flatMap((period) => 
   return geometry ? [{ period, geometry, lane: laneLayout.value.lanes.get(period.id) ?? 0 }] : []
 }))
 const laneCount = computed(() => Math.max(0, ...visiblePeriods.value.map(p => p.lane + 1)))
-const timelineHeight = computed(() => laneCount.value ? 58 + laneCount.value * 48 + 14 : 164)
+const timelineHeight = computed(() => Math.max(164, 58 + laneCount.value * 48 + 14))
 const selectedID = computed(() => draft.value?.id ?? (draft.value ? -1 : null))
 const draftDirty = computed(() => !!draft.value && JSON.stringify(draftPayload(draft.value)) !== draftBaseline.value)
 const rangeError = computed(() => {
