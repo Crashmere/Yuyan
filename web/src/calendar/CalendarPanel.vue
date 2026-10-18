@@ -785,8 +785,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
                 ></span>
               </button>
               <div v-if="dragging && draft && !creatingRange" class="yy-calendar-drag-feedback" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">{{ periodRangeLabel(draft) }} · {{ periodDays(draft) }} 天</div>
-              <div v-if="!visiblePeriods.length && !draft" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
-                <CalendarDays :size="28" /><strong>{{ periods.length ? '这段时间没有事件' : '从一段时间开始记录' }}</strong><span>{{ periods.length ? '打开事件列表，查找其他时间的记录。' : readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
+              <div v-if="!periods.length && !draft" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
+                <CalendarDays :size="28" /><strong>从一段时间开始记录</strong><span>{{ readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
               </div>
             </div>
           </div>
@@ -891,7 +891,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
 .yy-calendar-segments.wide { display: grid; grid-template-columns: repeat(3, 1fr); }
 .yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .yy-calendar-frame { overflow: hidden; border-radius: 0 0 12px 12px; }
-.yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-gutter: stable; overflow-anchor: none; }
+.yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-width: none; overflow-anchor: none; }
+.yy-calendar-scroll::-webkit-scrollbar { display: none; }
 .yy-calendar-timeline { position: relative; isolation: isolate; overflow: clip; touch-action: pan-x pan-y; user-select: none; cursor: crosshair; }
 .yy-calendar-ruler, .yy-calendar-grid { display: grid; grid-template-columns: repeat(var(--calendar-columns), minmax(0, 1fr)); }
 .yy-calendar-ruler { position: relative; z-index: 4; height: 58px; border-bottom: 1px solid var(--yy-border); background: var(--yy-bg-muted); }
