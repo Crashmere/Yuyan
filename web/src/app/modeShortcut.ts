@@ -29,7 +29,7 @@ export function useModeShortcut(key: string, hint: string, eligible: (event: Key
   const capture = (e: KeyboardEvent) => {
     candidate = undefined
     if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey || (e.shiftKey && key === 'Escape') || e.key.toLowerCase() !== key.toLowerCase()
-      || !eligible(e) || document.querySelector('[role="dialog"], [role="menu"], dialog[open], .yy-find, .yy-slash, .yy-doc-link-suggestion, .cm-search, .yy-code-search, .cm-tooltip-autocomplete, .yy-format-painting, .yy-editor-outline .is-reordering, .yy-columns.is-resizing')) {
+      || !eligible(e) || (e.target instanceof Element && e.target.closest('.yy-calendar-panel')) || document.querySelector('[role="dialog"], [role="menu"], dialog[open], .yy-find, .yy-slash, .yy-doc-link-suggestion, .cm-search, .yy-code-search, .cm-tooltip-autocomplete, .yy-format-painting, .yy-editor-outline .is-reordering, .yy-columns.is-resizing')) {
       reset()
       return
     }

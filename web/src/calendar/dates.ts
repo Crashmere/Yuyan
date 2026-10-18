@@ -107,7 +107,7 @@ export function windowCells(center: string, grain: CalendarPrecision): CalendarC
   return cells
 }
 
-function dayPosition(value: string, cells: CalendarCell[]): number {
+export function dayPosition(value: string, cells: CalendarCell[]): number {
   if (!cells.length || value <= cells[0].start) return 0
   const last = cells.at(-1)!
   if (value > last.end) return cells.length
@@ -120,6 +120,49 @@ function dayPosition(value: string, cells: CalendarCell[]): number {
     return index + offset / span
   }
   return cells.length
+}
+
+export function dateAtPosition(position: number, cells: CalendarCell[]): string {
+  const index = Math.max(0, Math.min(cells.length - 1, Math.floor(position)))
+  const cell = cells[index]!
+  const days = (parseCalendarDate(cell.end).getTime() - parseCalendarDate(cell.start).getTime()) / DAY + 1
+  return addDays(cell.start, Math.min(days - 1, Math.max(0, Math.floor((position - index) * days))))
+}
+
+export function periodDays(period: Pick<CalendarEntry, 'startDate' | 'endDate'>): number {
+  return (parseCalendarDate(period.endDate).getTime() - parseCalendarDate(period.startDate).getTime()) / DAY + 1
+}
+
+// Shift exact dates without JavaScript's end-of-month overflow (Jan 31 -> Feb 28).
+function shiftDate(value: string, grain: CalendarPrecision, amount: number): string {
+  if (grain === 'day') return addDays(value, amount)
+  const day = parseCalendarDate(value).getUTCDate()
+  const start = addUnits(value, grain === 'year' ? 'month' : grain, grain === 'year' ? amount * 12 : amount)
+  if (start < '1000-01-01' || start > '9999-12-31' || start.length !== 10) return start
+  return addDays(start, Math.min(day, parseCalendarDate(unitBounds(start, 'month').end).getUTCDate()) - 1)
+}
+
+export function adjustPeriod(period: CalendarEntry, grain: CalendarPrecision, amount: number, mode: 'move' | 'start' | 'end'): CalendarEntry {
+  if (!amount) return { ...period }
+  const shiftedStart = shiftDate(period.startDate, grain, amount)
+  const shiftedEnd = shiftDate(period.endDate, grain, amount)
+  if ([shiftedStart, shiftedEnd].some(date => date.length !== 10 || date < '1000-01-01' || date > '9999-12-31')) return { ...period }
+  let startDate = period.startDate, endDate = period.endDate
+  if (mode === 'move') {
+    startDate = unitBounds(shiftedStart, period.precision).start
+    if (period.precision === 'day') endDate = addDays(startDate, periodDays(period) - 1)
+    else {
+      const start = parseCalendarDate(period.startDate), next = parseCalendarDate(startDate)
+      const units = period.precision === 'year' ? next.getUTCFullYear() - start.getUTCFullYear()
+        : (next.getUTCFullYear() - start.getUTCFullYear()) * 12 + next.getUTCMonth() - start.getUTCMonth()
+      const last = addUnits(period.endDate, period.precision, units)
+      if (last.length !== 10 || last > '9999-12-31') return { ...period }
+      endDate = unitBounds(last, period.precision).end
+    }
+  } else if (mode === 'start') startDate = unitBounds(shiftedStart, period.precision).start
+  else endDate = unitBounds(shiftedEnd, period.precision).end
+  if (startDate > endDate || endDate > '9999-12-31' || endDate.length !== 10) return { ...period }
+  return { ...period, startDate, endDate }
 }
 
 export function periodGeometry(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, cells: CalendarCell[]): PeriodGeometry | null {
