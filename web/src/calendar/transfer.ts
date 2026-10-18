@@ -1,6 +1,5 @@
-import { unitBounds } from '../app/calendar'
-import { calendarDefaults, validCalendar, type CalendarData, type CalendarEntry } from '../schema/calendar'
-import type { CalendarPrecision } from '../shared/api'
+import { unitBounds } from './dates'
+import { calendarDefaults, validCalendar, type CalendarData, type CalendarEntry, type CalendarPrecision } from '../schema/calendar'
 
 const prefix = 'YYCAL1:'
 const grains: Record<string, CalendarPrecision> = { y: 'year', m: 'month', d: 'day' }

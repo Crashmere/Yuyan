@@ -1,4 +1,4 @@
-import type { CalendarPeriod, CalendarPrecision } from '../shared/api'
+import type { CalendarEntry, CalendarPrecision } from '../schema/calendar'
 
 export interface CalendarCell {
   start: string
@@ -122,7 +122,7 @@ function dayPosition(value: string, cells: CalendarCell[]): number {
   return cells.length
 }
 
-export function periodGeometry(period: Pick<CalendarPeriod, 'startDate' | 'endDate'>, cells: CalendarCell[]): PeriodGeometry | null {
+export function periodGeometry(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, cells: CalendarCell[]): PeriodGeometry | null {
   if (!cells.length || period.endDate < cells[0].start || period.startDate > cells.at(-1)!.end) return null
   const start = dayPosition(period.startDate, cells)
   const end = period.endDate >= cells.at(-1)!.end ? cells.length : dayPosition(addDays(period.endDate, 1), cells)
@@ -134,7 +134,7 @@ export function periodGeometry(period: Pick<CalendarPeriod, 'startDate' | 'endDa
   }
 }
 
-export function assignPeriodLanes(periods: Pick<CalendarPeriod, 'id' | 'startDate' | 'endDate'>[]): { lanes: Map<number, number>; count: number } {
+export function assignPeriodLanes(periods: Pick<CalendarEntry, 'id' | 'startDate' | 'endDate'>[]): { lanes: Map<number, number>; count: number } {
   const sorted = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id - b.id)
   const ends: string[] = []
   const lanes = new Map<number, number>()
@@ -147,7 +147,7 @@ export function assignPeriodLanes(periods: Pick<CalendarPeriod, 'id' | 'startDat
   return { lanes, count: ends.length }
 }
 
-export function periodRangeLabel(period: Pick<CalendarPeriod, 'startDate' | 'endDate' | 'precision'>): string {
+export function periodRangeLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate' | 'precision'>): string {
   if (period.precision === 'year') return period.startDate.slice(0, 4) === period.endDate.slice(0, 4)
     ? `${period.startDate.slice(0, 4)}年`
     : `${period.startDate.slice(0, 4)}年 – ${period.endDate.slice(0, 4)}年`

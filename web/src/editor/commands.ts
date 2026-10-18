@@ -1,5 +1,5 @@
 import { calendarDefaults } from '../schema/calendar'
-import { todayDate } from '../app/calendar'
+import { todayDate } from '../calendar/dates'
 import { openDrawing } from '../drawing/open'
 import type { Component } from 'vue'
 import type { Editor } from '@tiptap/core'

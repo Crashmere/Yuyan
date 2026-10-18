@@ -12,7 +12,7 @@ const name = 'yy-search'
 const blocks = '.yy-drawing-text, p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, figcaption, .callout-title, .yy-fold-title, .code-title, .yy-line, pre'
 // Formulas and diagrams are redrawn from their source; buttons and language labels are not part of
 // the text, nor are copies of deleted content shown by recent changes.
-const skipped = '.yy-calendar-page, [data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang, .yy-recent-ghost, .yy-segment'
+const skipped = '.yy-calendar-panel, [data-type="inline-math"], [data-type="block-math"], code.language-mermaid, .yy-mermaid, button, .code-lang, .yy-recent-ghost, .yy-segment'
 const limit = 500
 
 export function findMatches(root: HTMLElement, query: string): Range[] {

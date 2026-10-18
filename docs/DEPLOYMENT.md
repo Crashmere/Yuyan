@@ -25,7 +25,7 @@ To update only portal information, run `make portal`; it preflights and synchron
 
 Use the restricted yuyan-deploy identity; the private key exists only on the maintenance computer. To create the account for the first time, run `deploy/setup-deploy.sh <local-release-public-key>`; do not initialize an existing account again. The forced command accepts only deploy, portal-check, and portal; sudo allows only this application's fixed release script.
 
-Switching begins only after upload completes and validation passes. Preserve the pre-upgrade backup and the `previous` release artifact; restore the old program if health checks fail. A normal release does not carry production data. The administrator explicitly synchronizes the unit, Nginx, env, authorization, and release scripts from source; documentation uses the shared sync-docs.sh.
+Switching begins only after upload completes and validation passes. Preserve the pre-upgrade backup and the `previous` release artifact. The failure handler restores only the previous program; after a migration raises `min_layout`, recovery may instead require a compatible fixed program. Layout 4 requires layout-4-capable binaries, including support for calendar document blocks. A normal release does not carry production data. The administrator explicitly synchronizes the unit, Nginx, env, authorization, and release scripts from source; documentation uses the shared sync-docs.sh.
 
 The release tool uploads with gzip under the existing protocol and verifies the SHA-256 of the uncompressed program. When editor formats change, use the retained roundtrip tool as needed; an ordinary release does not run historical browser regression.
 

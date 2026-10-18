@@ -174,23 +174,6 @@ export interface TrashItem {
   deletedAt: string
 }
 
-export type CalendarPrecision = 'year' | 'month' | 'day'
-
-export interface CalendarPeriod {
-  id: number
-  title: string
-  note: string
-  startDate: string
-  endDate: string
-  precision: CalendarPrecision
-  color: string
-  revision: number
-  createdAt: string
-  updatedAt: string
-}
-
-export type CalendarPeriodInput = Pick<CalendarPeriod, 'title' | 'note' | 'startDate' | 'endDate' | 'precision' | 'color'>
-
 export interface Asset {
   size: number
   mime: string

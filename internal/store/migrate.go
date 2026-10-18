@@ -22,7 +22,8 @@ import (
 // step; programs whose last step is older then refuse to open the database.
 var migrations = []migration{
 	{layout: 2, name: "docs and doc_versions keep large columns last", run: largeColumnsLast},
-	{layout: 3, name: "add calendar periods", run: addCalendarPeriods},
+	// Layout 3 introduced the retired standalone calendar. Earlier layouts can skip its creation.
+	{layout: 4, name: "remove standalone calendar periods", breaksOlder: true, run: removeCalendarPeriods},
 }
 
 var currentLayout = migrations[len(migrations)-1].layout
@@ -184,11 +185,8 @@ func largeColumnsLast(ctx context.Context, tx *sql.Tx) error {
 	return rebuildTable(ctx, tx, "doc_versions", docVersionsTable, docVersionsIndexes)
 }
 
-func addCalendarPeriods(ctx context.Context, tx *sql.Tx) error {
-	if _, err := tx.ExecContext(ctx, calendarPeriodsTable); err != nil {
-		return err
-	}
-	_, err := tx.ExecContext(ctx, calendarPeriodsIndexes)
+func removeCalendarPeriods(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS calendar_periods`)
 	return err
 }
 

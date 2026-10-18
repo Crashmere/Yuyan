@@ -26,6 +26,7 @@ const themeKey = 'yuyan:theme'
 
 function load(): Partial<Prefs> {
   try {
+    localStorage.removeItem('yy-calendar-grain')
     const saved = JSON.parse(localStorage.getItem(prefsKey) ?? '{}') as Partial<Prefs> & { pageWidth?: unknown; codeLineNumbers?: unknown; codeWrap?: unknown }
     delete saved.pageWidth // All pages now use the former wide layout.
     delete saved.codeLineNumbers

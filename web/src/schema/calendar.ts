@@ -1,9 +1,17 @@
 import { Node } from '@tiptap/core'
 import type { DOMOutputSpec } from '@tiptap/pm/model'
-import type { CalendarPeriodInput, CalendarPrecision } from '../shared/api'
-import { canonicalRange, parseCalendarDate } from '../app/calendar'
+import { canonicalRange, parseCalendarDate } from '../calendar/dates'
 
-export interface CalendarEntry extends CalendarPeriodInput { id: number }
+export type CalendarPrecision = 'year' | 'month' | 'day'
+export interface CalendarEntry {
+  id: number
+  title: string
+  note: string
+  startDate: string
+  endDate: string
+  precision: CalendarPrecision
+  color: string
+}
 export interface CalendarData {
   version: number
   title: string

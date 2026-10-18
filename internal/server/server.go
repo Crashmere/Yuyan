@@ -156,10 +156,6 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.HandleFunc("GET /versions/{id}", s.appPage(routeVersion))
 	mux.HandleFunc("GET /search", s.appPage(routeSearch))
 	mux.HandleFunc("GET /trash", s.appPage(routeTrash))
-	// The standalone calendar has moved into document components; keep old bookmarks usable.
-	mux.HandleFunc("GET /calendar", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, s.base, http.StatusFound)
-	})
 	mux.HandleFunc("GET /", s.appPage(routeNotFound))
 
 	mux.HandleFunc("GET /assets/{file}", s.assetFile)
@@ -223,10 +219,6 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("POST /api/attachments", s.write(s.apiUploadAttachment))
 	mux.Handle("GET /api/attachments/{id}/preview", s.get(s.attachmentPreview))
 	mux.Handle("GET /api/search", s.read(s.apiSearch))
-	mux.Handle("GET /api/calendar/periods", s.get(s.calendarPeriods))
-	mux.Handle("POST /api/calendar/periods", s.write(s.apiCreateCalendarPeriod))
-	mux.Handle("PUT /api/calendar/periods/{id}", s.write(s.apiUpdateCalendarPeriod))
-	mux.Handle("DELETE /api/calendar/periods/{id}", s.write(s.apiDeleteCalendarPeriod))
 	mux.Handle("GET /api/trash", s.get(s.trash))
 	mux.Handle("DELETE /api/trash", s.write(s.apiEmptyTrash))
 	mux.Handle("DELETE /api/trash/docs/{id}", s.write(s.apiPurgeDoc))

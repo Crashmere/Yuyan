@@ -73,22 +73,6 @@ const docVersionsTable = `CREATE TABLE doc_versions (
 const docVersionsIndexes = `
 CREATE INDEX doc_versions_doc ON doc_versions(doc_id, id);`
 
-const calendarPeriodsTable = `CREATE TABLE calendar_periods (
-  id INTEGER PRIMARY KEY,
-  title TEXT NOT NULL,
-  note TEXT NOT NULL DEFAULT '',
-  start_date TEXT NOT NULL,
-  end_date TEXT NOT NULL,
-  precision TEXT NOT NULL CHECK (precision IN ('year', 'month', 'day')),
-  color TEXT NOT NULL,
-  revision INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-)`
-
-const calendarPeriodsIndexes = `
-CREATE INDEX calendar_periods_time ON calendar_periods(start_date, end_date, id);`
-
 const schema = `
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE books (
@@ -113,7 +97,6 @@ CREATE TABLE assets (
   original_name TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
-` + calendarPeriodsTable + `;` + calendarPeriodsIndexes + `
 `
 
 // Init creates an empty data directory. It refuses to touch an existing database.
