@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { CalendarRange, ChevronRight, FolderPlus, House, Plus } from 'lucide-vue-next'
+import { ChevronRight, FolderPlus, House, Plus } from 'lucide-vue-next'
 import IconButton from '../../ui/IconButton.vue'
 import ContextActions from '../../ui/ContextActions.vue'
 import { bookMenu, newBook, newBookGroup } from '../actions'
@@ -15,7 +15,6 @@ onMounted(() => void loadBooks())
   <div class="yy-sidebar-body">
     <nav class="yy-nav">
       <RouterLink to="/" class="yy-nav-item" exact-active-class="active"><House :size="16" />首页</RouterLink>
-      <RouterLink to="/calendar" class="yy-nav-item" active-class="active"><CalendarRange :size="16" />日历</RouterLink>
     </nav>
     <div class="yy-section-head">
       <span>知识库</span>

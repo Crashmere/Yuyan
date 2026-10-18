@@ -23,7 +23,6 @@ const (
 	routeVersion
 	routeSearch
 	routeTrash
-	routeCalendar
 	routeNotFound
 )
 
@@ -37,7 +36,6 @@ var routeViews = map[route]string{
 	routeVersion:  "src/app/views/VersionView.vue",
 	routeSearch:   "src/app/views/SearchView.vue",
 	routeTrash:    "src/app/views/TrashView.vue",
-	routeCalendar: "src/app/views/CalendarView.vue",
 	routeNotFound: "src/app/views/NotFoundView.vue",
 }
 
@@ -188,9 +186,6 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 		case routeTrash:
 			p.add("trash", r, s.trash)
 			title = "回收站"
-		case routeCalendar:
-			p.add("calendar/periods", r, s.calendarPeriods)
-			title = "日历"
 		case routeNotFound:
 			status = http.StatusNotFound
 		}

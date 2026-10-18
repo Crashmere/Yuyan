@@ -156,7 +156,10 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.HandleFunc("GET /versions/{id}", s.appPage(routeVersion))
 	mux.HandleFunc("GET /search", s.appPage(routeSearch))
 	mux.HandleFunc("GET /trash", s.appPage(routeTrash))
-	mux.HandleFunc("GET /calendar", s.appPage(routeCalendar))
+	// The standalone calendar has moved into document components; keep old bookmarks usable.
+	mux.HandleFunc("GET /calendar", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, s.base, http.StatusFound)
+	})
 	mux.HandleFunc("GET /", s.appPage(routeNotFound))
 
 	mux.HandleFunc("GET /assets/{file}", s.assetFile)
