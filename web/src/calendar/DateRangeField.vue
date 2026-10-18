@@ -150,7 +150,7 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
 
 <template>
   <div ref="field" class="yy-date-field" @keydown="onKey">
-    <div class="yy-date-label"><span>日期范围</span><div class="yy-date-precision" aria-label="事件时间粒度"><button v-for="item in precisions" :key="item.value" type="button" :aria-pressed="precision === item.value" @click="setPrecision(item.value)">{{ item.label }}</button></div></div>
+    <div class="yy-date-label"><span>日期范围</span><div class="yy-date-precision" aria-label="事件时间粒度" :style="{ '--precision-index': precisions.findIndex(item => item.value === precision) }"><button v-for="item in precisions" :key="item.value" type="button" :aria-pressed="precision === item.value" @click="setPrecision(item.value)">{{ item.label }}</button></div></div>
     <div ref="reference" class="yy-date-range" :class="{ invalid: parsed.error }">
       <label :class="{ active: open && side === 'start' }"><span>开始</span><input v-model="startText" aria-label="开始日期" inputmode="numeric" spellcheck="false" :placeholder="precision === 'day' ? 'YYYY-MM-DD' : precision === 'month' ? 'YYYY-MM' : 'YYYY'" @click="show('start')" @input="inputDate" @blur="normalizeInput" /></label>
       <ArrowRight :size="15" />
@@ -160,7 +160,9 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
     <div class="yy-date-summary"><span>{{ parsed.error || `共 ${duration}，包含起止${precision === 'day' ? '当天' : precision === 'month' ? '月份' : '年份'}` }}</span><button type="button" @click="useToday">{{ precision === 'day' ? '今天' : precision === 'month' ? '本月' : '今年' }}</button></div>
     <div v-if="loadError" class="yy-date-load-error">日期面板未能加载<button type="button" @click="show(side)">重试</button></div>
     <Teleport to="body">
+      <Transition name="yy-date-popover">
       <component :is="picker.module.value.default" v-if="open && picker.module.value && reference" ref="popover" :reference="reference" :start="start" :end="end" :precision="precision" :side="side" :selecting-end="selectingEnd" @select="select" @close="close" @keydown="onPopupKey" />
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -168,9 +170,10 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
 <style scoped>
 .yy-date-field { margin-top: 16px; }
 .yy-date-label { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; color: var(--yy-text-2); font-size: 12px; }
-.yy-date-precision { display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--yy-bg-muted); }
-.yy-date-precision button { border: 0; border-radius: 5px; padding: 3px 9px; background: transparent; color: var(--yy-text-3); font: inherit; font-size: 11px; cursor: pointer; }
-.yy-date-precision button[aria-pressed="true"] { color: var(--yy-primary); background: var(--yy-bg); font-weight: 600; }
+.yy-date-precision { position: relative; display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--yy-bg-muted); }
+.yy-date-precision::before { content: ''; position: absolute; left: 2px; top: 2px; bottom: 2px; width: 40px; border-radius: 5px; background: var(--yy-bg); box-shadow: 0 1px 3px #0000000a; transform: translateX(calc(var(--precision-index) * 42px)); transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
+.yy-date-precision button { position: relative; width: 40px; border: 0; border-radius: 5px; padding: 3px 0; background: transparent; color: var(--yy-text-3); font: inherit; font-size: 11px; cursor: pointer; }
+.yy-date-precision button[aria-pressed="true"] { color: var(--yy-primary); font-weight: 600; }
 .yy-date-range { display: flex; align-items: center; gap: 8px; border: 1px solid var(--yy-border); border-radius: 9px; padding: 4px; }
 .yy-date-range.invalid { border-color: var(--yy-danger); }
 .yy-date-range > label { display: flex; flex-direction: column; flex: 1; min-width: 0; padding: 6px 9px; border-radius: 6px; }
@@ -184,4 +187,11 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
 .yy-date-summary button { padding: 2px 4px; border: 0; background: transparent; color: var(--yy-primary); font: inherit; cursor: pointer; }
 .yy-date-load-error { margin-top: 6px; color: var(--yy-danger); font-size: 11px; }
 .yy-date-load-error button { margin-left: 8px; border: 0; background: transparent; color: var(--yy-primary); cursor: pointer; }
+.yy-date-field button, .yy-date-range > label { transition: background-color .12s ease, color .12s ease, scale .12s cubic-bezier(.22, .8, .25, 1); }
+.yy-date-field button:not(:disabled):active { scale: .95; }
+.yy-date-popover-leave-active { pointer-events: none; transition: opacity .1s ease; }
+.yy-date-popover-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before { transition: none !important; }
+}
 </style>

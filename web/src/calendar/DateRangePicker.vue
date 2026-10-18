@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, shallowRef, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, nextTick, shallowRef, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { CalendarDate, parseDate, type DateValue } from '@internationalized/date'
 import { CalendarRoot, CalendarGrid, CalendarGridHead, CalendarGridBody, CalendarGridRow, CalendarHeadCell, CalendarCell, CalendarCellTrigger } from 'reka-ui'
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
 import IconButton from '../ui/IconButton.vue'
 import { todayDate, unitBounds } from './dates'
+import { animateCalendar } from './motion'
 import type { CalendarPrecision } from '../schema/calendar'
 
 const props = defineProps<{ reference: HTMLElement; start: string; end: string; precision: CalendarPrecision; side: 'start' | 'end'; selectingEnd: boolean }>()
@@ -14,18 +15,27 @@ const panel = ref<HTMLElement>()
 const position = ref<{ left: string; top: string; visibility: 'visible' | 'hidden' }>({ left: '0px', top: '0px', visibility: 'hidden' })
 let stopPositioning: (() => void) | undefined
 let disposed = false
+let presented = false
 onMounted(() => {
   const element = panel.value!
   stopPositioning = autoUpdate(props.reference, element, async () => {
     const { x, y } = await computePosition(props.reference, element, {
       strategy: 'fixed', placement: 'bottom-start', middleware: [offset(8), flip(), shift({ padding: 8, crossAxis: true })],
     })
-    if (!disposed) position.value = { left: `${x}px`, top: `${y}px`, visibility: 'visible' }
+    if (disposed) return
+    position.value = { left: `${x}px`, top: `${y}px`, visibility: 'visible' }
+    if (!presented) {
+      presented = true
+      await nextTick()
+      if (!disposed) animateCalendar(element, [{ opacity: 0, clipPath: 'inset(3px 0 round 12px)' }, { opacity: 1, clipPath: 'inset(0 round 12px)' }], 140)
+    }
   })
 })
 onBeforeUnmount(() => { disposed = true; stopPositioning?.() })
 type View = 'day' | 'month' | 'year'
 const view = ref<View>(props.precision)
+const gridPanel = ref<HTMLElement>()
+let direction = 1
 const placeholder = shallowRef<DateValue>(parseDate(props.side === 'start' ? props.start : props.end))
 const hovered = ref('')
 const yearText = ref(String(placeholder.value.year))
@@ -45,7 +55,12 @@ watch(placeholder, date => { yearText.value = String(date.year); yearError.value
 const pageLabel = computed(() => view.value === 'day' ? `${placeholder.value.year}年 ${placeholder.value.month}月` : view.value === 'month' ? `${placeholder.value.year}年` : `${yearBase.value}–${yearBase.value + 11}年`)
 const canPrev = computed(() => view.value === 'day' ? placeholder.value.year > 1000 || placeholder.value.month > 1 : view.value === 'month' ? placeholder.value.year > 1000 : yearBase.value > 1000)
 const canNext = computed(() => view.value === 'day' ? placeholder.value.year < 9999 || placeholder.value.month < 12 : view.value === 'month' ? placeholder.value.year < 9999 : yearBase.value + 11 < 9999)
+watch(() => `${view.value}:${pageLabel.value}`, async () => {
+  await nextTick()
+  if (!disposed) animateCalendar(gridPanel.value, [{ opacity: .35, transform: `translateX(${direction * 7}px)` }, { opacity: 1, transform: 'translateX(0)' }], 140)
+})
 function move(amount: number) {
+  direction = amount
   if (view.value === 'day') placeholder.value = placeholder.value.set({ day: 1 }).add({ months: amount })
   else if (view.value === 'month') placeholder.value = placeholder.value.add({ years: amount })
   else placeholder.value = placeholder.value.set({ year: Math.max(1000, Math.min(9999, yearBase.value + amount * 12)) })
@@ -96,6 +111,7 @@ function yearKey(event: KeyboardEvent) {
       <IconButton :label="view === 'day' ? '下个月' : view === 'month' ? '下一年' : '后十二年'" :disabled="!canNext" @click="move(1)"><ChevronRight :size="17" /></IconButton>
     </div>
     <div class="yy-date-jump"><label><span>年份</span><input v-model="yearText" aria-label="跳转年份" inputmode="numeric" maxlength="4" :aria-invalid="yearError" @change="jumpYear" @keydown="yearKey" /></label><button type="button" @click="jumpYear">跳转</button><span class="yy-spacer"></span><button type="button" @click="thisPage">回到{{ precision === 'year' ? '今年' : '本月' }}</button></div>
+    <div class="yy-date-view"><div ref="gridPanel">
     <CalendarRoot v-if="view === 'day'" v-slot="{ grid, weekDays }" v-model:placeholder="placeholder" :model-value="selected" :min-value="min" :max-value="max" :week-starts-on="1" locale="zh-CN" fixed-weeks prevent-deselect class="yy-date-days" @update:model-value="selectDay">
       <CalendarGrid v-for="month in grid" :key="month.value.toString()" as="div" class="yy-date-grid" @mouseleave="hovered = ''">
         <CalendarGridHead as="div"><CalendarGridRow as="div" class="yy-date-week"><CalendarHeadCell v-for="(day, i) in weekDays" :key="i" as="div" role="columnheader">{{ day }}</CalendarHeadCell></CalendarGridRow></CalendarGridHead>
@@ -104,6 +120,7 @@ function yearKey(event: KeyboardEvent) {
     </CalendarRoot>
     <div v-else-if="view === 'month'" class="yy-date-units" @mouseleave="hovered = ''"><button v-for="date in months" :key="date.month" type="button" :aria-label="`${date.year}年${date.month}月`" :class="precision === 'month' ? dateClasses(date.toString(), 'month') : {}" @mouseenter="hover(date.toString())" @click="chooseMonth(date)">{{ date.month }}月</button></div>
     <div v-else class="yy-date-units" @mouseleave="hovered = ''"><button v-for="year in years" :key="year" type="button" :aria-label="`${year}年`" :class="precision === 'year' ? dateClasses(`${year}-01-01`, 'year') : {}" @mouseenter="hover(`${year}-01-01`)" @click="chooseYear(year)">{{ year }}</button></div>
+    </div></div>
     <div class="yy-date-picker-foot">{{ yearError ? '请输入 1000–9999 之间的年份' : selectingEnd ? '再选结束日期，也可以选同一天' : view === precision ? '点击日期选择，可直接输入或跳转年月' : view === 'year' ? '选择年份后，再选择月份' : '选择月份后，再选择日期' }}</div>
   </div>
 </template>
@@ -111,6 +128,7 @@ function yearKey(event: KeyboardEvent) {
 <style scoped>
 .yy-date-picker { position: fixed; z-index: 86; width: min(360px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); padding: 8px 12px 10px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--yy-border); border-radius: 12px; background: var(--yy-bg); box-shadow: 0 12px 36px #0002, 0 3px 10px #0001; color: var(--yy-text); font: 12px/1.5 var(--yy-font, sans-serif); }
 .yy-date-days { height: 234px; }
+.yy-date-view { height: 234px; overflow: clip; }
 .yy-date-picker-head { display: flex; align-items: center; justify-content: space-between; color: var(--yy-text-3); font-size: 11px; }
 .yy-date-picker-head :deep(.yy-icon-btn) { width: 26px; height: 26px; }
 .yy-date-nav { display: flex; justify-content: space-between; align-items: center; margin: 3px 0 8px; }
@@ -143,4 +161,9 @@ function yearKey(event: KeyboardEvent) {
 .yy-date-units button.range-start, .yy-date-units button.range-end { background: var(--yy-primary); color: white; font-weight: 600; }
 .yy-date-units button.today { text-decoration: underline; text-underline-offset: 5px; }
 .yy-date-picker-foot { min-height: 20px; padding: 5px 2px 0; color: var(--yy-text-4); font-size: 10px; }
+.yy-date-picker button { transition: background-color .1s ease, color .1s ease, scale .1s cubic-bezier(.22, .8, .25, 1); }
+.yy-date-picker button:not(:disabled):active { scale: .94; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, :deep(*), :deep(*::before), :deep(*::after) { transition: none !important; }
+}
 </style>

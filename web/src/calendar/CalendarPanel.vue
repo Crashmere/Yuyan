@@ -10,6 +10,7 @@ import { copyText } from '../shared/clipboard'
 import { decodeCalendar, encodeCalendar } from './transfer'
 import IconButton from '../ui/IconButton.vue'
 import DateRangeField from './DateRangeField.vue'
+import { animateCalendar } from './motion'
 import { toast } from '../ui/toast'
 import { searchTerms } from '../shared/searchMatch'
 import {
@@ -46,6 +47,7 @@ async function toggleExpanded(event?: MouseEvent) {
   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
   if (disposed) return
   await centerTimeline(anchor)
+  animateCalendar(root.value, [{ opacity: .55 }, { opacity: 1 }])
   relocating = false
   // Teleport moves the focused control out of its parent; restore focus after the move.
   if (!disposed) focused?.focus({ preventScroll: true })
@@ -325,6 +327,10 @@ function saveDraft(notify = true) {
   periods.value.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id - b.id)
   draft.value = null
   publish()
+  void nextTick(() => {
+    const bar = root.value?.querySelector<HTMLElement>(`[data-period-id="${saved.id}"]`)
+    animateCalendar(bar, [{ opacity: .4, filter: 'brightness(1.12)' }, { opacity: 1, filter: 'brightness(1)' }], 180)
+  })
   if (notify) toast('事件已应用到文档', 'success', { key: 'calendar-applied' })
 }
 
@@ -435,7 +441,7 @@ function setGrain(value: CalendarPrecision, date = viewportDate()) {
   center.value = date
   grain.value = value
   publish()
-  void centerTimeline()
+  void centerTimeline().then(() => animateCalendar(timelineScroll.value, [{ opacity: .55 }, { opacity: 1 }], 140))
 }
 
 function drillCell(date: string) {
@@ -673,7 +679,7 @@ function locate(value: string) {
   if (value < '1000-01-01' || value > '9999-12-31') return
   center.value = value
   publish()
-  void centerTimeline()
+  void centerTimeline().then(() => animateCalendar(timelineScroll.value, [{ opacity: .55 }, { opacity: 1 }], 140))
 }
 async function flush(): Promise<boolean> {
   renameCalendar()
@@ -717,10 +723,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
         <IconButton :label="expanded ? '收起日历' : '展开日历'" @click="toggleExpanded"><Minimize2 v-if="expanded" :size="17" /><Maximize2 v-else :size="17" /></IconButton>
       </div>
     </div>
-    <section v-show="!collapsed" class="yy-calendar-workspace">
+    <Transition name="yy-calendar-reveal">
+    <div v-show="!collapsed" class="yy-calendar-reveal" :inert="collapsed">
+    <section class="yy-calendar-workspace">
       <div class="yy-calendar-main">
         <div class="yy-calendar-toolbar">
-          <div class="yy-calendar-segments" aria-label="时间粒度">
+          <div class="yy-calendar-segments" aria-label="时间粒度" :style="{ '--segment-index': grains.findIndex(item => item.value === grain) }">
             <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
           </div>
           <span class="yy-calendar-window">{{ windowLabel }}</span>
@@ -754,6 +762,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                 :key="entry.period.id"
                 type="button"
                 class="yy-calendar-period"
+                :data-period-id="entry.period.id"
                 :class="[`color-${entry.period.color}`, { selected: selectedID === entry.period.id, tiny: entry.geometry.width * axisWidth / 100 < 32, 'clip-start': entry.geometry.clippedStart, 'clip-end': entry.geometry.clippedEnd }]"
                 :style="{ left: `${entry.geometry.left}%`, width: `${entry.geometry.width}%`, top: `${72 + entry.lane * 48}px` }"
                 :data-tip="`${entry.period.title} · ${periodRangeLabel(entry.period)}${entry.period.note ? ` · ${entry.period.note}` : ''}`"
@@ -774,10 +783,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                   @pointerdown.stop="beginBar($event, entry.period, 'end')"
                 ></span>
               </button>
+              <Transition name="yy-calendar-feedback">
               <div v-if="creatingRange || (dragging && draft)" class="yy-calendar-drag-feedback" :class="{ creating: !!creatingRange }" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
                 <template v-if="creatingRange">{{ periodRangeLabel({ startDate: creatingRange.start, endDate: creatingRange.end, precision: grain }) }} · 松开创建</template>
                 <template v-else-if="draft">{{ periodRangeLabel(draft) }} · {{ periodDays(draft) }} 天</template>
               </div>
+              </Transition>
               <div v-if="!periods.length" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
                 <CalendarDays :size="28" /><strong>从一段时间开始记录</strong><span>{{ readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
               </div>
@@ -785,7 +796,9 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
           </div>
         </div>
 
-        <div v-if="showList" class="yy-calendar-list">
+        <Transition name="yy-calendar-reveal">
+        <div v-if="showList" class="yy-calendar-reveal">
+        <div class="yy-calendar-list">
           <div class="yy-calendar-list-head"><label><Search :size="15" /><input v-model="listQuery" placeholder="搜索事件或标注" aria-label="搜索日历事件" /><button v-if="listQuery" type="button" aria-label="清空事件搜索" @click="listQuery = ''"><X :size="14" /></button></label><span>{{ listPeriods.length }} 个事件</span></div>
           <div class="yy-calendar-list-rows">
             <button v-for="period in listPeriods" :key="period.id" type="button" class="yy-calendar-list-row" :class="[`color-${period.color}`, { selected: selectedID === period.id }]" @click="selectPeriod(period)">
@@ -794,12 +807,17 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <p v-if="!listPeriods.length" class="yy-calendar-list-empty">{{ listQuery ? '没有匹配的事件，试试其他关键词。' : '添加事件后，可以在这里快速查找和定位。' }}</p>
           </div>
         </div>
+        </div>
+        </Transition>
       </div>
 
     </section>
+    </div>
+    </Transition>
   </section>
   </Teleport>
   <Teleport to="body">
+    <Transition name="yy-calendar-window">
     <div v-if="draft && !dragging" class="yy-calendar-inspector-layer" @pointerdown.self="closeDraft()" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
       <aside v-if="readonly" ref="inspector" class="yy-calendar-inspector yy-calendar-details" role="dialog" aria-modal="true" aria-label="事件详情" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head"><strong>{{ draft.title }}</strong><IconButton label="关闭详情" @click="closeDraft(true)"><X :size="17" /></IconButton></div>
@@ -848,16 +866,23 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
         <p class="yy-calendar-shortcut">⌘/Ctrl + Enter 应用 · Esc 关闭</p>
       </aside>
     </div>
+    </Transition>
   </Teleport>
 </template>
 
 <style scoped>
+.yy-calendar-reveal { display: grid; grid-template-rows: 1fr; }
+.yy-calendar-reveal > * { min-height: 0; overflow: hidden; }
+.yy-calendar-reveal-enter-active, .yy-calendar-reveal-leave-active { overflow: hidden; transition: grid-template-rows .18s cubic-bezier(.22, .8, .25, 1), opacity .14s ease; }
+.yy-calendar-reveal-enter-from, .yy-calendar-reveal-leave-to { grid-template-rows: 0fr; opacity: 0; }
+.yy-calendar-reveal-leave-active { pointer-events: none; }
 .yy-calendar-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 .yy-calendar-main { min-width: 0; border: 1px solid var(--yy-border); border-radius: 12px; background: var(--yy-bg); }
 .yy-calendar-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 58px; padding: 10px 12px; border-bottom: 1px solid var(--yy-border); }
-.yy-calendar-segments { display: inline-flex; flex: none; padding: 3px; border-radius: 8px; background: var(--yy-bg-muted); }
-.yy-calendar-segments button { min-width: 40px; height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
-.yy-calendar-segments button.active { background: var(--yy-bg); color: var(--yy-text); box-shadow: 0 1px 4px #00000012; font-weight: 600; }
+.yy-calendar-segments { position: relative; display: inline-flex; flex: none; padding: 3px; border-radius: 8px; background: var(--yy-bg-muted); }
+.yy-calendar-segments::before { content: ''; position: absolute; left: 3px; top: 3px; width: 40px; height: 28px; border-radius: 6px; background: var(--yy-bg); box-shadow: 0 1px 4px #00000012; transform: translateX(calc(var(--segment-index) * 40px)); transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
+.yy-calendar-segments button { position: relative; width: 40px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
+.yy-calendar-segments button.active { color: var(--yy-text); font-weight: 600; }
 .yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .yy-calendar-frame { overflow: hidden; border-radius: 0 0 12px 12px; }
 .yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-width: none; overflow-anchor: none; }
@@ -893,6 +918,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-today-line span { position: absolute; left: 0; bottom: 5px; padding: 1px 6px; border-radius: 8px; background: var(--yy-primary-soft); color: var(--yy-primary); font-size: 10px; white-space: nowrap; transform: translateX(-50%); }
 .yy-calendar-drag-feedback { position: absolute; z-index: 7; bottom: 6px; padding: 5px 12px; border: 1px solid var(--yy-border); border-radius: 20px; background: var(--yy-bg); box-shadow: 0 3px 12px #0002; color: var(--yy-text); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
 .yy-calendar-drag-feedback.creating { border-color: var(--yy-primary); background: var(--yy-primary); color: #fff; }
+.yy-calendar-feedback-enter-active, .yy-calendar-feedback-leave-active { transition: opacity .12s ease, translate .12s cubic-bezier(.22, .8, .25, 1); }
+.yy-calendar-feedback-enter-from, .yy-calendar-feedback-leave-to { opacity: 0; translate: 0 4px; }
 .dragging .yy-calendar-period { transition: none; }
 .yy-calendar-list { border-top: 1px solid var(--yy-border); }
 .yy-calendar-list-head { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--yy-bg-muted); }
@@ -930,6 +957,11 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-empty strong { margin-top: 5px; color: var(--yy-text-2); }
 .yy-calendar-empty span { font-size: 12px; }
 .yy-calendar-inspector-layer { position: fixed; z-index: 84; inset: 0; display: grid; place-items: center; padding: 16px; }
+.yy-calendar-window-enter-active { transition: opacity .16s ease; }
+.yy-calendar-window-leave-active { pointer-events: none; transition: opacity .1s ease; }
+.yy-calendar-window-enter-from, .yy-calendar-window-leave-to { opacity: 0; }
+.yy-calendar-window-enter-active .yy-calendar-inspector { animation: yy-calendar-window-in .16s cubic-bezier(.22, .8, .25, 1); }
+@keyframes yy-calendar-window-in { from { clip-path: inset(5px 0 round 16px); } to { clip-path: inset(0 round 16px); } }
 .yy-calendar-inspector { display: flex; flex-direction: column; width: min(460px, 100%); min-width: 0; max-height: calc(100dvh - 32px); overflow: hidden; border: 1px solid var(--yy-border); border-radius: 16px; background: var(--yy-bg); box-shadow: 0 20px 70px #0003, 0 4px 16px #0001; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
 .yy-calendar-inspector-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 0 20px 18px; }
 .yy-calendar-inspector-body > .yy-calendar-field:first-child { margin-top: 16px; }
@@ -945,6 +977,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-colors { display: flex; flex-wrap: wrap; gap: 8px; }
 .yy-calendar-colors button { --period: #00a66a; display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--period); color: #fff; cursor: pointer; }
 .yy-calendar-colors button.active { border-color: var(--yy-bg); box-shadow: 0 0 0 2px var(--period); }
+.yy-calendar-colors button.active svg { animation: yy-calendar-check-in .14s cubic-bezier(.22, .8, .25, 1); }
+@keyframes yy-calendar-check-in { from { opacity: 0; scale: .65; } to { opacity: 1; scale: 1; } }
 .color-emerald { --period: #00a66a !important; --period-soft: #dff7ed !important; }
 .color-blue { --period: #3b76d6 !important; --period-soft: #e5efff !important; }
 .color-violet { --period: #7b61c9 !important; --period-soft: #eee9ff !important; }
@@ -968,14 +1002,11 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   .yy-calendar-period-text small { display: none; }
   .yy-calendar-shortcut { display: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .yy-calendar-period { transition: none; }
-}
 .yy-calendar-panel { width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
 .yy-calendar-block-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; padding: 5px 8px 5px 6px; border: 1px solid var(--yy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--yy-bg); }
 .yy-calendar-toggle { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px solid transparent; border-radius: var(--yy-radius-sm); background: none; color: var(--yy-text-3); cursor: pointer; }
 .yy-calendar-toggle:hover { background: var(--yy-bg-hover); color: var(--yy-text-2); }
-.yy-calendar-toggle svg { transition: transform .15s; }
+.yy-calendar-toggle svg { transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
 .collapsed .yy-calendar-toggle svg { transform: rotate(-90deg); }
 .collapsed .yy-calendar-block-head { border-bottom: 1px solid var(--yy-border); border-radius: 8px; }
 .yy-calendar-block-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
@@ -987,6 +1018,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-note { white-space: pre-wrap; overflow-wrap: anywhere; }
 .readonly .yy-calendar-timeline, .readonly .yy-calendar-period { cursor: default; }
 .yy-calendar-panel.expanded { position: fixed; z-index: 80; inset: 16px; width: auto; overflow: auto; padding: 20px; background: var(--yy-bg); border: 1px solid var(--yy-border); border-radius: 16px; box-shadow: 0 0 0 100vmax #0008; }
+.yy-calendar-panel button:not(.yy-calendar-period):not(.yy-calendar-cell):not(.yy-calendar-list-row), .yy-calendar-inspector button { transition: background-color .12s ease, color .12s ease, border-color .12s ease, box-shadow .12s ease, scale .12s cubic-bezier(.22, .8, .25, 1); }
+.yy-calendar-panel button:not(.yy-calendar-period):not(.yy-calendar-cell):not(.yy-calendar-list-row):not(:disabled):active, .yy-calendar-inspector button:not(:disabled):active { scale: .95; }
+.yy-calendar-list-row, .yy-calendar-cell { transition: background-color .12s ease; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after, :deep(*), :deep(*::before), :deep(*::after) { transition: none !important; animation: none !important; }
+}
 @container (max-width: 160px) {
   .yy-calendar-period-text small { display: none; }
 }
