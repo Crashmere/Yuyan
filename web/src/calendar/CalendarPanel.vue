@@ -9,6 +9,7 @@ import { confirm, prompt } from '../ui/dialog'
 import { copyText } from '../shared/clipboard'
 import { decodeCalendar, encodeCalendar } from './transfer'
 import IconButton from '../ui/IconButton.vue'
+import DateRangeField from './DateRangeField.vue'
 import { toast } from '../ui/toast'
 import { searchTerms } from '../shared/searchMatch'
 import {
@@ -159,6 +160,7 @@ const axisWidth = ref(0)
 const showList = ref(false)
 const listQuery = ref('')
 const showValidation = ref(false)
+const dateInputError = ref('')
 const today = todayDate()
 const dragging = ref(false)
 const gestureLanes = ref<ReturnType<typeof assignPeriodLanes> | null>(null)
@@ -229,6 +231,7 @@ const draftDirty = computed(() => !!draft.value && JSON.stringify(draftPayload(d
 const rangeError = computed(() => {
   const value = draft.value
   if (!value) return ''
+  if (dateInputError.value) return dateInputError.value
   if (value.id == null && periods.value.length >= 2000) return '单个日历最多保存 2,000 个事件'
   if (!value.title.trim()) return '请填写事件名称'
   if ([...value.title.trim()].length > 120) return '事件名称不能超过 120 个字符'
@@ -296,7 +299,7 @@ async function newAtCenter() {
 
 async function closeDraft(force = false) {
   if (!draft.value) return
-  if (!force && draftDirty.value) {
+  if (!force && (draftDirty.value || dateInputError.value)) {
     const ok = await confirm({ title: '放弃未保存的修改？', message: '时间、名称或标注的修改还没有保存。', confirmText: '放弃修改', danger: true })
     if (!ok) { focusInspector(); return }
   }
@@ -365,31 +368,8 @@ async function removeDraft() {
   toast('事件已删除', 'success')
 }
 
-function setDraftPrecision(precision: CalendarPrecision) {
-  if (!draft.value || draft.value.precision === precision) return
-  const range = canonicalRange(draft.value.startDate, draft.value.endDate, precision)
-  Object.assign(draft.value, range, { precision })
-}
-
-function boundaryValue(side: 'start' | 'end'): string {
-  const value = draft.value
-  if (!value) return ''
-  const date = side === 'start' ? value.startDate : value.endDate
-  return value.precision === 'year' ? date.slice(0, 4) : value.precision === 'month' ? date.slice(0, 7) : date
-}
-
-function changeBoundary(side: 'start' | 'end', event: Event) {
-  const value = (event.target as HTMLInputElement).value
-  if (!draft.value || !value) return
-  let date = value
-  try {
-    if (draft.value.precision === 'year') date = `${value.padStart(4, '0')}-${side === 'start' ? '01-01' : '12-31'}`
-    else if (draft.value.precision === 'month') date = side === 'start' ? `${value}-01` : unitBounds(`${value}-01`, 'month').end
-    parseCalendarDate(date)
-    if (date < '1000-01-01' || date > '9999-12-31') return
-  } catch { return }
-  if (side === 'start') draft.value.startDate = date
-  else draft.value.endDate = date
+function changeDraftDates(value: { startDate: string; endDate: string; precision: CalendarPrecision }) {
+  if (draft.value) Object.assign(draft.value, value)
 }
 
 function syncViewport() {
@@ -697,7 +677,7 @@ function locate(value: string) {
 }
 async function flush(): Promise<boolean> {
   renameCalendar()
-  if (!draftDirty.value || props.readonly) return true
+  if ((!draftDirty.value && !dateInputError.value) || props.readonly) return true
   if (rangeError.value) {
     showValidation.value = true
     await nextTick()
@@ -717,7 +697,7 @@ async function revealMatch(query: string): Promise<HTMLElement | null> {
   if (period) await locateEvent(period)
   return root.value?.querySelector<HTMLElement>('.yy-calendar-list-text') ?? root.value
 }
-defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !== props.model.title, revealMatch })
+defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value || calendarTitle.value !== props.model.title, revealMatch })
 </script>
 
 <template>
@@ -839,37 +819,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
             <input v-model="draft.title" name="calendar-title" class="yy-input" maxlength="120" placeholder="例如：专注学习、项目冲刺、休整" />
           </label>
 
-          <div class="yy-calendar-field">
-            <span>时间粒度</span>
-            <div class="yy-calendar-segments wide" aria-label="事件时间粒度">
-              <button v-for="item in grains" :key="item.value" type="button" :class="{ active: draft.precision === item.value }" @click="setDraftPrecision(item.value)">{{ item.label }}</button>
-            </div>
-          </div>
-
-          <div class="yy-calendar-boundaries">
-            <label class="yy-calendar-field">
-              <span>开始</span>
-              <input
-                class="yy-input"
-                :type="draft.precision === 'year' ? 'number' : draft.precision === 'month' ? 'month' : 'date'"
-                :min="draft.precision === 'year' ? 1000 : draft.precision === 'month' ? '1000-01' : '1000-01-01'"
-                :max="draft.precision === 'year' ? 9999 : draft.precision === 'month' ? '9999-12' : '9999-12-31'"
-                :value="boundaryValue('start')"
-                @input="changeBoundary('start', $event)"
-              />
-            </label>
-            <label class="yy-calendar-field">
-              <span>结束 <small>包含当天</small></span>
-              <input
-                class="yy-input"
-                :type="draft.precision === 'year' ? 'number' : draft.precision === 'month' ? 'month' : 'date'"
-                :min="draft.precision === 'year' ? 1000 : draft.precision === 'month' ? '1000-01' : '1000-01-01'"
-                :max="draft.precision === 'year' ? 9999 : draft.precision === 'month' ? '9999-12' : '9999-12-31'"
-                :value="boundaryValue('end')"
-                @input="changeBoundary('end', $event)"
-              />
-            </label>
-          </div>
+          <DateRangeField :start="draft.startDate" :end="draft.endDate" :precision="draft.precision" @change="changeDraftDates" @invalid="dateInputError = $event" />
           <div class="yy-calendar-duration"><span>快捷时长</span><button v-for="amount in (draft.precision === 'day' ? [1, 7, 14, 30] : [1, 3, 6, 12])" :key="amount" type="button" @click="setDuration(amount)">{{ amount }}{{ draft.precision === 'year' ? '年' : draft.precision === 'month' ? '个月' : '天' }}</button></div>
           <p v-if="rangeError && (showValidation || draft.title.trim())" class="yy-calendar-field-error" role="status">{{ rangeError }}</p>
 
@@ -907,7 +857,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
 .yy-calendar-segments { display: inline-flex; flex: none; padding: 3px; border-radius: 8px; background: var(--yy-bg-muted); }
 .yy-calendar-segments button { min-width: 40px; height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
 .yy-calendar-segments button.active { background: var(--yy-bg); color: var(--yy-text); box-shadow: 0 1px 4px #00000012; font-weight: 600; }
-.yy-calendar-segments.wide { display: grid; grid-template-columns: repeat(3, 1fr); }
 .yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .yy-calendar-frame { overflow: hidden; border-radius: 0 0 12px 12px; }
 .yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-width: none; overflow-anchor: none; }
@@ -991,7 +940,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
 .yy-calendar-field { display: flex; flex-direction: column; gap: 5px; margin-top: 14px; }
 .yy-calendar-field > span { display: flex; justify-content: space-between; color: var(--yy-text-2); font-size: 12px; }
 .yy-calendar-field > span small { color: var(--yy-text-4); font-weight: 400; }
-.yy-calendar-boundaries { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .yy-calendar-field-error { margin: 5px 0 0; color: var(--yy-danger); font-size: 11px; }
 .yy-calendar-colors { display: flex; flex-wrap: wrap; gap: 8px; }
 .yy-calendar-colors button { --period: #00a66a; display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--period); color: #fff; cursor: pointer; }
@@ -1016,7 +964,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || calendarTitle.value !==
   .yy-calendar-inspector-actions { padding: 12px 16px; }
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
   .yy-calendar-window { order: 3; flex: 1 0 100%; padding-top: 5px; }
-  .yy-calendar-boundaries { grid-template-columns: 1fr; gap: 0; }
   .yy-calendar-period-text small { display: none; }
   .yy-calendar-shortcut { display: none; }
 }
