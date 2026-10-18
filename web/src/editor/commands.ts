@@ -131,7 +131,7 @@ export const insertItems: InsertItem[] = [
   },
   { id: 'table', label: '表格', description: '选择行数和列数', icon: Table, group: '插入', syntax: ['|'], pinyin: 'biao ge', keywords: 'bg table', run: (e, ui, anchor) => ui.openTableGrid(anchor ?? coordsRect(e)) },
   { id: 'attachment', label: '附件', description: '上传任意文件，常见格式可以预览', icon: Paperclip, group: '插入', pinyin: 'fu jian', keywords: 'fj attachment file pdf word excel zip 文件', run: (_e, ui) => ui.pickAttachment() },
-  { id: 'calendar', label: '日历', description: '独立的状态时间轴，支持重叠时间段与标注', icon: CalendarDays, group: '插入', pinyin: 'ri li', keywords: 'rl calendar timeline state 时间轴 状态', run: e => { e.chain().focus().insertContent({ type: 'calendar', attrs: { ...calendarDefaults, center: todayDate(), periods: [] } }).run() } },
+  { id: 'calendar', label: '日历', description: '独立的事件时间轴，支持重叠时间段与标注', icon: CalendarDays, group: '插入', pinyin: 'ri li', keywords: 'rl calendar timeline event state 时间轴 事件 状态', run: e => { e.chain().focus().insertContent({ type: 'calendar', attrs: { ...calendarDefaults, center: todayDate(), periods: [] } }).run() } },
   { id: 'drawing', label: '画板', description: '绘制图形、连线与技术示意图', icon: Workflow, group: '插入', pinyin: 'hua ban', keywords: 'hb drawing whiteboard excalidraw', run: e => { void openDrawing(e) } },
   { id: 'image', label: '图片', description: '上传图片，也可以直接粘贴或拖入', icon: Image, group: '插入', syntax: ['![]()'], pinyin: 'tu pian', keywords: 'tp image picture', run: (_e, ui) => ui.pickImage() },
   { id: 'link', label: '链接', description: '网址或本站文档的链接', icon: Link, group: '插入', syntax: ['[]()'], pinyin: 'lian jie', keywords: 'lj link url', run: (_e, ui) => ui.openLink() },

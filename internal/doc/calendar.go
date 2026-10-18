@@ -18,11 +18,12 @@ type CalendarPeriod struct {
 }
 
 type Calendar struct {
-	Version int              `json:"version"`
-	Title   string           `json:"title"`
-	Grain   string           `json:"grain"`
-	Center  string           `json:"center"`
-	Periods []CalendarPeriod `json:"periods"`
+	Version   int              `json:"version"`
+	Title     string           `json:"title"`
+	Grain     string           `json:"grain"`
+	Center    string           `json:"center"`
+	Collapsed bool             `json:"collapsed,omitempty"`
+	Periods   []CalendarPeriod `json:"periods"`
 }
 
 func CalendarData(n Node) (Calendar, error) {
@@ -36,6 +37,11 @@ func CalendarData(n Node) (Calendar, error) {
 		return c, err
 	}
 	invalid := errors.New("invalid calendar")
+	if value, exists := n.Attrs["collapsed"]; exists {
+		if _, ok := value.(bool); !ok {
+			return c, invalid
+		}
+	}
 	for _, key := range []string{"title", "center"} {
 		if _, ok := n.Attrs[key].(string); !ok {
 			return c, invalid

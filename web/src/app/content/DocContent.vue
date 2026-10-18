@@ -104,8 +104,9 @@ async function run() {
   if (location.hash) await scrollTo(decodeURIComponent(location.hash.slice(1)))
   if (token !== runs) return
   if (!position) reader?.start()
-  await mark()
   await drawn
+  if (token !== runs) return
+  await mark()
   if (token !== runs) return
   emit('ready')
   if (position) {
@@ -162,11 +163,11 @@ async function mark() {
     for (const i of candidates.slice(0, 5)) {
       await current.ensure(i)
       if (current !== reader || props.highlight !== query) return
-      if (showMatches(el, query)) return
+      if (await showMatches(el, query)) return
     }
     if (candidates.length) return
   }
-  showMatches(el, query)
+  await showMatches(el, query)
 }
 
 // Finding in the page and printing need the whole document: printing waits for it, finding

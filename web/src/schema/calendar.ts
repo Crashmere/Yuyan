@@ -17,9 +17,10 @@ export interface CalendarData {
   title: string
   grain: CalendarPrecision
   center: string
+  collapsed?: boolean
   periods: CalendarEntry[]
 }
-export const calendarDefaults: CalendarData = { version: 1, title: '日历', grain: 'month', center: '', periods: [] }
+export const calendarDefaults: CalendarData = { version: 1, title: '日历', grain: 'month', center: '', collapsed: false, periods: [] }
 const grains = ['year', 'month', 'day']
 const colors = ['emerald', 'blue', 'violet', 'amber', 'rose', 'cyan', 'slate', 'lime']
 function date(value: unknown): value is string {
@@ -29,6 +30,7 @@ function date(value: unknown): value is string {
 export function validCalendar(value: unknown): value is CalendarData {
   const a = value as CalendarData | undefined
   if (!a || a.version !== 1 || typeof a.title !== 'string' || [...a.title].length > 120 || !grains.includes(a.grain) || (a.center !== '' && !date(a.center)) || !Array.isArray(a.periods) || a.periods.length > 2000) return false
+  if (a.collapsed !== undefined && typeof a.collapsed !== 'boolean') return false
   const ids = new Set<number>()
   return a.periods.every(p => {
     if (!p || !Number.isSafeInteger(p.id) || p.id < 1 || ids.has(p.id) || typeof p.title !== 'string' || !p.title.trim() || [...p.title].length > 120 || typeof p.note !== 'string' || [...p.note].length > 2000 || !date(p.startDate) || !date(p.endDate) || p.startDate > p.endDate || !grains.includes(p.precision) || !colors.includes(p.color)) return false
@@ -57,7 +59,7 @@ export const Calendar = Node.create({
     const a = node.attrs as CalendarData
     return ['section', { 'data-calendar': a.version, 'data-calendar-content': JSON.stringify(a), class: 'yy-calendar-block' },
       ['strong', {}, a.title || '日历'],
-      ['table', {}, ['thead', {}, ['tr', {}, ...['状态', '起始', '结束', '标注'].map(label => ['th', {}, label] as DOMOutputSpec)]],
+      ['table', {}, ['thead', {}, ['tr', {}, ...['事件', '起始', '结束', '标注'].map(label => ['th', {}, label] as DOMOutputSpec)]],
         ['tbody', {}, ...a.periods.map(p => ['tr', {}, ...[p.title, p.startDate, p.endDate, p.note].map(text => ['td', {}, text] as DOMOutputSpec)] as DOMOutputSpec)]]]
   },
 })

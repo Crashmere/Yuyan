@@ -18,7 +18,7 @@ export function encodeCalendar(data: CalendarData): string {
 }
 
 function decodePeriod(row: unknown, index: number): CalendarEntry {
-  const fail = (reason: string): never => { throw new Error(`第 ${index + 1} 个状态：${reason}`) }
+  const fail = (reason: string): never => { throw new Error(`第 ${index + 1} 个事件：${reason}`) }
   if (!Array.isArray(row) || row.length < 2 || row.length > 5 || !row.every(v => typeof v === 'string')) return fail('格式不合法')
   const [title, start, end = '', color = '', note = ''] = row as string[]
   const pattern = /^(\d{4})(-\d{2})?(-\d{2})?$/
@@ -43,7 +43,7 @@ export function decodeCalendar(text: string): CalendarData {
   try { value = JSON.parse(source.slice(prefix.length)) }
   catch { throw new Error('日历字符串不完整或格式有误，请检查是否复制了全部内容') }
   if (!Array.isArray(value) || value.length !== 4 || typeof value[1] !== 'string' || !Object.hasOwn(grains, value[1]) || !Array.isArray(value[3])) throw new Error('日历字符串结构不合法')
-  if (value[3].length > 2000) throw new Error('单个日历最多保存 2,000 个状态')
+  if (value[3].length > 2000) throw new Error('单个日历最多保存 2,000 个事件')
   const data = { version: 1, title: value[0], grain: grains[value[1]], center: value[2], periods: value[3].map(decodePeriod) }
   if (!validCalendar(data)) throw new Error('日历名称或定位日期不合法')
   return data

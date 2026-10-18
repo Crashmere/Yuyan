@@ -93,7 +93,7 @@ export function reveal(el: Element) {
   if (!root) return
   let changed = false
   for (let block = el; block !== root && root.contains(block); block = block.parentElement!) {
-    if (block.matches('details[data-fold-block], details.yy-calendar-records')) (block as HTMLDetailsElement).open = true
+    if (block.matches('details[data-fold-block]')) (block as HTMLDetailsElement).open = true
     if (!block.classList.contains('yy-folded-away')) continue
     let within = levelOf(block) || 7
     for (let prev = block.previousElementSibling; prev && within > 1; prev = prev.previousElementSibling) {

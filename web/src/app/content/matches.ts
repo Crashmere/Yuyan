@@ -50,11 +50,35 @@ export function findMatches(root: HTMLElement, query: string): Range[] {
 }
 
 // Returns how many matches there are.
-export function showMatches(root: HTMLElement, query: string): number {
+export async function showMatches(root: HTMLElement, query: string): Promise<number> {
   const ranges = findMatches(root, query)
   if ('highlights' in CSS) CSS.highlights.set(name, new Highlight(...ranges))
   const at = ranges[0]?.startContainer.parentElement
   if (!at) return 0
+  const calendar = at.closest<HTMLElement>('[data-calendar]')
+  if (calendar) {
+    const detail = { query, ready: undefined as Promise<HTMLElement | null> | undefined }
+    calendar.dispatchEvent(new CustomEvent('yy-reveal-calendar', { detail }))
+    const target = await detail.ready
+    reveal(calendar)
+    if (target && 'highlights' in CSS) {
+      const matches: Range[] = []
+      const pattern = termPattern(query)
+      const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node && pattern; node = walker.nextNode()) {
+        pattern.lastIndex = 0
+        for (let match = pattern.exec(node.textContent ?? ''); match; match = pattern.exec(node.textContent ?? '')) {
+          const range = document.createRange()
+          range.setStart(node, match.index)
+          range.setEnd(node, match.index + match[0].length)
+          matches.push(range)
+        }
+      }
+      CSS.highlights.set(name, new Highlight(...matches))
+    }
+    scrollToElement(target ?? calendar, 'center')
+    return ranges.length
+  }
   at.dispatchEvent(new Event('yy-reveal-code', { bubbles: true }))
   reveal(at)
   const collapsed = '.callout.is-collapsed, .code-block.is-collapsed'
