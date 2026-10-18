@@ -10,8 +10,11 @@ const props = defineProps<{ start: string; end: string; precision: CalendarPreci
 const emit = defineEmits<{
   change: [value: { startDate: string; endDate: string; precision: CalendarPrecision }]
   invalid: [message: string]
+  key: [event: KeyboardEvent]
 }>()
 const field = ref<HTMLElement>()
+const reference = ref<HTMLElement>()
+const popover = ref<{ $el: HTMLElement }>()
 const open = ref(false)
 const side = ref<'start' | 'end'>('start')
 const startText = ref('')
@@ -92,7 +95,6 @@ function close(restoreFocus = true) {
 }
 function setPrecision(precision: CalendarPrecision) {
   if (precision === props.precision) return
-  close()
   const range = canonicalRange(props.start, props.end, precision)
   updateRange(range.startDate, range.endDate, precision)
   void nextTick(() => show('start'))
@@ -132,7 +134,12 @@ function onKey(event: KeyboardEvent) {
   }
 }
 function outside(event: PointerEvent) {
-  if (open.value && !field.value?.contains(event.target as Node)) close(false)
+  const target = event.target as Node
+  if (open.value && !field.value?.contains(target) && !popover.value?.$el.contains(target)) close(false)
+}
+function onPopupKey(event: KeyboardEvent) {
+  onKey(event)
+  if (!event.defaultPrevented) emit('key', event)
 }
 watch(open, value => {
   if (value) document.addEventListener('pointerdown', outside, true)
@@ -144,17 +151,17 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
 <template>
   <div ref="field" class="yy-date-field" @keydown="onKey">
     <div class="yy-date-label"><span>日期范围</span><div class="yy-date-precision" aria-label="事件时间粒度"><button v-for="item in precisions" :key="item.value" type="button" :aria-pressed="precision === item.value" @click="setPrecision(item.value)">{{ item.label }}</button></div></div>
-    <div class="yy-date-range" :class="{ invalid: parsed.error }">
+    <div ref="reference" class="yy-date-range" :class="{ invalid: parsed.error }">
       <label :class="{ active: open && side === 'start' }"><span>开始</span><input v-model="startText" aria-label="开始日期" inputmode="numeric" spellcheck="false" :placeholder="precision === 'day' ? 'YYYY-MM-DD' : precision === 'month' ? 'YYYY-MM' : 'YYYY'" @click="show('start')" @input="inputDate" @blur="normalizeInput" /></label>
       <ArrowRight :size="15" />
       <label :class="{ active: open && side === 'end' }"><span>结束</span><input v-model="endText" aria-label="结束日期" inputmode="numeric" spellcheck="false" :placeholder="precision === 'day' ? 'YYYY-MM-DD' : precision === 'month' ? 'YYYY-MM' : 'YYYY'" @click="show('end')" @input="inputDate" @blur="normalizeInput" /></label>
       <button type="button" class="yy-date-toggle" aria-label="选择日期范围" :aria-expanded="open" @click="open ? close() : show('start')"><CalendarDays :size="18" /></button>
     </div>
     <div class="yy-date-summary"><span>{{ parsed.error || `共 ${duration}，包含起止${precision === 'day' ? '当天' : precision === 'month' ? '月份' : '年份'}` }}</span><button type="button" @click="useToday">{{ precision === 'day' ? '今天' : precision === 'month' ? '本月' : '今年' }}</button></div>
-    <div v-if="open" class="yy-date-popover">
-      <component :is="picker.module.value.default" v-if="picker.module.value" :start="start" :end="end" :precision="precision" :side="side" :selecting-end="selectingEnd" @select="select" @close="close" />
-      <div v-else class="yy-date-loading">{{ loadError ? '日期面板未能加载' : '正在加载日历…' }}<button v-if="loadError" type="button" @click="show(side)">重试</button></div>
-    </div>
+    <div v-if="loadError" class="yy-date-load-error">日期面板未能加载<button type="button" @click="show(side)">重试</button></div>
+    <Teleport to="body">
+      <component :is="picker.module.value.default" v-if="open && picker.module.value && reference" ref="popover" :reference="reference" :start="start" :end="end" :precision="precision" :side="side" :selecting-end="selectingEnd" @select="select" @close="close" @keydown="onPopupKey" />
+    </Teleport>
   </div>
 </template>
 
@@ -175,7 +182,6 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
 .yy-date-toggle:hover { background: var(--yy-bg-hover); color: var(--yy-primary); }
 .yy-date-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; color: var(--yy-text-3); font-size: 10px; }
 .yy-date-summary button { padding: 2px 4px; border: 0; background: transparent; color: var(--yy-primary); font: inherit; cursor: pointer; }
-.yy-date-popover { margin-top: 8px; border: 1px solid var(--yy-border); border-radius: 10px; overflow: hidden; background: var(--yy-bg); }
-.yy-date-loading { display: flex; align-items: center; justify-content: center; gap: 12px; height: 280px; color: var(--yy-text-3); font-size: 12px; }
-.yy-date-loading button { border: 0; background: transparent; color: var(--yy-primary); cursor: pointer; }
+.yy-date-load-error { margin-top: 6px; color: var(--yy-danger); font-size: 11px; }
+.yy-date-load-error button { margin-left: 8px; border: 0; background: transparent; color: var(--yy-primary); cursor: pointer; }
 </style>

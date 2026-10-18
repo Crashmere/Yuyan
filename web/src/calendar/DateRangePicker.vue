@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, shallowRef, ref, watch } from 'vue'
+import { computed, shallowRef, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { autoUpdate, computePosition, flip, offset, shift } from '@floating-ui/dom'
 import { CalendarDate, parseDate, type DateValue } from '@internationalized/date'
 import { CalendarRoot, CalendarGrid, CalendarGridHead, CalendarGridBody, CalendarGridRow, CalendarHeadCell, CalendarCell, CalendarCellTrigger } from 'reka-ui'
 import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next'
@@ -7,8 +8,22 @@ import IconButton from '../ui/IconButton.vue'
 import { todayDate, unitBounds } from './dates'
 import type { CalendarPrecision } from '../schema/calendar'
 
-const props = defineProps<{ start: string; end: string; precision: CalendarPrecision; side: 'start' | 'end'; selectingEnd: boolean }>()
+const props = defineProps<{ reference: HTMLElement; start: string; end: string; precision: CalendarPrecision; side: 'start' | 'end'; selectingEnd: boolean }>()
 const emit = defineEmits<{ select: [date: string]; close: [] }>()
+const panel = ref<HTMLElement>()
+const position = ref<{ left: string; top: string; visibility: 'visible' | 'hidden' }>({ left: '0px', top: '0px', visibility: 'hidden' })
+let stopPositioning: (() => void) | undefined
+let disposed = false
+onMounted(() => {
+  const element = panel.value!
+  stopPositioning = autoUpdate(props.reference, element, async () => {
+    const { x, y } = await computePosition(props.reference, element, {
+      strategy: 'fixed', placement: 'bottom-start', middleware: [offset(8), flip(), shift({ padding: 8, crossAxis: true })],
+    })
+    if (!disposed) position.value = { left: `${x}px`, top: `${y}px`, visibility: 'visible' }
+  })
+})
+onBeforeUnmount(() => { disposed = true; stopPositioning?.() })
 type View = 'day' | 'month' | 'year'
 const view = ref<View>(props.precision)
 const placeholder = shallowRef<DateValue>(parseDate(props.side === 'start' ? props.start : props.end))
@@ -73,7 +88,7 @@ function yearKey(event: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="yy-date-picker">
+  <div ref="panel" class="yy-date-picker" :style="position" role="dialog" aria-label="选择日期范围" @pointerdown.stop @wheel.stop @touchmove.stop>
     <div class="yy-date-picker-head"><span>{{ side === 'start' ? '选择开始日期' : '选择结束日期' }}</span><IconButton label="收起日期面板" @click="emit('close')"><X :size="15" /></IconButton></div>
     <div class="yy-date-nav">
       <IconButton :label="view === 'day' ? '上个月' : view === 'month' ? '上一年' : '前十二年'" :disabled="!canPrev" @click="move(-1)"><ChevronLeft :size="17" /></IconButton>
@@ -94,7 +109,8 @@ function yearKey(event: KeyboardEvent) {
 </template>
 
 <style scoped>
-.yy-date-picker { padding: 8px 12px 10px; font-size: 12px; }
+.yy-date-picker { position: fixed; z-index: 86; width: min(360px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); padding: 8px 12px 10px; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--yy-border); border-radius: 12px; background: var(--yy-bg); box-shadow: 0 12px 36px #0002, 0 3px 10px #0001; color: var(--yy-text); font: 12px/1.5 var(--yy-font, sans-serif); }
+.yy-date-days { height: 234px; }
 .yy-date-picker-head { display: flex; align-items: center; justify-content: space-between; color: var(--yy-text-3); font-size: 11px; }
 .yy-date-picker-head :deep(.yy-icon-btn) { width: 26px; height: 26px; }
 .yy-date-nav { display: flex; justify-content: space-between; align-items: center; margin: 3px 0 8px; }

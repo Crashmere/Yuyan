@@ -819,7 +819,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <input v-model="draft.title" name="calendar-title" class="yy-input" maxlength="120" placeholder="例如：专注学习、项目冲刺、休整" />
           </label>
 
-          <DateRangeField :start="draft.startDate" :end="draft.endDate" :precision="draft.precision" @change="changeDraftDates" @invalid="dateInputError = $event" />
+          <DateRangeField :start="draft.startDate" :end="draft.endDate" :precision="draft.precision" @change="changeDraftDates" @invalid="dateInputError = $event" @key="onKey" />
           <div class="yy-calendar-duration"><span>快捷时长</span><button v-for="amount in (draft.precision === 'day' ? [1, 7, 14, 30] : [1, 3, 6, 12])" :key="amount" type="button" @click="setDuration(amount)">{{ amount }}{{ draft.precision === 'year' ? '年' : draft.precision === 'month' ? '个月' : '天' }}</button></div>
           <p v-if="rangeError && (showValidation || draft.title.trim())" class="yy-calendar-field-error" role="status">{{ rangeError }}</p>
 
