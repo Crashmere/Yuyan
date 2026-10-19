@@ -796,7 +796,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
               </div>
               </Transition>
               <div v-if="!periods.length" class="yy-calendar-empty" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
-                <CalendarDays :size="28" /><strong>从一段时间开始记录</strong><span>{{ readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
+                <CalendarDays :size="28" /><span>{{ readonly ? '编辑文档以添加时间段。' : '拖选时间区间，或点击“新建事件”。' }}</span>
               </div>
             </div>
           </div>
@@ -961,8 +961,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-selection { position: absolute; z-index: 6; top: 58px; bottom: 0; border: 1px dashed var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 8%, transparent); pointer-events: none; transition: left .09s cubic-bezier(.22, .8, .25, 1), width .09s cubic-bezier(.22, .8, .25, 1); }
 .yy-calendar-selection.motion-paused { transition: none; }
 .yy-calendar-empty { position: absolute; z-index: 1; left: 50%; top: 84px; display: flex; flex-direction: column; align-items: center; color: var(--yy-text-3); transform: translateX(-50%); pointer-events: none; }
-.yy-calendar-empty strong { margin-top: 5px; color: var(--yy-text-2); }
-.yy-calendar-empty span { font-size: 12px; }
+.yy-calendar-empty span { margin-top: 5px; font-size: 12px; }
 .yy-calendar-inspector-layer { position: fixed; z-index: 84; inset: 0; display: grid; place-items: center; padding: 16px; }
 .yy-calendar-window-enter-active { transition: opacity .16s ease; }
 .yy-calendar-window-leave-active { pointer-events: none; transition: opacity .1s ease; }
