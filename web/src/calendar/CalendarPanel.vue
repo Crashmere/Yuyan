@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
-  CalendarDays, Check, ChevronRight, ChevronDown,
+  CalendarDays, Check, ChevronLeft, ChevronRight, ChevronDown,
   Plus, Save, Trash2, X, Maximize2, Minimize2, Copy, ClipboardPaste, ListFilter, Search,
 } from 'lucide-vue-next'
 import { errorMessage } from '../shared/api'
@@ -163,8 +163,13 @@ const showList = ref(false)
 const listQuery = ref('')
 const showValidation = ref(false)
 const dateInputError = ref('')
-const today = todayDate()
+// Recomputed when the local day rolls over so status labels never go stale.
+const today = ref(todayDate())
 const dragging = ref(false)
+// Cell the pointer is resting over empty timeline space, hinting that a click there creates.
+const hoverCell = ref<number | null>(null)
+// True on wide screens, where the editor docks beside the timeline instead of covering it.
+const wideViewport = ref(false)
 const gestureLanes = ref<ReturnType<typeof assignPeriodLanes> | null>(null)
 
 interface Draft extends Omit<CalendarEntry, 'id'> {
@@ -180,16 +185,28 @@ const visibleStart = computed(() => dateAtPosition(scrollLeft.value / cellWidth.
 const visibleEnd = computed(() => dateAtPosition((scrollLeft.value + viewportWidth.value - 1) / cellWidth.value, cells.value))
 const windowLabel = computed(() => periodRangeLabel({ startDate: visibleStart.value, endDate: visibleEnd.value, precision: grain.value }))
 const timelineMinWidth = computed(() => cells.value.length * unitWidth.value)
-const todayGeometry = computed(() => periodGeometry({ startDate: today, endDate: today }, cells.value))
+const todayGeometry = computed(() => periodGeometry({ startDate: today.value, endDate: today.value }, cells.value))
 const listPeriods = computed(() => {
   const terms = searchTerms(listQuery.value)
-  return [...renderedPeriods.value].filter(p => terms.every(term => `${p.title}\n${p.note}\n${p.startDate}\n${p.endDate}\n${periodRangeLabel(p)}`.toLocaleLowerCase().includes(term)))
+  // The list stays stable while editing; only saved events appear, never the live draft preview.
+  return [...periods.value].filter(p => terms.every(term => `${p.title}\n${p.note}\n${p.startDate}\n${p.endDate}\n${periodRangeLabel(p)}`.toLocaleLowerCase().includes(term)))
     .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id - b.id)
 })
 function periodStatus(period: Pick<CalendarEntry, 'startDate' | 'endDate'>) {
-  return period.startDate > today ? '未开始' : period.endDate < today ? '已结束' : '进行中'
+  return period.startDate > today.value ? '未开始' : period.endDate < today.value ? '已结束' : '进行中'
 }
-const currentCount = computed(() => periods.value.filter(p => p.startDate <= today && p.endDate >= today).length)
+const currentCount = computed(() => periods.value.filter(p => p.startDate <= today.value && p.endDate >= today.value).length)
+// Nearest event fully outside the current viewport, used by the edge jump arrows.
+const nearestBefore = computed(() => {
+  let best: CalendarEntry | null = null
+  for (const period of periods.value) if (period.endDate < visibleStart.value && (!best || period.endDate > best.endDate)) best = period
+  return best
+})
+const nearestAfter = computed(() => {
+  let best: CalendarEntry | null = null
+  for (const period of periods.value) if (period.startDate > visibleEnd.value && (!best || period.startDate < best.startDate)) best = period
+  return best
+})
 
 function draftAsPeriod(): CalendarEntry | null {
   if (!draft.value) return null
@@ -200,9 +217,9 @@ function draftAsPeriod(): CalendarEntry | null {
 }
 
 const renderedPeriods = computed(() => {
-  // Form edits never affect the calendar. Only an active bar gesture has a live preview.
-  if (!dragging.value) return periods.value
-  const preview = draftAsPeriod()
+  // Editing never writes the document until applied, but the open draft previews live on the
+  // timeline so a side-docked panel or keyboard nudge shows the bar move as the dates change.
+  const preview = draft.value ? draftAsPeriod() : null
   if (!preview) return periods.value
   if (preview.id === -1) return [...periods.value, preview]
   return periods.value.map((period) => period.id === preview.id ? preview : period)
@@ -213,8 +230,13 @@ const visiblePeriods = computed(() => renderedPeriods.value.flatMap((period) => 
   return geometry ? [{ period, geometry, lane: laneLayout.value.lanes.get(period.id) ?? 0 }] : []
 }))
 const laneCount = computed(() => Math.max(0, ...visiblePeriods.value.map(p => p.lane + 1)))
-const timelineHeight = computed(() => Math.max(164, 58 + laneCount.value * 48 + 14))
-const selectedID = computed(() => dragging.value ? draft.value?.id ?? null : null)
+// Cap height so a crowded calendar scrolls vertically instead of pushing the page down.
+const maxLanes = computed(() => expanded.value ? 24 : 7)
+const timelineHeight = computed(() => Math.max(164, 58 + Math.min(laneCount.value, maxLanes.value) * 48 + 14))
+const timelineInnerHeight = computed(() => Math.max(164, 58 + laneCount.value * 48 + 14))
+const scrollsVertically = computed(() => timelineInnerHeight.value > timelineHeight.value)
+// Highlight the open draft's bar whether it is being dragged or edited in the side panel.
+const selectedID = computed(() => draft.value?.id ?? null)
 const inspectorOpen = computed(() => !!draft.value && !dragging.value)
 watch(inspectorOpen, async (open) => {
   await nextTick()
@@ -348,6 +370,15 @@ async function locateEvent(period: CalendarEntry) {
   await centerTimeline()
 }
 
+// Jump the viewport to an off-screen event without changing grain or writing the document.
+async function jumpToEvent(period: CalendarEntry | null) {
+  if (!period) return
+  const target = addDays(period.startDate, Math.floor((periodDays(period) - 1) / 2))
+  axisCenter.value = viewportDate()
+  await centerTimeline(target)
+  animateCalendar(timelineScroll.value, [{ opacity: .62 }, { opacity: 1 }], 140)
+}
+
 function duplicateDraft() {
   if (!draft.value) return
   if (periods.value.length >= 2000) { toast('单个日历最多保存 2,000 个事件', 'info'); return }
@@ -419,15 +450,42 @@ async function scrollTimeline() {
 }
 
 function wheelTimeline(event: WheelEvent) {
-  if (event.ctrlKey || event.metaKey || event.altKey) return
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    if (event.ctrlKey || event.metaKey) zoomTimeline(event)
+    return
+  }
   const element = timelineScroll.value
   if (!element) return
+  const unit = event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? element.clientWidth : 1
+  // When lanes overflow, a vertical wheel scrolls lanes; otherwise it pans the timeline sideways.
+  if (scrollsVertically.value && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
+    const max = element.scrollHeight - element.clientHeight
+    const next = Math.max(0, Math.min(max, element.scrollTop + event.deltaY * unit))
+    if (next !== element.scrollTop) { event.preventDefault(); element.scrollTop = next; syncViewport(); return }
+  }
   const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
   if (!delta) return
   event.preventDefault()
-  const amount = delta * (event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? element.clientWidth : 1)
-  element.scrollLeft += amount
+  element.scrollLeft += delta * unit
   void scrollTimeline()
+}
+
+const grainOrder: CalendarPrecision[] = ['year', 'month', 'day']
+let zoomCooldown = 0
+function zoomTimeline(event: WheelEvent) {
+  if (dragging.value || !timeline.value) return
+  const delta = event.deltaY || event.deltaX
+  if (!delta) return
+  event.preventDefault()
+  // Trackpad pinch-zoom fires a stream of small deltas; step one grain per rest.
+  const now = event.timeStamp || performance.now()
+  if (now - zoomCooldown < 260) return
+  // Scroll up / pinch out zooms in (coarser → finer); down zooms out.
+  const direction = delta < 0 ? 1 : -1
+  const next = grainOrder[grainOrder.indexOf(grain.value) + direction]
+  if (!next) return
+  zoomCooldown = now
+  setGrain(next, dateAtPosition(cellIndex(event.clientX) + 0.5, cells.value))
 }
 
 function viewportDate(sync = true) {
@@ -501,10 +559,23 @@ function beginCreate(event: PointerEvent) {
 }
 
 function moveCreate(event: PointerEvent) {
-  if (!createGesture || event.pointerId !== createGesture.pointerId) return
+  if (!createGesture) {
+    // No drag in progress: hint that empty space is clickable by ghosting the hovered cell.
+    hoverCell.value = props.readonly || draft.value || event.pointerType === 'touch'
+      || (event.target as HTMLElement).closest('.yy-calendar-period, button.yy-calendar-cell') ? null : cellIndex(event.clientX)
+    return
+  }
+  if (event.pointerId !== createGesture.pointerId) return
   edgeScroll(event.clientX)
   updateCreate(event.clientX)
 }
+function leaveCreate() { hoverCell.value = null }
+
+const hoverGeometry = computed(() => {
+  if (hoverCell.value == null || dragging.value || !cells.value[hoverCell.value]) return null
+  const cell = cells.value[hoverCell.value]
+  return periodGeometry({ startDate: cell.start, endDate: cell.end }, cells.value)
+})
 
 function endCreate(event: PointerEvent) {
   if (!createGesture || event.pointerId !== createGesture.pointerId) return
@@ -647,6 +718,7 @@ function onKey(event: KeyboardEvent) {
   }
   if (event.key === 'Escape' && !draft.value && expanded.value) { void toggleExpanded(); event.preventDefault(); return }
   if (!draft.value || event.defaultPrevented || event.isComposing) return
+  if (!props.readonly && !(event.target as HTMLElement).closest('input, textarea') && nudgeDraft(event)) return
   if (event.key === 'Escape') {
     event.preventDefault()
     void closeDraft()
@@ -656,9 +728,46 @@ function onKey(event: KeyboardEvent) {
   }
 }
 
+// Arrow keys shift the open draft by one of its own units; Shift+arrow stretches the end only.
+function nudgeDraft(event: KeyboardEvent): boolean {
+  if (event.metaKey || event.ctrlKey || event.altKey) return false
+  const value = draft.value
+  if (!value || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return false
+  event.preventDefault()
+  const amount = event.key === 'ArrowRight' ? 1 : -1
+  const base: CalendarEntry = { ...draftPayload(value), id: value.id ?? -1 }
+  const next = adjustPeriod(base, value.precision, amount, event.shiftKey ? 'end' : 'move')
+  if (next.startDate === value.startDate && next.endDate === value.endDate) return true
+  Object.assign(value, { startDate: next.startDate, endDate: next.endDate })
+  // Keep the moving bar in view without recentering the whole axis.
+  void nextTick(() => {
+    const bar = timeline.value?.querySelector<HTMLElement>(`[data-period-id="${value.id ?? -1}"]`)
+    bar?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+  return true
+}
+
 let resizeObserver: ResizeObserver | undefined
+let dayTimer: ReturnType<typeof setTimeout> | undefined
+function refreshToday() {
+  const now = todayDate()
+  if (now !== today.value) today.value = now
+  clearTimeout(dayTimer)
+  // Wake just after the next local midnight; a wrong clock or sleep is caught on visibility.
+  const next = new Date()
+  next.setHours(24, 0, 2, 0)
+  dayTimer = setTimeout(refreshToday, Math.min(next.getTime() - Date.now(), 2_147_483_647))
+}
+function onVisible() { if (document.visibilityState === 'visible') refreshToday() }
+// A right-docked editor only fits when the viewport is wide; narrower falls back to the modal.
+const wideQuery = matchMedia('(min-width: 900px)')
+function syncWide() { wideViewport.value = wideQuery.matches }
 onMounted(() => {
   void centerTimeline()
+  refreshToday()
+  syncWide()
+  wideQuery.addEventListener('change', syncWide)
+  document.addEventListener('visibilitychange', onVisible)
   resizeObserver = new ResizeObserver(() => {
     if (relocating || rebasing || collapsed.value) return
     if (dragging.value) { syncViewport(); return }
@@ -673,6 +782,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disposed = true
   resizeObserver?.disconnect()
+  clearTimeout(dayTimer)
+  wideQuery.removeEventListener('change', syncWide)
+  document.removeEventListener('visibilitychange', onVisible)
   stopEdgeScroll()
   if (barGesture) {
     barGesture.target.removeEventListener('pointermove', moveBar)
@@ -743,15 +855,22 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
         </div>
 
         <div class="yy-calendar-frame">
-          <div ref="timelineScroll" class="yy-calendar-scroll" @scroll="scrollTimeline" @wheel="wheelTimeline">
+          <Transition name="yy-calendar-edge">
+          <button v-if="nearestBefore" type="button" class="yy-calendar-edge start" :data-tip="`跳到更早的事件 · ${nearestBefore.title || '未命名事件'}`" aria-label="跳到更早的事件" @click="jumpToEvent(nearestBefore)"><ChevronLeft :size="18" /></button>
+          </Transition>
+          <Transition name="yy-calendar-edge">
+          <button v-if="nearestAfter" type="button" class="yy-calendar-edge end" :data-tip="`跳到更晚的事件 · ${nearestAfter.title || '未命名事件'}`" aria-label="跳到更晚的事件" @click="jumpToEvent(nearestAfter)"><ChevronRight :size="18" /></button>
+          </Transition>
+          <div ref="timelineScroll" class="yy-calendar-scroll" :class="{ 'scrolls-y': scrollsVertically }" :style="{ maxHeight: `${timelineHeight}px` }" @scroll="scrollTimeline" @wheel="wheelTimeline">
             <div
               ref="timeline"
               class="yy-calendar-timeline"
-              :style="{ minWidth: `${timelineMinWidth}px`, height: `${timelineHeight}px`, '--calendar-columns': cells.length }"
+              :style="{ minWidth: `${timelineMinWidth}px`, height: `${timelineInnerHeight}px`, '--calendar-columns': cells.length }"
               @pointerdown="beginCreate"
               @pointermove="moveCreate"
               @pointerup="endCreate"
               @pointercancel="endCreate"
+              @pointerleave="leaveCreate"
             >
               <div class="yy-calendar-ruler">
                 <button v-for="cell in cells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }" :data-date="cell.start" :data-tip="grain === 'day' ? `定位到 ${cell.start}` : `查看 ${cell.primary}${cell.secondary}的${grain === 'year' ? '月份' : '日期'}`" @click="grain === 'day' ? locate(cell.start) : drillCell(cell.start)">
@@ -762,6 +881,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                 <span v-for="cell in cells" :key="cell.start" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }"></span>
               </div>
               <div v-if="todayGeometry" class="yy-calendar-today-line" :style="{ left: `${todayGeometry.left + todayGeometry.width / 2}%` }" aria-hidden="true"><span>今天</span></div>
+              <div v-if="hoverGeometry" class="yy-calendar-hover" :style="{ left: `${hoverGeometry.left}%`, width: `${hoverGeometry.width}%` }" aria-hidden="true"><Plus :size="15" /></div>
               <div v-if="creatingGeometry" ref="creatingSelection" class="yy-calendar-selection" :class="{ 'motion-paused': selectionMotionPaused }" :style="{ left: `${creatingGeometry.left}%`, width: `${creatingGeometry.width}%` }" aria-hidden="true"></div>
               <button
                 v-for="entry in visiblePeriods"
@@ -821,7 +941,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   </Teleport>
   <Teleport to="body">
     <Transition name="yy-calendar-window">
-    <div v-if="draft && !dragging" class="yy-calendar-inspector-layer" @pointerdown.self="closeDraft()" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
+    <div v-if="draft && !dragging" class="yy-calendar-inspector-layer" :class="{ docked: wideViewport && !readonly }" @pointerdown.self="closeDraft()" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
       <aside v-if="readonly" ref="inspector" class="yy-calendar-inspector yy-calendar-details" role="dialog" aria-modal="true" aria-label="事件详情" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head"><strong>{{ draft.title }}</strong><IconButton label="关闭详情" @click="closeDraft(true)"><X :size="17" /></IconButton></div>
         <div class="yy-calendar-inspector-body">
@@ -887,12 +1007,21 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-segments button { position: relative; width: 40px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
 .yy-calendar-segments button.active { color: var(--yy-text); font-weight: 600; }
 .yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
-.yy-calendar-frame { overflow: hidden; border-radius: 0 0 12px 12px; }
+.yy-calendar-frame { position: relative; overflow: hidden; border-radius: 0 0 12px 12px; }
+.yy-calendar-edge { position: absolute; z-index: 8; top: 50%; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--yy-border); border-radius: 50%; background: var(--yy-bg); color: var(--yy-text-2); box-shadow: 0 2px 10px #0000001f; cursor: pointer; transform: translateY(-50%); }
+.yy-calendar-edge:hover { border-color: var(--yy-primary); color: var(--yy-primary); }
+.yy-calendar-edge.start { left: 8px; }
+.yy-calendar-edge.end { right: 8px; }
+.yy-calendar-edge-enter-active, .yy-calendar-edge-leave-active { transition: opacity .14s ease, translate .14s cubic-bezier(.22, .8, .25, 1); }
+.yy-calendar-edge-enter-from, .yy-calendar-edge-leave-to { opacity: 0; }
+.yy-calendar-edge.start.yy-calendar-edge-enter-from, .yy-calendar-edge.start.yy-calendar-edge-leave-to { translate: -5px 0; }
+.yy-calendar-edge.end.yy-calendar-edge-enter-from, .yy-calendar-edge.end.yy-calendar-edge-leave-to { translate: 5px 0; }
 .yy-calendar-scroll { overflow: auto hidden; overscroll-behavior-x: contain; scrollbar-width: none; overflow-anchor: none; }
+.yy-calendar-scroll.scrolls-y { overflow: auto; overscroll-behavior: contain; }
 .yy-calendar-scroll::-webkit-scrollbar { display: none; }
 .yy-calendar-timeline { position: relative; isolation: isolate; overflow: clip; touch-action: pan-x pan-y; user-select: none; cursor: crosshair; }
 .yy-calendar-ruler, .yy-calendar-grid { display: grid; grid-template-columns: repeat(var(--calendar-columns), minmax(0, 1fr)); }
-.yy-calendar-ruler { position: relative; z-index: 4; height: 58px; border-bottom: 1px solid var(--yy-border); background: var(--yy-bg-muted); }
+.yy-calendar-ruler { position: sticky; top: 0; z-index: 4; height: 58px; border-bottom: 1px solid var(--yy-border); background: var(--yy-bg-muted); }
 .yy-calendar-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 0; border: 0; border-left: 1px solid var(--yy-border); background: transparent; color: var(--yy-text-3); font: inherit; font-size: 10px; line-height: 1.25; cursor: pointer; }
 .yy-calendar-cell:hover { background: var(--yy-bg-hover); }
 .yy-calendar-cell:first-child { border-left: 0; }
@@ -919,6 +1048,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-period-text small { flex: none; opacity: .72; font-size: 10px; font-variant-numeric: tabular-nums; }
 .yy-calendar-today-line { position: absolute; z-index: 1; top: 58px; bottom: 0; width: 1px; background: color-mix(in srgb, var(--yy-primary) 45%, transparent); pointer-events: none; }
 .yy-calendar-today-line span { position: absolute; left: 0; bottom: 5px; padding: 1px 6px; border-radius: 8px; background: var(--yy-primary-soft); color: var(--yy-primary); font-size: 10px; white-space: nowrap; transform: translateX(-50%); }
+.yy-calendar-hover { position: absolute; z-index: 1; top: 58px; bottom: 0; display: grid; place-items: center; border-radius: 7px; background: color-mix(in srgb, var(--yy-primary) 7%, transparent); color: color-mix(in srgb, var(--yy-primary) 70%, transparent); pointer-events: none; }
+.readonly .yy-calendar-hover { display: none; }
 .yy-calendar-drag-feedback { position: absolute; z-index: 7; bottom: 6px; padding: 5px 12px; border: 1px solid var(--yy-border); border-radius: 20px; background: var(--yy-bg); box-shadow: 0 3px 12px #0002; color: var(--yy-text); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translateX(-50%); }
 .yy-calendar-drag-feedback.creating { border-color: var(--yy-primary); background: var(--yy-primary); color: #fff; }
 .yy-calendar-feedback-enter-active, .yy-calendar-feedback-leave-active { transition: opacity .12s ease, translate .12s cubic-bezier(.22, .8, .25, 1); }
@@ -958,6 +1089,11 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-selection { position: absolute; z-index: 6; top: 58px; bottom: 0; border: 1px dashed var(--yy-primary); background: color-mix(in srgb, var(--yy-primary) 8%, transparent); pointer-events: none; transition: left .09s cubic-bezier(.22, .8, .25, 1), width .09s cubic-bezier(.22, .8, .25, 1); }
 .yy-calendar-selection.motion-paused { transition: none; }
 .yy-calendar-inspector-layer { position: fixed; z-index: 84; inset: 0; display: grid; place-items: center; padding: 16px; }
+/* On wide screens the editor docks to the right so the timeline stays visible and draggable. */
+.yy-calendar-inspector-layer.docked { display: block; padding: 0; pointer-events: none; }
+.yy-calendar-inspector-layer.docked .yy-calendar-inspector { position: fixed; top: 16px; right: 16px; bottom: 16px; width: min(380px, calc(100vw - 32px)); max-height: none; pointer-events: auto; }
+.yy-calendar-window-enter-active .yy-calendar-inspector, .yy-calendar-window-leave-active .yy-calendar-inspector { transition: translate .18s cubic-bezier(.22, .8, .25, 1), opacity .16s ease; }
+.yy-calendar-inspector-layer.docked.yy-calendar-window-enter-from .yy-calendar-inspector, .yy-calendar-inspector-layer.docked.yy-calendar-window-leave-to .yy-calendar-inspector { translate: 12px 0; }
 .yy-calendar-window-enter-active { transition: opacity .16s ease; }
 .yy-calendar-window-leave-active { pointer-events: none; transition: opacity .1s ease; }
 .yy-calendar-window-enter-from, .yy-calendar-window-leave-to { opacity: 0; }
