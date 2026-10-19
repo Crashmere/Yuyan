@@ -119,6 +119,14 @@ watch(
     if ((t ?? '') !== titleText.value) titleText.value = t ?? ''
   },
 )
+// Showing or hiding the title bar flips the `has-title` class, which changes `.cm-content`'s
+// padding (editor.css reserves 38px for the floating bar only without a title). A CSS class change
+// does not notify CodeMirror, so its gutter re-syncs with the new layout while the content lines
+// stay at the old padding. Ask the mounted editor to re-measure once the class has updated.
+watch(titled, () => {
+  const view = code.value?.view
+  if (view) void nextTick(() => view.requestMeasure())
+})
 watch(titleText, (t) => {
   if (typeof props.node.attrs.title === 'string' && t !== props.node.attrs.title) props.updateAttributes({ title: t })
 })

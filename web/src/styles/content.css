@@ -784,7 +784,10 @@ pre:hover > .yy-copy {
 .yy-content ul[data-type='taskList'] > li > div > p:first-child {
   margin-top: 0;
 }
-.yy-content ul[data-type='taskList'] > li[data-checked='true'] > div {
+/* A checked task strikes through and grays only its own content. Nested sub-tasks stay
+   independent, so checking a parent never strikes or grays its (unchecked) children; each nested
+   item follows its own checkbox through the same rule. */
+.yy-content ul[data-type='taskList'] > li[data-checked='true'] > div > :not(ul[data-type='taskList']) {
   color: var(--yy-text-3);
   text-decoration: line-through;
 }
