@@ -14,8 +14,8 @@ import { animateCalendar } from './motion'
 import { toast } from '../ui/toast'
 import { searchTerms } from '../shared/searchMatch'
 import {
-  addDays, addUnits, adjustPeriod, assignPeriodLanes, canonicalRange, dateAtPosition, dayPosition,
-  parseCalendarDate, periodDays, periodGeometry, periodRangeLabel, todayDate, unitBounds, windowCells,
+  addDays, addUnits, adjustPeriod, assignPeriodLanes, canonicalRange, dateAtPosition, dayPosition, minPeriodWidth,
+  parseCalendarDate, periodDays, periodDurationLabel, periodGeometry, periodRangeLabel, periodSpan, todayDate, unitBounds, windowCells,
 } from './dates'
 import type { CalendarData, CalendarEntry, CalendarPrecision } from '../schema/calendar'
 
@@ -224,10 +224,56 @@ const renderedPeriods = computed(() => {
   if (preview.id === -1) return [...periods.value, preview]
   return periods.value.map((period) => period.id === preview.id ? preview : period)
 })
-const laneLayout = computed(() => gestureLanes.value ?? assignPeriodLanes(renderedPeriods.value))
+// A title that does not fit inside its bar is drawn just after the bar, as in a Gantt chart. Lane
+// packing reserves that label room in the current grain so it never runs under the next bar.
+const labelFamily = ref('sans-serif')
+const titleFont = '650 12px', durationFont = '10px', outsideTitleMax = 240
+let measureContext: CanvasRenderingContext2D | null | undefined
+const textWidths = new Map<string, number>()
+function textWidth(text: string, font: string) {
+  const key = `${font} ${labelFamily.value}\n${text}`
+  let width = textWidths.get(key)
+  if (width == null) {
+    measureContext ??= document.createElement('canvas').getContext('2d')
+    if (measureContext) measureContext.font = `${font} ${labelFamily.value}`
+    // Two spare pixels absorb tabular digits and rounding differences from CSS layout.
+    width = Math.ceil(measureContext ? measureContext.measureText(text).width : [...text].length * 12) + 2
+    textWidths.set(key, width)
+  }
+  return width
+}
+const savedTitles = computed(() => new Map(periods.value.map(period => [period.id, period.title])))
+const periodLabels = computed(() => {
+  const unit = unitWidth.value
+  const minimum = Math.max(9, minPeriodWidth / 100 * timelineMinWidth.value)
+  const labels = new Map<number, { outside: boolean; duration: boolean; start: number; end: number }>()
+  for (const period of renderedPeriods.value) {
+    const span = periodSpan(period, grain.value)
+    const bar = Math.max(minimum, (span.end - span.start) * unit)
+    // Padding, borders, and the sticky text inset leave this much room inside the bar.
+    const inner = bar - 40
+    const duration = textWidth(periodDurationLabel(period), durationFont)
+    // Stay inside whenever the bar shows at least as much of the title as a capped outside label.
+    const fits = (width: number) => inner >= Math.min(width, outsideTitleMax)
+    const title = textWidth(period.title || '未命名事件', titleFont)
+    // Reserve room by the saved title so typing in the editor never reshuffles lanes.
+    const packed = textWidth(savedTitles.value.get(period.id) || '未命名事件', titleFont)
+    labels.set(period.id, {
+      outside: !fits(title),
+      duration: !fits(title) || inner >= title + 8 + duration,
+      start: span.start,
+      end: span.start + (fits(packed) ? bar : bar + 8 + Math.min(packed, outsideTitleMax) + 8 + duration + 12) / unit,
+    })
+  }
+  return labels
+})
+function packLanes() {
+  return assignPeriodLanes(renderedPeriods.value, period => periodLabels.value.get(period.id)!)
+}
+const laneLayout = computed(() => gestureLanes.value ?? packLanes())
 const visiblePeriods = computed(() => renderedPeriods.value.flatMap((period) => {
   const geometry = periodGeometry(period, cells.value)
-  return geometry ? [{ period, geometry, lane: laneLayout.value.lanes.get(period.id) ?? 0 }] : []
+  return geometry ? [{ period, geometry, lane: laneLayout.value.lanes.get(period.id) ?? 0, label: periodLabels.value.get(period.id)! }] : []
 }))
 const laneCount = computed(() => Math.max(0, ...visiblePeriods.value.map(p => p.lane + 1)))
 // Cap height so a crowded calendar scrolls vertically instead of pushing the page down.
@@ -654,7 +700,7 @@ function beginBar(event: PointerEvent, period: CalendarEntry, mode: BarMode) {
   target.setPointerCapture(event.pointerId)
   barGesture = { pointerId: event.pointerId, startX: event.clientX, period: { ...period }, mode, moved: false, target,
     draftBefore: draft.value ? { ...draft.value } : null, baselineBefore: draftBaseline.value, startScroll: timelineScroll.value?.scrollLeft ?? 0 }
-  gestureLanes.value = assignPeriodLanes(renderedPeriods.value)
+  gestureLanes.value = packLanes()
   target.addEventListener('pointermove', moveBar)
   target.addEventListener('pointerup', endBar)
   target.addEventListener('pointercancel', endBar)
@@ -763,6 +809,7 @@ function onVisible() { if (document.visibilityState === 'visible') refreshToday(
 const wideQuery = matchMedia('(min-width: 900px)')
 function syncWide() { wideViewport.value = wideQuery.matches }
 onMounted(() => {
+  if (root.value) labelFamily.value = getComputedStyle(root.value).fontFamily || 'sans-serif'
   void centerTimeline()
   refreshToday()
   syncWide()
@@ -889,7 +936,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                 type="button"
                 class="yy-calendar-period"
                 :data-period-id="entry.period.id"
-                :class="[`color-${entry.period.color}`, { selected: selectedID === entry.period.id, tiny: entry.geometry.width * axisWidth / 100 < 32, 'clip-start': entry.geometry.clippedStart, 'clip-end': entry.geometry.clippedEnd }]"
+                :class="[`color-${entry.period.color}`, { selected: selectedID === entry.period.id, tiny: entry.geometry.width * axisWidth / 100 < 32, outside: entry.label.outside, 'clip-start': entry.geometry.clippedStart, 'clip-end': entry.geometry.clippedEnd }]"
                 :style="{ left: `${entry.geometry.left}%`, width: `${entry.geometry.width}%`, top: `${72 + entry.lane * 48}px` }"
                 :data-tip="`${entry.period.title} · ${periodRangeLabel(entry.period)}${entry.period.note ? ` · ${entry.period.note}` : ''}`"
                 @click="$event.detail === 0 && selectPeriod(entry.period)"
@@ -901,7 +948,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                   data-tip="调整起点"
                   @pointerdown.stop="beginBar($event, entry.period, 'start')"
                 ></span>
-                <span class="yy-calendar-period-text"><strong>{{ entry.period.title || '未命名事件' }}</strong><small>{{ periodRangeLabel(entry.period) }}</small></span>
+                <span class="yy-calendar-period-text"><strong>{{ entry.period.title || '未命名事件' }}</strong><small v-if="entry.label.duration">{{ periodDurationLabel(entry.period) }}</small></span>
                 <span
                   v-if="!readonly && !entry.geometry.clippedEnd && entry.geometry.width * axisWidth / 100 >= 32"
                   class="yy-calendar-resize end"
@@ -1035,17 +1082,22 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-grid span.current { background: color-mix(in srgb, var(--yy-primary-soft) 45%, transparent); }
 .yy-calendar-grid span.weekend { background: color-mix(in srgb, var(--yy-bg-muted) 62%, transparent); }
 .yy-calendar-grid span.boundary { border-left-color: var(--yy-border-strong); }
-.yy-calendar-period { container-type: inline-size; --period: #00a66a; --period-soft: #dff7ed; position: absolute; z-index: 2; display: flex; align-items: center; min-width: 9px; height: 38px; padding: 0 12px; overflow: clip; border: 1px solid color-mix(in srgb, var(--period) 38%, transparent); border-left: 3px solid var(--period); border-radius: 7px; background: color-mix(in srgb, var(--period) 12%, var(--yy-bg)); color: color-mix(in srgb, var(--period) 65%, var(--yy-text)); box-shadow: 0 2px 5px #0000000d; cursor: grab; text-align: left; transition: box-shadow .15s, background .15s; }
+.yy-calendar-period { --period: #00a66a; --period-soft: #dff7ed; position: absolute; z-index: 2; display: flex; align-items: center; min-width: 9px; height: 38px; padding: 0 12px; overflow: clip; border: 1px solid color-mix(in srgb, var(--period) 38%, transparent); border-left: 3px solid var(--period); border-radius: 7px; background: color-mix(in srgb, var(--period) 12%, var(--yy-bg)); color: color-mix(in srgb, var(--period) 65%, var(--yy-text)); box-shadow: 0 2px 5px #0000000d; cursor: grab; text-align: left; transition: box-shadow .15s, background .15s; }
 .yy-calendar-period:hover { z-index: 5; border-color: var(--period); box-shadow: 0 4px 12px #00000016; }
 .yy-calendar-period:active { cursor: grabbing; }
 .yy-calendar-period.tiny { padding: 0; border-left-width: 1px; }
-.yy-calendar-period.tiny .yy-calendar-period-text { display: none; }
+.yy-calendar-period.tiny:not(.outside) .yy-calendar-period-text { display: none; }
 .yy-calendar-period.selected { z-index: 4; border-color: var(--period); box-shadow: 0 0 0 2px color-mix(in srgb, var(--period) 24%, transparent), 0 4px 12px #00000016; }
 .yy-calendar-period.clip-start { border-left-style: dashed; border-radius: 2px 7px 7px 2px; }
 .yy-calendar-period.clip-end { border-right-style: dashed; border-radius: 7px 2px 2px 7px; }
 .yy-calendar-period-text { position: sticky; left: 12px; display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: calc(100% - 12px); pointer-events: none; }
 .yy-calendar-period-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 650; }
 .yy-calendar-period-text small { flex: none; opacity: .72; font-size: 10px; font-variant-numeric: tabular-nums; }
+/* Gantt-style label beside a bar too short for its title; lane packing reserves its width. */
+.yy-calendar-period.outside { overflow: visible; }
+.yy-calendar-period.outside .yy-calendar-period-text { position: absolute; top: 50%; left: calc(100% + 8px); width: max-content; max-width: none; translate: 0 -50%; color: var(--yy-text); pointer-events: auto; }
+.yy-calendar-period.outside .yy-calendar-period-text strong { max-width: 240px; }
+.yy-calendar-period.outside .yy-calendar-period-text small { color: var(--yy-text-3); opacity: 1; }
 .yy-calendar-today-line { position: absolute; z-index: 1; top: 58px; bottom: 0; width: 1px; background: color-mix(in srgb, var(--yy-primary) 45%, transparent); pointer-events: none; }
 .yy-calendar-today-line span { position: absolute; left: 0; bottom: 5px; padding: 1px 6px; border-radius: 8px; background: var(--yy-primary-soft); color: var(--yy-primary); font-size: 10px; white-space: nowrap; transform: translateX(-50%); }
 .yy-calendar-hover { position: absolute; z-index: 1; top: 58px; bottom: 0; display: grid; place-items: center; border-radius: 7px; background: color-mix(in srgb, var(--yy-primary) 7%, transparent); color: color-mix(in srgb, var(--yy-primary) 70%, transparent); pointer-events: none; }
@@ -1134,7 +1186,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   .yy-calendar-inspector-actions { padding: 12px 16px; }
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
   .yy-calendar-window { order: 3; flex: 1 0 100%; padding-top: 5px; }
-  .yy-calendar-period-text small { display: none; }
   .yy-calendar-shortcut { display: none; }
 }
 .yy-calendar-panel { width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
@@ -1158,9 +1209,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-list-row, .yy-calendar-cell { transition: background-color .12s ease; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, :deep(*), :deep(*::before), :deep(*::after) { transition: none !important; animation: none !important; }
-}
-@container (max-width: 160px) {
-  .yy-calendar-period-text small { display: none; }
 }
 @container (max-width: 680px) {
   .yy-calendar-window { order: 4; flex: 1 0 100%; }

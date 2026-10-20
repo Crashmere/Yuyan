@@ -165,29 +165,62 @@ export function adjustPeriod(period: CalendarEntry, grain: CalendarPrecision, am
   return { ...period, startDate, endDate }
 }
 
+// Narrowest bar, as a percentage of the rendered axis, so a short range stays visible and clickable.
+export const minPeriodWidth = 0.18
+
 export function periodGeometry(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, cells: CalendarCell[]): PeriodGeometry | null {
   if (!cells.length || period.endDate < cells[0].start || period.startDate > cells.at(-1)!.end) return null
   const start = dayPosition(period.startDate, cells)
   const end = period.endDate >= cells.at(-1)!.end ? cells.length : dayPosition(addDays(period.endDate, 1), cells)
   return {
     left: start / cells.length * 100,
-    width: Math.max(0.18, (end - start) / cells.length * 100),
+    width: Math.max(minPeriodWidth, (end - start) / cells.length * 100),
     clippedStart: period.startDate < cells[0].start,
     clippedEnd: period.endDate > cells.at(-1)!.end,
   }
 }
 
-export function assignPeriodLanes(periods: Pick<CalendarEntry, 'id' | 'startDate' | 'endDate'>[]): { lanes: Map<number, number>; count: number } {
+// Absolute position of a day's start (or end) in grain units, independent of the rendered cell
+// window, so pixel-based layout stays stable while the axis is recycled.
+function dayEdge(value: string, grain: CalendarPrecision, after: boolean): number {
+  const date = parseCalendarDate(value)
+  const day = date.getTime() / DAY + (after ? 1 : 0)
+  if (grain === 'day') return day
+  const bounds = unitBounds(value, grain)
+  const start = parseCalendarDate(bounds.start).getTime() / DAY
+  const span = parseCalendarDate(bounds.end).getTime() / DAY + 1 - start
+  const unit = grain === 'year' ? date.getUTCFullYear() : date.getUTCFullYear() * 12 + date.getUTCMonth()
+  return unit + (day - start) / span
+}
+
+export function periodSpan(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, grain: CalendarPrecision): { start: number; end: number } {
+  return { start: dayEdge(period.startDate, grain, false), end: dayEdge(period.endDate, grain, true) }
+}
+
+// Packs by occupied extent; the default is the date range itself, callers may widen the end
+// (for example by a label drawn beside the bar).
+export function assignPeriodLanes<T extends Pick<CalendarEntry, 'id' | 'startDate' | 'endDate'>>(
+  periods: T[], extent: (period: T) => { start: number; end: number } = period => periodSpan(period, 'day'),
+): { lanes: Map<number, number>; count: number } {
   const sorted = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate) || a.id - b.id)
-  const ends: string[] = []
+  const ends: number[] = []
   const lanes = new Map<number, number>()
   for (const period of sorted) {
-    let lane = ends.findIndex((end) => end < period.startDate)
+    const span = extent(period)
+    let lane = ends.findIndex((end) => end <= span.start)
     if (lane < 0) lane = ends.length
-    ends[lane] = period.endDate
+    ends[lane] = span.end
     lanes.set(period.id, lane)
   }
   return { lanes, count: ends.length }
+}
+
+export function periodDurationLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate' | 'precision'>): string {
+  if (period.precision === 'day') return `${periodDays(period)} 天`
+  const start = parseCalendarDate(period.startDate), end = parseCalendarDate(period.endDate)
+  const years = end.getUTCFullYear() - start.getUTCFullYear()
+  if (period.precision === 'year') return `${years + 1} 年`
+  return `${years * 12 + end.getUTCMonth() - start.getUTCMonth() + 1} 个月`
 }
 
 export function periodRangeLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate' | 'precision'>): string {
