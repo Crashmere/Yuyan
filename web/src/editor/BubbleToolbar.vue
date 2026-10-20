@@ -109,31 +109,39 @@ function anchor() {
     } }
   }
   if (!(selection instanceof CellSelection) && !(selection.empty && e.isActive('table'))) return null
+  const wholeTable = selection.empty
   const caretDOM = selection.empty ? e.view.domAtPos(selection.from).node : null
   const caretCell = (caretDOM instanceof Element ? caretDOM : caretDOM?.parentElement)?.closest('td, th')
   const first = selection instanceof CellSelection ? e.view.nodeDOM(selection.$anchorCell.pos) : caretCell
   const last = selection instanceof CellSelection ? e.view.nodeDOM(selection.$headCell.pos) : caretCell
-  if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) return null
+  const tableEl = first instanceof HTMLElement ? first.closest('table') : null
+  if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement) || !(tableEl instanceof HTMLElement)) return null
   return {
-    contextElement: first,
+    contextElement: wholeTable ? tableEl : first,
     getBoundingClientRect() {
       const a = first.getBoundingClientRect(), b = last.getBoundingClientRect()
-      const table = first.closest('table')!.getBoundingClientRect()
-      const scroll = first.closest('.yy-table-scroll')!.getBoundingClientRect()
+      const table = tableEl.getBoundingClientRect()
+      const scroll = (first.closest('.yy-table-scroll') ?? tableEl).getBoundingClientRect()
       const toolbar = document.querySelector('.yy-toolbar')?.getBoundingClientRect().bottom ?? 0
       const height = document.querySelector<HTMLElement>('.yy-selection-toolbar')?.offsetHeight ?? 38
-      const left = Math.max(Math.min(a.left, b.left), scroll.left, 8)
-      const right = Math.min(Math.max(a.right, b.right), scroll.right, innerWidth - 8)
+      // A caret uses the table itself. The scroll frame can be much wider than the grid,
+      // so centering on it would leave the toolbar away from the table.
+      const spanLeft = wholeTable ? table.left : Math.min(a.left, b.left)
+      const spanRight = wholeTable ? table.right : Math.max(a.right, b.right)
+      const left = Math.max(spanLeft, scroll.left, 8)
+      const right = Math.min(spanRight, scroll.right, innerWidth - 8)
       const selectedTop = Math.min(a.top, b.top)
-      // Above the first few rows, a menu anchored to the row would cross the column rail.
-      // Place it above the table there; farther down it can follow the selected rows.
-      const above = selectedTop - table.top < height + 80 ? table.top : selectedTop
+      // A caret always keeps the table toolbar above the table, so a lower cell does not
+      // cover the rows above it. A cell selection near the header does the same, so it
+      // clears the column rail; farther down it follows the selected rows.
+      const above = wholeTable || selectedTop - table.top < height + 80 ? table.top : selectedTop
       const floor = toolbar + height + 48
       // If the rail still fits but a menu above it does not, put the menu inside the table.
       // Reserving its height in the rail itself would make the rail disappear much too early.
       const top = above === table.top && above < floor && table.top > toolbar
         ? table.top + height + 48 : Math.max(above, floor)
-      const bottom = Math.max(top, Math.min(Math.max(a.bottom, b.bottom), innerHeight - 8))
+      const contentBottom = wholeTable ? table.bottom : Math.max(a.bottom, b.bottom)
+      const bottom = Math.max(top, Math.min(contentBottom, innerHeight - 8))
       return new DOMRect(left, top, Math.max(0, right - left), bottom - top)
     },
   }
