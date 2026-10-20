@@ -602,6 +602,13 @@ body.yy-row-dragging * {
   white-space: nowrap;
 }
 .yy-bubble-btn.is-mixed { background: var(--yy-bg-hover); }
+.yy-table-split-menu button.yy-menu-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
 .yy-selection-toolbar .yy-remove-selection {
   margin-left: auto;
 }
