@@ -1,34 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import type { Editor } from '@tiptap/core'
 import type { EditorView } from '@tiptap/pm/view'
-import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { ClipboardCopy, ExternalLink, PencilLine, Unlink } from 'lucide-vue-next'
 import { base } from '../shared/api'
 import { copyText } from '../shared/clipboard'
 import { toast } from '../ui/toast'
 import { useEditorContext } from './context'
 import { openHref } from './links'
-import { toolbarMotion } from './toolbarMotion'
+import FloatingToolbar from './FloatingToolbar.vue'
 
-// Shown when the cursor stands in a link: open, edit, copy or remove it.
+// The link's own card, shown below the link when the cursor stands in it: open, edit, copy
+// or remove it. (Creating or editing a link from selected text stays in the text toolbar.)
 const props = defineProps<{ hidden: boolean }>()
 const { editor, tick, ui } = useEditorContext()
-const menu = ref<InstanceType<typeof BubbleMenu> | null>(null)
-const options = { ...toolbarMotion(() => menu.value?.$el), placement: 'bottom-start' as const, offset: 8 }
 
 const href = computed(() => {
   void tick.value
   return String(editor.value?.getAttributes('link').href ?? '')
 })
-
-watch(
-  () => props.hidden,
-  (hidden) => {
-    const e = editor.value
-    if (hidden && e) e.view.dispatch(e.state.tr.setMeta('linkCard', 'hide'))
-  },
-)
 
 function shouldShow({ editor: e, element, view }: { editor: Editor; element: HTMLElement; view: EditorView }) {
   const focused = view.hasFocus() || element.contains(document.activeElement)
@@ -47,12 +37,12 @@ function unlink() {
 </script>
 
 <template>
-  <BubbleMenu v-if="editor" ref="menu" :editor="editor" plugin-key="linkCard" :should-show="shouldShow" :options="options" class="yy-link-card">
+  <FloatingToolbar name="linkCard" label="链接" :hidden="hidden" :should-show="shouldShow" placement="bottom-start" class="yy-link-card">
     <button type="button" class="yy-link-card-url" :data-tip="href" @mousedown.prevent @click="openHref(href)">
       <ExternalLink :size="14" /><span>{{ href }}</span>
     </button>
     <button type="button" class="yy-bubble-btn" data-tip="编辑链接" aria-label="编辑链接" @mousedown.prevent @click="ui.openLink()"><PencilLine :size="15" /></button>
     <button type="button" class="yy-bubble-btn" data-tip="复制链接" aria-label="复制链接" @mousedown.prevent @click="copy"><ClipboardCopy :size="15" /></button>
     <button type="button" class="yy-bubble-btn" data-tip="取消链接" aria-label="取消链接" @mousedown.prevent @click="unlink"><Unlink :size="15" /></button>
-  </BubbleMenu>
+  </FloatingToolbar>
 </template>

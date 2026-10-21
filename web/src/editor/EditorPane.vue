@@ -10,7 +10,9 @@ import { stopLoading } from '../shared/images'
 import { toast } from '../ui/toast'
 import { prefs } from '../app/prefs'
 import type { ReadingPosition } from '../app/content/readingPosition'
-import BubbleToolbar from './BubbleToolbar.vue'
+import TextToolbar from './TextToolbar.vue'
+import TableFloatingToolbar from './TableFloatingToolbar.vue'
+import ColumnsFloatingToolbar from './ColumnsFloatingToolbar.vue'
 import { editorKey, type EditorUi } from './context'
 import EditorOutline from './EditorOutline.vue'
 import EditorToolbar from './EditorToolbar.vue'
@@ -500,12 +502,17 @@ onBeforeUnmount(() => {
 
     <FindReplace v-if="findOpen" ref="find" @close="findOpen = false" />
     <ConflictDiff v-if="conflictMine" :doc-id="props.doc.id" :mine="conflictMine" @close="conflictMine = null" @reload="reloadLatest" @overwrite="overwriteCompared" />
-    <BubbleToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
+    <!-- One shared text toolbar, then each component's own floating toolbar at its fixed
+         position. Add a new component toolbar here as its own FloatingToolbar; never add
+         component buttons to TextToolbar. -->
+    <TextToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
+    <TableFloatingToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
+    <ColumnsFloatingToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
     <LinkCard :hidden="!!linkEdit || !!mathTarget" />
     <LinkPopover v-if="linkEdit" v-bind="linkEdit" @close="linkEdit = null" />
     <MathPopover v-if="mathTarget" :key="mathTarget.pos" :pos="mathTarget.pos" :fresh="mathTarget.fresh" @close="mathTarget = null" />
     <TableGrid v-if="tableGrid" :anchor="tableGrid" @pick="insertTable" @close="tableGrid = null" />
-    <ImageToolbar />
+    <ImageToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit" />
     <HighlightBlockToolbar :hidden="!!linkEdit || !!mathTarget || !!imageEdit || !!tableGrid || findOpen" />
     <ImageToolsDialog v-if="imageEdit" v-bind="imageEdit" @close="imageEdit = null" />
 

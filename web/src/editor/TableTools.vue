@@ -9,12 +9,13 @@ import { openColorPicker } from './colorPreferences'
 import TableHeaderIcon from './TableHeaderIcon.vue'
 import TableSettingsMenu from './TableSettingsMenu.vue'
 import TableSplitMenu from './TableSplitMenu.vue'
+import CellAlignmentControls from './CellAlignmentControls.vue'
 import { useEditorContext } from './context'
 import { fitTableColumns, tablesInSelection } from './tableFit'
 import { isFirstRowHeader, openTableMenu, setTableHeaderRows, tableHeaderRowCount } from './tableHeaders'
 import { canSplitSelectedCells, splitSelectedCells } from './splitTableCells'
 
-defineProps<{ compact?: boolean }>()
+defineProps<{ compact?: boolean; standalone?: boolean }>()
 const { editor, tick } = useEditorContext()
 const id = useId()
 const tableCount = computed(() => { void tick.value; return editor.value ? tablesInSelection(editor.value.state).length : 0 })
@@ -99,7 +100,7 @@ const state = computed(() => {
 
 <template>
   <template v-if="editor && (tableCount || splitOpen || settingsOpen)">
-    <span :class="compact ? 'yy-bubble-sep' : 'yy-toolbar-sep'"></span>
+    <span v-if="!standalone" :class="compact ? 'yy-bubble-sep' : 'yy-toolbar-sep'"></span>
     <button v-if="tableCount" type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" :aria-label="fitLabel" :data-tip="fitLabel" @mousedown.prevent @click="openTableMenu = null; fitTableColumns(editor)"><ArrowLeftRight :size="17" /></button>
     <template v-if="state">
       <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="合并单元格" data-tip="合并单元格" :disabled="!state.merge" @mousedown.prevent @click="apply(chain => chain.mergeCells())"><Merge :size="17" /></button>
@@ -116,6 +117,7 @@ const state = computed(() => {
       @vertical="apply(chain => chain.command(({ tr }) => splitSelectedCells(tr, 'vertical')), true)"
       @unmerge="apply(chain => chain.splitCell(), true)"
     />
+    <CellAlignmentControls v-if="compact && state" :compact="compact" />
     <template v-if="state">
       <ColorPicker kind="cell" :compact="compact" :value="state.background" :mixed="state.backgroundMixed" @pick="color => apply(chain => chain.setCellAttribute('backgroundColor', color))" />
       <button type="button" :class="[compact ? 'yy-bubble-btn' : 'yy-icon-btn', { active: state.header }]" aria-label="首行为表头" :aria-pressed="state.header" :data-tip="state.header ? '取消首行为表头' : '首行为表头'" :disabled="!state.canToggleHeader" @mousedown.prevent @click="rememberTableSelection(); apply(chain => chain.command(({ tr }) => setTableHeaderRows(tr, state?.header ? 0 : 1)), true)"><TableHeaderIcon /></button>

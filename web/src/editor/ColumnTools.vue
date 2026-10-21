@@ -6,6 +6,7 @@ import type { MenuEntry } from '../ui/menu'
 import { useEditorContext } from './context'
 import { activeColumns, moveColumn, setColumnCount, setColumnWidths, unwrapColumns } from './columns'
 
+defineProps<{ compact?: boolean; standalone?: boolean }>()
 const { editor, tick } = useEditorContext()
 const active = computed(() => { void tick.value; return editor.value ? activeColumns(editor.value.state) : null })
 const items = computed<MenuEntry[]>(() => {
@@ -30,9 +31,9 @@ const items = computed<MenuEntry[]>(() => {
 
 <template>
   <template v-if="active">
-    <span class="yy-toolbar-sep"></span>
+    <span v-if="!standalone" :class="compact ? 'yy-bubble-sep' : 'yy-toolbar-sep'"></span>
     <ActionMenu :items="items" :restore-focus="false">
-      <button type="button" class="yy-icon-btn" aria-label="分栏设置" data-tip="分栏设置" @mousedown.prevent><Columns2 :size="17" /></button>
+      <button type="button" :class="compact ? 'yy-bubble-btn' : 'yy-icon-btn'" aria-label="分栏设置" data-tip="分栏设置" @mousedown.prevent><Columns2 :size="17" /></button>
     </ActionMenu>
   </template>
 </template>
