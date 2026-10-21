@@ -1,10 +1,28 @@
 import type { Editor } from '@tiptap/core'
+import { skipTrailingNodeMeta } from '@tiptap/extensions'
+import { GapCursor } from '@tiptap/pm/gapcursor'
 import { Selection } from '@tiptap/pm/state'
 import type { Node } from '@tiptap/pm/model'
 import type { Mapping } from '@tiptap/pm/transform'
 import { captureBlockPosition, type ReadingPosition } from '../app/content/readingPosition'
 import { codeEditorIn } from '../code/editor'
 import { revealHeadingAt } from './headingFolds'
+
+// Automatic positioning must not select an entire atom. Use its leading gap when valid,
+// otherwise find a text caret nearby. Positioning alone must not add a trailing paragraph.
+export function placeCaret(editor: Editor, pos: number) {
+  const { doc } = editor.state
+  const $pos = doc.resolve(pos)
+  let selection = Selection.near($pos)
+  if (!selection.empty) {
+    const gap = new GapCursor(doc.resolve(selection.from)).getBookmark().resolve(doc)
+    selection = gap instanceof GapCursor ? gap
+      : Selection.findFrom($pos, 1, true) ?? Selection.findFrom($pos, -1, true) ?? gap
+  }
+  if (!selection.eq(editor.state.selection)) {
+    editor.view.dispatch(editor.state.tr.setSelection(selection).setMeta(skipTrailingNodeMeta, true).setMeta('addToHistory', false))
+  }
+}
 
 export function captureEditingPosition(editor: Editor, original?: { doc: Node; mapping: Mapping }): ReadingPosition | undefined {
   const blocks: (Element | null)[] = []
@@ -56,9 +74,9 @@ export function restoreReadingPosition(editor: Editor, position: ReadingPosition
     return true
   }
   const caret = editor.view.posAtCoords({ left: visible.left + 8, top: Math.max(top, visible.top) + 8 })
-  // Focusing the old selection at the start would undo the restored scroll, and typing should
-  // start in the visible content. Atom nodes can fall back to the start of this block.
-  editor.view.dispatch(editor.state.tr.setSelection(Selection.near(editor.state.doc.resolve(caret?.pos ?? pos))))
-  editor.commands.focus(null, { scrollIntoView: false })
+  // Focusing the old selection at the start would undo the restored scroll. Keep an empty
+  // caret near the visible content even when coordinates land on a calendar or another atom.
+  placeCaret(editor, caret?.pos ?? pos)
+  editor.view.focus()
   return true
 }

@@ -37,7 +37,7 @@ import { insertImages, insertAttachments, pendingUploads } from './uploads'
 import { clearUnusedBlockSpaces } from './blockSpaces'
 import { openTemplates, saveEditorTemplate } from './templates'
 import { setupLinkPreviews } from '../shared/linkPreview'
-import { captureEditingPosition, restoreReadingPosition } from './readingPosition'
+import { captureEditingPosition, placeCaret, restoreReadingPosition } from './readingPosition'
 import 'katex/dist/katex.min.css'
 import '../styles/editor.css'
 
@@ -369,6 +369,14 @@ function autosizeTitle() {
   el.style.height = `${el.scrollHeight}px`
 }
 
+function focusBodyStart() {
+  const e = editor.value
+  if (!e) return
+  placeCaret(e, 0)
+  // EditorContent mounts its node views after this component's nextTick.
+  requestAnimationFrame(() => { if (!e.isDestroyed) e.view.focus() })
+}
+
 function beforeUnload(e: BeforeUnloadEvent) {
   if (discarded) return
   const uploading = !!editor.value && pendingUploads(editor.value) > 0
@@ -422,6 +430,7 @@ onMounted(async () => {
       Object.assign(imageSizes(ed), d.images)
     },
   })
+  placeCaret(e, 0)
   editor.value = e
   previewCleanup = setupLinkPreviews(e.view.dom)
   emit('words', countCharacters(e.state.doc))
@@ -434,7 +443,7 @@ onMounted(async () => {
   autosizeTitle()
   const focusStart = () => {
     if (!d.content.content?.some((n) => n.content?.length)) titleInput.value?.focus()
-    else e.commands.focus('start')
+    else focusBodyStart()
   }
   if (props.readingPosition) {
     // EditorContent attaches the document and builds its Vue node views in another nextTick.
@@ -486,7 +495,7 @@ onBeforeUnmount(() => {
           class="yy-title-input"
           rows="1"
           placeholder="请输入标题"
-          @keydown.enter.prevent="!$event.isComposing && editor?.commands.focus('start')"
+          @keydown.enter.prevent="!$event.isComposing && focusBodyStart()"
         ></textarea>
         <editor-content v-if="editor" :editor="editor" class="yy-content" />
       </div>
