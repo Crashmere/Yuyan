@@ -260,8 +260,9 @@ const periodLabels = computed(() => {
   for (const period of renderedPeriods.value) {
     const span = periodSpan(period, grain.value)
     const bar = Math.max(minimum, (span.end - span.start) * unit)
-    // Padding, borders, and the sticky text inset leave this much room inside the bar.
-    const inner = bar - 40
+    // Borders (4 px), horizontal padding (24 px), and a 2 px spare leave this much room
+    // for text inside the bar; keep in step with .yy-calendar-period-text's max-width.
+    const inner = bar - 30
     const duration = textWidth(periodDurationLabel(period), durationFont)
     // Stay inside whenever the bar shows at least as much of the title as a capped outside label.
     const fits = (width: number) => inner >= Math.min(width, outsideTitleMax)
@@ -1146,7 +1147,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-period.selected { z-index: 4; border-color: var(--period); box-shadow: 0 0 0 2px color-mix(in srgb, var(--period) 24%, transparent), 0 4px 12px #00000016; }
 .yy-calendar-period.clip-start { border-left-style: dashed; border-radius: 2px 7px 7px 2px; }
 .yy-calendar-period.clip-end { border-right-style: dashed; border-radius: 7px 2px 2px 7px; }
-.yy-calendar-period-text { position: sticky; left: 12px; display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: calc(100% - 12px); pointer-events: none; }
+.yy-calendar-period-text { position: sticky; left: 12px; display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: calc(100% - 2px); pointer-events: none; }
 .yy-calendar-period-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 650; }
 .yy-calendar-period-text small { flex: none; opacity: .72; font-size: 10px; font-variant-numeric: tabular-nums; }
 /* Gantt-style label beside a bar too short for its title; lane packing reserves its width. */
