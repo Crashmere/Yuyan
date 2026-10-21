@@ -174,7 +174,7 @@ function saveCaption(value: string | null) {
 </script>
 
 <template>
-  <FloatingToolbar ref="shell" name="imageMenu" label="图片" :hidden="hidden" :should-show="shouldShow" :anchor="anchor" class="yy-image-toolbar" @show="menuVisible = true" @hide="menuVisible = false">
+  <FloatingToolbar ref="shell" name="imageMenu" label="图片" :hidden="hidden" :should-show="shouldShow" :anchor="anchor" update-on-tick class="yy-image-toolbar" @show="menuVisible = true" @hide="menuVisible = false">
     <template v-if="!altOpen && !captionOpen">
       <span v-if="mode && mode !== 'single'" class="yy-selected-image-count">{{ images.length }} 张图片</span>
       <ImageFormatControls>

@@ -2,7 +2,6 @@
 import { ref, watch } from 'vue'
 import type { Editor } from '@tiptap/core'
 import type { EditorView } from '@tiptap/pm/view'
-import { PluginKey } from '@tiptap/pm/state'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { useEditorContext } from './context'
 import { toolbarMotion } from './toolbarMotion'
@@ -36,7 +35,11 @@ const emit = defineEmits<{ show: []; hide: [] }>()
 
 const { editor, tick } = useEditorContext()
 const menu = ref<InstanceType<typeof BubbleMenu> | null>(null)
-const pluginKey = new PluginKey(props.name)
+// Keep the key as the plain name string: BubbleMenu's view looks position/hide messages up
+// by that string, so `tr.setMeta(name, 'updatePosition')` from component toolbars (e.g. the
+// image toolbar's autoUpdate) matches. A PluginKey object would key those messages under
+// its suffixed internal key instead, and the updates would be silently dropped.
+const pluginKey = props.name
 const motion = toolbarMotion(() => menu.value?.$el)
 const options = {
   ...motion,
