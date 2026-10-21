@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   CalendarDays, Check, ChevronLeft, ChevronRight, ChevronDown,
-  Plus, Save, Trash2, X, Maximize2, Minimize2, Copy, ClipboardPaste, ListFilter, Search,
+  Plus, Save, Trash2, X, Maximize2, Minimize2, Copy, ClipboardPaste, ListFilter, Search, ZoomIn, ZoomOut,
 } from 'lucide-vue-next'
 import { errorMessage } from '../shared/api'
 import { confirm, prompt } from '../ui/dialog'
@@ -178,7 +178,17 @@ interface Draft extends Omit<CalendarEntry, 'id'> {
 const draft = ref<Draft | null>(null)
 const draftBaseline = ref('')
 
-const unitWidth = computed(() => grain.value === 'year' ? 88 : grain.value === 'month' ? 80 : 48)
+// Cell width is a local viewing zoom only: it never enters the saved model, so it
+// neither creates an undo step nor changes the configured grain.
+const cellWidths: Record<CalendarPrecision, { default: number; min: number; max: number }> = {
+  year: { default: 88, min: 56, max: 240 },
+  month: { default: 80, min: 48, max: 220 },
+  day: { default: 48, min: 36, max: 180 },
+}
+const zoomWidth = ref(cellWidths[grain.value].default)
+const unitWidth = computed(() => zoomWidth.value)
+const canZoomOut = computed(() => zoomWidth.value > cellWidths[grain.value].min + .5)
+const canZoomIn = computed(() => zoomWidth.value < cellWidths[grain.value].max - .5)
 const cells = computed(() => windowCells(axisCenter.value, grain.value, 192))
 const cellWidth = computed(() => axisWidth.value / cells.value.length || unitWidth.value)
 const visibleStart = computed(() => dateAtPosition(scrollLeft.value / cellWidth.value, cells.value))
@@ -408,9 +418,9 @@ async function selectPeriod(period: CalendarEntry) {
   if (draft.value?.id !== period.id) openPeriod(period)
 }
 
+// Locating an event only moves the viewport; it must not rewrite the configured grain.
 async function locateEvent(period: CalendarEntry) {
   const days = periodDays(period)
-  grain.value = days <= 42 ? 'day' : days <= 730 ? 'month' : 'year'
   center.value = addDays(period.startDate, Math.floor((days - 1) / 2))
   publish()
   await centerTimeline()
@@ -523,22 +533,40 @@ function wheelTimeline(event: WheelEvent) {
   void scrollTimeline()
 }
 
-const grainOrder: CalendarPrecision[] = ['year', 'month', 'day']
-let zoomCooldown = 0
+// Zooming scales the width of each cell in the current grain (equivalently, how many
+// cells fit in the viewport). The anchor date keeps its place under the pointer for a
+// wheel zoom and at the centre for the toolbar buttons.
+async function zoomTo(width: number, anchor: string, fraction = .5) {
+  const limits = cellWidths[grain.value]
+  const next = Math.min(limits.max, Math.max(limits.min, width))
+  if (Math.abs(next - zoomWidth.value) < .01) return
+  zoomWidth.value = next
+  await nextTick()
+  const element = timelineScroll.value
+  if (disposed || !element) return
+  syncViewport()
+  element.scrollLeft = Math.max(0, dateOffset(anchor) - fraction * element.clientWidth)
+  syncViewport()
+}
+
+function zoomBy(factor: number) {
+  void zoomTo(zoomWidth.value * factor, viewportDate())
+}
+
 function zoomTimeline(event: WheelEvent) {
-  if (dragging.value || !timeline.value) return
+  if (dragging.value || !timeline.value || !timelineScroll.value) return
   const delta = event.deltaY || event.deltaX
   if (!delta) return
   event.preventDefault()
-  // Trackpad pinch-zoom fires a stream of small deltas; step one grain per rest.
-  const now = event.timeStamp || performance.now()
-  if (now - zoomCooldown < 260) return
-  // Scroll up / pinch out zooms in (coarser → finer); down zooms out.
-  const direction = delta < 0 ? 1 : -1
-  const next = grainOrder[grainOrder.indexOf(grain.value) + direction]
-  if (!next) return
-  zoomCooldown = now
-  setGrain(next, dateAtPosition(cellIndex(event.clientX) + 0.5, cells.value))
+  // Pinch-zoom arrives as ctrl/meta plus small wheel deltas; scale continuously by the
+  // amount reported, clamped per event so one mouse-wheel notch stays a modest step.
+  const unit = event.deltaMode === 1 ? 33 : event.deltaMode === 2 ? timelineScroll.value.clientWidth : 1
+  const factor = Math.min(1.3, Math.max(.77, Math.exp(-delta * unit * .0016)))
+  const timelineRect = timeline.value.getBoundingClientRect()
+  const position = Math.max(0, Math.min(cells.value.length - .001, (event.clientX - timelineRect.left) / timelineRect.width * cells.value.length))
+  const scrollRect = timelineScroll.value.getBoundingClientRect()
+  const fraction = Math.min(1, Math.max(0, (event.clientX - scrollRect.left) / scrollRect.width))
+  void zoomTo(zoomWidth.value * factor, dateAtPosition(position, cells.value), fraction)
 }
 
 function viewportDate(sync = true) {
@@ -551,16 +579,20 @@ function dateOffset(date: string) {
   return (dayPosition(date, cells.value) + .5 / periodDays({ startDate: bounds.start, endDate: bounds.end })) * cellWidth.value
 }
 
+// The grain is a saved setting of the calendar block, configurable only while editing;
+// reading always opens at the saved grain and browsing never rewrites it.
 function setGrain(value: CalendarPrecision, date = viewportDate()) {
-  if (dragging.value) return
+  if (dragging.value || props.readonly) return
   center.value = date
   grain.value = value
   publish()
   void centerTimeline().then(() => animateCalendar(timelineScroll.value, [{ opacity: .55 }, { opacity: 1 }], 140))
 }
 
-function drillCell(date: string) {
-  setGrain(grain.value === 'year' ? 'month' : 'day', date)
+function cellTip(cell: (typeof cells.value)[number]): string {
+  if (grain.value === 'year') return `定位到 ${cell.primary}年`
+  if (grain.value === 'month') return `定位到 ${cell.secondary}年${cell.primary}`
+  return `定位到 ${cell.start}`
 }
 
 async function centerTimeline(date = center.value) {
@@ -575,7 +607,11 @@ async function centerTimeline(date = center.value) {
   }
 }
 
-watch(grain, () => void centerTimeline())
+watch(grain, () => {
+  // A new grain starts from its own default cell width rather than the old grain's zoom.
+  zoomWidth.value = cellWidths[grain.value].default
+  void centerTimeline()
+})
 watch(center, () => void centerTimeline())
 
 interface CreateGesture {
@@ -888,6 +924,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
       <input v-else ref="titleInput" v-model="calendarTitle" class="yy-calendar-title" maxlength="120" aria-label="日历名称" placeholder="日历" @change="renameCalendar" @keydown.enter.prevent="!$event.isComposing && (renameCalendar(), titleInput?.blur())" />
       <span class="yy-calendar-block-count">{{ periods.length }} 个事件</span>
       <span v-if="currentCount" class="yy-calendar-current-count">{{ currentCount }} 个进行中</span>
+      <div v-if="!readonly" class="yy-calendar-grain-setting">
+        <span aria-hidden="true">展示维度</span>
+        <div class="yy-calendar-segments" aria-label="展示维度" :style="{ '--segment-index': grains.findIndex(item => item.value === grain) }">
+          <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
+        </div>
+      </div>
       <div class="yy-calendar-block-actions">
         <IconButton label="复制日历" :disabled="transferring" @click="copyCalendar"><Copy :size="16" /></IconButton>
         <IconButton v-if="!readonly" label="从剪贴板导入（替换当前日历，可撤销）" :disabled="transferring" @click="importCalendar"><ClipboardPaste :size="16" /></IconButton>
@@ -900,8 +942,9 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
     <section class="yy-calendar-workspace">
       <div class="yy-calendar-main">
         <div class="yy-calendar-toolbar">
-          <div class="yy-calendar-segments" aria-label="时间粒度" :style="{ '--segment-index': grains.findIndex(item => item.value === grain) }">
-            <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
+          <div class="yy-calendar-zoom" aria-label="格宽缩放">
+            <IconButton label="缩小格宽" :disabled="!canZoomOut" @click="zoomBy(1 / 1.25)"><ZoomOut :size="16" /></IconButton>
+            <IconButton label="扩大格宽" :disabled="!canZoomIn" @click="zoomBy(1.25)"><ZoomIn :size="16" /></IconButton>
           </div>
           <span class="yy-calendar-window">{{ windowLabel }}</span>
           <button type="button" class="yy-btn small" @click="locate(todayDate())">今天</button>
@@ -919,6 +962,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <div
               ref="timeline"
               class="yy-calendar-timeline"
+              :class="{ compact: unitWidth < 40 }"
               :style="{ minWidth: `${timelineMinWidth}px`, height: `${timelineInnerHeight}px`, '--calendar-columns': cells.length }"
               @pointerdown="beginCreate"
               @pointermove="moveCreate"
@@ -927,7 +971,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
               @pointerleave="leaveCreate"
             >
               <div class="yy-calendar-ruler">
-                <button v-for="cell in cells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }" :data-date="cell.start" :data-tip="grain === 'day' ? `定位到 ${cell.start}` : `查看 ${cell.primary}${cell.secondary}的${grain === 'year' ? '月份' : '日期'}`" @click="grain === 'day' ? locate(cell.start) : drillCell(cell.start)">
+                <button v-for="cell in cells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }" :data-date="cell.start" :data-tip="cellTip(cell)" @click="locate(cell.start)">
                   <strong>{{ cell.primary }}</strong><span>{{ cell.secondary }}</span>
                 </button>
               </div>
@@ -1060,6 +1104,9 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-segments::before { content: ''; position: absolute; left: 3px; top: 3px; width: 40px; height: 28px; border-radius: 6px; background: var(--yy-bg); box-shadow: 0 1px 4px #00000012; transform: translateX(calc(var(--segment-index) * 40px)); transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
 .yy-calendar-segments button { position: relative; width: 40px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
 .yy-calendar-segments button.active { color: var(--yy-text); font-weight: 600; }
+.yy-calendar-grain-setting { display: inline-flex; flex: none; align-items: center; gap: 5px; }
+.yy-calendar-grain-setting > span { color: var(--yy-text-3); font-size: 11px; white-space: nowrap; }
+.yy-calendar-zoom { display: inline-flex; flex: none; align-items: center; gap: 2px; }
 .yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
 .yy-calendar-frame { position: relative; overflow: hidden; border-radius: 0 0 12px 12px; }
 .yy-calendar-edge { position: absolute; z-index: 8; top: 50%; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--yy-border); border-radius: 50%; background: var(--yy-bg); color: var(--yy-text-2); box-shadow: 0 2px 10px #0000001f; cursor: pointer; transform: translateY(-50%); }
@@ -1080,6 +1127,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-cell:hover { background: var(--yy-bg-hover); }
 .yy-calendar-cell:first-child { border-left: 0; }
 .yy-calendar-cell strong { color: var(--yy-text-2); font-size: 12px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.yy-calendar-cell strong, .yy-calendar-cell span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.yy-calendar-timeline.compact .yy-calendar-cell strong { font-size: 11px; }
 .yy-calendar-cell.current { background: var(--yy-primary-soft); }
 .yy-calendar-cell.current strong { color: var(--yy-primary); }
 .yy-calendar-cell.weekend { background: color-mix(in srgb, var(--yy-bg-active) 48%, transparent); }
@@ -1225,5 +1274,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   .yy-calendar-toolbar { gap: 6px; padding: 9px; }
   .yy-calendar-list-toggle { margin-left: auto; }
   .yy-calendar-current-count { display: none; }
+  .yy-calendar-grain-setting > span { display: none; }
 }
 </style>
