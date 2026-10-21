@@ -20,7 +20,7 @@ import {
 import type { CalendarData, CalendarEntry, CalendarPrecision } from '../schema/calendar'
 import { calendarCellWidths } from '../schema/calendar'
 
-const props = defineProps<{ model: CalendarData; readonly?: boolean }>()
+const props = defineProps<{ model: CalendarData; readonly?: boolean; selected?: boolean }>()
 const emit = defineEmits<{ change: [value: CalendarData]; undo: [redo: boolean] }>()
 const root = ref<HTMLElement | null>(null)
 const widthFrame = ref<HTMLElement | null>(null)
@@ -1005,7 +1005,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 <template>
   <div ref="widthFrame" class="yy-calendar-width-frame">
   <Teleport to="body" :disabled="!expanded">
-  <section ref="root" class="yy-calendar-panel" :class="{ expanded, readonly, dragging, collapsed, resizing: liveWidth !== null }" :style="panelStyle" tabindex="-1" @keydown="onKey">
+  <section ref="root" class="yy-calendar-panel" :class="{ expanded, readonly, dragging, collapsed, 'is-selected': selected, resizing: liveWidth !== null }" :style="panelStyle" tabindex="-1" @keydown="onKey">
     <div class="yy-calendar-block-head">
       <div class="yy-calendar-heading">
       <button type="button" class="yy-calendar-toggle" :aria-label="collapsed ? '展开日历内容' : '收起日历内容'" :data-tip="collapsed ? '展开日历内容' : '收起日历内容'" :aria-expanded="!collapsed" @click="toggleCollapsed"><ChevronDown :size="15" /></button>
@@ -1340,6 +1340,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 }
 .yy-calendar-width-frame { width: 100%; min-width: 0; }
 .yy-calendar-panel { position: relative; width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
+.yy-calendar-panel.is-selected { outline: 2px solid var(--yy-primary); outline-offset: 2px; border-radius: 8px; }
 .yy-calendar-block-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; min-height: 40px; padding: 5px 6px; border: 1px solid var(--yy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--yy-bg); }
 .yy-calendar-heading { grid-column: 1; grid-row: 1; display: flex; min-width: 0; align-items: center; gap: 6px; }
 .yy-calendar-width-handle { position: absolute; z-index: 9; top: 0; bottom: 0; width: 12px; cursor: ew-resize; touch-action: none; }

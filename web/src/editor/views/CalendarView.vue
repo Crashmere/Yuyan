@@ -23,6 +23,6 @@ onBeforeUnmount(unregister)
 </script>
 <template>
   <NodeViewWrapper contenteditable="false" class="yy-calendar-node" :class="{ 'ProseMirror-selectednode': selected }" @mousedown.stop @keydown.stop>
-    <CalendarPanel ref="panel" :model="model" @change="change" @undo="redo => redo ? editor.commands.redo() : editor.commands.undo()" />
+    <CalendarPanel ref="panel" :model="model" :selected="selected" @change="change" @undo="redo => redo ? editor.commands.redo() : editor.commands.undo()" />
   </NodeViewWrapper>
 </template>
