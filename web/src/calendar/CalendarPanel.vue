@@ -18,6 +18,7 @@ import {
   parseCalendarDate, periodDays, periodDurationLabel, periodGeometry, periodRangeLabel, periodSpan, todayDate, unitBounds, windowCells,
 } from './dates'
 import type { CalendarData, CalendarEntry, CalendarPrecision } from '../schema/calendar'
+import { calendarCellWidths } from '../schema/calendar'
 
 const props = defineProps<{ model: CalendarData; readonly?: boolean }>()
 const emit = defineEmits<{ change: [value: CalendarData]; undo: [redo: boolean] }>()
@@ -54,7 +55,7 @@ async function toggleExpanded(event?: MouseEvent) {
 }
 const calendarTitle = ref(props.model.title)
 function calendarData(): CalendarData {
-  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value,
+  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, cellWidth: savedCellWidth.value,
     periods: periods.value.map(period => ({ ...period })) }
 }
 function publish() {
@@ -109,6 +110,8 @@ async function importCalendar() {
       if (!await flush() || disposed) return
       calendarTitle.value = data.title
       grain.value = data.grain
+      savedCellWidth.value = data.cellWidth ?? null
+      zoomWidth.value = savedCellWidth.value ?? calendarCellWidths[data.grain].default
       center.value = data.center || todayDate()
       collapsed.value = !!data.collapsed
       periods.value = data.periods.map(p => ({ ...p }))
@@ -121,8 +124,12 @@ async function importCalendar() {
   } finally { transferring.value = false }
 }
 function syncModel() {
+  const width = props.model.cellWidth ?? null
+  const displayChanged = grain.value !== props.model.grain || savedCellWidth.value !== width
   calendarTitle.value = props.model.title
   grain.value = props.model.grain
+  savedCellWidth.value = width
+  if (displayChanged) zoomWidth.value = width ?? calendarCellWidths[grain.value].default
   center.value = props.model.center || todayDate()
   collapsed.value = !!props.model.collapsed
   periods.value = props.model.periods.map(p => ({ ...p }))
@@ -178,17 +185,12 @@ interface Draft extends Omit<CalendarEntry, 'id'> {
 const draft = ref<Draft | null>(null)
 const draftBaseline = ref('')
 
-// Cell width is a local viewing zoom only: it never enters the saved model, so it
-// neither creates an undo step nor changes the configured grain.
-const cellWidths: Record<CalendarPrecision, { default: number; min: number; max: number }> = {
-  year: { default: 88, min: 56, max: 240 },
-  month: { default: 80, min: 48, max: 220 },
-  day: { default: 48, min: 36, max: 180 },
-}
-const zoomWidth = ref(cellWidths[grain.value].default)
+// Editing saves the default width; reading may zoom locally without rewriting it.
+const savedCellWidth = ref(props.model.cellWidth ?? null)
+const zoomWidth = ref(savedCellWidth.value ?? calendarCellWidths[grain.value].default)
 const unitWidth = computed(() => zoomWidth.value)
-const canZoomOut = computed(() => zoomWidth.value > cellWidths[grain.value].min + .5)
-const canZoomIn = computed(() => zoomWidth.value < cellWidths[grain.value].max - .5)
+const canZoomOut = computed(() => zoomWidth.value > calendarCellWidths[grain.value].min + .5)
+const canZoomIn = computed(() => zoomWidth.value < calendarCellWidths[grain.value].max - .5)
 const cells = computed(() => windowCells(axisCenter.value, grain.value, 192))
 const cellWidth = computed(() => axisWidth.value / cells.value.length || unitWidth.value)
 const visibleStart = computed(() => dateAtPosition(scrollLeft.value / cellWidth.value, cells.value))
@@ -538,10 +540,14 @@ function wheelTimeline(event: WheelEvent) {
 // cells fit in the viewport). The anchor date keeps its place under the pointer for a
 // wheel zoom and at the centre for the toolbar buttons.
 async function zoomTo(width: number, anchor: string, fraction = .5) {
-  const limits = cellWidths[grain.value]
+  const limits = calendarCellWidths[grain.value]
   const next = Math.min(limits.max, Math.max(limits.min, width))
   if (Math.abs(next - zoomWidth.value) < .01) return
   zoomWidth.value = next
+  if (!props.readonly) {
+    savedCellWidth.value = next
+    publish()
+  }
   await nextTick()
   const element = timelineScroll.value
   if (disposed || !element) return
@@ -583,9 +589,11 @@ function dateOffset(date: string) {
 // The grain is a saved setting of the calendar block, configurable only while editing;
 // reading always opens at the saved grain and browsing never rewrites it.
 function setGrain(value: CalendarPrecision, date = viewportDate()) {
-  if (dragging.value || props.readonly) return
+  if (dragging.value || props.readonly || value === grain.value) return
   center.value = date
   grain.value = value
+  savedCellWidth.value = null
+  zoomWidth.value = calendarCellWidths[value].default
   publish()
   void centerTimeline().then(() => animateCalendar(timelineScroll.value, [{ opacity: .55 }, { opacity: 1 }], 140))
 }
@@ -609,8 +617,6 @@ async function centerTimeline(date = center.value) {
 }
 
 watch(grain, () => {
-  // A new grain starts from its own default cell width rather than the old grain's zoom.
-  zoomWidth.value = cellWidths[grain.value].default
   void centerTimeline()
 })
 watch(center, () => void centerTimeline())
@@ -925,16 +931,25 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
       <input v-else ref="titleInput" v-model="calendarTitle" class="yy-calendar-title" maxlength="120" aria-label="日历名称" placeholder="日历" @change="renameCalendar" @keydown.enter.prevent="!$event.isComposing && (renameCalendar(), titleInput?.blur())" />
       <span class="yy-calendar-block-count">{{ periods.length }} 个事件</span>
       <span v-if="currentCount" class="yy-calendar-current-count">{{ currentCount }} 个进行中</span>
-      <div v-if="!readonly" class="yy-calendar-grain-setting">
-        <span aria-hidden="true">展示维度</span>
-        <div class="yy-calendar-segments" aria-label="展示维度" :style="{ '--segment-index': grains.findIndex(item => item.value === grain) }">
-          <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
-        </div>
-      </div>
+      <span v-if="!collapsed" class="yy-calendar-window">{{ windowLabel }}</span>
       <div class="yy-calendar-block-actions">
+        <div v-if="!readonly" class="yy-calendar-grain-setting">
+          <span aria-hidden="true">展示维度</span>
+          <div class="yy-calendar-segments" aria-label="展示维度" :style="{ '--segment-index': grains.findIndex(item => item.value === grain) }">
+            <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
+          </div>
+        </div>
+        <template v-if="!collapsed">
+          <div class="yy-calendar-zoom" aria-label="格宽缩放">
+            <IconButton label="缩小格宽" :disabled="!canZoomOut" @click="zoomBy(1 / 1.25)"><ZoomOut :size="16" /></IconButton>
+            <IconButton label="扩大格宽" :disabled="!canZoomIn" @click="zoomBy(1.25)"><ZoomIn :size="16" /></IconButton>
+          </div>
+          <button type="button" class="yy-btn small" @click="locate(todayDate())">今天</button>
+          <IconButton label="事件列表" class="yy-calendar-list-toggle" :class="{ active: showList }" :aria-expanded="showList" @click="showList = !showList"><ListFilter :size="16" /></IconButton>
+        </template>
         <IconButton label="复制日历" :disabled="transferring" @click="copyCalendar"><Copy :size="16" /></IconButton>
         <IconButton v-if="!readonly" label="从剪贴板导入（替换当前日历，可撤销）" :disabled="transferring" @click="importCalendar"><ClipboardPaste :size="16" /></IconButton>
-        <button v-if="!readonly" type="button" class="yy-btn small primary" @click="newAtCenter"><Plus :size="15" />新建事件</button>
+        <IconButton v-if="!readonly" label="新建事件" class="yy-calendar-new" @click="newAtCenter"><Plus :size="17" /></IconButton>
         <IconButton :label="expanded ? '收起日历' : '展开日历'" @click="toggleExpanded"><Minimize2 v-if="expanded" :size="17" /><Maximize2 v-else :size="17" /></IconButton>
       </div>
     </div>
@@ -942,16 +957,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
     <div v-show="!collapsed" class="yy-calendar-reveal" :inert="collapsed">
     <section class="yy-calendar-workspace">
       <div class="yy-calendar-main">
-        <div class="yy-calendar-toolbar">
-          <div class="yy-calendar-zoom" aria-label="格宽缩放">
-            <IconButton label="缩小格宽" :disabled="!canZoomOut" @click="zoomBy(1 / 1.25)"><ZoomOut :size="16" /></IconButton>
-            <IconButton label="扩大格宽" :disabled="!canZoomIn" @click="zoomBy(1.25)"><ZoomIn :size="16" /></IconButton>
-          </div>
-          <span class="yy-calendar-window">{{ windowLabel }}</span>
-          <button type="button" class="yy-btn small" @click="locate(todayDate())">今天</button>
-          <button type="button" class="yy-btn small yy-calendar-list-toggle" :class="{ active: showList }" :aria-expanded="showList" @click="showList = !showList"><ListFilter :size="15" />事件列表</button>
-        </div>
-
         <div class="yy-calendar-frame">
           <Transition name="yy-calendar-edge">
           <button v-if="nearestBefore" type="button" class="yy-calendar-edge start" :data-tip="`跳到更早的事件 · ${nearestBefore.title || '未命名事件'}`" aria-label="跳到更早的事件" @click="jumpToEvent(nearestBefore)"><ChevronLeft :size="18" /></button>
@@ -1100,7 +1105,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-reveal-leave-active { pointer-events: none; }
 .yy-calendar-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 .yy-calendar-main { min-width: 0; border: 1px solid var(--yy-border); border-radius: 12px; background: var(--yy-bg); }
-.yy-calendar-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 58px; padding: 10px 12px; border-bottom: 1px solid var(--yy-border); }
 .yy-calendar-segments { position: relative; display: inline-flex; flex: none; padding: 3px; border-radius: 8px; background: var(--yy-bg-muted); }
 .yy-calendar-segments::before { content: ''; position: absolute; left: 3px; top: 3px; width: 40px; height: 28px; border-radius: 6px; background: var(--yy-bg); box-shadow: 0 1px 4px #00000012; transform: translateX(calc(var(--segment-index) * 40px)); transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
 .yy-calendar-segments button { position: relative; width: 40px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--yy-text-2); cursor: pointer; }
@@ -1108,7 +1112,9 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-grain-setting { display: inline-flex; flex: none; align-items: center; gap: 5px; }
 .yy-calendar-grain-setting > span { color: var(--yy-text-3); font-size: 11px; white-space: nowrap; }
 .yy-calendar-zoom { display: inline-flex; flex: none; align-items: center; gap: 2px; }
-.yy-calendar-window { flex: 1; min-width: 170px; text-align: center; color: var(--yy-text-2); font-size: 12px; font-variant-numeric: tabular-nums; }
+.yy-calendar-window { flex: none; color: var(--yy-text-2); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.yy-calendar-list-toggle.active { background: var(--yy-primary-soft); color: var(--yy-primary); }
+.yy-calendar-new { color: var(--yy-primary); }
 .yy-calendar-frame { position: relative; overflow: hidden; border-radius: 0 0 12px 12px; }
 .yy-calendar-edge { position: absolute; z-index: 8; top: 50%; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--yy-border); border-radius: 50%; background: var(--yy-bg); color: var(--yy-text-2); box-shadow: 0 2px 10px #0000001f; cursor: pointer; transform: translateY(-50%); }
 .yy-calendar-edge:hover { border-color: var(--yy-primary); color: var(--yy-primary); }
@@ -1241,8 +1247,6 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   .yy-calendar-inspector-head { padding: 14px 16px 12px; }
   .yy-calendar-inspector-body { padding: 0 16px 16px; }
   .yy-calendar-inspector-actions { padding: 12px 16px; }
-  .yy-calendar-toolbar { gap: 6px; padding: 9px; }
-  .yy-calendar-window { order: 3; flex: 1 0 100%; padding-top: 5px; }
   .yy-calendar-shortcut { display: none; }
 }
 .yy-calendar-panel { width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
@@ -1252,7 +1256,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-toggle svg { transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
 .collapsed .yy-calendar-toggle svg { transform: rotate(-90deg); }
 .collapsed .yy-calendar-block-head { border-bottom: 1px solid var(--yy-border); border-radius: 8px; }
-.yy-calendar-block-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.yy-calendar-block-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; max-width: 100%; margin-left: auto; }
+.yy-calendar-block-actions > button { flex: none; }
 .yy-calendar-block-head > .lucide { color: var(--yy-primary); flex: none; }
 .yy-calendar-title { flex: 1; min-width: 60px; width: 0; height: 28px; padding: 0 4px; border: 0; background: transparent; color: var(--yy-text); font: inherit; font-weight: 650; }
 .yy-calendar-title-button { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -1267,14 +1272,12 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, :deep(*), :deep(*::before), :deep(*::after) { transition: none !important; animation: none !important; }
 }
-@container (max-width: 680px) {
-  .yy-calendar-window { order: 4; flex: 1 0 100%; }
+@container (max-width: 1000px) {
   .yy-calendar-block-count { display: none; }
-}
-@container (max-width: 420px) {
-  .yy-calendar-toolbar { gap: 6px; padding: 9px; }
-  .yy-calendar-list-toggle { margin-left: auto; }
   .yy-calendar-current-count { display: none; }
   .yy-calendar-grain-setting > span { display: none; }
+}
+@container (max-width: 560px) {
+  .yy-calendar-block-actions { flex-basis: 100%; }
 }
 </style>

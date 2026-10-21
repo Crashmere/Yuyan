@@ -23,6 +23,7 @@ type Calendar struct {
 	Grain     string           `json:"grain"`
 	Center    string           `json:"center"`
 	Collapsed bool             `json:"collapsed,omitempty"`
+	CellWidth *float64         `json:"cellWidth,omitempty"`
 	Periods   []CalendarPeriod `json:"periods"`
 }
 
@@ -72,6 +73,12 @@ func CalendarData(n Node) (Calendar, error) {
 	}
 	if _, ok := date(c.Center); c.Center != "" && !ok {
 		return c, invalid
+	}
+	if c.CellWidth != nil {
+		limits := map[string][2]float64{"year": {56, 240}, "month": {48, 220}, "day": {36, 180}}[c.Grain]
+		if *c.CellWidth < limits[0] || *c.CellWidth > limits[1] {
+			return c, invalid
+		}
 	}
 	ids := make(map[int64]bool)
 	for _, p := range c.Periods {
