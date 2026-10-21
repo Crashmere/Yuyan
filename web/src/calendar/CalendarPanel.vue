@@ -503,11 +503,18 @@ function wheelTimeline(event: WheelEvent) {
   const element = timelineScroll.value
   if (!element) return
   const unit = event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? element.clientWidth : 1
-  // When lanes overflow, a vertical wheel scrolls lanes; otherwise it pans the timeline sideways.
-  if (scrollsVertically.value && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
-    const max = element.scrollHeight - element.clientHeight
-    const next = Math.max(0, Math.min(max, element.scrollTop + event.deltaY * unit))
-    if (next !== element.scrollTop) { event.preventDefault(); element.scrollTop = next; syncViewport(); return }
+  if (!event.shiftKey) {
+    // An ordinary wheel never pans the timeline sideways. When lanes overflow it
+    // scrolls them vertically; otherwise the page scrolls as usual.
+    if (scrollsVertically.value && Math.abs(event.deltaY) >= Math.abs(event.deltaX)) {
+      const max = element.scrollHeight - element.clientHeight
+      const next = Math.max(0, Math.min(max, element.scrollTop + event.deltaY * unit))
+      if (next !== element.scrollTop) { event.preventDefault(); element.scrollTop = next; syncViewport() }
+      return
+    }
+    // Native horizontal scrolling (horizontal wheel / trackpad) is retained:
+    // do not intercept it; the browser scrolls the container and @scroll recycles.
+    return
   }
   const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
   if (!delta) return
