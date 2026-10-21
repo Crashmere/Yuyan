@@ -23,6 +23,16 @@ import { calendarCellWidths } from '../schema/calendar'
 const props = defineProps<{ model: CalendarData; readonly?: boolean }>()
 const emit = defineEmits<{ change: [value: CalendarData]; undo: [redo: boolean] }>()
 const root = ref<HTMLElement | null>(null)
+const widthFrame = ref<HTMLElement | null>(null)
+const savedWidth = ref(props.model.width ?? null)
+const liveWidth = ref<number | null>(null)
+const availableWidth = ref(0)
+const frameOffset = ref(0)
+const panelStyle = computed(() => {
+  if (expanded.value) return undefined
+  const width = Math.min(availableWidth.value, liveWidth.value ?? savedWidth.value ?? availableWidth.value)
+  return { width: width ? `${width}px` : '100%', marginLeft: `${frameOffset.value + (availableWidth.value - width) / 2}px` }
+})
 const inspector = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const collapsed = ref(!!props.model.collapsed)
@@ -55,7 +65,7 @@ async function toggleExpanded(event?: MouseEvent) {
 }
 const calendarTitle = ref(props.model.title)
 function calendarData(): CalendarData {
-  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, cellWidth: savedCellWidth.value,
+  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, cellWidth: savedCellWidth.value, width: savedWidth.value,
     periods: periods.value.map(period => ({ ...period })) }
 }
 function publish() {
@@ -111,6 +121,7 @@ async function importCalendar() {
       calendarTitle.value = data.title
       grain.value = data.grain
       savedCellWidth.value = data.cellWidth ?? null
+      savedWidth.value = data.width ?? null
       zoomWidth.value = savedCellWidth.value ?? calendarCellWidths[data.grain].default
       center.value = data.center || todayDate()
       collapsed.value = !!data.collapsed
@@ -129,6 +140,7 @@ function syncModel() {
   calendarTitle.value = props.model.title
   grain.value = props.model.grain
   savedCellWidth.value = width
+  savedWidth.value = props.model.width ?? null
   if (displayChanged) zoomWidth.value = width ?? calendarCellWidths[grain.value].default
   center.value = props.model.center || todayDate()
   collapsed.value = !!props.model.collapsed
@@ -801,6 +813,7 @@ function endBar(event: PointerEvent) {
 
 function onKey(event: KeyboardEvent) {
   event.stopPropagation()
+  if (event.key === 'Escape' && widthGesture) { event.preventDefault(); widthGesture.cancel(); return }
   if (event.key === 'Escape' && (barGesture || createGesture)) {
     event.preventDefault()
     if (barGesture) endBar(new PointerEvent('pointercancel', { pointerId: barGesture.pointerId }))
@@ -844,6 +857,67 @@ function nudgeDraft(event: KeyboardEvent): boolean {
 }
 
 let resizeObserver: ResizeObserver | undefined
+let frameObserver: ResizeObserver | undefined
+let layoutObserver: MutationObserver | undefined
+function measureWidth() {
+  const frame = widthFrame.value
+  if (!frame) return
+  const box = frame.getBoundingClientRect()
+  const host = frame.parentElement?.closest('.yy-calendar-node, [data-calendar]')
+  const top = host?.parentElement?.matches('.yy-content, .ProseMirror')
+  const page = frame.closest<HTMLElement>('main')
+  if (!top || !page) { availableWidth.value = box.width; frameOffset.value = 0; return }
+  const area = frame.closest<HTMLElement>('.yy-editor-body') ?? page
+  frameObserver?.observe(area)
+  const app = frame.closest('.yy-app')
+  if (app) layoutObserver?.observe(app, { attributes: true, attributeFilter: ['class', 'style'] })
+  const edge = area.getBoundingClientRect()
+  const padding = getComputedStyle(area)
+  const sidebar = document.querySelector<HTMLElement>('.yy-sidebar')
+  const sidebarRight = sidebar?.getClientRects().length && matchMedia('(min-width: 1701px)').matches && !app?.matches('.sidebar-collapsed, .focus-mode') ? sidebar.offsetWidth : 0
+  const aside = page.querySelector<HTMLElement>('.yy-doc-aside')
+  if (aside) { frameObserver?.observe(aside); layoutObserver?.observe(aside, { attributes: true, attributeFilter: ['class'] }) }
+  const right = aside?.getClientRects().length && !aside.classList.contains('is-peek') && !aside.classList.contains('outline-open')
+    ? aside.getBoundingClientRect().left - 24 : edge.right - parseFloat(padding.paddingRight)
+  const left = Math.max(edge.left + parseFloat(padding.paddingLeft), sidebarRight ? sidebarRight + 24 : 0)
+  availableWidth.value = Math.max(0, right - left)
+  frameOffset.value = left - box.left
+}
+let widthGesture: { cancel(): void } | null = null
+function startWidthResize(event: PointerEvent, direction: -1 | 1) {
+  if (event.button !== 0 || props.readonly || expanded.value || dragging.value || !root.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  root.value.focus({ preventScroll: true })
+  const target = event.currentTarget as HTMLElement
+  const start = root.value.getBoundingClientRect().width
+  const startX = event.clientX
+  try { target.setPointerCapture(event.pointerId) } catch { /* Synthetic pointer checks have no capture. */ }
+  const move = (next: PointerEvent) => {
+    const min = Math.min(280, availableWidth.value)
+    liveWidth.value = Math.round(Math.min(availableWidth.value, Math.max(min, start + direction * (next.clientX - startX) * 2)))
+  }
+  const finish = (next?: PointerEvent) => {
+    target.removeEventListener('pointermove', move)
+    target.removeEventListener('pointerup', finish)
+    target.removeEventListener('pointercancel', cancel)
+    target.removeEventListener('lostpointercapture', cancel)
+    widthGesture = null
+    const value = liveWidth.value
+    liveWidth.value = null
+    if (next?.type === 'pointerup' && value !== null && value !== Math.round(start)) {
+      savedWidth.value = value >= availableWidth.value - 1 ? null : value
+      publish()
+    }
+  }
+  const cancel = () => finish()
+  widthGesture = { cancel }
+  target.addEventListener('pointermove', move)
+  target.addEventListener('pointerup', finish)
+  target.addEventListener('pointercancel', cancel)
+  target.addEventListener('lostpointercapture', cancel)
+}
+function resetWidth() { savedWidth.value = null; publish() }
 let dayTimer: ReturnType<typeof setTimeout> | undefined
 function refreshToday() {
   const now = todayDate()
@@ -859,6 +933,10 @@ function onVisible() { if (document.visibilityState === 'visible') refreshToday(
 const wideQuery = matchMedia('(min-width: 900px)')
 function syncWide() { wideViewport.value = wideQuery.matches }
 onMounted(() => {
+  frameObserver = new ResizeObserver(measureWidth)
+  layoutObserver = new MutationObserver(measureWidth)
+  if (widthFrame.value) frameObserver.observe(widthFrame.value)
+  measureWidth()
   if (root.value) labelFamily.value = getComputedStyle(root.value).fontFamily || 'sans-serif'
   void centerTimeline()
   refreshToday()
@@ -879,6 +957,9 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disposed = true
   resizeObserver?.disconnect()
+  frameObserver?.disconnect()
+  layoutObserver?.disconnect()
+  widthGesture?.cancel()
   clearTimeout(dayTimer)
   wideQuery.removeEventListener('change', syncWide)
   document.removeEventListener('visibilitychange', onVisible)
@@ -922,15 +1003,18 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 </script>
 
 <template>
+  <div ref="widthFrame" class="yy-calendar-width-frame">
   <Teleport to="body" :disabled="!expanded">
-  <section ref="root" class="yy-calendar-panel" :class="{ expanded, readonly, dragging, collapsed }" tabindex="-1" @keydown="onKey">
+  <section ref="root" class="yy-calendar-panel" :class="{ expanded, readonly, dragging, collapsed, resizing: liveWidth !== null }" :style="panelStyle" tabindex="-1" @keydown="onKey">
     <div class="yy-calendar-block-head">
+      <div class="yy-calendar-heading">
       <button type="button" class="yy-calendar-toggle" :aria-label="collapsed ? '展开日历内容' : '收起日历内容'" :data-tip="collapsed ? '展开日历内容' : '收起日历内容'" :aria-expanded="!collapsed" @click="toggleCollapsed"><ChevronDown :size="15" /></button>
       <CalendarDays :size="18" />
       <button v-if="readonly" type="button" class="yy-calendar-title yy-calendar-title-button" @click="toggleCollapsed">{{ calendarTitle || '日历' }}</button>
       <input v-else ref="titleInput" v-model="calendarTitle" class="yy-calendar-title" maxlength="120" aria-label="日历名称" placeholder="日历" @change="renameCalendar" @keydown.enter.prevent="!$event.isComposing && (renameCalendar(), titleInput?.blur())" />
       <span class="yy-calendar-block-count">{{ periods.length }} 个事件</span>
       <span v-if="currentCount" class="yy-calendar-current-count">{{ currentCount }} 个进行中</span>
+      </div>
       <span v-if="!collapsed" class="yy-calendar-window">{{ windowLabel }}</span>
       <div class="yy-calendar-block-actions">
         <div v-if="!readonly" class="yy-calendar-grain-setting">
@@ -953,6 +1037,10 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
         <IconButton :label="expanded ? '收起日历' : '展开日历'" @click="toggleExpanded"><Minimize2 v-if="expanded" :size="17" /><Maximize2 v-else :size="17" /></IconButton>
       </div>
     </div>
+    <template v-if="!readonly && !expanded">
+      <div class="yy-calendar-width-handle left" role="separator" aria-label="调整日历左侧宽度" aria-orientation="vertical" tabindex="-1" data-tip="拖动调整宽度，双击恢复全宽" @pointerdown="startWidthResize($event, -1)" @dblclick="resetWidth"></div>
+      <div class="yy-calendar-width-handle right" role="separator" aria-label="调整日历右侧宽度" aria-orientation="vertical" tabindex="-1" data-tip="拖动调整宽度，双击恢复全宽" @pointerdown="startWidthResize($event, 1)" @dblclick="resetWidth"></div>
+    </template>
     <Transition name="yy-calendar-reveal">
     <div v-show="!collapsed" class="yy-calendar-reveal" :inert="collapsed">
     <section class="yy-calendar-workspace">
@@ -1095,6 +1183,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
     </div>
     </Transition>
   </Teleport>
+  </div>
 </template>
 
 <style scoped>
@@ -1112,7 +1201,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-grain-setting { display: inline-flex; flex: none; align-items: center; gap: 5px; }
 .yy-calendar-grain-setting > span { color: var(--yy-text-3); font-size: 11px; white-space: nowrap; }
 .yy-calendar-zoom { display: inline-flex; flex: none; align-items: center; gap: 2px; }
-.yy-calendar-window { flex: none; color: var(--yy-text-2); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.yy-calendar-window { grid-column: 2; grid-row: 1; justify-self: center; color: var(--yy-text-2); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .yy-calendar-list-toggle.active { background: var(--yy-primary-soft); color: var(--yy-primary); }
 .yy-calendar-new { color: var(--yy-primary); }
 .yy-calendar-frame { position: relative; overflow: hidden; border-radius: 0 0 12px 12px; }
@@ -1249,17 +1338,26 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   .yy-calendar-inspector-actions { padding: 12px 16px; }
   .yy-calendar-shortcut { display: none; }
 }
-.yy-calendar-panel { width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
-.yy-calendar-block-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 40px; padding: 5px 8px 5px 6px; border: 1px solid var(--yy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--yy-bg); }
+.yy-calendar-width-frame { width: 100%; min-width: 0; }
+.yy-calendar-panel { position: relative; width: 100%; padding: 0; margin: 0; container-type: inline-size; font: 13px/1.5 var(--yy-font, sans-serif); color: var(--yy-text); }
+.yy-calendar-block-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; min-height: 40px; padding: 5px 6px; border: 1px solid var(--yy-border); border-bottom: 0; border-radius: 8px 8px 0 0; background: var(--yy-bg); }
+.yy-calendar-heading { grid-column: 1; grid-row: 1; display: flex; min-width: 0; align-items: center; gap: 6px; }
+.yy-calendar-width-handle { position: absolute; z-index: 9; top: 0; bottom: 0; width: 12px; cursor: ew-resize; touch-action: none; }
+.yy-calendar-width-handle.left { left: -6px; }
+.yy-calendar-width-handle.right { right: -6px; }
+.yy-calendar-width-handle::after { content: ''; position: absolute; top: 50%; left: 4px; width: 4px; height: 36px; border-radius: 3px; background: var(--yy-primary); opacity: 0; transform: translateY(-50%); transition: opacity .12s ease; }
+.yy-calendar-panel:hover .yy-calendar-width-handle::after { opacity: .35; }
+.yy-calendar-width-handle:hover::after, .resizing .yy-calendar-width-handle::after { opacity: 1; }
+.resizing { user-select: none; }
 .yy-calendar-toggle { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 1px solid transparent; border-radius: var(--yy-radius-sm); background: none; color: var(--yy-text-3); cursor: pointer; }
 .yy-calendar-toggle:hover { background: var(--yy-bg-hover); color: var(--yy-text-2); }
 .yy-calendar-toggle svg { transition: transform .18s cubic-bezier(.22, .8, .25, 1); }
 .collapsed .yy-calendar-toggle svg { transform: rotate(-90deg); }
 .collapsed .yy-calendar-block-head { border-bottom: 1px solid var(--yy-border); border-radius: 8px; }
-.yy-calendar-block-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; max-width: 100%; margin-left: auto; }
+.yy-calendar-block-actions { grid-column: 3; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; max-width: 100%; }
 .yy-calendar-block-actions > button { flex: none; }
-.yy-calendar-block-head > .lucide { color: var(--yy-primary); flex: none; }
-.yy-calendar-title { flex: 1; min-width: 60px; width: 0; height: 28px; padding: 0 4px; border: 0; background: transparent; color: var(--yy-text); font: inherit; font-weight: 650; }
+.yy-calendar-heading > .lucide { color: var(--yy-primary); flex: none; }
+.yy-calendar-title { flex: 1; min-width: 0; width: 0; height: 28px; padding: 0 4px; border: 0; background: transparent; color: var(--yy-text); font: inherit; font-weight: 650; }
 .yy-calendar-title-button { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .yy-calendar-block-count { color: var(--yy-text-3); font-size: 11px; white-space: nowrap; }
 .yy-calendar-main { border-radius: 0 0 12px 12px; box-shadow: none; }
@@ -1272,12 +1370,21 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, :deep(*), :deep(*::before), :deep(*::after) { transition: none !important; animation: none !important; }
 }
-@container (max-width: 1000px) {
+@container (max-width: 1200px) {
   .yy-calendar-block-count { display: none; }
   .yy-calendar-current-count { display: none; }
   .yy-calendar-grain-setting > span { display: none; }
 }
-@container (max-width: 560px) {
-  .yy-calendar-block-actions { flex-basis: 100%; }
+@container (max-width: 1000px) {
+  .yy-calendar-panel:not(.readonly) .yy-calendar-block-actions { grid-column: 1 / -1; grid-row: 2; }
+}
+@container (max-width: 620px) {
+  .yy-calendar-block-actions { grid-column: 1 / -1; grid-row: 2; }
+}
+@container (max-width: 420px) {
+  .yy-calendar-block-head { grid-template-columns: minmax(0, 1fr); }
+  .yy-calendar-heading { grid-column: 1; grid-row: 1; }
+  .yy-calendar-window { grid-column: 1; grid-row: 2; }
+  .yy-calendar-block-actions { grid-column: 1 !important; grid-row: 3 !important; }
 }
 </style>
