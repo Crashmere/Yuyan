@@ -31,7 +31,7 @@ import ImageToolsDialog from './ImageToolsDialog.vue'
 import ConflictDiff from './ConflictDiff.vue'
 import type { ImageEditMode } from './imageOperations'
 import { selectionContent } from './selectionContent'
-import { cancelSelection } from './cancelSelection'
+import { escapeSelection } from './escapeSelection'
 import { flushPendingBlocks, hasPendingBlocks } from './pendingBlocks'
 import { insertImages, insertAttachments, pendingUploads } from './uploads'
 import { clearUnusedBlockSpaces } from './blockSpaces'
@@ -311,7 +311,7 @@ async function finish(): Promise<boolean> {
   }
 }
 
-defineExpose({ hasUnfinishedBlocks: () => !!editor.value && hasPendingBlocks(editor.value), flush, finish, setTitle, touched, savedChanges, discard, abandon, capturePosition, cancelSelection: (event: KeyboardEvent) => !!editor.value && cancelSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
+defineExpose({ hasUnfinishedBlocks: () => !!editor.value && hasPendingBlocks(editor.value), flush, finish, setTitle, touched, savedChanges, discard, abandon, capturePosition, escapeSelection: (event: KeyboardEvent) => !!editor.value && escapeSelection(editor.value, event), saveTemplate: () => { if (editor.value) void saveEditorTemplate(editor.value, 'document', title.value) }, saveSnippet: ui.saveSnippet })
 
 // Explicit user choice after a conflict: keep this tab's content on top of the newer revision.
 function overwrite() {

@@ -1,9 +1,9 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { toast } from '../ui/toast'
 
-// Capture checks the UI before an Escape handler closes it. Selection cancellation counts as
-// the first press, but does not show a hint. Other handled keys still belong to their panels.
-export function useModeShortcut(key: string, hint: string, eligible: (event: KeyboardEvent) => boolean, run: () => void, cancelSelection?: (event: KeyboardEvent) => boolean) {
+// Capture checks the UI before an Escape handler closes it. A selection command counts as
+// the first press. Other handled keys still belong to their panels.
+export function useModeShortcut(key: string, hint: string | null, eligible: (event: KeyboardEvent) => boolean, run: () => void, onSinglePress?: (event: KeyboardEvent) => boolean) {
   let last = -Infinity
   let timer: ReturnType<typeof setTimeout> | undefined
   let dismiss: (() => void) | undefined
@@ -23,7 +23,7 @@ export function useModeShortcut(key: string, hint: string, eligible: (event: Key
       run()
     } else {
       last = now
-      if (showHint) timer = setTimeout(() => { dismiss = toast(hint, 'info', { key: 'mode-hint', ms: 1800 }) }, 400)
+      if (showHint && hint) timer = setTimeout(() => { dismiss = toast(hint, 'info', { key: 'mode-hint', ms: 1800 }) }, 400)
     }
   }
   const capture = (e: KeyboardEvent) => {
@@ -35,7 +35,7 @@ export function useModeShortcut(key: string, hint: string, eligible: (event: Key
     }
     // Holding the key does not count as a second press or extend the double-press window.
     if (e.repeat) return
-    if (cancelSelection?.(e)) {
+    if (onSinglePress?.(e)) {
       e.preventDefault()
       e.stopPropagation()
       press(false)
