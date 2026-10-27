@@ -481,6 +481,7 @@ pre:hover > .yy-copy {
    title, and the language and copy button on the right (enhance.ts). A block saved without one
    has it hidden (no-title), and the copy button in the code's corner stands in. */
 .yy-content .code-block {
+  --yy-code-actions-space: 65px;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--yy-codeblock-border);
@@ -488,10 +489,22 @@ pre:hover > .yy-copy {
   background: var(--yy-codeblock-bg);
 }
 .code-block > .yy-code-actions { position: absolute; top: 7px; right: 7px; z-index: 2; }
-.code-block .code-title { padding-right: 65px; }
+.code-block .code-title { padding-right: var(--yy-code-actions-space); }
 .code-block.no-title > .yy-code-actions { opacity: 0; transition: opacity .15s; }
 .code-block.no-title:hover > .yy-code-actions { opacity: 1; }
-.code-block.no-title > pre > .yy-copy { right: 67px; }
+.code-block.has-preview-fold { --yy-code-actions-space: 93px; }
+.code-block.no-title.has-preview-fold > .yy-code-actions { opacity: 1; }
+.code-block.no-title > pre > .yy-copy { right: calc(var(--yy-code-actions-space) + 2px); }
+.yy-code-fold-toggle path {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform .18s ease-out;
+}
+.yy-code-fold-toggle[aria-expanded='true'] path:first-child { transform: translateY(2px) rotate(180deg); }
+.yy-code-fold-toggle[aria-expanded='true'] path:last-child { transform: translateY(-2px) rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .yy-code-fold-toggle path { transition: none; }
+}
 .yy-code-region-fold, .yy-code-line-select { position: absolute; top: 0; height: 1.65em; padding: 0; border: 0; color: var(--yy-codeblock-muted); background: none; font: inherit; cursor: pointer; user-select: none; }
 .yy-code-region-fold { right: 2px; width: 14px; }
 .yy-code-line-select { left: 0; width: 2.2em; cursor: default; }
@@ -525,7 +538,7 @@ pre:hover > .yy-copy {
     gap: 4px; padding: 8px 12px;
   }
   .code-title::before { grid-area: 1 / 1; }
-  .code-title-text { grid-area: 1 / 2 / 2 / -1; margin-right: 56px; }
+  .code-title-text { grid-area: 1 / 2 / 2 / -1; margin-right: calc(var(--yy-code-actions-space) - 9px); }
   .code-title > .code-lang { grid-area: 2 / 1 / 3 / 3; margin-left: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .code-title > .yy-code-wrap-btn { grid-area: 2 / 3; padding: 0; justify-content: center; }
   .code-title > .yy-copy { grid-area: 2 / 4; padding: 0; justify-content: center; }

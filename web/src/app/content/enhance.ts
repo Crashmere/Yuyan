@@ -94,7 +94,7 @@ function enhanceCode(root: HTMLElement, scope: HTMLElement, first: number) {
     if (readCodePreferences(key).folds?.length) restoring.push(activate())
     cleanup.push(() => { disposed = true; block.removeEventListener('pointerenter', hover); block.removeEventListener('focusin', hover); void loading?.then(reader => reader?.destroy()) })
     // A block saved with a title bar collapses from it instead of starting folded.
-    if (block.classList.contains('no-title') && lines > foldLines + 5) addFold(pre, block, lines)
+    if (block.classList.contains('no-title') && lines > foldLines + 5) addFold(pre, block, lines, actions)
   }
   return Promise.all(restoring)
 }
@@ -222,20 +222,38 @@ function addCopyButton(parent: Element, text: string) {
   parent.appendChild(button)
 }
 
-function addFold(pre: HTMLElement, block: HTMLElement, lines: number) {
+function addFold(pre: HTMLElement, block: HTMLElement, lines: number, actions: HTMLElement) {
   pre.classList.add('is-folded')
   pre.style.setProperty('--yy-fold-lines', String(foldLines))
+  block.classList.add('has-preview-fold')
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'yy-code-fold'
+  const corner = document.createElement('button')
+  corner.type = 'button'
+  corner.className = 'yy-code-action yy-code-fold-toggle'
+  corner.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8 4-4 4 4"/><path d="m8 16 4 4 4-4"/></svg>'
+  corner.addEventListener('mousedown', e => e.preventDefault())
   const label = () => (pre.classList.contains('is-folded') ? `展开全部 ${lines} 行` : '收起代码')
-  button.textContent = label()
-  button.addEventListener('click', () => {
+  const update = () => {
+    const text = label()
+    const expanded = String(!pre.classList.contains('is-folded'))
+    button.textContent = text
+    button.setAttribute('aria-expanded', expanded)
+    corner.setAttribute('aria-label', text)
+    corner.setAttribute('aria-expanded', expanded)
+    corner.dataset.tip = text
+  }
+  const toggle = () => {
     const folded = pre.classList.toggle('is-folded')
-    button.textContent = label()
+    update()
     // Collapsing a block read to its end would otherwise leave the page far below it.
     if (folded && block.getBoundingClientRect().top < 0) block.scrollIntoView({ block: 'start' })
-  })
+  }
+  update()
+  button.addEventListener('click', toggle)
+  corner.addEventListener('click', toggle)
+  actions.prepend(corner)
   block.after(button)
 }
 
