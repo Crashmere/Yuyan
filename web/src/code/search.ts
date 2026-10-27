@@ -31,8 +31,16 @@ export function codeSearchPanel(view: EditorView): Panel {
   const submit = () => {
     const previous = getSearchQuery(view.state)
     const next = new SearchQuery({ search: query.value, replace: replacement.value, caseSensitive: matchCase, regexp })
+    const caret = query.selectionStart, caretEnd = query.selectionEnd
     view.dispatch({ effects: setSearchQuery.of(next) })
-    if (next.valid && (previous.search !== next.search || previous.caseSensitive !== next.caseSensitive || previous.regexp !== next.regexp)) findNext(view)
+    if (next.valid && (previous.search !== next.search || previous.caseSensitive !== next.caseSensitive || previous.regexp !== next.regexp)) {
+      findNext(view)
+      // findNext selects the whole query in the search field (CodeMirror's selectSearchInput), so
+      // the next keystroke would replace everything typed so far with a single character. Put the
+      // caret back where typing left it; pasting several characters in one input event was the
+      // only way to enter more than one character.
+      if (caret !== null && document.activeElement === query) query.setSelectionRange(caret, caretEnd ?? caret)
+    }
   }
   const button = (label: string, action: () => void, text = label) => {
     const b = document.createElement('button')

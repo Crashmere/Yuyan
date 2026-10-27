@@ -49,6 +49,21 @@ export function findMatches(root: HTMLElement, query: string): Range[] {
   return ranges
 }
 
+// Opens the code block around an element with a match in it: a block collapsed from its title
+// bar, a long block folded to its first lines, and any syntax region folded inside it. The fold
+// button keeps its label in step; without one the folded class is removed directly.
+export function openCodeMatch(el: Element) {
+  el.dispatchEvent(new Event('yy-reveal-code', { bubbles: true }))
+  for (let c = el.closest('.code-block.is-collapsed'); c; c = c.parentElement?.closest('.code-block.is-collapsed') ?? null) {
+    c.classList.remove('is-collapsed')
+  }
+  const pre = el.closest<HTMLElement>('pre.is-folded')
+  if (!pre) return
+  const fold = pre.closest('.code-block')?.nextElementSibling
+  if (fold instanceof HTMLButtonElement && fold.classList.contains('yy-code-fold')) fold.click()
+  else pre.classList.remove('is-folded')
+}
+
 // Returns how many matches there are.
 export async function showMatches(root: HTMLElement, query: string): Promise<number> {
   const ranges = findMatches(root, query)
@@ -79,18 +94,16 @@ export async function showMatches(root: HTMLElement, query: string): Promise<num
     scrollToElement(target ?? calendar, 'center')
     return ranges.length
   }
-  at.dispatchEvent(new Event('yy-reveal-code', { bubbles: true }))
   reveal(at)
   const collapsed = '.callout.is-collapsed, .code-block.is-collapsed'
   for (let c = at.closest(collapsed); c; c = c.parentElement?.closest(collapsed) ?? null) {
     c.classList.remove('is-collapsed')
   }
-  const pre = at.closest<HTMLElement>('pre.is-folded')
-  const line = at.closest('.yy-line')
-  const shown = Number(pre?.style.getPropertyValue('--yy-fold-lines'))
-  if (pre && line && [...line.parentElement!.children].indexOf(line) >= shown) {
-    const fold = pre.closest('.code-block')?.nextElementSibling
-    if (fold instanceof HTMLButtonElement && fold.classList.contains('yy-code-fold')) fold.click()
+  // Every code block holding a match opens, not only the first match's: a long block folded to
+  // its first lines otherwise keeps the highlights it contains hidden.
+  for (const range of ranges) {
+    const el = range.startContainer.parentElement
+    if (el) openCodeMatch(el)
   }
   scrollToElement(at.closest('.yy-drawing') ?? at, 'center')
   at.closest('.yy-drawing')?.classList.add('yy-drawing-match')
@@ -100,11 +113,11 @@ export async function showMatches(root: HTMLElement, query: string): Promise<num
 // Highlights matches in content that joined the page later, such as a segment of a long document.
 export function addMatches(nodes: Element[], query: string) {
   const highlight = 'highlights' in CSS ? CSS.highlights.get(name) : undefined
-  if (!highlight) return
   for (const node of nodes) {
     for (const range of findMatches(node as HTMLElement, query)) {
-      if (highlight.size >= limit) return
-      highlight.add(range)
+      if (highlight && highlight.size < limit) highlight.add(range)
+      const el = range.startContainer.parentElement
+      if (el) openCodeMatch(el)
     }
   }
 }
