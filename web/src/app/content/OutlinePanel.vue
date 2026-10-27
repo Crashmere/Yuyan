@@ -45,10 +45,13 @@ function toggleAll() {
   else folded.clear()
 }
 
-// A long outline follows the page: when the highlighted entry leaves the outline's scrolled area
-// it is brought to the middle, showing the sections ahead. Never while the pointer is over the
-// outline, where the list would move under it. Unpinned, the panel keeps its layout while hidden,
-// so it opens with the entry in view.
+// A long outline follows the page. While reading, it moves only far enough to bring the
+// highlighted entry back into view, keeping about two entries of context past it, and glides
+// there: the entry reaching an edge used to jump instantly to the middle, shifting the whole
+// list by half its height at once. An entry further away than the visible area (a jump, the
+// outline appearing) is still placed in the middle at once. Never while the pointer is over
+// the outline, where the list would move under it. Unpinned, the panel keeps its layout while
+// hidden, so it opens with the entry in view.
 const nav = ref<HTMLElement>()
 let pointerInside = false
 function hover(inside: boolean) {
@@ -66,7 +69,13 @@ function reveal() {
   const view = box.getBoundingClientRect(), item = entry.getBoundingClientRect()
   // The sticky head covers the top of the scrolled area.
   const top = view.top + (nav.value!.querySelector('.yy-toc-head')?.getBoundingClientRect().height ?? 0)
-  if (item.top < top || item.bottom > view.bottom) box.scrollTop += item.top + item.height / 2 - (top + view.bottom) / 2
+  if (item.top >= top && item.bottom <= view.bottom) return
+  const buffer = item.height * 2
+  let delta = item.top < top ? item.top - top - buffer : item.bottom - view.bottom + buffer
+  const far = Math.abs(delta) > view.bottom - top
+  if (far) delta = item.top + item.height / 2 - (top + view.bottom) / 2
+  const instant = far || matchMedia('(prefers-reduced-motion: reduce)').matches
+  box.scrollTo({ top: box.scrollTop + delta, behavior: instant ? 'auto' : 'smooth' })
 }
 watch([highlighted, () => props.pinned], reveal, { flush: 'post' })
 // Also when the outline appears, as the drawer on narrow screens, or changes size.
