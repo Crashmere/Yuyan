@@ -32,27 +32,29 @@ export async function enhance(root: HTMLElement, options: { math: boolean; merma
     if (!disposed) calendarCleanup = module.enhanceCalendars(scope)
   }) : undefined
   const codeReady = enhanceCode(root, scope, firstCode)
-  frameTables(scope)
+  cleanup.push(...frameTables(scope))
   await Promise.all([calendarReady, codeReady, options.math && renderMath(scope), options.mermaid && renderDiagrams(scope)])
 }
 
 // Copies of earlier content (recentGhosts.ts) draw like the page but keep their code static:
 // code enhancement keys the reader's saved code preferences by block position.
 export async function enhanceCopy(root: HTMLElement) {
-  frameTables(root)
+  frameTables(root, false)
   await Promise.all([renderMath(root), renderDiagrams(root)])
 }
 
 // Wide tables scroll sideways in a frame (shared/tableFrame.ts).
-function frameTables(root: HTMLElement) {
+function frameTables(root: HTMLElement, stickyHeader = true) {
+  const cleanup: (() => void)[] = []
   for (const table of root.querySelectorAll('table')) {
     if (table.closest('[data-calendar]')) continue
     const frame = Object.assign(document.createElement('div'), { className: 'yy-table-frame' })
     const scroller = frame.appendChild(Object.assign(document.createElement('div'), { className: 'yy-table-scroll' }))
     table.replaceWith(frame)
     scroller.append(table)
-    frameTable(frame, scroller)
+    cleanup.push(frameTable(frame, scroller, stickyHeader))
   }
+  return cleanup
 }
 
 // Longer code blocks start folded to about this many lines.

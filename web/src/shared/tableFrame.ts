@@ -1,4 +1,5 @@
 import { scrollToPosition } from './scroll'
+import { trackTableHeader } from './tableHeader'
 
 // Wide tables, on reading pages (app/content/enhance.ts) and in the editor (editor/tables.ts). A
 // table starts in line with the text; its scroll area reaches right past the text column as far as
@@ -7,20 +8,28 @@ import { scrollToPosition } from './scroll'
 // side lies behind a shadow. The scrollbar spans the text column only, so it is drawn here: it
 // shows while the table scrolls or the pointer is over it, and it drags. Tables inside callouts or
 // lists stay within them. Returns a function that stops the tracking.
-export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => void {
+export function frameTable(frame: HTMLElement, scroller: HTMLElement, stickyHeader = true): () => void {
   const bar = Object.assign(document.createElement('div'), { className: 'yy-table-bar', contentEditable: 'false' })
   const thumb = bar.appendChild(Object.assign(document.createElement('div'), { className: 'yy-table-thumb' }))
   frame.appendChild(bar)
   let bleed = 0
   let extend = 0
   let attached = false
+  let pending = 0
   let idle: ReturnType<typeof setTimeout> | undefined
   const table = scroller.querySelector('table')
-  const attributes = new MutationObserver(measure)
+  const header = table && stickyHeader ? trackTableHeader(table) : undefined
+  const attributes = new MutationObserver(scheduleMeasure)
   if (table) attributes.observe(table, { attributes: true, attributeFilter: ['data-align'] })
-  const observer = new ResizeObserver(measure)
+  const observer = new ResizeObserver(scheduleMeasure)
   observer.observe(frame)
   if (scroller.firstElementChild) observer.observe(scroller.firstElementChild)
+
+  // Frame margins can change the observed size. Settle them outside resize notifications.
+  function scheduleMeasure() {
+    if (pending) return
+    pending = requestAnimationFrame(() => { pending = 0; measure() })
+  }
 
   function measure() {
     const page = frame.closest('main')
@@ -44,6 +53,7 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => voi
     const align = table?.dataset.align
     const free = Math.max(0, right - left - (table?.getBoundingClientRect().width ?? 0))
     frame.style.setProperty('--table-offset', `${align === 'right' ? free : align === 'center' ? free / 2 : 0}px`)
+    header?.update()
     update()
   }
 
@@ -100,6 +110,8 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement): () => voi
   function release() {
     observer.disconnect()
     attributes.disconnect()
+    header?.destroy()
+    cancelAnimationFrame(pending)
     scroller.removeEventListener('scroll', onScroll)
     clearTimeout(idle)
   }
