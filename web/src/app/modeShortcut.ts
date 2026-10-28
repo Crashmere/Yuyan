@@ -28,14 +28,17 @@ export function useModeShortcut(key: string, hint: string | null, eligible: (eve
   }
   const capture = (e: KeyboardEvent) => {
     candidate = undefined
+    const scopeSelector = `[data-mode-shortcut="${key}"]`
+    const scope = e.target instanceof Element && e.target.closest(scopeSelector)
     if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey || (e.shiftKey && key === 'Escape') || e.key.toLowerCase() !== key.toLowerCase()
-      || !eligible(e) || (e.target instanceof Element && e.target.closest('.yy-calendar-panel')) || document.querySelector('[role="dialog"], [role="menu"], dialog[open], .yy-find, .yy-slash, .yy-doc-link-suggestion, .cm-search, .yy-code-search, .cm-tooltip-autocomplete, .yy-format-painting, .yy-editor-outline .is-reordering, .yy-columns.is-resizing')) {
+      || !eligible(e) || (e.target instanceof Element && e.target.closest('.yy-calendar-panel') && !scope) || document.querySelector(`[role="dialog"]:not(${scopeSelector}), [role="menu"], dialog[open], .yy-find, .yy-slash, .yy-doc-link-suggestion, .cm-search, .yy-code-search, .cm-tooltip-autocomplete, .yy-format-painting, .yy-editor-outline .is-reordering, .yy-columns.is-resizing`)) {
       reset()
       return
     }
     // Holding the key does not count as a second press or extend the double-press window.
     if (e.repeat) return
-    if (onSinglePress?.(e)) {
+    // Opted-in block controls join the page sequence before their local handlers stop bubbling.
+    if (onSinglePress?.(e) || scope) {
       e.preventDefault()
       e.stopPropagation()
       press(false)

@@ -851,7 +851,7 @@ function endBar(event: PointerEvent) {
 
 function onKey(event: KeyboardEvent) {
   event.stopPropagation()
-  if (event.key === 'Escape' && widthGesture) { event.preventDefault(); widthGesture.cancel(); return }
+  if (event.key === 'Escape' && widthGesture.value) { event.preventDefault(); widthGesture.value.cancel(); return }
   if (event.key === 'Escape' && (barGesture || createGesture)) {
     event.preventDefault()
     if (barGesture) endBar(new PointerEvent('pointercancel', { pointerId: barGesture.pointerId }))
@@ -866,7 +866,7 @@ function onKey(event: KeyboardEvent) {
   if (event.key === 'Escape' && !draft.value && expanded.value) { void toggleExpanded(); event.preventDefault(); return }
   if (!draft.value || event.defaultPrevented || event.isComposing) return
   if (!props.readonly && !(event.target as HTMLElement).closest('input, textarea') && nudgeDraft(event)) return
-  if (event.key === 'Escape') {
+  if (event.key === 'Escape' && props.readonly) {
     event.preventDefault()
     void closeDraft()
   } else if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -921,7 +921,7 @@ function measureWidth() {
   availableWidth.value = Math.max(0, right - left)
   frameOffset.value = left - box.left
 }
-let widthGesture: { cancel(): void } | null = null
+const widthGesture = ref<{ cancel(): void } | null>(null)
 function startWidthResize(event: PointerEvent, direction: -1 | 1) {
   if (event.button !== 0 || props.readonly || expanded.value || dragging.value || !root.value) return
   event.preventDefault()
@@ -940,7 +940,7 @@ function startWidthResize(event: PointerEvent, direction: -1 | 1) {
     target.removeEventListener('pointerup', finish)
     target.removeEventListener('pointercancel', cancel)
     target.removeEventListener('lostpointercapture', cancel)
-    widthGesture = null
+    widthGesture.value = null
     const value = liveWidth.value
     liveWidth.value = null
     if (next?.type === 'pointerup' && value !== null && value !== Math.round(start)) {
@@ -949,7 +949,7 @@ function startWidthResize(event: PointerEvent, direction: -1 | 1) {
     }
   }
   const cancel = () => finish()
-  widthGesture = { cancel }
+  widthGesture.value = { cancel }
   target.addEventListener('pointermove', move)
   target.addEventListener('pointerup', finish)
   target.addEventListener('pointercancel', cancel)
@@ -999,7 +999,7 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   frameObserver?.disconnect()
   layoutObserver?.disconnect()
-  widthGesture?.cancel()
+  widthGesture.value?.cancel()
   clearTimeout(dayTimer)
   wideQuery.removeEventListener('change', syncWide)
   document.removeEventListener('visibilitychange', onVisible)
@@ -1045,7 +1045,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 <template>
   <div ref="widthFrame" class="yy-calendar-width-frame">
   <Teleport to="body" :disabled="!expanded">
-  <section ref="root" class="yy-calendar-panel" :class="{ expanded, readonly, dragging, collapsed, 'is-selected': selected, resizing: liveWidth !== null }" :style="panelStyle" tabindex="-1" @keydown="onKey">
+  <section ref="root" class="yy-calendar-panel" :class="{ expanded, readonly, dragging, collapsed, 'is-selected': selected, resizing: liveWidth !== null }" :style="panelStyle" :data-mode-shortcut="!readonly && !dragging && !widthGesture ? 'Escape' : null" tabindex="-1" @keydown="onKey">
     <div class="yy-calendar-block-head">
       <div class="yy-calendar-heading">
       <button type="button" class="yy-calendar-toggle" :aria-label="collapsed ? '展开日历内容' : '收起日历内容'" :data-tip="collapsed ? '展开日历内容' : '收起日历内容'" :aria-expanded="!collapsed" @click="toggleCollapsed"><ChevronDown :size="15" /></button>
@@ -1182,7 +1182,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
           <p>{{ periodRangeLabel(draft) }}</p><p class="yy-calendar-note">{{ draft.note || '暂无标注' }}</p>
         </div>
       </aside>
-      <aside v-else ref="inspector" class="yy-calendar-inspector" role="dialog" aria-modal="true" :aria-label="draft.id == null ? '新建事件' : '编辑事件'" tabindex="-1" @keydown="onKey" @pointerdown.stop>
+      <aside v-else ref="inspector" class="yy-calendar-inspector" role="dialog" aria-modal="true" :aria-label="draft.id == null ? '新建事件' : '编辑事件'" data-mode-shortcut="Escape" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head">
           <div><span>{{ draft.id == null ? '新建事件' : '编辑事件' }} <em>{{ draftDirty ? '待应用' : draft.id == null ? '' : '已应用' }}</em></span><small>{{ periodRangeLabel(draftAsPeriod()!) }} · {{ rangeError ? '' : dayCountLabel(draft) }}</small></div>
           <IconButton label="关闭" @click="closeDraft()"><X :size="17" /></IconButton>
@@ -1219,7 +1219,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
           <IconButton v-if="draft.id != null" label="复制为新事件" @click="duplicateDraft"><Copy :size="15" /></IconButton>
           <button type="button" class="yy-btn primary" :disabled="!!rangeError || (draft.id != null && !draftDirty)" @click="saveDraft()"><Save :size="15" />应用</button>
         </div>
-        <p class="yy-calendar-shortcut">⌘/Ctrl + Enter 应用 · Esc 关闭</p>
+        <p class="yy-calendar-shortcut">⌘/Ctrl + Enter 应用 · 连按两次 Esc 保存并退出编辑</p>
       </aside>
     </div>
     </Transition>
