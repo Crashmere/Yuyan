@@ -72,7 +72,7 @@ function enhanceCode(root: HTMLElement, scope: HTMLElement, first: number) {
     if (language === 'mermaid') continue
     const text = code.textContent ?? ''
     const lines = splitLines(code)
-    const block = addTitleBar(pre, language, text, key)
+    const block = addTitleBar(pre, language, text, key, lines)
     addCopyButton(pre, text)
     const title = block.querySelector('.code-title')?.firstChild?.textContent ?? ''
     let loading: Promise<Awaited<ReturnType<typeof import('../../code/reading')['readingCode']>> | undefined> | undefined
@@ -102,7 +102,7 @@ function enhanceCode(root: HTMLElement, scope: HTMLElement, first: number) {
 // Every code block gets Yuque's title bar (schema/codeBlock.ts), hidden on blocks saved without
 // one. The tab on the bar's lower edge shows or hides it for
 // this visit only; the document keeps what the editor saved.
-function addTitleBar(pre: HTMLElement, language: string | undefined, text: string, key: string): HTMLElement {
+function addTitleBar(pre: HTMLElement, language: string | undefined, text: string, key: string, lines: number): HTMLElement {
   let block = pre.parentElement!
   if (!block.classList.contains('code-block')) {
     block = Object.assign(document.createElement('div'), { className: 'code-block no-title' })
@@ -116,9 +116,12 @@ function addTitleBar(pre: HTMLElement, language: string | undefined, text: strin
   const titleText = Object.assign(document.createElement('span'), { className: 'code-title-text' })
   titleText.append(...bar.childNodes)
   bar.append(titleText)
+  const meta = Object.assign(document.createElement('span'), { className: 'code-meta' })
+  const count = Object.assign(document.createElement('span'), { className: 'yy-code-line-count', textContent: `${lines} 行` })
   const label = Object.assign(document.createElement('span'), { className: 'code-lang' })
   label.textContent = languages.find((l) => l.id === language || l.aliases.includes(language ?? ''))?.label ?? language ?? '纯文本'
-  bar.appendChild(label)
+  meta.append(count, label)
+  bar.appendChild(meta)
   const wrap = Object.assign(document.createElement('button'), { type: 'button', className: 'yy-code-wrap-btn' })
   wrap.append(codeIcon('wrap'), Object.assign(document.createElement('span'), { textContent: '自动换行' }))
   wrap.setAttribute('aria-label', '自动换行')
@@ -186,7 +189,7 @@ function splitLines(code: HTMLElement): number {
     }
   }
   code.childNodes.forEach(walk)
-  if (line.textContent || !lines.length) lines.push(line)
+  lines.push(line)
   lines.forEach((line, i) => {
     line.dataset.line = String(i + 1)
     const gutter = document.createElement('span'); gutter.className = 'yy-code-gutter'; gutter.dataset.line = String(i + 1)

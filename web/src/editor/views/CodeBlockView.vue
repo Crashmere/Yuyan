@@ -185,7 +185,8 @@ const staticText = computed(() => {
   const text = props.node.textContent
   return text === '' || text.endsWith('\n') ? `${text} ` : text
 })
-const staticNumbers = computed(() => Array.from({ length: props.node.textContent.split('\n').length }, (_, i) => i + 1).join('\n'))
+const lineCount = computed(() => props.node.textContent.split('\n').length)
+const staticNumbers = computed(() => Array.from({ length: lineCount.value }, (_, i) => i + 1).join('\n'))
 function enterCode(event: MouseEvent) {
   const cm = mount()
   if (!cm) return
@@ -372,6 +373,7 @@ async function copy() {
         <ChevronDown :size="15" />
       </button>
       <input ref="titleInput" v-model="titleText" class="yy-codeblock-name" data-editor-tab placeholder="代码块标题" aria-label="代码块标题" @keydown="titleKey" />
+      <span class="yy-code-line-count">{{ lineCount }} 行</span>
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
       <button type="button" class="yy-codeblock-btn yy-code-wrap-btn" aria-label="自动换行" :aria-pressed="wrapped" :data-tip="wrapped ? '关闭自动换行' : '开启自动换行'" @mousedown.prevent @click="toggleWrap">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="codeIcons.wrap" /></svg><span>自动换行</span>
@@ -382,6 +384,7 @@ async function copy() {
       <span ref="actions" class="yy-code-actions"></span>
     </div>
     <div v-else class="yy-codeblock-bar" contenteditable="false">
+      <span class="yy-code-line-count">{{ lineCount }} 行</span>
       <LanguagePicker :value="language" @change="setLanguage" @done="refocus" />
       <button type="button" class="yy-codeblock-btn yy-code-copy-icon" :aria-label="copied ? '已复制' : '复制'" :data-tip="copied ? '已复制' : '复制代码'" @mousedown.prevent @click="copy">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path :d="copied ? codeIcons.check : codeIcons.copy" /></svg>

@@ -242,6 +242,7 @@ details.yy-fold-block[open] > .yy-fold-title::after { transform: rotate(90deg); 
 }
 
 /* Shared code actions also serve the lazy-loaded code editor and its expanded view. */
+.yy-code-line-count { display: inline-flex; align-items: center; flex: none; color: var(--yy-codeblock-muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .yy-code-actions { display: inline-flex; align-items: center; gap: 2px; flex: none; }
 .yy-code-action { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--yy-codeblock-muted); cursor: pointer; }
 .yy-code-action:hover { background: var(--yy-codeblock-hover); color: var(--yy-codeblock-title); }
@@ -539,7 +540,7 @@ pre:hover > .yy-copy {
   }
   .code-title::before { grid-area: 1 / 1; }
   .code-title-text { grid-area: 1 / 2 / 2 / -1; margin-right: calc(var(--yy-code-actions-space) - 9px); }
-  .code-title > .code-lang { grid-area: 2 / 1 / 3 / 3; margin-left: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .code-title > .code-meta { grid-area: 2 / 1 / 3 / 3; margin-left: 0; }
   .code-title > .yy-code-wrap-btn { grid-area: 2 / 3; padding: 0; justify-content: center; }
   .code-title > .yy-copy { grid-area: 2 / 4; padding: 0; justify-content: center; }
   .code-title > :is(.yy-code-wrap-btn, .yy-copy) > span { display: none; }
@@ -609,9 +610,12 @@ pre:hover > .yy-copy {
 :is(.code-block, .yy-codeblock):hover .code-tab {
   opacity: 1;
 }
+.code-meta { display: inline-flex; align-items: center; gap: 8px; flex: none; min-width: 0; margin-left: auto; }
 .code-lang {
-  flex: none;
-  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--yy-codeblock-muted);
   font-size: 12px;
   font-weight: 400;

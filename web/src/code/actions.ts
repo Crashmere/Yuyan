@@ -72,6 +72,7 @@ export function expandCode(code: CodeEditor, title: string, onClose?: () => void
   const dialog = document.createElement('dialog'); dialog.className = 'yy-code-dialog'; dialog.setAttribute('aria-label', title || '代码块')
   const bar = document.createElement('div'); bar.className = 'yy-code-dialog-title'
   const label = document.createElement('strong'); label.textContent = title || '代码块'
+  const count = document.createElement('span'); count.className = 'yy-code-line-count'; count.textContent = `${code.view.state.doc.lines} 行`
   const close = document.createElement('button'); close.type = 'button'; close.textContent = '×'; close.dataset.tip = '关闭放大视图'; close.setAttribute('aria-label', '关闭放大视图')
   close.onclick = () => dialog.close()
   const find = document.createElement('button'); find.type = 'button'; find.textContent = '查找'; find.onclick = () => code.find()
@@ -79,7 +80,7 @@ export function expandCode(code: CodeEditor, title: string, onClose?: () => void
   const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = '复制'; copy.dataset.tip = '复制代码'; copy.onclick = async () => { copy.textContent = await copyText(code.view.state.doc.toString()) ? '已复制' : '复制失败' }
   const toolbarParent = toolbar?.parentElement, toolbarNext = toolbar?.nextSibling ?? null
   if (toolbar) { bar.classList.add('has-editor-toolbar'); bar.append(toolbar, close) }
-  else bar.append(label, find, wrap, copy, close)
+  else bar.append(label, count, find, wrap, copy, close)
   const body = document.createElement('div'); body.className = 'yy-code-editor-host yy-code-dialog-body'
   body.append(code.view.dom); dialog.append(bar, body); document.body.append(dialog)
   const overflow = document.body.style.overflow; document.body.style.overflow = 'hidden'
