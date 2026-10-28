@@ -8,7 +8,9 @@ let tracked = 0
 let resized = false
 
 function topEdge() {
-  return Math.max(0, ...Array.from(document.querySelectorAll('.yy-topbar, .yy-toolbar'), bar => bar.getBoundingClientRect().bottom))
+  const bottom = Math.max(0, ...Array.from(document.querySelectorAll('.yy-topbar, .yy-toolbar'), bar => bar.getBoundingClientRect().bottom))
+  // Overlap the toolbar border so collapsed cell borders and subpixel rounding leave no seam.
+  return Math.max(0, bottom - 1)
 }
 
 function schedule() {
