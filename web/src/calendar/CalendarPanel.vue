@@ -43,7 +43,10 @@ async function toggleCollapsed() {
   if (!collapsed.value) collapsedAnchor = viewportDate()
   collapsed.value = !collapsed.value
   publish()
-  if (!collapsed.value) await centerTimeline(collapsedAnchor)
+  if (!collapsed.value) {
+    if (initialPositionPending) await initializeTimeline()
+    else await centerTimeline(collapsedAnchor)
+  }
 }
 let relocating = false
 async function toggleExpanded(event?: MouseEvent) {
@@ -57,7 +60,8 @@ async function toggleExpanded(event?: MouseEvent) {
   // Let the new container finish layout before restoring its horizontal position.
   await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
   if (disposed) return
-  await centerTimeline(anchor)
+  if (initialPositionPending) await initializeTimeline()
+  else await centerTimeline(anchor)
   animateCalendar(root.value, [{ opacity: .55 }, { opacity: 1 }])
   relocating = false
   // Teleport moves the focused control out of its parent; restore focus after the move.
@@ -617,6 +621,7 @@ function cellTip(cell: (typeof cells.value)[number]): string {
 }
 
 async function centerTimeline(date = center.value) {
+  initialPositionPending = false
   axisCenter.value = date
   await nextTick()
   const element = timelineScroll.value
@@ -626,6 +631,25 @@ async function centerTimeline(date = center.value) {
     element.scrollLeft = Math.max(0, offset - element.clientWidth / 2)
     syncViewport()
   }
+}
+
+let initialPositionPending = true
+async function initializeTimeline() {
+  const latest = props.readonly ? periods.value.reduce<CalendarEntry | null>((last, period) =>
+    !last || period.endDate > last.endDate || (period.endDate === last.endDate && period.startDate > last.startDate) ? period : last, null) : null
+  const date = latest?.endDate ?? center.value
+  axisCenter.value = date
+  await nextTick()
+  const element = timelineScroll.value
+  if (disposed || !element?.clientWidth) return
+  syncViewport()
+  // Use the rendered bar edge, including its minimum width at coarse grains.
+  const geometry = latest && periodGeometry(latest, cells.value)
+  element.scrollLeft = geometry
+    ? (geometry.left + geometry.width) / 100 * axisWidth.value - element.clientWidth
+    : dateOffset(date) - element.clientWidth / 2
+  syncViewport()
+  initialPositionPending = false
 }
 
 watch(grain, () => {
@@ -938,16 +962,18 @@ onMounted(() => {
   if (widthFrame.value) frameObserver.observe(widthFrame.value)
   measureWidth()
   if (root.value) labelFamily.value = getComputedStyle(root.value).fontFamily || 'sans-serif'
-  void centerTimeline()
   refreshToday()
   syncWide()
   wideQuery.addEventListener('change', syncWide)
   document.addEventListener('visibilitychange', onVisible)
   resizeObserver = new ResizeObserver(() => {
     if (relocating || rebasing || collapsed.value) return
+    if (initialPositionPending) { void initializeTimeline(); return }
     if (dragging.value) { syncViewport(); return }
+    const previousWidth = viewportWidth.value
     const anchor = viewportDate(false)
     syncViewport()
+    if (viewportWidth.value === previousWidth) return
     const element = timelineScroll.value
     if (element) element.scrollLeft = dateOffset(anchor) - viewportWidth.value / 2
     syncViewport()
