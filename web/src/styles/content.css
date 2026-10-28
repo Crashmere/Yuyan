@@ -695,6 +695,7 @@ pre:hover > .yy-copy {
 }
 .yy-table-scroll th {
   position: relative;
+  z-index: 2;
 }
 .yy-table-frame::before,
 .yy-table-frame::after {

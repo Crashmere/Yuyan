@@ -18,7 +18,7 @@ export function frameTable(frame: HTMLElement, scroller: HTMLElement, stickyHead
   let pending = 0
   let idle: ReturnType<typeof setTimeout> | undefined
   const table = scroller.querySelector('table')
-  const header = table && stickyHeader ? trackTableHeader(table) : undefined
+  const header = table && stickyHeader ? trackTableHeader(table, frame) : undefined
   const attributes = new MutationObserver(scheduleMeasure)
   if (table) attributes.observe(table, { attributes: true, attributeFilter: ['data-align'] })
   const observer = new ResizeObserver(scheduleMeasure)
