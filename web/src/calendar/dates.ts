@@ -129,8 +129,20 @@ export function dateAtPosition(position: number, cells: CalendarCell[]): string 
   return addDays(cell.start, Math.min(days - 1, Math.max(0, Math.floor((position - index) * days))))
 }
 
-export function periodDays(period: Pick<CalendarEntry, 'startDate' | 'endDate'>): number {
-  return (parseCalendarDate(period.endDate).getTime() - parseCalendarDate(period.startDate).getTime()) / DAY + 1
+export function periodDays(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, workdaysOnly = false): number {
+  const start = parseCalendarDate(period.startDate)
+  const days = (parseCalendarDate(period.endDate).getTime() - start.getTime()) / DAY + 1
+  if (!workdaysOnly) return days
+  let count = Math.floor(days / 7) * 5
+  for (let offset = 0; offset < days % 7; offset++) {
+    const weekday = (start.getUTCDay() + offset) % 7
+    if (weekday !== 0 && weekday !== 6) count++
+  }
+  return count
+}
+
+export function periodDaysLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, workdaysOnly = false): string {
+  return `${periodDays(period, workdaysOnly)} ${workdaysOnly ? '个工作日' : '天'}`
 }
 
 // Shift exact dates without JavaScript's end-of-month overflow (Jan 31 -> Feb 28).
@@ -215,8 +227,8 @@ export function assignPeriodLanes<T extends Pick<CalendarEntry, 'id' | 'startDat
   return { lanes, count: ends.length }
 }
 
-export function periodDurationLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate' | 'precision'>): string {
-  if (period.precision === 'day') return `${periodDays(period)} 天`
+export function periodDurationLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate' | 'precision'>, workdaysOnly = false): string {
+  if (period.precision === 'day') return periodDaysLabel(period, workdaysOnly)
   const start = parseCalendarDate(period.startDate), end = parseCalendarDate(period.endDate)
   const years = end.getUTCFullYear() - start.getUTCFullYear()
   if (period.precision === 'year') return `${years + 1} 年`

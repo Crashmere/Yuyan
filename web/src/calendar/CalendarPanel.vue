@@ -15,7 +15,7 @@ import { toast } from '../ui/toast'
 import { searchTerms } from '../shared/searchMatch'
 import {
   addDays, addUnits, adjustPeriod, assignPeriodLanes, canonicalRange, dateAtPosition, dayPosition, minPeriodWidth,
-  parseCalendarDate, periodDays, periodDurationLabel, periodGeometry, periodRangeLabel, periodSpan, todayDate, unitBounds, windowCells,
+  parseCalendarDate, periodDays, periodDaysLabel, periodDurationLabel, periodGeometry, periodRangeLabel, periodSpan, todayDate, unitBounds, windowCells,
 } from './dates'
 import type { CalendarData, CalendarEntry, CalendarPrecision } from '../schema/calendar'
 import { calendarCellWidths } from '../schema/calendar'
@@ -36,6 +36,7 @@ const panelStyle = computed(() => {
 const inspector = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const collapsed = ref(!!props.model.collapsed)
+const workdaysOnly = ref(!!props.model.workdaysOnly)
 const titleInput = ref<HTMLInputElement | null>(null)
 let collapsedAnchor = props.model.center || todayDate()
 async function toggleCollapsed() {
@@ -69,7 +70,7 @@ async function toggleExpanded(event?: MouseEvent) {
 }
 const calendarTitle = ref(props.model.title)
 function calendarData(): CalendarData {
-  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, cellWidth: savedCellWidth.value, width: savedWidth.value,
+  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, workdaysOnly: workdaysOnly.value, cellWidth: savedCellWidth.value, width: savedWidth.value,
     periods: periods.value.map(period => ({ ...period })) }
 }
 function publish() {
@@ -79,6 +80,17 @@ function publish() {
 function renameCalendar() {
   calendarTitle.value = [...calendarTitle.value.trim()].slice(0, 120).join('') || '日历'
   if (calendarTitle.value !== props.model.title) publish()
+}
+function toggleWorkdaysOnly() {
+  if (props.readonly || dragging.value) return
+  workdaysOnly.value = !workdaysOnly.value
+  publish()
+}
+function dayCountLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate'>) {
+  return periodDaysLabel(period, workdaysOnly.value)
+}
+function durationLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate' | 'precision'>) {
+  return periodDurationLabel(period, workdaysOnly.value)
 }
 const transferring = ref(false)
 let disposed = false
@@ -129,6 +141,7 @@ async function importCalendar() {
       zoomWidth.value = savedCellWidth.value ?? calendarCellWidths[data.grain].default
       center.value = data.center || todayDate()
       collapsed.value = !!data.collapsed
+      workdaysOnly.value = !!data.workdaysOnly
       periods.value = data.periods.map(p => ({ ...p }))
       draft.value = null
       emit('change', data)
@@ -148,6 +161,7 @@ function syncModel() {
   if (displayChanged) zoomWidth.value = width ?? calendarCellWidths[grain.value].default
   center.value = props.model.center || todayDate()
   collapsed.value = !!props.model.collapsed
+  workdaysOnly.value = !!props.model.workdaysOnly
   periods.value = props.model.periods.map(p => ({ ...p }))
 }
 watch(() => props.model, () => {
@@ -281,7 +295,7 @@ const periodLabels = computed(() => {
     // Borders (4 px), horizontal padding (24 px), and a 2 px spare leave this much room
     // for text inside the bar; keep in step with .yy-calendar-period-text's max-width.
     const inner = bar - 30
-    const duration = textWidth(periodDurationLabel(period), durationFont)
+    const duration = textWidth(durationLabel(period), durationFont)
     // Stay inside whenever the bar shows at least as much of the title as a capped outside label.
     const fits = (width: number) => inner >= Math.min(width, outsideTitleMax)
     const title = textWidth(period.title || '未命名事件', titleFont)
@@ -1049,6 +1063,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
           </div>
         </div>
+        <button v-if="!readonly" type="button" class="yy-btn small yy-calendar-workdays" :class="{ active: workdaysOnly }" :aria-pressed="workdaysOnly" data-tip="天数仅统计周一至周五，周末不计入" @click="toggleWorkdaysOnly"><Check v-if="workdaysOnly" :size="14" />仅统计工作日</button>
         <template v-if="!collapsed">
           <div class="yy-calendar-zoom" aria-label="格宽缩放">
             <IconButton label="缩小格宽" :disabled="!canZoomOut" @click="zoomBy(1 / 1.25)"><ZoomOut :size="16" /></IconButton>
@@ -1119,7 +1134,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
                   data-tip="调整起点"
                   @pointerdown.stop="beginBar($event, entry.period, 'start')"
                 ></span>
-                <span class="yy-calendar-period-text"><strong>{{ entry.period.title || '未命名事件' }}</strong><small v-if="entry.label.duration">{{ periodDurationLabel(entry.period) }}</small></span>
+                <span class="yy-calendar-period-text"><strong>{{ entry.period.title || '未命名事件' }}</strong><small v-if="entry.label.duration">{{ durationLabel(entry.period) }}</small></span>
                 <span
                   v-if="!readonly && !entry.geometry.clippedEnd && entry.geometry.width * axisWidth / 100 >= 32"
                   class="yy-calendar-resize end"
@@ -1130,7 +1145,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
               <Transition name="yy-calendar-feedback">
               <div v-if="creatingRange || (dragging && draft)" class="yy-calendar-drag-feedback" :class="{ creating: !!creatingRange }" :style="{ left: `${scrollLeft + viewportWidth / 2}px` }">
                 <template v-if="creatingRange">{{ periodRangeLabel({ startDate: creatingRange.start, endDate: creatingRange.end, precision: grain }) }} · 松开创建</template>
-                <template v-else-if="draft">{{ periodRangeLabel(draft) }} · {{ periodDays(draft) }} 天</template>
+                <template v-else-if="draft">{{ periodRangeLabel(draft) }} · {{ dayCountLabel(draft) }}</template>
               </div>
               </Transition>
             </div>
@@ -1143,7 +1158,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
           <div class="yy-calendar-list-head"><label><Search :size="15" /><input v-model="listQuery" placeholder="搜索事件或标注" aria-label="搜索日历事件" /><button v-if="listQuery" type="button" aria-label="清空事件搜索" @click="listQuery = ''"><X :size="14" /></button></label><span>{{ listPeriods.length }} 个事件</span></div>
           <div class="yy-calendar-list-rows">
             <button v-for="period in listPeriods" :key="period.id" type="button" class="yy-calendar-list-row" :class="[`color-${period.color}`, { selected: selectedID === period.id }]" @click="selectPeriod(period)">
-              <span class="yy-calendar-dot"></span><span class="yy-calendar-list-text"><strong>{{ period.title || '未命名事件' }}</strong><small>{{ periodRangeLabel(period) }} · {{ periodDays(period) }} 天</small><span v-if="period.note">{{ period.note }}</span></span><span class="yy-calendar-status" :class="{ current: periodStatus(period) === '进行中' }">{{ periodStatus(period) }}</span><ChevronRight :size="15" />
+              <span class="yy-calendar-dot"></span><span class="yy-calendar-list-text"><strong>{{ period.title || '未命名事件' }}</strong><small>{{ periodRangeLabel(period) }} · {{ dayCountLabel(period) }}</small><span v-if="period.note">{{ period.note }}</span></span><span class="yy-calendar-status" :class="{ current: periodStatus(period) === '进行中' }">{{ periodStatus(period) }}</span><ChevronRight :size="15" />
             </button>
             <p v-if="!listPeriods.length" class="yy-calendar-list-empty">{{ listQuery ? '没有匹配的事件，试试其他关键词。' : '添加事件后，可以在这里快速查找和定位。' }}</p>
           </div>
@@ -1163,13 +1178,13 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
       <aside v-if="readonly" ref="inspector" class="yy-calendar-inspector yy-calendar-details" role="dialog" aria-modal="true" aria-label="事件详情" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head"><strong>{{ draft.title }}</strong><IconButton label="关闭详情" @click="closeDraft(true)"><X :size="17" /></IconButton></div>
         <div class="yy-calendar-inspector-body">
-          <div class="yy-calendar-detail-meta"><span class="yy-calendar-status" :class="{ current: periodStatus(draft) === '进行中' }">{{ periodStatus(draft) }}</span><span>{{ periodDays(draft) }} 天</span></div>
+          <div class="yy-calendar-detail-meta"><span class="yy-calendar-status" :class="{ current: periodStatus(draft) === '进行中' }">{{ periodStatus(draft) }}</span><span>{{ dayCountLabel(draft) }}</span></div>
           <p>{{ periodRangeLabel(draft) }}</p><p class="yy-calendar-note">{{ draft.note || '暂无标注' }}</p>
         </div>
       </aside>
       <aside v-else ref="inspector" class="yy-calendar-inspector" role="dialog" aria-modal="true" :aria-label="draft.id == null ? '新建事件' : '编辑事件'" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head">
-          <div><span>{{ draft.id == null ? '新建事件' : '编辑事件' }} <em>{{ draftDirty ? '待应用' : draft.id == null ? '' : '已应用' }}</em></span><small>{{ periodRangeLabel(draftAsPeriod()!) }} · {{ rangeError ? '' : `${periodDays(draft)} 天` }}</small></div>
+          <div><span>{{ draft.id == null ? '新建事件' : '编辑事件' }} <em>{{ draftDirty ? '待应用' : draft.id == null ? '' : '已应用' }}</em></span><small>{{ periodRangeLabel(draftAsPeriod()!) }} · {{ rangeError ? '' : dayCountLabel(draft) }}</small></div>
           <IconButton label="关闭" @click="closeDraft()"><X :size="17" /></IconButton>
         </div>
 
@@ -1179,7 +1194,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <input v-model="draft.title" name="calendar-title" class="yy-input" maxlength="120" placeholder="例如：专注学习、项目冲刺、休整" />
           </label>
 
-          <DateRangeField :start="draft.startDate" :end="draft.endDate" :precision="draft.precision" @change="changeDraftDates" @invalid="dateInputError = $event" @key="onKey" />
+          <DateRangeField :start="draft.startDate" :end="draft.endDate" :precision="draft.precision" :workdays-only="workdaysOnly" @change="changeDraftDates" @invalid="dateInputError = $event" @key="onKey" />
           <div class="yy-calendar-duration"><span>快捷时长</span><button v-for="amount in (draft.precision === 'day' ? [1, 7, 14, 30] : [1, 3, 6, 12])" :key="amount" type="button" @click="setDuration(amount)">{{ amount }}{{ draft.precision === 'year' ? '年' : draft.precision === 'month' ? '个月' : '天' }}</button></div>
           <p v-if="rangeError && (showValidation || draft.title.trim())" class="yy-calendar-field-error" role="status">{{ rangeError }}</p>
 
@@ -1229,6 +1244,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-zoom { display: inline-flex; flex: none; align-items: center; gap: 2px; }
 .yy-calendar-window { grid-column: 2; grid-row: 1; justify-self: center; color: var(--yy-text-2); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .yy-calendar-list-toggle.active { background: var(--yy-primary-soft); color: var(--yy-primary); }
+.yy-calendar-workdays.active { background: var(--yy-primary-soft); color: var(--yy-primary); border-color: transparent; }
 .yy-calendar-new { color: var(--yy-primary); }
 .yy-calendar-frame { position: relative; overflow: hidden; border-radius: 0 0 12px 12px; }
 .yy-calendar-edge { position: absolute; z-index: 8; top: 50%; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--yy-border); border-radius: 50%; background: var(--yy-bg); color: var(--yy-text-2); box-shadow: 0 2px 10px #0000001f; cursor: pointer; transform: translateY(-50%); }

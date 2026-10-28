@@ -18,11 +18,12 @@ export interface CalendarData {
   grain: CalendarPrecision
   center: string
   collapsed?: boolean
+  workdaysOnly?: boolean
   cellWidth?: number | null
   width?: number | null
   periods: CalendarEntry[]
 }
-export const calendarDefaults: CalendarData = { version: 1, title: '日历', grain: 'month', center: '', collapsed: false, cellWidth: null, width: null, periods: [] }
+export const calendarDefaults: CalendarData = { version: 1, title: '日历', grain: 'month', center: '', collapsed: false, workdaysOnly: false, cellWidth: null, width: null, periods: [] }
 export const calendarCellWidths: Record<CalendarPrecision, { default: number; min: number; max: number }> = {
   year: { default: 88, min: 56, max: 240 },
   month: { default: 80, min: 48, max: 220 },
@@ -38,6 +39,7 @@ export function validCalendar(value: unknown): value is CalendarData {
   const a = value as CalendarData | undefined
   if (!a || a.version !== 1 || typeof a.title !== 'string' || [...a.title].length > 120 || !grains.includes(a.grain) || (a.center !== '' && !date(a.center)) || !Array.isArray(a.periods) || a.periods.length > 2000) return false
   if (a.collapsed !== undefined && typeof a.collapsed !== 'boolean') return false
+  if (a.workdaysOnly !== undefined && typeof a.workdaysOnly !== 'boolean') return false
   if (a.cellWidth != null && (typeof a.cellWidth !== 'number' || !Number.isFinite(a.cellWidth) || a.cellWidth < calendarCellWidths[a.grain].min || a.cellWidth > calendarCellWidths[a.grain].max)) return false
   if (a.width != null && (!Number.isInteger(a.width) || a.width < 280 || a.width > 10000)) return false
   const ids = new Set<number>()

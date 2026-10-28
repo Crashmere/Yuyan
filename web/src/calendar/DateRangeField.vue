@@ -2,11 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ArrowRight, CalendarDays } from 'lucide-vue-next'
 import { deferred } from '../shared/deferred'
-import { canonicalRange, parseCalendarDate, periodDays, todayDate, unitBounds } from './dates'
+import { canonicalRange, parseCalendarDate, periodDurationLabel, todayDate, unitBounds } from './dates'
 import type { CalendarPrecision } from '../schema/calendar'
 
 const picker = deferred(() => import('./DateRangePicker.vue'))
-const props = defineProps<{ start: string; end: string; precision: CalendarPrecision }>()
+const props = defineProps<{ start: string; end: string; precision: CalendarPrecision; workdaysOnly?: boolean }>()
 const emit = defineEmits<{
   change: [value: { startDate: string; endDate: string; precision: CalendarPrecision }]
   invalid: [message: string]
@@ -56,9 +56,7 @@ const parsed = computed(() => {
 watch(() => parsed.value.error, message => emit('invalid', message), { immediate: true })
 const duration = computed(() => {
   if (parsed.value.error) return ''
-  if (props.precision === 'year') return `${Number(props.end.slice(0, 4)) - Number(props.start.slice(0, 4)) + 1} 年`
-  if (props.precision === 'month') return `${(Number(props.end.slice(0, 4)) - Number(props.start.slice(0, 4))) * 12 + Number(props.end.slice(5, 7)) - Number(props.start.slice(5, 7)) + 1} 个月`
-  return `${periodDays({ startDate: props.start, endDate: props.end })} 天`
+  return periodDurationLabel({ startDate: props.start, endDate: props.end, precision: props.precision }, props.workdaysOnly)
 })
 function inputDate() {
   selectingEnd.value = false
@@ -157,7 +155,7 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
       <label :class="{ active: open && side === 'end' }"><span>结束</span><input v-model="endText" aria-label="结束日期" inputmode="numeric" spellcheck="false" :placeholder="precision === 'day' ? 'YYYY-MM-DD' : precision === 'month' ? 'YYYY-MM' : 'YYYY'" @click="show('end')" @input="inputDate" @blur="normalizeInput" /></label>
       <button type="button" class="yy-date-toggle" aria-label="选择日期范围" :aria-expanded="open" @click="open ? close() : show('start')"><CalendarDays :size="18" /></button>
     </div>
-    <div class="yy-date-summary"><span>{{ parsed.error || `共 ${duration}，包含起止${precision === 'day' ? '当天' : precision === 'month' ? '月份' : '年份'}` }}</span><button type="button" @click="useToday">{{ precision === 'day' ? '今天' : precision === 'month' ? '本月' : '今年' }}</button></div>
+    <div class="yy-date-summary"><span>{{ parsed.error || `共 ${duration}，${precision === 'day' && workdaysOnly ? '周末不计入' : `包含起止${precision === 'day' ? '当天' : precision === 'month' ? '月份' : '年份'}`}` }}</span><button type="button" @click="useToday">{{ precision === 'day' ? '今天' : precision === 'month' ? '本月' : '今年' }}</button></div>
     <div v-if="loadError" class="yy-date-load-error">日期面板未能加载<button type="button" @click="show(side)">重试</button></div>
     <Teleport to="body">
       <Transition name="yy-date-popover">

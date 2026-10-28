@@ -4,7 +4,7 @@ import { calendarDefaults, validCalendar, type CalendarData, type CalendarEntry,
 const prefix = 'YYCAL1:'
 const grains: Record<string, CalendarPrecision> = { y: 'year', m: 'month', d: 'day' }
 
-// [title, grain, center, [[title, start, end?, color?, note?], ...], cellWidth?, width?]
+// [title, grain, center, [[title, start, end?, color?, note?], ...], cellWidth?, width?, workdaysOnly?]
 // Empty end means the starting unit; empty color means emerald. Trim empty tails.
 export function encodeCalendar(data: CalendarData): string {
   if (!validCalendar(data)) throw new Error('日历内容不完整，请先完成当前编辑')
@@ -15,8 +15,9 @@ export function encodeCalendar(data: CalendarData): string {
     while (row.length > 2 && row.at(-1) === '') row.pop()
     return row
   })]
-  if (data.cellWidth != null || data.width != null) value.push(data.cellWidth ?? null)
-  if (data.width != null) value.push(data.width)
+  if (data.cellWidth != null || data.width != null || data.workdaysOnly) value.push(data.cellWidth ?? null)
+  if (data.width != null || data.workdaysOnly) value.push(data.width ?? null)
+  if (data.workdaysOnly) value.push(true)
   return prefix + JSON.stringify(value)
 }
 
@@ -45,9 +46,9 @@ export function decodeCalendar(text: string): CalendarData {
   let value: unknown
   try { value = JSON.parse(source.slice(prefix.length)) }
   catch { throw new Error('日历字符串不完整或格式有误，请检查是否复制了全部内容') }
-  if (!Array.isArray(value) || value.length < 4 || value.length > 6 || typeof value[1] !== 'string' || !Object.hasOwn(grains, value[1]) || !Array.isArray(value[3])) throw new Error('日历字符串结构不合法')
+  if (!Array.isArray(value) || value.length < 4 || value.length > 7 || typeof value[1] !== 'string' || !Object.hasOwn(grains, value[1]) || !Array.isArray(value[3])) throw new Error('日历字符串结构不合法')
   if (value[3].length > 2000) throw new Error('单个日历最多保存 2,000 个事件')
-  const data = { version: 1, title: value[0], grain: grains[value[1]], center: value[2], ...(value.length >= 5 ? { cellWidth: value[4] } : {}), ...(value.length === 6 ? { width: value[5] } : {}), periods: value[3].map(decodePeriod) }
-  if (!validCalendar(data)) throw new Error('日历名称、定位日期或宽度不合法')
+  const data = { version: 1, title: value[0], grain: grains[value[1]], center: value[2], ...(value.length >= 5 ? { cellWidth: value[4] } : {}), ...(value.length >= 6 ? { width: value[5] } : {}), ...(value.length === 7 ? { workdaysOnly: value[6] } : {}), periods: value[3].map(decodePeriod) }
+  if (!validCalendar(data)) throw new Error('日历名称、定位日期或配置不合法')
   return data
 }
