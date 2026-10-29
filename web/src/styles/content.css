@@ -682,6 +682,8 @@ pre:hover > .yy-copy {
   padding-bottom: 12px;
 }
 .yy-table-scroll {
+  /* Keep transformed header cells inside the same paint boundary as the body rows. */
+  contain: paint;
   overflow-x: auto;
   padding-left: var(--bleed, 0px);
   scrollbar-width: none;
