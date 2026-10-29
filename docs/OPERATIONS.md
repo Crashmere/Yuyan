@@ -2,7 +2,7 @@
 
 The public entry point uses HTTPS with a trusted IP certificate, while retaining the existing `/yuyan/` path. Public HTTP returns 308; API clients must use HTTPS directly. Nginx overrides `X-Forwarded-Proto`, and the public entry point uniformly validates device credentials. For certificates, renewal, rollback, and whole-machine acceptance, see [Shared HTTPS Operations](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/https.md) (server copy: `/opt/server-context/references/https.md`). This project's backend and deployment checks retain local HTTP, and the proxy-check entry point at `127.0.0.1:80` must not be publicly accessible. The public endpoint has been integrated with ServerPortal's unified device authentication: first enter the passphrase at `/portal/login` to authorize the device, then access the site with a same-origin Secure/HttpOnly cookie; unauthorized API requests return 401. Local deployment checks and service-to-service calls remain available.
 
-Before operating on `ali`, load server-operations and explicitly read `/opt/AGENTS.md`. Do not record the production public address in the public repository; obtain live environment information through the trusted SSH alias.
+Yuyan's application target is `nas`; `vps` exposes public HTTPS port 8443 and temporary `ali` access forwards to the same instance. NAS provides local-CA HTTPS for home devices. Read server-operations and the target's remote `/opt/AGENTS.md`; current-state records activation. Keep addresses in trusted SSH configuration, not this public repository.
 
 Image/attachment uploads and large-document saves all pass through device authentication: the attachment endpoint has no upload-size limit and receives data as a stream; the image endpoint remains limited to 25 MiB per image, JSON is limited to 16 MiB, and the Nginx limit for other application requests is 26 MiB. Internal authentication subrequests do not impose another body-size limit; if a large request returns 500 before reaching the application, see [Unified Authentication Incorrectly Blocking Large Requests](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#统一认证误拦大请求).
 
@@ -18,7 +18,7 @@ Candidate snapshots are parsed before cleanup. History deletion, media grace-per
 
 The editor's first save carries `sessionRevision` and records a new “编辑前” snapshot in the same transaction, protecting the content and media that existed before an editing session that is later canceled. If the latest snapshot already marks a session boundary with identical state and is more than one week from expiration, that snapshot is reused (DESIGN.md 13.2). Canceling removes the current session snapshot. Restoring a version records “恢复前” in the same transaction, checks the revision, updates the content, and records the result. Both kinds of protective snapshots use the same 30-day retention period. `version_sequence` in `meta` stores the ID high-water mark, so old version links are not reused after history cleanup, cancellation, or permanent deletion; a missing version returns 404 / `version_not_found`.
 
-Native backups continue to preserve the complete SQLite database, including retained history and scheduling state, plus registered assets. Existing backups are unaffected by history cleanup; daily, before-deploy, and manual backups continue to follow their respective retention policies. After a backup is restored, the next service startup catches up on expired-history cleanup according to the current time. To extract older history, first inspect it with read-only tools in an isolated restore directory without starting the service. Rolling back the program does not restore records or files that have already been cleaned, and older versions do not maintain the history ID high-water mark; rollback must use a version that understands this policy, while a real restore must still select and confirm the desired point in time through the native-backup process.
+Both native and NAS full cold backups preserve the complete SQLite database, including retained history and scheduling state; the NAS format also includes all data files and derivatives. Existing archives are unaffected by history cleanup, and NAS does not automatically rotate backups. On restoration, service startup catches up expired-history cleanup according to current time. Inspect older recovery copies read-only in an isolated directory before starting the service. Program rollback cannot restore cleaned rows/files; it must retain history high-water-mark compatibility. The agent selects and confirms the recovery point separately.
 
 ## Attachment and Backup Compatibility
 
@@ -54,7 +54,7 @@ The reading page and editor load narrower display variants according to rendered
 
 The read-only diagnostic `yuyan images --data <数据目录>` summarizes the processed count, count with variants, count with a high-density tier (`dense`), per-reason counts, space used by variants, and estimated transfer volume for images with variants on a 3× phone and 2× desktop. Reasons are: `small` (under 128 KiB), `animated`, `palette`, `cmyk`, `hdr`, `orientation` (PNG/WebP carries orientation), `profile` (abnormal color profile), `large` (over the decode limit), `decode`, `none` (no variant worth retaining), and `error`. The `display versions: backfill done` log records processed and variant counts for a completed pass; an individual failure records `display versions` and the reason. For a full rebuild, stop the service, delete `data/derived/images`, and restart. Deleting it while the service runs is also safe: missing files fall back to the original and regenerate when the page is opened.
 
-Images read and written during backfill enter the page cache, so `MemoryCurrent` and `MemoryPeak` can reach the 384M limit. Evaluate memory pressure through `anon` in `memory.stat`, `memory.pressure`, and `oom_kill` in `memory.events`. `derived/` is registered as `cache` (derived cache) in the portal declaration; portal backup packages never collect it at any scope, and the portal's storage page reports its usage separately.
+Images read/written during backfill enter page cache, so `MemoryCurrent` and `MemoryPeak` can reach the 384M limit. Evaluate pressure through `anon`, `memory.pressure`, and `oom_kill`. `derived/` remains a cache resource and is reported separately by Portal, but NAS full cold backups and temporary upgrade copies include it; only the native registered-asset format omits it.
 
 ## Layout
 
@@ -85,7 +85,7 @@ systemctl reload nginx
 bash deploy/setup-deploy.sh /path/to/yuyan-deploy.pub
 ```
 
-`install` refuses to overwrite an existing directory or identity, explicitly initializes an empty production database, enables the service and backup timer, and obtains the first backup through the unit. `setup-deploy` creates the `yuyan-deploy` identity, which can execute only the three fixed commit/SHA-256 commands `deploy`, `portal-check`, and `portal`; sudo permits only the root-managed deployment script. After installation, verify direct access, proxy access, and deep links for all five applications.
+`install` refuses existing directories/identities, explicitly initializes an empty database, starts the service, and leaves native backup scheduling disabled by default. It is not an existing-data migration importer. `setup-deploy` creates `yuyan-deploy` with only the fixed `deploy`, `portal-check`, and `portal` commands; sudo permits only its root-managed script. After installation, check direct/proxied health, resources, and deep links across the shared inventory.
 
 ## Database Layout Migration
 
@@ -96,9 +96,9 @@ yuyan migrate --dry-run --data /path/to/data   # Report the current layout and p
 yuyan migrate --data /path/to/data             # Execute and report elapsed time
 ```
 
-Step 2, which moves large fields to the end of `docs` and `doc_versions`, ran with the 2026-10-14 release. Earlier programs can still run against the new layout, so rollback is unaffected. After migration, the file grows by roughly the size of the rebuilt tables. Later writes reuse those free pages, backups do not include them, and no manual VACUUM is needed. For each future step, first time it as `yuyan` against a server copy of the latest before-deploy backup; it must finish within the deployment check's 60-second limit. Delete the copy after use. If `min_layout` exceeds the layout supported by a program, that program refuses to open the database; before rollback, confirm with `migrate --dry-run` or the error message.
+Step 2, moving large fields to the end of `docs` and `doc_versions`, ran with the 2026-10-14 release. Earlier programs remain compatible. Rebuilt tables enlarge the file temporarily; later writes reuse free pages, native SQLite snapshots compact them, while complete NAS cold copies preserve the whole file. No manual VACUUM is needed. Rehearse future steps as `yuyan` against the independent candidate copy within the check's 60-second limit. Successful acceptance removes that work copy; failure retains the root-private recovery state. Confirm `min_layout` compatibility before rollback.
 
-Step 4 removes the retired `calendar_periods` table and index, and raises `min_layout` to 4. Layouts 1 and 2 skip obsolete table creation and advance through the remaining migration steps; existing layout-3 instances drop the table. New instances initialize directly at layout 4. Document bodies, history, templates, and assets are preserved. Rollback requires a layout-4-capable program that recognizes calendar document blocks; merely replacing the binary with a layout-3 release cannot restart the service. Normal pre-deployment backups remain subject to the existing retention policy.
+Step 4 removes retired `calendar_periods` and raises `min_layout` to 4. Layouts 1/2 skip obsolete table creation; layout 3 drops it; new databases initialize at layout 4. Document bodies, history, templates, and assets remain. Rollback requires a layout-4-capable program recognizing document calendars. NAS upgrade copies follow immediate successful acceptance or failure retention, not the legacy five-copy rule.
 
 ## Deployment and Rollback
 
@@ -163,11 +163,10 @@ The overrides file records choices that require human judgment, such as differen
 
 ## Code Callout Migration
 
-`migrate-code` converts `[!code]` Callouts back into code blocks with title bars (see DESIGN.md section 16 for the rules). It runs on the development computer and writes to production through an SSH tunnel; first deploy a program that understands code-block titles. The production program itself has no `/yuyan/` prefix because Nginx removes it, so the tunnel URL stops at the port. This rewrites real documents, so create a manual backup first:
+`migrate-code` converts `[!code]` Callouts into titled code blocks (DESIGN 16). It runs locally through an SSH tunnel to NAS; first deploy a compatible program. Direct upstream paths have no `/yuyan/` prefix. This rewrites real documents: obtain the user's write authorization and a complete manual external backup through the Portal/agent workflow before the write command.
 
 ```sh
-ssh ali 'runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-$(date -u +%Y%m%dT%H%M%SZ)-before-code-migration'
-ssh -N -L 18199:127.0.0.1:18084 ali &                                    # Tunnel; terminate it when finished
+ssh -N -L 18199:127.0.0.1:18084 nas &                                    # Tunnel; terminate it when finished
 npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/ --dry   # Report only
 npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/
 npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
@@ -221,16 +220,15 @@ The target directory must be new and empty or a previous export result. Exportin
 
 ## Backup and Restore
 
-Daily backups run at 04:00 Asia/Shanghai with a random delay of 0–5 minutes, retaining 14 daily backups. The backup unit's writable directory must be all of `/opt/yuyan`; see the shared [Photo Hard-Link Backups Fail Under the systemd Sandbox](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/common-issues.md#systemd-沙箱下照片硬链接备份失败) for the reason. A backup contains a consistent SQLite snapshot (`VACUUM INTO`), hard-linked images/attachments, and a SHA-256 manifest. Before-deploy backups rotate according to the shared deployment-retention policy; manual backups are not cleaned automatically. On 2026-09-27, a separate full-application archive containing this project's database and every registered image was created, downloaded to the maintenance computer, and verified; see the [Shared Backup Guide](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#手工数据归档). This application's scripts do not initiate off-machine synchronization. The server also has Alibaba Cloud file backup; see [Host Cloud Backup](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md#云备份) for its scope, 30-day retention, and restore limitations. Use the export tool in the preceding section when an Obsidian-usable content copy is required.
+NAS routine backups are manual complete compressed archives on an explicitly identified external volume through Portal or the agent. Pause business/background services, cold-copy every database table and all data/config/program files to external staging, resume previously running services, then compress and verify the immutable copy. Coverage includes retained history, templates, document calendars, original assets/attachments/drawings, and `data/derived`. No routine stage/archive, native daily timer, or automatic backup deletion runs on NAS. Existing verified 2026-09-27 maintenance-computer and independent ALI Cloud Backup materials remain preserved in shared current-state. Use export when an Obsidian-usable content copy is required.
 
 ```sh
 systemctl status yuyan-backup.timer
-systemctl start yuyan-backup.service
 journalctl -u yuyan-backup.service -n 50 --no-pager
 runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-UNIQUE
 ```
 
-The backup target directory must not exist. Images and attachments in a backup are hard links to the production assets and share the same underlying data; they must not be modified in place. Only a directory with a complete `manifest.json` may be restored.
+The native tools below remain for old packages and isolated checks. Their format uses `VACUUM INTO`, hard-linked registered assets/attachments, and a SHA-256 manifest; it omits derived files and is not the NAS full-state job. Destinations must not exist. Never edit hard-linked originals inside a native snapshot; restore requires its completed manifest.
 
 ```sh
 yuyan restore --from /path/to/backup --data /path/to/new-restore-directory
@@ -239,7 +237,7 @@ yuyan check --data /path/to/new-restore-directory
 yuyan serve --data /path/to/new-restore-directory --listen 127.0.0.1:19084 --with-prefix
 ```
 
-`restore` verifies every file in the manifest, refuses an existing target, and copies images into independent files. Before a production restore, confirm the point in time and any later changes that could be lost; stop the service, retain the current directory, restore into a new directory, verify it, switch directories, and restart and verify. Program rollback is not database rollback.
+The native `restore` verifies its manifest and copies assets independently into a new target. Full NAS cold archives are instead extracted and verified in an isolated directory before the agent restores the complete application subtree. Confirm the recovery point and later data loss; stop writes, preserve current state, set ownership, and restart for read-only validation. Inspect old history before startup maintenance and keep NAS native scheduling disabled. Program rollback is not data restoration.
 
 ## Diagnostics
 
@@ -255,7 +253,7 @@ runuser -u yuyan -- /opt/yuyan/bin/yuyan images --data /opt/yuyan/data
 
 `MemoryCurrent` includes page cache. The program itself (`anon`) uses about 80 MiB after startup, including about 18 MiB for the full-text search index; the `search index ready` startup log reports the document count, byte count, and elapsed time. Most of the remainder is reclaimable file cache. When diagnosing memory, inspect `anon` in `/sys/fs/cgroup/system.slice/yuyan.service/memory.stat` and `oom_kill` in `memory.events`; do not infer a problem merely from usage near the limit.
 
-If the database is missing or corrupt, inspect backups and permissions; do not conceal the error by using `init` to create an empty database. After documentation commits are pushed, run `~/agent-config/skills/server-operations/scripts/sync-docs.sh Yuyan`.
+If the database is missing or corrupt, inspect backups and permissions; never hide it with an empty `init`. After managed documentation is pushed, run `SYNC_HOST=nas ~/agent-config/skills/server-operations/scripts/sync-docs.sh Yuyan`.
 
 ## ServerPortal Integration Materials
 
@@ -267,7 +265,7 @@ Source-code or database-behavior changes must not use this option as a substitut
 
 When the data root, media, backup format, unit, port, or access path changes, update the declaration and corresponding documentation in the same commit, update the shared inventory, and verify resource coverage. The portal automatically reads files, media, database tables, and systemd state; the maintaining agent must explicitly update directory purposes, API descriptions, and permission boundaries. See [Portal Maintenance](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/portal.md) for shared protocols, failure handling, and new-application integration.
 
-The portal at `/portal/` now uniformly protects public access. Deployment scripts check application health over loopback; a local deployment's public check is expected to receive 401 when unauthorized. Device authorization remains valid until explicitly revoked, and the cookie is renewed by shared Nginx on valid requests. If this application adds an `add_header`, it must preserve shared `Set-Cookie` forwarding; see the shared portal-maintenance document for rules and acceptance checks. Portal backups use this application's native consistent snapshots. Acceptance of the complete real restore chain remains deferred at the user's request and is not performed automatically as part of this maintenance.
+Portal protects both HTTPS entrances; loopback release checks remain private and public unauthorized APIs return 401. Device grants persist until revocation; preserve shared cookie-renewal headers. NAS Portal backups cold-copy complete state, including derivatives, to external staging rather than relying on native registered-asset snapshots. Recovery remains agent-operated after confirming the recovery point.
 
 ## Mobile Home-Screen Icon
 
@@ -283,6 +281,6 @@ See [Local Deployment and Rollback](DEPLOYMENT.md) for the complete process. Git
 
 The table-header control is now a direct button in both top and floating table tool sets and uses the exact user-supplied PNG without redrawing it; the empty `表格设置` entry remains visible but disabled. This is a frontend-only interaction change with no data migration, document-format, API, portal-declaration, or server-configuration change. Existing tabs require a page refresh. See VERIFICATION 26.5.2–26.5.3 for the focused desktop/mobile checks and release receipts.
 
-## Automatic Cleanup of Release Materials
+## Release-Material Cleanup
 
-Every day at 05:00 Asia/Shanghai, the server follows [Automatic Retention of Release Materials](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/retention.md), retaining the most recent 3 successful releases and the most recent 5 complete before-deploy backups while protecting the current version, its corresponding backup, and failed batches awaiting review. server-operations maintains the shared implementation, lock, receipts, preview, and disable command; this project's deployment retains the deployment script's `recovery` marker and the daily backup's `flock` entry point. During initial installation, create `/run/lock/ali-release-retention.lock` according to the shared documentation before enabling the backup timer. Daily and manual backups, business data, portal exports, and build materials on the maintenance computer are outside this automatic cleanup scope.
+NAS has no daily backup/release pruning. Successful upgrade acceptance removes only its private `/var/lib/server-upgrades/yuyan/<release>/` and candidate work copy; failed or uncertain copies remain for the agent. Existing ALI and maintenance-computer backups are untouched. [Legacy retention](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/retention.md) is not enabled for NAS upgrades.

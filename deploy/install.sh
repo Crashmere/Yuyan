@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Shared backup/cleanup lock must exist before enabling the backup timer.
-[[ -f /run/lock/ali-release-retention.lock ]] || {
+# Native daily backups are opt-in only for legacy hosts; NAS uses manual external backups.
+[[ ${ENABLE_APP_BACKUP_TIMER:-false} != true || -f /run/lock/ali-release-retention.lock ]] || {
   echo 'Prepare the server-operations retention tmpfiles lock before installing this application.' >&2
   exit 1
 }
+if [[ ${ENABLE_APP_BACKUP_TIMER:-false} == true && -r /etc/server-maintenance-host && $(< /etc/server-maintenance-host) == nas ]]; then
+  echo 'Scheduled internal application backups are disabled on NAS.' >&2; exit 1
+fi
 if [[ $EUID -ne 0 || $# -ne 1 ]]; then
   echo 'Usage: sudo bash deploy/install.sh <linux-binary>' >&2; exit 64
 fi
@@ -22,8 +25,12 @@ install -m 0644 "$scripts/nginx-location.conf" "$scripts/yuyan.service" "$script
 runuser -u yuyan -- /opt/yuyan/bin/yuyan init --data /opt/yuyan/data
 systemctl link /opt/yuyan/config/yuyan.service /opt/yuyan/config/yuyan-backup.service /opt/yuyan/config/yuyan-backup.timer
 systemctl daemon-reload
-systemctl enable --now yuyan.service yuyan-backup.timer
+systemctl enable --now yuyan.service
+if [[ ${ENABLE_APP_BACKUP_TIMER:-false} == true ]]; then systemctl enable --now yuyan-backup.timer;
+else systemctl disable --now yuyan-backup.timer; fi
 curl --fail --silent --retry 10 --retry-delay 1 --retry-connrefused http://127.0.0.1:18084/healthz
-systemctl start yuyan-backup.service
-test "$(systemctl show yuyan-backup.service -p Result --value)" = success
+if [[ ${ENABLE_APP_BACKUP_TIMER:-false} == true ]]; then
+  systemctl start yuyan-backup.service
+  test "$(systemctl show yuyan-backup.service -p Result --value)" = success
+fi
 echo 'Yuyan installed. Add its Nginx location after local health verification.'
