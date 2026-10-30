@@ -148,7 +148,7 @@ Dialogs once caused code blocks to be emptied: Vue node views gave ProseMirror a
 
 ## Production Import
 
-Import is a one-time operation, and the target must be an empty instance. The tool runs on the development computer. The public endpoint now requires a device cookie, so existing command-line tools use a trusted SSH tunnel: first run `ssh -N -L 127.0.0.1:18199:127.0.0.1:18084 ali` in another terminal, after confirming that the local port is free. The direct backend has no `/yuyan/` prefix. Import through the tunnel still requires separate confirmation before writing real data.
+Import is a one-time operation, and the target must be an empty instance. The tool runs on the development computer. Public endpoints require a device cookie, so command-line tools reach NAS through a trusted SSH tunnel: first run `ssh -N -L 127.0.0.1:18199:127.0.0.1:18084 nas` in another terminal, after confirming that the local port is free. When VPS management transport is selected, use `nas-via-vps` instead of `nas`; leave frozen ALI unchanged. The direct backend has no `/yuyan/` prefix. Import through the tunnel still requires separate confirmation before writing real data.
 
 ```sh
 npm --prefix web run import -- --source <笔记仓库副本> --server http://127.0.0.1:18199/ \
@@ -163,10 +163,10 @@ The overrides file records choices that require human judgment, such as differen
 
 ## Code Callout Migration
 
-`migrate-code` converts `[!code]` Callouts into titled code blocks (DESIGN 16). It runs locally through an SSH tunnel to NAS; first deploy a compatible program. Direct upstream paths have no `/yuyan/` prefix. This rewrites real documents: obtain the user's write authorization and a complete manual external backup through the Portal/agent workflow before the write command.
+`migrate-code` converts `[!code]` Callouts into titled code blocks (DESIGN 16). It runs locally through an SSH tunnel to NAS; first deploy a compatible program. Direct upstream paths have no `/yuyan/` prefix. This rewrites real documents: obtain the user's write authorization and a complete manual external backup through the agent-only workflow in [Backup and Restore](#backup-and-restore) before the write command.
 
 ```sh
-ssh -N -L 18199:127.0.0.1:18084 nas &                                    # Tunnel; terminate it when finished
+ssh -N -L 127.0.0.1:18199:127.0.0.1:18084 nas &                         # Tunnel; terminate it when finished
 npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/ --dry   # Report only
 npm --prefix web run migrate-code -- --server http://127.0.0.1:18199/
 npm --prefix web run roundtrip -- --server http://127.0.0.1:18199/
@@ -224,15 +224,10 @@ Use the agent-owned [backup and recovery runbook](https://github.com/Crashmere/a
 
 NAS routine backups are manual complete compressed archives on an explicitly identified external volume through agent-only server-operations tooling. Pause business/background services, cold-copy every database table and all data/config/program files to external staging, resume previously running services, then compress and verify the immutable copy. Coverage includes retained history, templates, document calendars, original assets/attachments/drawings, and `data/derived`. No routine stage/archive, native daily timer, or automatic backup deletion runs on NAS. Existing verified 2026-09-27 maintenance-computer and independent ALI Cloud Backup materials remain preserved in shared current-state. Use export when an Obsidian-usable content copy is required.
 
-```sh
-systemctl status yuyan-backup.timer
-journalctl -u yuyan-backup.service -n 50 --no-pager
-runuser -u yuyan -- /opt/yuyan/bin/yuyan backup --data /opt/yuyan/data --out /opt/yuyan/backups/manual-UNIQUE
-```
-
-The native tools below remain for old packages and isolated checks. Their format uses `VACUUM INTO`, hard-linked registered assets/attachments, and a SHA-256 manifest; it omits derived files and is not the NAS full-state job. Destinations must not exist. Never edit hard-linked originals inside a native snapshot; restore requires its completed manifest.
+The native tools below remain for old packages and isolated checks, not routine captures of live NAS data. Their format uses `VACUUM INTO`, hard-linked registered assets/attachments, and a SHA-256 manifest; it omits derived files and is not the NAS full-state job. Destinations must not exist. Never edit hard-linked originals inside a native snapshot; restore requires its completed manifest.
 
 ```sh
+yuyan backup --data /path/to/isolated-data --out /path/to/new-native-snapshot
 yuyan restore --from /path/to/backup --data /path/to/new-restore-directory
 yuyan check --data /path/to/new-restore-directory
 # First check that 19084 is free, then start the isolated restored instance
@@ -244,7 +239,7 @@ The native `restore` verifies its manifest and copies assets independently into 
 ## Diagnostics
 
 ```sh
-systemctl status yuyan yuyan-backup.timer
+systemctl status yuyan
 journalctl -u yuyan -n 100 --no-pager
 curl --fail http://127.0.0.1:18084/healthz
 curl --fail http://127.0.0.1/yuyan/healthz
