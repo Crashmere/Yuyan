@@ -1,5 +1,5 @@
 import { Extension } from '@tiptap/core'
-import { TextSelection } from '@tiptap/pm/state'
+import { Plugin, TextSelection } from '@tiptap/pm/state'
 import { placeCaret } from './readingPosition'
 
 // Shortcuts that open the editor's panels, plus the Yuque shortcuts Tiptap binds differently or
@@ -9,6 +9,20 @@ export const UiShortcuts = Extension.create<{ openFind: () => void }>({
 
   addOptions() {
     return { openFind: () => {} }
+  },
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: {
+        handleKeyDown: (view, event) => {
+          if (event.defaultPrevented || event.isComposing || view.composing || event.keyCode === 229 ||
+            event.code !== 'Digit9' || !event.shiftKey || event.altKey || event.ctrlKey === event.metaKey) return false
+          // Shifted digits vary by layout; do not rely on keymap's deprecated keyCode fallback.
+          if (!event.repeat) this.editor.commands.toggleTaskList()
+          return true
+        },
+      },
+    })]
   },
 
   addKeyboardShortcuts() {
