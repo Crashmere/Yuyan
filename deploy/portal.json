@@ -9,12 +9,9 @@
   "port": 18084,
   "user": "yuyan",
   "units": [
-    "yuyan.service",
-    "yuyan-backup.service",
-    "yuyan-backup.timer"
+    "yuyan.service"
   ],
   "database": "/opt/yuyan/data/yuyan.db",
-  "backupKind": "media",
   "resources": [
     {
       "id": "data",
@@ -31,15 +28,6 @@
       "path": "/opt/yuyan/data/derived",
       "purpose": "图片显示版本：由原图生成的较窄 PNG/JPEG 副本及清单。可整体删除，删除或恢复后由应用自动重建；nas 手工全量备份和升级冷副本完整收录，原生工具仍不收录。",
       "kind": "cache",
-      "browse": true,
-      "cleanup": false
-    },
-    {
-      "id": "backups",
-      "name": "数据备份",
-      "path": "/opt/yuyan/backups",
-      "purpose": "nas 的日常备份由门户或 agent 手动写入外置盘，采用全量压缩归档；本目录中的历史原生材料不自动清理。升级临时全量副本由 /var/lib/server-upgrades 管理，运行和数据验证成功后立即删除，失败或未确认时保留。",
-      "kind": "backups",
       "browse": true,
       "cleanup": false
     },
