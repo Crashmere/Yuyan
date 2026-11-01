@@ -11,9 +11,13 @@ if [[ $EUID -eq 0 && $# -eq 3 && ( $1 == portal || $1 == portal-check ) && $2 =~
   exec timeout 45 /opt/serverportal/bin/portal "$portal_action" --app yuyan --commit "$2" --sha256 "$3"
 fi
 
-if [[ $EUID -ne 0 || $# -ne 2 || ! $1 =~ ^[0-9a-f]{40}$ || ! $2 =~ ^[0-9a-f]{64}$ ]]; then echo 'Usage: deploy-release.sh <commit> <binary-sha256> < binary.gz' >&2; exit 64; fi
+if [[ $EUID -ne 0 || $# -lt 2 || $# -gt 3 || ! $1 =~ ^[0-9a-f]{40}$ || ! $2 =~ ^[0-9a-f]{64}$ ]]; then echo 'Usage: deploy-release.sh <commit> <binary-sha256> < binary.gz' >&2; exit 64; fi
 commit=$1
 expected=$2
+plan_token=${3:-}
+if [[ -n $plan_token && ( ! $plan_token =~ ^[A-Za-z0-9_-]+$ || ${#plan_token} -gt 4096 ) ]]; then
+  echo 'Invalid database protection plan.' >&2; exit 64
+fi
 app=/opt/yuyan
 nas=false
 upgrade=/opt/server-context/scripts/upgrade-state.py
@@ -23,6 +27,7 @@ if [[ -r /etc/server-maintenance-host && $(< /etc/server-maintenance-host) == na
   exec 8>/run/lock/server-maintenance.lock
   flock -s -n 8 || { printf 'A full backup or maintenance operation is running.\n' >&2; exit 75; }
 fi
+if [[ -n $plan_token && $nas != true ]]; then echo 'Database plans require the NAS release flow.' >&2; exit 64; fi
 exec 9>/run/lock/yuyan-deploy.lock
 flock -n 9 || { echo 'Another release is running.' >&2; exit 75; }
 test -f "$app/data/yuyan.db"
@@ -73,20 +78,22 @@ backup="$app/backups/before-deploy-$(basename "$release")"
 stopped=true
 systemctl stop yuyan
 if [[ $nas == true ]]; then
-  candidate_data=$(python3 "$upgrade" begin --app yuyan --release "$(basename "$release")")
+  candidate_data=$(python3 "$upgrade" begin --app yuyan --release "$(basename "$release")" --plan-token "$plan_token")
   backup="/var/lib/server-upgrades/yuyan/$(basename "$release")"
   runuser -u yuyan -- timeout 60 "$release/yuyan" check --data "$candidate_data"
 else
   runuser -u yuyan -- timeout 300 "$app/bin/yuyan" backup --data "$app/data" --out "$backup"
 fi
 # Uploaded executable always runs as the application identity.
-runuser -u yuyan -- timeout 60 "$release/yuyan" check --data "$app/data"
+if [[ $nas != true || $candidate_data != "$app/data" ]]; then
+  runuser -u yuyan -- timeout 60 "$release/yuyan" check --data "$app/data"
+fi
 install -m 0755 "$release/yuyan" "$app/bin/yuyan.next"
 replaced=true
 mv -f "$app/bin/yuyan.next" "$app/bin/yuyan"
 systemctl start yuyan
 wait_healthy
-if [[ $nas == true ]]; then
+if [[ $nas == true && -d $backup ]]; then
   systemctl stop yuyan
   python3 "$upgrade" verify --app yuyan --release "$(basename "$release")"
   systemctl start yuyan
