@@ -43,7 +43,7 @@ See DESIGN.md 12.6 for slash insertion-menu search: it shares pinyin matching wi
 
 See DESIGN.md 23.6 for foldable blocks and highlight blocks: collapsible heading/body cards without a background color, and content blocks with a choice of 10 soft background colors. Editing, reading, and HTML import/export share the format.
 
-Insert `日历` from the document insertion or slash menu to create an independent event calendar that saves with the document. Its compact title bar supports renaming and folding, and its continuous timeline supports year/month/day scales, annotations, overlapping events, undo/history, portable HTML-in-Markdown export, and compact clipboard strings with direct undoable import. Reading supports interactive browsing and a searchable event list. Calendars belong only to documents; the standalone page, APIs, and storage have been removed. See DESIGN.md section 27 and the corresponding VERIFICATION record.
+Insert `日历` from the document insertion or slash menu to create an independent event calendar that saves with the document. Its compact title bar supports renaming, folding, and an optional saved display range. The timeline supports year/month/day scales, annotations, overlapping events, undo/history, portable HTML-in-Markdown export, and compact clipboard strings with direct undoable import. Range limits affect only the timeline; every event remains in the searchable list. Reading supports interactive browsing. Calendars belong only to documents; the standalone page, APIs, and storage have been removed. See DESIGN.md section 27 and the corresponding VERIFICATION record.
 
 <a id="yuyan-doc-同步维护"></a>
 

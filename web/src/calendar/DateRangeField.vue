@@ -6,7 +6,7 @@ import { canonicalRange, parseCalendarDate, periodDurationLabel, todayDate, unit
 import type { CalendarPrecision } from '../schema/calendar'
 
 const picker = deferred(() => import('./DateRangePicker.vue'))
-const props = defineProps<{ start: string; end: string; precision: CalendarPrecision; workdaysOnly?: boolean }>()
+const props = defineProps<{ start: string; end: string; precision: CalendarPrecision; workdaysOnly?: boolean; precisionLabel?: string }>()
 const emit = defineEmits<{
   change: [value: { startDate: string; endDate: string; precision: CalendarPrecision }]
   invalid: [message: string]
@@ -148,7 +148,7 @@ onBeforeUnmount(() => { disposed = true; document.removeEventListener('pointerdo
 
 <template>
   <div ref="field" class="yy-date-field" @keydown="onKey">
-    <div class="yy-date-label"><span>日期范围</span><div class="yy-date-precision" aria-label="事件时间粒度" :style="{ '--precision-index': precisions.findIndex(item => item.value === precision) }"><button v-for="item in precisions" :key="item.value" type="button" :aria-pressed="precision === item.value" @click="setPrecision(item.value)">{{ item.label }}</button></div></div>
+    <div class="yy-date-label"><span>日期范围</span><div class="yy-date-precision" :aria-label="precisionLabel ?? '事件时间粒度'" :style="{ '--precision-index': precisions.findIndex(item => item.value === precision) }"><button v-for="item in precisions" :key="item.value" type="button" :aria-pressed="precision === item.value" @click="setPrecision(item.value)">{{ item.label }}</button></div></div>
     <div ref="reference" class="yy-date-range" :class="{ invalid: parsed.error }">
       <label :class="{ active: open && side === 'start' }"><span>开始</span><input v-model="startText" aria-label="开始日期" inputmode="numeric" spellcheck="false" :placeholder="precision === 'day' ? 'YYYY-MM-DD' : precision === 'month' ? 'YYYY-MM' : 'YYYY'" @click="show('start')" @input="inputDate" @blur="normalizeInput" /></label>
       <ArrowRight :size="15" />

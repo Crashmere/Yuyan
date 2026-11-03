@@ -1,4 +1,4 @@
-import type { CalendarEntry, CalendarPrecision } from '../schema/calendar'
+import type { CalendarDisplayRange, CalendarEntry, CalendarPrecision } from '../schema/calendar'
 
 export interface CalendarCell {
   start: string
@@ -74,15 +74,19 @@ export function addUnits(value: string, grain: CalendarPrecision, amount: number
   return formatCalendarDate(date)
 }
 
-export function windowCells(center: string, grain: CalendarPrecision, count = 96): CalendarCell[] {
+export function windowCells(center: string, grain: CalendarPrecision, count = 96, range?: CalendarDisplayRange | null): CalendarCell[] {
+  const first = unitBounds(range?.startDate ?? '1000-01-01', grain).start
+  const last = unitBounds(range?.endDate ?? '9999-12-31', grain).end
+  const span = periodSpan({ startDate: first, endDate: last }, grain)
+  count = Math.min(count, Math.round(span.end - span.start))
   const before = Math.floor(count / 2)
-  const latestStart = addUnits('9999-12-31', grain, 1 - count)
-  const start = [addUnits(center, grain, -before), '1000-01-01', latestStart].sort()[1]!
+  const latestStart = addUnits(last, grain, 1 - count)
+  const start = [addUnits(center, grain, -before), first, latestStart].sort()[1]!
   const today = todayDate()
   const cells: CalendarCell[] = []
   for (let index = 0; index < count; index++) {
     const value = addUnits(start, grain, index)
-    if (value.length > 10 || value > '9999-12-31') break
+    if (value.length > 10 || value > last) break
     const bounds = unitBounds(value, grain)
     const date = parseCalendarDate(bounds.start)
     let primary = ''

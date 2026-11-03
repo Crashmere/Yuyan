@@ -330,7 +330,7 @@ func (s *Server) apiMeta(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"schemaVersion": doc.SchemaVersion, "stats": stats, "features": []string{"drawing-v1", "calendar-v1"}, "drawingTool": map[string]any{"module": s.entries["drawing-tool"].JS, "css": s.entries["drawing-tool"].CSS}})
+	writeJSON(w, http.StatusOK, map[string]any{"schemaVersion": doc.SchemaVersion, "stats": stats, "features": []string{"drawing-v1", "calendar-v1", "calendar-display-range-v1"}, "drawingTool": map[string]any{"module": s.entries["drawing-tool"].JS, "css": s.entries["drawing-tool"].CSS}})
 	return nil
 }
 

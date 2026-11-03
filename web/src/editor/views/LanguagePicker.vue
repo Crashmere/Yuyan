@@ -4,6 +4,7 @@ import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka
 import { Check, ChevronDown } from 'lucide-vue-next'
 import { languageLabel, searchLanguages } from '../languages'
 import { containMenuWheel } from '../../ui/menuWheel'
+import { pointerMoved } from '../../shared/pointerSelection'
 
 // Picks a code block's language by typing part of its name or alias.
 const props = defineProps<{ value: string }>()
@@ -87,7 +88,7 @@ function onKey(e: KeyboardEvent) {
             role="option"
             :aria-selected="i === active"
             :class="{ active: i === active }"
-            @mouseenter="active = i"
+            @pointermove="pointerMoved($event) && (active = i)"
             @click="pick(l.id)"
           >
             <span>{{ l.label }}</span>

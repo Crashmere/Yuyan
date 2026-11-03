@@ -17,7 +17,7 @@ import {
   addDays, addUnits, adjustPeriod, assignPeriodLanes, canonicalRange, dateAtPosition, dayPosition, minPeriodWidth,
   parseCalendarDate, periodDays, periodDaysLabel, periodDurationLabel, periodGeometry, periodRangeLabel, periodSpan, todayDate, unitBounds, windowCells,
 } from './dates'
-import type { CalendarData, CalendarEntry, CalendarPrecision } from '../schema/calendar'
+import type { CalendarData, CalendarDisplayRange, CalendarEntry, CalendarPrecision } from '../schema/calendar'
 import { calendarCellWidths } from '../schema/calendar'
 
 const props = defineProps<{ model: CalendarData; readonly?: boolean; selected?: boolean }>()
@@ -37,6 +37,12 @@ const inspector = ref<HTMLElement | null>(null)
 const expanded = ref(false)
 const collapsed = ref(!!props.model.collapsed)
 const workdaysOnly = ref(!!props.model.workdaysOnly)
+const displayRange = ref<CalendarDisplayRange | null>(props.model.displayRange ? { ...props.model.displayRange } : null)
+const rangeInspector = ref<HTMLElement | null>(null)
+const rangeDraft = ref<(CalendarDisplayRange & { precision: CalendarPrecision }) | null>(null)
+const rangeBaseline = ref('')
+const displayRangeError = ref('')
+const rangeDirty = computed(() => !!rangeDraft.value && JSON.stringify(rangeDraft.value) !== rangeBaseline.value)
 const titleInput = ref<HTMLInputElement | null>(null)
 let collapsedAnchor = props.model.center || todayDate()
 async function toggleCollapsed() {
@@ -70,7 +76,7 @@ async function toggleExpanded(event?: MouseEvent) {
 }
 const calendarTitle = ref(props.model.title)
 function calendarData(): CalendarData {
-  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, workdaysOnly: workdaysOnly.value, cellWidth: savedCellWidth.value, width: savedWidth.value,
+  return { version: 1, title: calendarTitle.value, grain: grain.value, center: center.value, collapsed: collapsed.value, workdaysOnly: workdaysOnly.value, cellWidth: savedCellWidth.value, width: savedWidth.value, displayRange: displayRange.value ? { ...displayRange.value } : null,
     periods: periods.value.map(period => ({ ...period })) }
 }
 function publish() {
@@ -85,6 +91,46 @@ function toggleWorkdaysOnly() {
   if (props.readonly || dragging.value) return
   workdaysOnly.value = !workdaysOnly.value
   publish()
+}
+async function editDisplayRange() {
+  if (props.readonly || dragging.value || !await flush()) return
+  draft.value = null
+  const range = displayRange.value ?? (viewportWidth.value ? canonicalRange(visibleStart.value, visibleEnd.value, grain.value) : canonicalRange(center.value, center.value, grain.value))
+  rangeDraft.value = { ...range, precision: displayRange.value ? 'day' : grain.value }
+  rangeBaseline.value = JSON.stringify(rangeDraft.value)
+  displayRangeError.value = ''
+  await nextTick()
+  rangeInspector.value?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
+}
+function closeDisplayRange() {
+  rangeDraft.value = null
+  displayRangeError.value = ''
+  root.value?.querySelector<HTMLButtonElement>('.yy-calendar-range-toggle')?.focus({ preventScroll: true })
+}
+function applyDisplayRange(unlimited = false): boolean {
+  if (props.readonly || (!unlimited && (!rangeDraft.value || displayRangeError.value))) {
+    if (displayRangeError.value) toast(displayRangeError.value, 'error')
+    return false
+  }
+  const anchor = viewportDate()
+  displayRange.value = unlimited ? null : { startDate: rangeDraft.value!.startDate, endDate: rangeDraft.value!.endDate }
+  publish()
+  closeDisplayRange()
+  if (displayRange.value) void startDisplayRange()
+  else void centerTimeline(anchor)
+  return true
+}
+async function startDisplayRange() {
+  if (!displayRange.value) return
+  initialPositionPending = true
+  await nextTick()
+  if (disposed || !displayRange.value) return
+  axisCenter.value = displayRange.value.startDate
+  await nextTick()
+  if (disposed || !timelineScroll.value?.clientWidth) return
+  timelineScroll.value.scrollLeft = 0
+  syncViewport()
+  initialPositionPending = false
 }
 function dayCountLabel(period: Pick<CalendarEntry, 'startDate' | 'endDate'>) {
   return periodDaysLabel(period, workdaysOnly.value)
@@ -142,10 +188,12 @@ async function importCalendar() {
       center.value = data.center || todayDate()
       collapsed.value = !!data.collapsed
       workdaysOnly.value = !!data.workdaysOnly
+      displayRange.value = data.displayRange ? { ...data.displayRange } : null
       periods.value = data.periods.map(p => ({ ...p }))
       draft.value = null
       emit('change', data)
-      await centerTimeline()
+      if (displayRange.value) await startDisplayRange()
+      else await centerTimeline()
       if (!disposed) toast(`已导入 ${data.periods.length} 个事件，可撤销恢复原日历`, 'success')
       return
     }
@@ -162,13 +210,21 @@ function syncModel() {
   center.value = props.model.center || todayDate()
   collapsed.value = !!props.model.collapsed
   workdaysOnly.value = !!props.model.workdaysOnly
+  displayRange.value = props.model.displayRange ? { ...props.model.displayRange } : null
   periods.value = props.model.periods.map(p => ({ ...p }))
 }
 watch(() => props.model, () => {
   const previous = JSON.stringify(periods.value)
+  const previousRange = JSON.stringify(displayRange.value)
   syncModel()
   // Undo or external document updates replace the event draft as well.
   if (previous !== JSON.stringify(props.model.periods)) draft.value = null
+  if (previousRange !== JSON.stringify(displayRange.value)) {
+    rangeDraft.value = null
+    displayRangeError.value = ''
+    if (displayRange.value) void startDisplayRange()
+    else void centerTimeline()
+  }
 })
 
 const grains: { value: CalendarPrecision; label: string }[] = [
@@ -221,7 +277,9 @@ const zoomWidth = ref(savedCellWidth.value ?? calendarCellWidths[grain.value].de
 const unitWidth = computed(() => zoomWidth.value)
 const canZoomOut = computed(() => zoomWidth.value > calendarCellWidths[grain.value].min + .5)
 const canZoomIn = computed(() => zoomWidth.value < calendarCellWidths[grain.value].max - .5)
-const cells = computed(() => windowCells(axisCenter.value, grain.value, 192))
+const axisStart = computed(() => unitBounds(displayRange.value?.startDate ?? '1000-01-01', grain.value).start)
+const axisEnd = computed(() => unitBounds(displayRange.value?.endDate ?? '9999-12-31', grain.value).end)
+const cells = computed(() => windowCells(axisCenter.value, grain.value, 192, displayRange.value))
 const cellWidth = computed(() => axisWidth.value / cells.value.length || unitWidth.value)
 const visibleStart = computed(() => dateAtPosition(scrollLeft.value / cellWidth.value, cells.value))
 const visibleEnd = computed(() => dateAtPosition((scrollLeft.value + viewportWidth.value - 1) / cellWidth.value, cells.value))
@@ -241,12 +299,12 @@ const currentCount = computed(() => periods.value.filter(p => p.startDate <= tod
 // Nearest event fully outside the current viewport, used by the edge jump arrows.
 const nearestBefore = computed(() => {
   let best: CalendarEntry | null = null
-  for (const period of periods.value) if (period.endDate < visibleStart.value && (!best || period.endDate > best.endDate)) best = period
+  for (const period of periods.value) if (period.endDate >= axisStart.value && period.endDate < visibleStart.value && (!best || period.endDate > best.endDate)) best = period
   return best
 })
 const nearestAfter = computed(() => {
   let best: CalendarEntry | null = null
-  for (const period of periods.value) if (period.startDate > visibleEnd.value && (!best || period.startDate < best.startDate)) best = period
+  for (const period of periods.value) if (period.startDate <= axisEnd.value && period.startDate > visibleEnd.value && (!best || period.startDate < best.startDate)) best = period
   return best
 })
 
@@ -286,7 +344,7 @@ function textWidth(text: string, font: string) {
 }
 const savedTitles = computed(() => new Map(periods.value.map(period => [period.id, period.title])))
 const periodLabels = computed(() => {
-  const unit = unitWidth.value
+  const unit = cellWidth.value
   const minimum = Math.max(9, minPeriodWidth / 100 * timelineMinWidth.value)
   const labels = new Map<number, { outside: boolean; duration: boolean; start: number; end: number }>()
   for (const period of renderedPeriods.value) {
@@ -514,8 +572,8 @@ async function scrollTimeline() {
   if (barGesture?.moved) updateBar(edgeX)
   if (createGesture) updateCreate(edgeX)
   const buffer = Math.max(viewportWidth.value * 2, unitWidth.value * 48)
-  const left = element.scrollLeft < buffer && cells.value[0].start > '1000-01-01'
-  const right = element.scrollWidth - element.clientWidth - element.scrollLeft < buffer && cells.value.at(-1)!.end < '9999-12-31'
+  const left = element.scrollLeft < buffer && cells.value[0].start > axisStart.value
+  const right = element.scrollWidth - element.clientWidth - element.scrollLeft < buffer && cells.value.at(-1)!.end < axisEnd.value
   if (!left && !right) return
   rebasing = true
   selectionMotionPaused.value = true
@@ -649,6 +707,7 @@ async function centerTimeline(date = center.value) {
 
 let initialPositionPending = true
 async function initializeTimeline() {
+  if (displayRange.value) { await startDisplayRange(); return }
   const latest = props.readonly ? periods.value.reduce<CalendarEntry | null>((last, period) =>
     !last || period.endDate > last.endDate || (period.endDate === last.endDate && period.startDate > last.startDate) ? period : last, null) : null
   const date = latest?.endDate ?? center.value
@@ -851,6 +910,11 @@ function endBar(event: PointerEvent) {
 
 function onKey(event: KeyboardEvent) {
   event.stopPropagation()
+  if (rangeDraft.value && !event.defaultPrevented && !event.isComposing) {
+    if (event.key === 'Escape') { event.preventDefault(); closeDisplayRange() }
+    else if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') { event.preventDefault(); applyDisplayRange() }
+    return
+  }
   if (event.key === 'Escape' && widthGesture.value) { event.preventDefault(); widthGesture.value.cancel(); return }
   if (event.key === 'Escape' && (barGesture || createGesture)) {
     event.preventDefault()
@@ -1019,6 +1083,15 @@ function locate(value: string) {
 }
 async function flush(): Promise<boolean> {
   renameCalendar()
+  if (!props.readonly && rangeDraft.value) {
+    if (displayRangeError.value) {
+      toast(`日历显示范围未完成：${displayRangeError.value}`, 'error')
+      rangeInspector.value?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
+      return false
+    }
+    if (rangeDirty.value) applyDisplayRange()
+    else closeDisplayRange()
+  }
   if ((!draftDirty.value && !dateInputError.value) || props.readonly) return true
   if (rangeError.value) {
     showValidation.value = true
@@ -1039,7 +1112,7 @@ async function revealMatch(query: string): Promise<HTMLElement | null> {
   if (period) await locateEvent(period)
   return root.value?.querySelector<HTMLElement>('.yy-calendar-list-text') ?? root.value
 }
-defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value || calendarTitle.value !== props.model.title, revealMatch })
+defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value || rangeDirty.value || !!displayRangeError.value || calendarTitle.value !== props.model.title, revealMatch })
 </script>
 
 <template>
@@ -1063,13 +1136,14 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
           </div>
         </div>
+        <button v-if="!readonly" type="button" class="yy-btn small yy-calendar-range-toggle" :class="{ active: displayRange }" :aria-expanded="!!rangeDraft" aria-label="设置日历显示范围" @click="editDisplayRange">显示范围</button>
         <button v-if="!readonly" type="button" class="yy-btn small yy-calendar-workdays" :class="{ active: workdaysOnly }" :aria-pressed="workdaysOnly" data-tip="天数仅统计周一至周五，周末不计入" @click="toggleWorkdaysOnly"><Check v-if="workdaysOnly" :size="14" />仅统计工作日</button>
         <template v-if="!collapsed">
           <div class="yy-calendar-zoom" aria-label="格宽缩放">
             <IconButton label="缩小格宽" :disabled="!canZoomOut" @click="zoomBy(1 / 1.25)"><ZoomOut :size="16" /></IconButton>
             <IconButton label="扩大格宽" :disabled="!canZoomIn" @click="zoomBy(1.25)"><ZoomIn :size="16" /></IconButton>
           </div>
-          <button type="button" class="yy-btn small" @click="locate(todayDate())">今天</button>
+          <button type="button" class="yy-btn small" :disabled="today < axisStart || today > axisEnd" @click="locate(todayDate())">今天</button>
           <IconButton label="事件列表" class="yy-calendar-list-toggle" :class="{ active: showList }" :aria-expanded="showList" @click="showList = !showList"><ListFilter :size="16" /></IconButton>
         </template>
         <IconButton label="复制日历" :disabled="transferring" @click="copyCalendar"><Copy :size="16" /></IconButton>
@@ -1173,6 +1247,24 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   </section>
   </Teleport>
   <Teleport to="body">
+    <Transition name="yy-calendar-window">
+    <div v-if="rangeDraft" class="yy-calendar-inspector-layer" @pointerdown.self="closeDisplayRange" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
+      <aside ref="rangeInspector" class="yy-calendar-inspector" role="dialog" aria-modal="true" aria-label="日历显示范围" tabindex="-1" @keydown="onKey" @pointerdown.stop>
+        <div class="yy-calendar-inspector-head"><strong>显示时间范围</strong><IconButton label="关闭显示范围" @click="closeDisplayRange"><X :size="17" /></IconButton></div>
+        <div class="yy-calendar-inspector-body">
+          <DateRangeField :start="rangeDraft.startDate" :end="rangeDraft.endDate" :precision="rangeDraft.precision" precision-label="显示范围精度" @change="rangeDraft = $event" @invalid="displayRangeError = $event" @key="onKey" />
+          <p class="yy-calendar-range-hint">时间轴只展示所选范围，按展示维度包含完整的起止年、月或日。范围外事件仍保留在事件列表中。</p>
+        </div>
+        <div class="yy-calendar-inspector-actions">
+          <button type="button" class="yy-btn" @click="applyDisplayRange(true)">不限范围</button>
+          <span class="yy-spacer"></span>
+          <button type="button" class="yy-btn" @click="closeDisplayRange">取消</button>
+          <button type="button" class="yy-btn primary" :disabled="!!displayRangeError" @click="applyDisplayRange()"><Save :size="15" />应用</button>
+        </div>
+        <p class="yy-calendar-shortcut">⌘/Ctrl + Enter 应用</p>
+      </aside>
+    </div>
+    </Transition>
     <Transition name="yy-calendar-window">
     <div v-if="draft && !dragging" class="yy-calendar-inspector-layer" :class="{ docked: wideViewport && !readonly }" @pointerdown.self="closeDraft()" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
       <aside v-if="readonly" ref="inspector" class="yy-calendar-inspector yy-calendar-details" role="dialog" aria-modal="true" aria-label="事件详情" tabindex="-1" @keydown="onKey" @pointerdown.stop>
@@ -1355,6 +1447,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-field > span { display: flex; justify-content: space-between; color: var(--yy-text-2); font-size: 12px; }
 .yy-calendar-field > span small { color: var(--yy-text-4); font-weight: 400; }
 .yy-calendar-field-error { margin: 5px 0 0; color: var(--yy-danger); font-size: 11px; }
+.yy-calendar-range-hint { margin: 14px 0 0; color: var(--yy-text-3); font-size: 11px; }
 .yy-calendar-colors { display: flex; flex-wrap: wrap; gap: 8px; }
 .yy-calendar-colors button { --period: #00a66a; display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--period); color: #fff; cursor: pointer; }
 .yy-calendar-colors button.active { border-color: var(--yy-bg); box-shadow: 0 0 0 2px var(--period); }

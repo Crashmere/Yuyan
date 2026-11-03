@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { SlashEntry } from './slash'
+import { pointerMoved } from '../shared/pointerSelection'
 
 const props = defineProps<{ items: SlashEntry[]; command: (item: SlashEntry) => void }>()
 const selected = ref(0)
@@ -49,7 +50,7 @@ defineExpose({ onKeyDown })
           :aria-selected="row.index === selected"
           :class="{ active: row.index === selected }"
           @mousedown.prevent="choose(row.index)"
-          @mouseenter="selected = row.index"
+          @pointermove="pointerMoved($event) && (selected = row.index)"
         >
           <span class="yy-slash-icon"><component :is="row.item.icon" :size="17" /></span>
           <span class="yy-slash-text">

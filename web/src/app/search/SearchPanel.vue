@@ -9,6 +9,7 @@ import { loadBooks } from '../store'
 import { parts } from './highlight'
 import { score, units, type Units } from '../../shared/searchMatch'
 import { searchOpen } from './panel'
+import { pointerMoved } from '../../shared/pointerSelection'
 
 // Opened with Cmd/Ctrl+K or the sidebar's search button. Before typing it lists recent documents;
 // then knowledge bases and documents whose name matches, also by pinyin, at once, and full-text
@@ -201,7 +202,7 @@ function onKey(e: KeyboardEvent) {
               :class="{ active: offsets[si] + k === active }"
               :aria-selected="offsets[si] + k === active"
               :data-index="offsets[si] + k"
-              @mouseenter="active = offsets[si] + k"
+              @pointermove="pointerMoved($event) && (active = offsets[si] + k)"
               @click="go(it)"
             >
               <component :is="it.icon" :size="16" />

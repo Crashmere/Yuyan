@@ -28,6 +28,7 @@ function chooseLink(choice: LinkChoice) {
 }
 const panel = ref<HTMLElement | null>(null)
 const first = ref<HTMLInputElement | null>(null)
+const linkInput = ref<HTMLInputElement | null>(null)
 let unplace = () => {}
 let unoutside = () => {}
 let closed = false
@@ -70,6 +71,15 @@ function remove() {
 
 function onKeydown(e: KeyboardEvent) {
   if (e.isComposing) return
+  if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey && props.withText && !internal.value) {
+    if (e.target === first.value || e.target === linkInput.value) {
+      e.preventDefault()
+      e.stopPropagation()
+      const next = e.target === first.value ? linkInput.value : first.value
+      next?.focus({ preventScroll: true })
+      return
+    }
+  }
   if (internal.value && picker.value?.onKeyDown(e)) { e.preventDefault(); e.stopPropagation(); return }
   if (e.key === 'Enter') {
     e.preventDefault()
@@ -93,8 +103,9 @@ onMounted(async () => {
   })
   unoutside = onOutside(() => panel.value, () => close(false))
   await nextTick()
-  first.value?.focus()
-  first.value?.select()
+  const initial = !internal.value && !props.withText ? linkInput.value : first.value
+  initial?.focus()
+  initial?.select()
 })
 onBeforeUnmount(() => {
   unplace()
@@ -115,11 +126,11 @@ onBeforeUnmount(() => {
     <template v-else>
     <label v-if="withText" class="yy-float-field">
       <span>文字</span>
-      <input ref="first" v-model="text" class="yy-input" placeholder="显示的文字" />
+      <input ref="first" v-model="text" class="yy-input" placeholder="显示的文字" data-tab-cycle />
     </label>
     <label class="yy-float-field">
       <span>链接</span>
-      <input :ref="withText ? undefined : (el) => (first = el as HTMLInputElement)" v-model="url" class="yy-input" placeholder="粘贴或输入链接地址" />
+      <input ref="linkInput" v-model="url" class="yy-input" placeholder="粘贴或输入链接地址" :data-tab-cycle="withText ? '' : null" />
     </label>
     <div class="yy-float-actions">
       <button v-if="href" type="button" class="yy-btn small danger-text" @mousedown.prevent @click="remove">移除链接</button>

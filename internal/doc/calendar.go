@@ -26,7 +26,13 @@ type Calendar struct {
 	WorkdaysOnly bool             `json:"workdaysOnly,omitempty"`
 	CellWidth    *float64         `json:"cellWidth,omitempty"`
 	Width        *int             `json:"width,omitempty"`
+	DisplayRange *CalendarRange   `json:"displayRange,omitempty"`
 	Periods      []CalendarPeriod `json:"periods"`
+}
+
+type CalendarRange struct {
+	StartDate string `json:"startDate"`
+	EndDate   string `json:"endDate"`
 }
 
 func CalendarData(n Node) (Calendar, error) {
@@ -86,6 +92,13 @@ func CalendarData(n Node) (Calendar, error) {
 	}
 	if c.Width != nil && (*c.Width < 280 || *c.Width > 10000) {
 		return c, invalid
+	}
+	if c.DisplayRange != nil {
+		_, validStart := date(c.DisplayRange.StartDate)
+		_, validEnd := date(c.DisplayRange.EndDate)
+		if !validStart || !validEnd || c.DisplayRange.StartDate > c.DisplayRange.EndDate {
+			return c, invalid
+		}
 	}
 	ids := make(map[int64]bool)
 	for _, p := range c.Periods {

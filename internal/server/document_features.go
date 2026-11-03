@@ -9,7 +9,7 @@ import (
 	"github.com/Crashmere/Yuyan/internal/doc"
 )
 
-// Old tabs can drop unknown atomic nodes while parsing. Check the current stored body,
+// Old tabs can drop unknown nodes or attributes while parsing. Check the current stored body,
 // not the submitted body, so omitting a component cannot bypass this protection.
 func requireDocumentClient(r *http.Request, n doc.Node) error {
 	features := strings.FieldsFunc(r.Header.Get("X-Yuyan-Features"), func(c rune) bool { return c == ',' || c == ' ' })
@@ -21,6 +21,9 @@ func requireDocumentClient(r *http.Request, n doc.Node) error {
 			feature, label = "drawing-v1", "画板"
 		case "calendar":
 			feature, label = "calendar-v1", "日历组件"
+			if n.Attrs["displayRange"] != nil && !slices.Contains(features, "calendar-display-range-v1") {
+				return fmt.Errorf("%w: 文档包含日历显示范围，请刷新页面或更新 yuyan-doc 后再保存", errBadRequest)
+			}
 		}
 		if feature != "" && !slices.Contains(features, feature) {
 			return fmt.Errorf("%w: 文档包含%s，请刷新页面或更新 yuyan-doc 后再保存", errBadRequest, label)

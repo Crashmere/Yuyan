@@ -12,6 +12,10 @@ export interface CalendarEntry {
   precision: CalendarPrecision
   color: string
 }
+export interface CalendarDisplayRange {
+  startDate: string
+  endDate: string
+}
 export interface CalendarData {
   version: number
   title: string
@@ -21,9 +25,10 @@ export interface CalendarData {
   workdaysOnly?: boolean
   cellWidth?: number | null
   width?: number | null
+  displayRange?: CalendarDisplayRange | null
   periods: CalendarEntry[]
 }
-export const calendarDefaults: CalendarData = { version: 1, title: '日历', grain: 'month', center: '', collapsed: false, workdaysOnly: false, cellWidth: null, width: null, periods: [] }
+export const calendarDefaults: CalendarData = { version: 1, title: '日历', grain: 'month', center: '', collapsed: false, workdaysOnly: false, cellWidth: null, width: null, displayRange: null, periods: [] }
 export const calendarCellWidths: Record<CalendarPrecision, { default: number; min: number; max: number }> = {
   year: { default: 88, min: 56, max: 240 },
   month: { default: 80, min: 48, max: 220 },
@@ -42,6 +47,7 @@ export function validCalendar(value: unknown): value is CalendarData {
   if (a.workdaysOnly !== undefined && typeof a.workdaysOnly !== 'boolean') return false
   if (a.cellWidth != null && (typeof a.cellWidth !== 'number' || !Number.isFinite(a.cellWidth) || a.cellWidth < calendarCellWidths[a.grain].min || a.cellWidth > calendarCellWidths[a.grain].max)) return false
   if (a.width != null && (!Number.isInteger(a.width) || a.width < 280 || a.width > 10000)) return false
+  if (a.displayRange != null && (!date(a.displayRange.startDate) || !date(a.displayRange.endDate) || a.displayRange.startDate > a.displayRange.endDate)) return false
   const ids = new Set<number>()
   return a.periods.every(p => {
     if (!p || !Number.isSafeInteger(p.id) || p.id < 1 || ids.has(p.id) || typeof p.title !== 'string' || !p.title.trim() || [...p.title].length > 120 || typeof p.note !== 'string' || [...p.note].length > 2000 || !date(p.startDate) || !date(p.endDate) || p.startDate > p.endDate || !grains.includes(p.precision) || !colors.includes(p.color)) return false

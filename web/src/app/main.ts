@@ -9,8 +9,10 @@ import { installTooltips } from '../ui/tooltip'
 import { installModuleLoadRecovery } from '../shared/moduleLoad'
 import { prefetchDeferred } from '../shared/deferred'
 import { installTabPolicy } from '../shared/tabKey'
+import { installPointerSelection } from '../shared/pointerSelection'
 
 installTabPolicy()
+installPointerSelection()
 installModuleLoadRecovery()
 applyPrefs()
 installTooltips()

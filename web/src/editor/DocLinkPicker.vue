@@ -11,6 +11,7 @@ import { ChevronDown, FileText, Hash } from 'lucide-vue-next'
 import { api, errorMessage } from '../shared/api'
 import { linkChoices, type LinkChoice, type LinkTarget } from '../shared/internalLinks'
 import { setupLinkPreviews } from '../shared/linkPreview'
+import { pointerMoved } from '../shared/pointerSelection'
 
 const props = defineProps<{ query: string; command: (choice: LinkChoice) => void }>()
 const docs = ref<LinkTarget[]>(lastTargets ?? []), failure = ref(''), busy = ref(!lastTargets), selected = ref(0), expanded = ref<number | null>(null)
@@ -47,7 +48,7 @@ defineExpose({ onKeyDown: handleKey })
   <div ref="root" class="yy-doc-link-picker" role="listbox" aria-label="选择文档或章节">
     <div class="yy-picker-hint">文档与章节 · 支持拼音和首字母</div>
     <p v-if="busy || failure || !items.length" class="yy-picker-empty">{{ busy ? '正在加载…' : failure || '没有匹配的文档或章节' }}</p>
-    <div v-for="(item, index) in items" :key="item.href" class="yy-doc-link-row" :class="{ active: index === selected }" :data-index="index" @mouseenter="selected = index">
+    <div v-for="(item, index) in items" :key="item.href" class="yy-doc-link-row" :class="{ active: index === selected }" :data-index="index" @pointermove="pointerMoved($event) && (selected = index)">
       <button type="button" role="option" :aria-selected="index === selected" :data-preview-href="item.href" @mousedown.prevent @click="command(item)">
         <component :is="item.heading ? Hash : FileText" :size="16" />
         <span><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></span>
