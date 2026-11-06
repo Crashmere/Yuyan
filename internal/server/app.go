@@ -193,9 +193,9 @@ func (s *Server) appPage(rt route) http.HandlerFunc {
 			title = "找不到内容"
 		}
 		if title == "" {
-			title = "语燕"
+			title = "Yuyan"
 		} else {
-			title += " - 语燕"
+			title += " - Yuyan"
 		}
 		initial, err := marshalJSON(p)
 		if err != nil {

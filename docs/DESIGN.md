@@ -1,4 +1,4 @@
-# Yuyan (语燕) Design Discussion Draft
+# Yuyan Design Discussion Draft
 
 Updated: 2026-10-13
 
@@ -10,7 +10,7 @@ Project direction changed on 2026-09-26: Obsidian is no longer the starting poin
 
 ## 1. Project Positioning and Current Scope
 
-Yuyan (语燕, a name modeled after 语雀/Yuque) is a single-user web knowledge base. The authorized migration places one application/data instance on NAS, reached directly through LAN local-CA HTTPS 443 and through VPS public HTTPS 8443; compatibility ALI HTTPS 443 forwards to the same state. The [shared inventory](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md) records the actual cutover phase. Writing, editing, and reading all take place in the browser, using the subset of Yuque's web features suitable for one person.
+Yuyan is a single-user web knowledge base. The authorized migration places one application/data instance on NAS, reached directly through LAN local-CA HTTPS 443 and through VPS public HTTPS 8443; compatibility ALI HTTPS 443 forwards to the same state. The [shared inventory](https://github.com/Crashmere/agent-config/blob/main/skills/server-operations/references/current-state.md) records the actual cutover phase. Writing, editing, and reading all take place in the browser, using the subset of Yuque's web features suitable for one person.
 
 - Yuyan stores its content independently and does not depend on Obsidian. Obsidian remains the user's personal note-taking tool, maintained by the user as a single local vault synchronized through GitHub; the only relationship between the two is import and export.
 - The existing `Crashmere/ObsidianRepository` remains the user's note-synchronization repository. The previous plan to rename and archive it has been canceled.

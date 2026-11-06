@@ -18,7 +18,7 @@ const bookId = computed(() => (route.meta.sidebar === 'book' ? state.bookId : nu
 <template>
   <div class="yy-sidebar-inner">
     <div class="yy-sidebar-head">
-      <RouterLink to="/" class="yy-brand"><span class="yy-brand-mark"><Bird :size="16" /></span>语燕</RouterLink>
+      <RouterLink to="/" class="yy-brand"><span class="yy-brand-mark"><Bird :size="16" /></span>Yuyan</RouterLink>
       <IconButton :label="withKey('搜索', 'Mod-K')" @click="openSearch()"><Search :size="17" /></IconButton>
       <IconButton class="yy-collapse-btn" label="收起侧栏" @click="prefs.sidebarCollapsed = true"><PanelLeftClose :size="17" /></IconButton>
     </div>

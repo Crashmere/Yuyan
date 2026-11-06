@@ -83,5 +83,5 @@ router.onError((error: Error, to) => {
 })
 
 export function setTitle(title?: string) {
-  document.title = title ? `${title} - 语燕` : '语燕'
+  document.title = title ? `${title} - Yuyan` : 'Yuyan'
 }
