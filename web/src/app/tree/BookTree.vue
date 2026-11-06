@@ -18,7 +18,11 @@ const expanded = reactive(loadExpanded(props.bookId))
 const selection = useTreeSelection(() => props.nodes, (id) => expanded.has(id))
 const { active: selecting, selectedNodes, roots: selectedRoots, allState: selectionState } = selection
 const renaming = ref<number | null>(null)
-const drag = reactive({ id: null as number | null, overId: null as number | null, position: null as DropPosition | null })
+const moving = ref(false)
+const busy = computed(() => !!props.busy || moving.value)
+const drag = reactive({ id: null as number | null, ids: [] as number[], overId: null as number | null, position: null as DropPosition | null })
+let draggedRoots: TreeNode[] = []
+let batchDrag = false
 const dropAtEnd = ref(false)
 let expandTimer: ReturnType<typeof setTimeout> | undefined
 let stopDragScroll: (() => void) | undefined
@@ -69,7 +73,8 @@ async function locateCurrent(center = true) {
 }
 function startSelecting() { renaming.value = null; reset(); selecting.value = true }
 defineExpose({ hasBranches, hasExpanded, toggleAll, canLocate, locateCurrent, selecting, selectedNodes, selectedRoots,
-  selectionState, startSelecting, exitSelecting: selection.exit, selectAll: selection.selectAll, clearSelection: () => selection.selected.clear() })
+  selectionState, moving, startSelecting, exitSelecting: selection.exit, selectAll: selection.selectAll, clearSelection: () => selection.selected.clear() })
+watch(selecting, reset)
 
 // Opening a document expands the path to it and scrolls its row into view.
 watch(
@@ -90,8 +95,8 @@ async function finishRename(node: TreeNode, title: string | null) {
   }
 }
 
-function dragged(): TreeNode | null {
-  return drag.id == null ? null : (store.locate(props.bookId, drag.id)?.node ?? null)
+function canDrop(node: TreeNode): boolean {
+  return drag.id != null && !busy.value && !draggedRoots.some((n) => store.contains(n, node.id))
 }
 
 function positionOf(row: Element, clientY: number): DropPosition {
@@ -112,6 +117,9 @@ function reset() {
   stopDragScroll = undefined
   clearDrop()
   drag.id = null
+  drag.ids = []
+  draggedRoots = []
+  batchDrag = false
 }
 onBeforeUnmount(reset)
 
@@ -120,8 +128,7 @@ function leaveTree(e: DragEvent) {
 }
 
 function overNode(node: TreeNode, position: DropPosition) {
-  const d = dragged()
-  if (!d || store.contains(d, node.id)) { clearDrop(); return }
+  if (!canDrop(node)) { clearDrop(); return }
   if (drag.overId === node.id && drag.position === position) return
   clearDrop()
   drag.overId = node.id
@@ -140,32 +147,41 @@ function locateDrop(x: number, y: number) {
   if (el?.closest('.yy-tree-end') === root.value?.nextElementSibling) dropAtEnd.value = true
 }
 
-// target works out where a drop puts the dragged node; the index counts siblings without it.
-function target(node: TreeNode, position: DropPosition, dragId: number): { parentId: number | null; index: number } {
+// The destination index counts siblings after removing every moving root.
+function target(node: TreeNode, position: DropPosition, roots: TreeNode[]): { parentId: number | null; index: number } {
+  const ids = new Set(roots.map((n) => n.id))
   // Below an expanded node with children the drop line sits above its first child.
   if (dropsIntoNode(node, position, expanded.has(node.id))) {
-    const kids = (node.children ?? []).filter((c) => c.id !== dragId)
+    const kids = (node.children ?? []).filter((c) => !ids.has(c.id))
     return { parentId: node.id, index: position === 'inside' ? kids.length : 0 }
   }
   const found = store.locate(props.bookId, node.id)!
-  const siblings = found.siblings.filter((s) => s.id !== dragId)
+  const siblings = found.siblings.filter((s) => !ids.has(s.id))
   const i = siblings.findIndex((s) => s.id === node.id)
   return { parentId: found.parent?.id ?? null, index: position === 'before' ? i : i + 1 }
 }
 
-async function move(d: TreeNode, to: { parentId: number | null; index: number }) {
-  const from = store.locate(props.bookId, d.id)!
-  if ((from.parent?.id ?? null) === to.parentId && from.siblings.indexOf(d) === to.index) return
+async function move(roots: TreeNode[], ids: number[], batch: boolean, to: { parentId: number | null; index: number }) {
+  const siblings = to.parentId == null ? props.nodes : store.locate(props.bookId, to.parentId)?.node.children ?? []
+  const rootIds = roots.map((n) => n.id)
+  const order = siblings.filter((n) => !rootIds.includes(n.id)).map((n) => n.id)
+  order.splice(to.index, 0, ...rootIds)
+  if (roots.every((n) => n.parentId === to.parentId) && order.length === siblings.length && order.every((id, i) => id === siblings[i].id)) return
+  moving.value = true
   try {
-    await store.moveDoc(d.id, props.bookId, { bookId: props.bookId, ...to })
+    if (batch) {
+      const result = await store.batchDocs(props.bookId, ids, 'move', { bookId: props.bookId, ...to })
+      selection.selected.clear()
+      toast(`已移动 ${ids.length} 项${result.refreshed ? '' : '，请刷新页面以更新目录'}`, 'success')
+    } else await store.moveDoc(roots[0].id, props.bookId, { bookId: props.bookId, ...to })
     if (to.parentId != null) toggle(to.parentId, true)
   } catch (err) {
     toast(`移动失败：${errorMessage(err)}`, 'error')
-  }
+  } finally { moving.value = false }
 }
 
 function overEnd(e: DragEvent) {
-  if (!dragged() || selecting.value) return
+  if (drag.id == null || busy.value) return
   e.preventDefault()
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
   clearDrop()
@@ -173,12 +189,13 @@ function overEnd(e: DragEvent) {
 }
 
 async function dropEnd(e: DragEvent) {
-  const d = dragged()
+  const roots = draggedRoots, ids = [...drag.ids], batch = batchDrag
   const atEnd = dropAtEnd.value
+  const index = props.nodes.filter((n) => !roots.some((r) => r.id === n.id)).length
   reset()
-  if (!d || !atEnd) return
+  if (!roots.length || !atEnd || busy.value) return
   e.preventDefault()
-  await move(d, { parentId: null, index: props.nodes.filter((n) => n.id !== d.id).length })
+  await move(roots, ids, batch, { parentId: null, index })
 }
 
 provide(treeKey, {
@@ -188,37 +205,40 @@ provide(treeKey, {
   toggle,
   selecting: () => selecting.value,
   selectionState: selection.state,
-  select: (node, range) => { if (!props.busy) selection.toggle(node, range) },
-  busy: () => !!props.busy,
+  select: (node, range) => { if (!busy.value) selection.toggle(node, range) },
+  busy: () => busy.value,
   renaming,
   finishRename,
   menu: (node) => nodeMenu(props.bookId, node, { rename: () => (renaming.value = node.id) }),
   drag,
   onDragStart(node, e) {
-    if (selecting.value) { e.preventDefault(); return }
+    if (busy.value || (selecting.value && selection.state(node) !== true)) { e.preventDefault(); return }
     reset()
     drag.id = node.id
+    batchDrag = selecting.value
+    drag.ids = (batchDrag ? selectedNodes.value : [node]).map((n) => n.id)
+    draggedRoots = batchDrag ? [...selectedRoots.value] : [node]
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('text/plain', node.title)
+      e.dataTransfer.setData('text/plain', draggedRoots.map((n) => n.title).join('\n'))
     }
     const scroller = root.value?.closest<HTMLElement>('.yy-tree-scroll')
     if (scroller) stopDragScroll = dragScroll(scroller, locateDrop)
   },
   onDragOver(node, e) {
-    const d = dragged()
-    if (!d || store.contains(d, node.id)) { clearDrop(); return }
+    if (!canDrop(node)) { clearDrop(); return }
     e.preventDefault()
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
     overNode(node, positionOf(e.currentTarget as Element, e.clientY))
   },
   async onDrop(node, e) {
     e.preventDefault()
-    const d = dragged()
+    const roots = draggedRoots, ids = [...drag.ids], batch = batchDrag
     const position = positionOf(e.currentTarget as Element, e.clientY)
+    const to = canDrop(node) ? target(node, position, roots) : null
     reset()
-    if (!d || !position || store.contains(d, node.id)) return
-    await move(d, target(node, position, d.id))
+    if (!to) return
+    await move(roots, ids, batch, to)
   },
   onDragEnd: reset,
 })
@@ -229,8 +249,8 @@ provide(treeKey, {
     <TreeItem v-for="n in nodes" :key="n.id" :node="n" :depth="0" />
   </ul>
   <p v-else class="yy-tree-empty">还没有文档</p>
-  <div v-if="nodes.length && !selecting" class="yy-tree-end" :class="{ 'drop-end': dropAtEnd }" aria-hidden="true"
-    @dragover="overEnd" @drop="dropEnd" @dragleave="clearDrop">
+  <div v-if="nodes.length" class="yy-tree-end" :class="{ 'drop-end': dropAtEnd }" aria-hidden="true"
+    @dragenter="overEnd" @dragover="overEnd" @drop="dropEnd" @dragleave="clearDrop">
     <span v-if="drag.id !== null">放到最顶层末尾</span>
   </div>
 </template>

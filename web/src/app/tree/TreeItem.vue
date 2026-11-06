@@ -56,12 +56,13 @@ function onTitleClick(e: MouseEvent) {
     <ContextActions :items="items" :disabled="selecting" @open="(v) => (contextOpen = v)">
       <div
         class="yy-tree-row"
-        :class="[node.kind, drop, { current, selecting, checked: selecting && selected === true, active: menuOpen || contextOpen, dragging: tree.drag.id === node.id }]"
+        :class="[node.kind, drop, { current, selecting, checked: selecting && selected === true, active: menuOpen || contextOpen, dragging: tree.drag.ids.includes(node.id) }]"
         :style="{ '--depth': depth, '--drop-depth': dropDepth }"
         :data-tree-id="node.id"
-        :draggable="!renaming && !selecting"
+        :draggable="!renaming && !tree.busy() && (!selecting || selected === true)"
         @click="activate"
         @dragstart="tree.onDragStart(node, $event)"
+        @dragenter="tree.onDragOver(node, $event)"
         @dragover="tree.onDragOver(node, $event)"
         @drop="tree.onDrop(node, $event)"
         @dragend="tree.onDragEnd()"

@@ -23,17 +23,18 @@ const treeView = ref<InstanceType<typeof BookTree> | null>(null)
 const selecting = computed(() => !!treeView.value?.selecting)
 const selectedCount = computed(() => treeView.value?.selectedNodes.length ?? 0)
 const hasSelectedDocs = computed(() => treeView.value?.selectedNodes.some((n) => n.kind === 'doc'))
-const busy = ref(false)
+const runningBatch = ref(false)
+const busy = computed(() => runningBatch.value || !!treeView.value?.moving)
 
 async function batch(action: BatchAction) {
   const view = treeView.value
   if (!view || busy.value || !selectedCount.value) return
-  busy.value = true
+  runningBatch.value = true
   try {
     if (await runBatch(action, props.bookId, [...view.selectedNodes], [...view.selectedRoots])) view.clearSelection()
   } catch (e) {
     toast(errorMessage(e), 'error')
-  } finally { busy.value = false }
+  } finally { runningBatch.value = false }
 }
 
 function escape(e: KeyboardEvent) {

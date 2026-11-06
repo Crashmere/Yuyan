@@ -22,7 +22,7 @@ export interface TreeContext {
   renaming: Ref<number | null>
   finishRename: (node: TreeNode, title: string | null) => void
   menu: (node: TreeNode) => MenuEntry[]
-  drag: { id: number | null; overId: number | null; position: DropPosition | null }
+  drag: { id: number | null; ids: number[]; overId: number | null; position: DropPosition | null }
   onDragStart: (node: TreeNode, e: DragEvent) => void
   onDragOver: (node: TreeNode, e: DragEvent) => void
   onDrop: (node: TreeNode, e: DragEvent) => void

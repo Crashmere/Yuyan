@@ -273,10 +273,10 @@ export async function bookToGroup(bookId: number, input: BookToGroupInput) {
   return { ...result, refreshed }
 }
 
-export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 'move' | 'trash', target?: { bookId: number; parentId: number | null }) {
+export async function batchDocs(bookId: number, ids: number[], action: 'copy' | 'move' | 'trash', target?: { bookId: number; parentId: number | null; index?: number }) {
   let result: { ids: number[] }
   try {
-    result = await api('docs/batch', { method: 'POST', json: { bookId, ids, action, targetBookId: target?.bookId, parentId: target?.parentId } })
+    result = await api('docs/batch', { method: 'POST', json: { bookId, ids, action, targetBookId: target?.bookId, parentId: target?.parentId, index: target?.index } })
   } catch (e) {
     await refresh(bookId, ...(target ? [target.bookId] : [])).catch(() => {})
     if (e instanceof ApiError && e.status === 409) throw new Error('目录已变化，请重新选择后重试')

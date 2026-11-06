@@ -17,6 +17,7 @@ type BatchDocsInput struct {
 	Action       string  `json:"action"`
 	TargetBookID int64   `json:"targetBookId"`
 	ParentID     *int64  `json:"parentId"`
+	Index        *int    `json:"index,omitempty"`
 }
 
 type BatchDocsResult struct {
@@ -29,6 +30,9 @@ type BatchDocsResult struct {
 func (s *Store) BatchDocs(ctx context.Context, in BatchDocsInput) (BatchDocsResult, error) {
 	result := BatchDocsResult{IDs: []int64{}}
 	if len(in.IDs) == 0 || len(in.IDs) > 5000 || (in.Action != "move" && in.Action != "copy" && in.Action != "trash") {
+		return result, ErrInvalid
+	}
+	if in.Index != nil && in.Action != "move" {
 		return result, ErrInvalid
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -125,6 +129,33 @@ func (s *Store) BatchDocs(ctx context.Context, in BatchDocsInput) (BatchDocsResu
 			return result, err
 		}
 		if in.Action == "move" {
+			var order []int64
+			if in.Index != nil {
+				// The drop index counts siblings after the whole selection is removed.
+				rows, err := tx.QueryContext(ctx, `SELECT id FROM docs WHERE book_id = ? AND parent_id IS ? AND deleted_at IS NULL ORDER BY position, id`, in.TargetBookID, in.ParentID)
+				if err != nil {
+					return result, err
+				}
+				var siblings []int64
+				for rows.Next() {
+					var id int64
+					if err := rows.Scan(&id); err != nil {
+						rows.Close()
+						return result, err
+					}
+					if !selected[id] {
+						siblings = append(siblings, id)
+					}
+				}
+				rows.Close()
+				if err := rows.Err(); err != nil {
+					return result, err
+				}
+				index := max(0, min(*in.Index, len(siblings)))
+				order = append(order, siblings[:index]...)
+				order = append(order, roots...)
+				order = append(order, siblings[index:]...)
+			}
 			for _, id := range roots {
 				position++
 				if _, err := tx.ExecContext(ctx, `WITH RECURSIVE sub(id) AS (
@@ -133,6 +164,11 @@ SELECT id FROM docs WHERE id = ? UNION ALL SELECT d.id FROM docs d JOIN sub ON d
 					return result, err
 				}
 				if _, err := tx.ExecContext(ctx, `UPDATE docs SET parent_id = ?, position = ? WHERE id = ?`, in.ParentID, position, id); err != nil {
+					return result, err
+				}
+			}
+			for i, id := range order {
+				if _, err := tx.ExecContext(ctx, `UPDATE docs SET position = ? WHERE id = ?`, i+1, id); err != nil {
 					return result, err
 				}
 			}
