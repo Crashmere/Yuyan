@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { autoUpdate, computePosition, flip, offset, shift, size } from '@floating-ui/dom'
 import {
   CalendarDays, Check, ChevronLeft, ChevronRight, ChevronDown,
   Plus, Save, Trash2, X, Maximize2, Minimize2, Copy, ClipboardPaste, ListFilter, Search, ZoomIn, ZoomOut,
@@ -14,7 +15,7 @@ import { animateCalendar } from './motion'
 import { toast } from '../ui/toast'
 import { searchTerms } from '../shared/searchMatch'
 import {
-  addDays, addUnits, adjustPeriod, assignPeriodLanes, canonicalRange, dateAtPosition, dayPosition, minPeriodWidth,
+  addDays, addUnits, adjustPeriod, assignPeriodLanes, axisLength, canonicalRange, dateAtPosition, dayPosition, minPeriodWidth,
   parseCalendarDate, periodDays, periodDaysLabel, periodDurationLabel, periodGeometry, periodRangeLabel, periodSpan, todayDate, unitBounds, windowCells,
 } from './dates'
 import type { CalendarData, CalendarDisplayRange, CalendarEntry, CalendarPrecision } from '../schema/calendar'
@@ -39,10 +40,35 @@ const collapsed = ref(!!props.model.collapsed)
 const workdaysOnly = ref(!!props.model.workdaysOnly)
 const displayRange = ref<CalendarDisplayRange | null>(props.model.displayRange ? { ...props.model.displayRange } : null)
 const rangeInspector = ref<HTMLElement | null>(null)
+const rangeButton = ref<HTMLButtonElement | null>(null)
+const rangeSide = ref('bottom')
+const rangePosition = ref({ left: '0px', top: '0px', visibility: 'hidden' as 'hidden' | 'visible', '--range-join-left': '0px', '--range-join-width': '0px', '--range-corner-radius': '12px' })
 const rangeDraft = ref<(CalendarDisplayRange & { precision: CalendarPrecision }) | null>(null)
 const rangeBaseline = ref('')
 const displayRangeError = ref('')
 const rangeDirty = computed(() => !!rangeDraft.value && JSON.stringify(rangeDraft.value) !== rangeBaseline.value)
+watch([rangeInspector, rangeButton, expanded], ([panel, button], _, onCleanup) => {
+  if (!panel || !button) return
+  let active = true, presented = false
+  rangePosition.value.visibility = 'hidden'
+  const stop = autoUpdate(button, panel, async () => {
+    const { x, y, placement } = await computePosition(button, panel, {
+      strategy: 'fixed', placement: 'bottom-end', middleware: [offset(-1), flip(), shift({ padding: 8 }), size({ padding: 8, apply({ availableHeight, elements }) {
+        elements.floating.style.setProperty('--range-max-height', `${Math.max(0, availableHeight)}px`)
+      } })],
+    })
+    if (!active) return
+    const anchor = button.getBoundingClientRect()
+    rangeSide.value = placement.startsWith('top') ? 'top' : 'bottom'
+    rangePosition.value = { left: `${x}px`, top: `${y}px`, visibility: 'visible', '--range-join-left': `${anchor.left - x + 1}px`, '--range-join-width': `${anchor.width - 2}px`, '--range-corner-radius': Math.abs(anchor.right - x - panel.offsetWidth) < 2 ? '0px' : '12px' }
+    if (!presented) {
+      presented = true
+      await nextTick()
+      if (active) animateCalendar(panel, [{ opacity: 0, scale: '1 .97' }, { opacity: 1, scale: '1' }], 140)
+    }
+  })
+  onCleanup(() => { active = false; stop() })
+})
 const titleInput = ref<HTMLInputElement | null>(null)
 let collapsedAnchor = props.model.center || todayDate()
 async function toggleCollapsed() {
@@ -89,8 +115,10 @@ function renameCalendar() {
 }
 function toggleWorkdaysOnly() {
   if (props.readonly || dragging.value) return
+  const anchor = viewportDate()
   workdaysOnly.value = !workdaysOnly.value
   publish()
+  void centerTimeline(anchor).then(() => animateCalendar(timelineScroll.value, [{ opacity: .55 }, { opacity: 1 }], 180))
 }
 async function editDisplayRange() {
   if (props.readonly || dragging.value || !await flush()) return
@@ -216,6 +244,7 @@ function syncModel() {
 watch(() => props.model, () => {
   const previous = JSON.stringify(periods.value)
   const previousRange = JSON.stringify(displayRange.value)
+  const workdaysAnchor = workdaysOnly.value !== !!props.model.workdaysOnly ? viewportDate() : null
   syncModel()
   // Undo or external document updates replace the event draft as well.
   if (previous !== JSON.stringify(props.model.periods)) draft.value = null
@@ -224,7 +253,7 @@ watch(() => props.model, () => {
     displayRangeError.value = ''
     if (displayRange.value) void startDisplayRange()
     else void centerTimeline()
-  }
+  } else if (workdaysAnchor && grain.value === 'day') void centerTimeline(workdaysAnchor)
 })
 
 const grains: { value: CalendarPrecision; label: string }[] = [
@@ -279,12 +308,27 @@ const canZoomOut = computed(() => zoomWidth.value > calendarCellWidths[grain.val
 const canZoomIn = computed(() => zoomWidth.value < calendarCellWidths[grain.value].max - .5)
 const axisStart = computed(() => unitBounds(displayRange.value?.startDate ?? '1000-01-01', grain.value).start)
 const axisEnd = computed(() => unitBounds(displayRange.value?.endDate ?? '9999-12-31', grain.value).end)
-const cells = computed(() => windowCells(axisCenter.value, grain.value, 192, displayRange.value))
-const cellWidth = computed(() => axisWidth.value / cells.value.length || unitWidth.value)
+const cells = computed(() => windowCells(axisCenter.value, grain.value, 192, displayRange.value, workdaysOnly.value))
+const axisUnits = computed(() => axisLength(cells.value))
+const cellWidth = computed(() => axisWidth.value / axisUnits.value || unitWidth.value)
+const rulerCells = computed(() => {
+  const result: typeof cells.value = []
+  for (const cell of cells.value) {
+    const previous = result.at(-1)
+    if (workdaysOnly.value && cell.weekend && previous?.weekend) {
+      previous.end = cell.end
+      previous.weight += cell.weight
+      previous.current ||= cell.current
+      previous.boundary ||= cell.boundary
+    } else result.push({ ...cell })
+  }
+  return result
+})
+const axisColumns = computed(() => rulerCells.value.map(cell => `${cell.weight}fr`).join(' '))
 const visibleStart = computed(() => dateAtPosition(scrollLeft.value / cellWidth.value, cells.value))
 const visibleEnd = computed(() => dateAtPosition((scrollLeft.value + viewportWidth.value - 1) / cellWidth.value, cells.value))
 const windowLabel = computed(() => periodRangeLabel({ startDate: visibleStart.value, endDate: visibleEnd.value, precision: grain.value }))
-const timelineMinWidth = computed(() => cells.value.length * unitWidth.value)
+const timelineMinWidth = computed(() => axisUnits.value * unitWidth.value)
 const todayGeometry = computed(() => periodGeometry({ startDate: today.value, endDate: today.value }, cells.value))
 const listPeriods = computed(() => {
   const terms = searchTerms(listQuery.value)
@@ -348,7 +392,7 @@ const periodLabels = computed(() => {
   const minimum = Math.max(9, minPeriodWidth / 100 * timelineMinWidth.value)
   const labels = new Map<number, { outside: boolean; duration: boolean; start: number; end: number }>()
   for (const period of renderedPeriods.value) {
-    const span = periodSpan(period, grain.value)
+    const span = periodSpan(period, grain.value, workdaysOnly.value)
     const bar = Math.max(minimum, (span.end - span.start) * unit)
     // Borders (4 px), horizontal padding (24 px), and a 2 px spare leave this much room
     // for text inside the bar; keep in step with .yy-calendar-period-text's max-width.
@@ -658,7 +702,7 @@ function zoomTimeline(event: WheelEvent) {
   const unit = event.deltaMode === 1 ? 33 : event.deltaMode === 2 ? timelineScroll.value.clientWidth : 1
   const factor = Math.min(1.3, Math.max(.77, Math.exp(-delta * unit * .0016)))
   const timelineRect = timeline.value.getBoundingClientRect()
-  const position = Math.max(0, Math.min(cells.value.length - .001, (event.clientX - timelineRect.left) / timelineRect.width * cells.value.length))
+  const position = Math.max(0, Math.min(axisUnits.value - .001, (event.clientX - timelineRect.left) / timelineRect.width * axisUnits.value))
   const scrollRect = timelineScroll.value.getBoundingClientRect()
   const fraction = Math.min(1, Math.max(0, (event.clientX - scrollRect.left) / scrollRect.width))
   void zoomTo(zoomWidth.value * factor, dateAtPosition(position, cells.value), fraction)
@@ -671,7 +715,8 @@ function viewportDate(sync = true) {
 
 function dateOffset(date: string) {
   const bounds = unitBounds(date, grain.value)
-  return (dayPosition(date, cells.value) + .5 / periodDays({ startDate: bounds.start, endDate: bounds.end })) * cellWidth.value
+  const weight = cells.value.find(cell => cell.start <= date && cell.end >= date)?.weight ?? 1
+  return (dayPosition(date, cells.value) + weight * .5 / periodDays({ startDate: bounds.start, endDate: bounds.end })) * cellWidth.value
 }
 
 // The grain is a saved setting of the calendar block, configurable only while editing;
@@ -689,7 +734,7 @@ function setGrain(value: CalendarPrecision, date = viewportDate()) {
 function cellTip(cell: (typeof cells.value)[number]): string {
   if (grain.value === 'year') return `定位到 ${cell.primary}年`
   if (grain.value === 'month') return `定位到 ${cell.secondary}年${cell.primary}`
-  return `定位到 ${cell.start}`
+  return workdaysOnly.value && cell.weekend ? `周末已折叠 · ${cell.start}${cell.end !== cell.start ? ` 至 ${cell.end}` : ''}` : `定位到 ${cell.start}`
 }
 
 async function centerTimeline(date = center.value) {
@@ -744,7 +789,12 @@ function cellIndex(clientX: number): number {
   const element = timeline.value
   if (!element) return 0
   const rect = element.getBoundingClientRect()
-  return Math.max(0, Math.min(cells.value.length - 1, Math.floor((clientX - rect.left) / rect.width * cells.value.length)))
+  const date = dateAtPosition((clientX - rect.left) / cellWidth.value, cells.value)
+  return cells.value.findIndex(cell => cell.start <= date && cell.end >= date)
+}
+function pointerUnit(clientX: number): number {
+  const cell = cells.value[cellIndex(clientX)]
+  return periodSpan({ startDate: cell.start, endDate: cell.end }, grain.value).start
 }
 
 function beginCreate(event: PointerEvent) {
@@ -803,6 +853,7 @@ interface BarGesture {
   draftBefore: Draft | null
   baselineBefore: string
   startScroll: number
+  startUnit: number
 }
 let barGesture: BarGesture | null = null
 let edgeFrame = 0
@@ -858,7 +909,8 @@ function beginBar(event: PointerEvent, period: CalendarEntry, mode: BarMode) {
   root.value?.focus({ preventScroll: true })
   target.setPointerCapture(event.pointerId)
   barGesture = { pointerId: event.pointerId, startX: event.clientX, period: { ...period }, mode, moved: false, target,
-    draftBefore: draft.value ? { ...draft.value } : null, baselineBefore: draftBaseline.value, startScroll: timelineScroll.value?.scrollLeft ?? 0 }
+    draftBefore: draft.value ? { ...draft.value } : null, baselineBefore: draftBaseline.value, startScroll: timelineScroll.value?.scrollLeft ?? 0,
+    startUnit: pointerUnit(event.clientX) }
   gestureLanes.value = packLanes()
   target.addEventListener('pointermove', moveBar)
   target.addEventListener('pointerup', endBar)
@@ -880,7 +932,9 @@ function updateBar(clientX: number) {
   if (!gesture.moved && Math.abs(distance) < 5) return
   gesture.moved = true
   dragging.value = true
-  const delta = Math.round(distance / cellWidth.value)
+  const delta = workdaysOnly.value && grain.value === 'day'
+    ? Math.round(pointerUnit(clientX) - gesture.startUnit)
+    : Math.round(distance / cellWidth.value)
   const adjusted = adjustPeriod(gesture.period, grain.value, delta, gesture.mode)
   if (draft.value?.id !== gesture.period.id) openPeriod(gesture.period)
   if (draft.value) Object.assign(draft.value, { startDate: adjusted.startDate, endDate: adjusted.endDate })
@@ -1136,8 +1190,8 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
             <button v-for="item in grains" :key="item.value" type="button" :aria-pressed="grain === item.value" :class="{ active: grain === item.value }" @click="setGrain(item.value)">{{ item.label }}</button>
           </div>
         </div>
-        <button v-if="!readonly" type="button" class="yy-btn small yy-calendar-range-toggle" :class="{ active: displayRange }" :aria-expanded="!!rangeDraft" aria-label="设置日历显示范围" @click="editDisplayRange">显示范围</button>
-        <button v-if="!readonly" type="button" class="yy-btn small yy-calendar-workdays" :class="{ active: workdaysOnly }" :aria-pressed="workdaysOnly" data-tip="天数仅统计周一至周五，周末不计入" @click="toggleWorkdaysOnly"><Check v-if="workdaysOnly" :size="14" />仅统计工作日</button>
+        <button v-if="!readonly" ref="rangeButton" type="button" class="yy-btn small yy-calendar-range-toggle" :class="{ active: displayRange, open: rangeDraft }" :data-side="rangeSide" :aria-expanded="!!rangeDraft" aria-label="设置日历显示范围" @click="editDisplayRange">显示范围</button>
+        <button v-if="!readonly" type="button" class="yy-btn small yy-calendar-workdays" :class="{ active: workdaysOnly }" :aria-pressed="workdaysOnly" data-tip="天数仅统计周一至周五，日视图折叠周末" @click="toggleWorkdaysOnly"><Check v-if="workdaysOnly" :size="14" />仅统计工作日</button>
         <template v-if="!collapsed">
           <div class="yy-calendar-zoom" aria-label="格宽缩放">
             <IconButton label="缩小格宽" :disabled="!canZoomOut" @click="zoomBy(1 / 1.25)"><ZoomOut :size="16" /></IconButton>
@@ -1172,7 +1226,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
               ref="timeline"
               class="yy-calendar-timeline"
               :class="{ compact: unitWidth < 40 }"
-              :style="{ minWidth: `${timelineMinWidth}px`, height: `${timelineInnerHeight}px`, '--calendar-columns': cells.length }"
+              :style="{ minWidth: `${timelineMinWidth}px`, height: `${timelineInnerHeight}px`, '--calendar-columns': axisColumns }"
               @pointerdown="beginCreate"
               @pointermove="moveCreate"
               @pointerup="endCreate"
@@ -1180,12 +1234,13 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
               @pointerleave="leaveCreate"
             >
               <div class="yy-calendar-ruler">
-                <button v-for="cell in cells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }" :data-date="cell.start" :data-tip="cellTip(cell)" @click="locate(cell.start)">
-                  <strong>{{ cell.primary }}</strong><span>{{ cell.secondary }}</span>
+                <button v-for="cell in rulerCells" :key="cell.start" type="button" class="yy-calendar-cell" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary, folded: workdaysOnly && cell.weekend }" :data-date="cell.start" :data-end="cell.end" :data-tip="cellTip(cell)" :aria-label="cellTip(cell)" @click="locate(cell.start)">
+                  <span v-if="workdaysOnly && cell.weekend" class="yy-calendar-weekend-mark" aria-hidden="true"></span>
+                  <template v-else><strong>{{ cell.primary }}</strong><span>{{ cell.secondary }}</span></template>
                 </button>
               </div>
               <div class="yy-calendar-grid" aria-hidden="true">
-                <span v-for="cell in cells" :key="cell.start" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary }"></span>
+                <span v-for="cell in rulerCells" :key="cell.start" :class="{ current: cell.current, weekend: cell.weekend, boundary: cell.boundary, folded: workdaysOnly && cell.weekend }"></span>
               </div>
               <div v-if="todayGeometry" class="yy-calendar-today-line" :style="{ left: `${todayGeometry.left + todayGeometry.width / 2}%` }" aria-hidden="true"><span>今天</span></div>
               <div v-if="hoverGeometry" class="yy-calendar-hover" :style="{ left: `${hoverGeometry.left}%`, width: `${hoverGeometry.width}%` }" aria-hidden="true"><Plus :size="15" /></div>
@@ -1247,9 +1302,9 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
   </section>
   </Teleport>
   <Teleport to="body">
-    <Transition name="yy-calendar-window">
-    <div v-if="rangeDraft" class="yy-calendar-inspector-layer" @pointerdown.self="closeDisplayRange" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
-      <aside ref="rangeInspector" class="yy-calendar-inspector" role="dialog" aria-modal="true" aria-label="日历显示范围" tabindex="-1" @keydown="onKey" @pointerdown.stop>
+    <Transition name="yy-calendar-range-window">
+    <div v-if="rangeDraft" class="yy-calendar-inspector-layer yy-calendar-range-layer" @pointerdown.self="closeDisplayRange" @wheel="containInspectorScroll" @touchmove="containInspectorScroll">
+      <aside ref="rangeInspector" class="yy-calendar-inspector yy-calendar-range-popover" :style="rangePosition" :data-side="rangeSide" role="dialog" aria-modal="true" aria-label="日历显示范围" tabindex="-1" @keydown="onKey" @pointerdown.stop>
         <div class="yy-calendar-inspector-head"><strong>显示时间范围</strong><IconButton label="关闭显示范围" @click="closeDisplayRange"><X :size="17" /></IconButton></div>
         <div class="yy-calendar-inspector-body">
           <DateRangeField :start="rangeDraft.startDate" :end="rangeDraft.endDate" :precision="rangeDraft.precision" precision-label="显示范围精度" @change="rangeDraft = $event" @invalid="displayRangeError = $event" @key="onKey" />
@@ -1351,7 +1406,7 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-scroll.scrolls-y { overflow: auto; overscroll-behavior: contain; }
 .yy-calendar-scroll::-webkit-scrollbar { display: none; }
 .yy-calendar-timeline { position: relative; isolation: isolate; overflow: clip; touch-action: pan-x pan-y; user-select: none; cursor: crosshair; }
-.yy-calendar-ruler, .yy-calendar-grid { display: grid; grid-template-columns: repeat(var(--calendar-columns), minmax(0, 1fr)); }
+.yy-calendar-ruler, .yy-calendar-grid { display: grid; grid-template-columns: var(--calendar-columns); }
 .yy-calendar-ruler { position: sticky; top: 0; z-index: 4; height: 58px; border-bottom: 1px solid var(--yy-border); background: var(--yy-bg-muted); }
 .yy-calendar-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-width: 0; padding: 0; border: 0; border-left: 1px solid var(--yy-border); background: transparent; color: var(--yy-text-3); font: inherit; font-size: 10px; line-height: 1.25; cursor: pointer; }
 .yy-calendar-cell:hover { background: var(--yy-bg-hover); }
@@ -1363,11 +1418,19 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-cell.current strong { color: var(--yy-primary); }
 .yy-calendar-cell.weekend { background: color-mix(in srgb, var(--yy-bg-active) 48%, transparent); }
 .yy-calendar-cell.boundary { border-left-color: var(--yy-border-strong); }
+.yy-calendar-cell.folded { position: relative; background: linear-gradient(90deg, var(--yy-bg-muted), var(--yy-bg-active), var(--yy-bg-muted)); color: var(--yy-text-4); }
+.yy-calendar-cell.folded:hover, .yy-calendar-cell.folded.current { background: var(--yy-primary-soft); color: var(--yy-primary); }
+.yy-calendar-weekend-mark { position: relative; flex: none; width: 7px; height: 13px; overflow: visible !important; animation: yy-calendar-weekend-in .18s ease-out; }
+.yy-calendar-weekend-mark::before, .yy-calendar-weekend-mark::after { content: ''; position: absolute; top: 0; bottom: 0; width: 1px; background: currentColor; transform: skewX(-18deg); }
+.yy-calendar-weekend-mark::before { left: 1px; }
+.yy-calendar-weekend-mark::after { right: 1px; }
+@keyframes yy-calendar-weekend-in { from { opacity: 0; scale: 1.6 1; } to { opacity: 1; scale: 1; } }
 .yy-calendar-grid { position: absolute; z-index: -1; inset: 58px 0 0; pointer-events: none; }
 .yy-calendar-grid span { border-left: 1px solid color-mix(in srgb, var(--yy-border) 72%, transparent); }
 .yy-calendar-grid span.current { background: color-mix(in srgb, var(--yy-primary-soft) 45%, transparent); }
 .yy-calendar-grid span.weekend { background: color-mix(in srgb, var(--yy-bg-muted) 62%, transparent); }
 .yy-calendar-grid span.boundary { border-left-color: var(--yy-border-strong); }
+.yy-calendar-grid span.folded { border-inline: 1px dashed color-mix(in srgb, var(--yy-primary) 18%, var(--yy-border)); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--yy-bg-active) 70%, transparent), transparent), repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--yy-primary) 7%, transparent) 5px 6px); }
 .yy-calendar-period { --period: #00a66a; --period-soft: #dff7ed; position: absolute; z-index: 2; display: flex; align-items: center; min-width: 9px; height: 38px; padding: 0 12px; overflow: clip; border: 1px solid color-mix(in srgb, var(--period) 38%, transparent); border-left: 3px solid var(--period); border-radius: 7px; background: color-mix(in srgb, var(--period) 12%, var(--yy-bg)); color: color-mix(in srgb, var(--period) 65%, var(--yy-text)); box-shadow: 0 2px 5px #0000000d; cursor: grab; text-align: left; transition: box-shadow .15s, background .15s; }
 .yy-calendar-period:hover { z-index: 5; border-color: var(--period); box-shadow: 0 4px 12px #00000016; }
 .yy-calendar-period:active { cursor: grabbing; }
@@ -1448,6 +1511,21 @@ defineExpose({ flush, isDirty: () => draftDirty.value || !!dateInputError.value 
 .yy-calendar-field > span small { color: var(--yy-text-4); font-weight: 400; }
 .yy-calendar-field-error { margin: 5px 0 0; color: var(--yy-danger); font-size: 11px; }
 .yy-calendar-range-hint { margin: 14px 0 0; color: var(--yy-text-3); font-size: 11px; }
+.yy-calendar-range-toggle.open { background: var(--yy-bg); border-color: var(--yy-border); color: var(--yy-primary); }
+.yy-calendar-range-toggle.open[data-side="bottom"] { border-bottom-color: transparent; border-radius: 6px 6px 0 0; }
+.yy-calendar-range-toggle.open[data-side="top"] { border-top-color: transparent; border-radius: 0 0 6px 6px; }
+.yy-calendar-range-layer { display: block; padding: 0; }
+.yy-calendar-range-popover { position: fixed; width: min(400px, calc(100vw - 16px)); max-height: min(var(--range-max-height, 100dvh), calc(100dvh - 16px)); overflow: visible; border-radius: 12px; box-shadow: 0 8px 28px #0002, 0 2px 8px #0001; transform-origin: calc(var(--range-join-left) + var(--range-join-width) / 2) top; }
+.yy-calendar-range-popover[data-side="bottom"] { border-top-right-radius: var(--range-corner-radius); }
+.yy-calendar-range-popover[data-side="top"] { border-bottom-right-radius: var(--range-corner-radius); transform-origin: calc(var(--range-join-left) + var(--range-join-width) / 2) bottom; }
+.yy-calendar-range-popover::before { content: ''; position: absolute; left: var(--range-join-left); top: -1px; width: var(--range-join-width); height: 1px; background: var(--yy-bg); }
+.yy-calendar-range-popover[data-side="top"]::before { top: auto; bottom: -1px; }
+.yy-calendar-range-popover .yy-calendar-inspector-head { padding: 12px 16px 10px; }
+.yy-calendar-range-popover .yy-calendar-inspector-body { padding: 0 16px 14px; }
+.yy-calendar-range-popover .yy-calendar-inspector-actions { padding: 12px 16px 0; }
+.yy-calendar-range-popover .yy-calendar-shortcut { margin: 8px 16px 12px; }
+.yy-calendar-range-window-leave-active { pointer-events: none; transition: opacity .1s ease; }
+.yy-calendar-range-window-leave-to { opacity: 0; }
 .yy-calendar-colors { display: flex; flex-wrap: wrap; gap: 8px; }
 .yy-calendar-colors button { --period: #00a66a; display: grid; place-items: center; width: 27px; height: 27px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--period); color: #fff; cursor: pointer; }
 .yy-calendar-colors button.active { border-color: var(--yy-bg); box-shadow: 0 0 0 2px var(--period); }

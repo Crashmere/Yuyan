@@ -8,6 +8,7 @@ export interface CalendarCell {
   current: boolean
   weekend: boolean
   boundary: boolean
+  weight: number
 }
 
 export interface PeriodGeometry {
@@ -18,6 +19,7 @@ export interface PeriodGeometry {
 }
 
 const DAY = 86_400_000
+const WEEKEND_WEIGHT = .18
 
 export function parseCalendarDate(value: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -74,7 +76,7 @@ export function addUnits(value: string, grain: CalendarPrecision, amount: number
   return formatCalendarDate(date)
 }
 
-export function windowCells(center: string, grain: CalendarPrecision, count = 96, range?: CalendarDisplayRange | null): CalendarCell[] {
+export function windowCells(center: string, grain: CalendarPrecision, count = 96, range?: CalendarDisplayRange | null, workdaysOnly = false): CalendarCell[] {
   const first = unitBounds(range?.startDate ?? '1000-01-01', grain).start
   const last = unitBounds(range?.endDate ?? '9999-12-31', grain).end
   const span = periodSpan({ startDate: first, endDate: last }, grain)
@@ -99,38 +101,45 @@ export function windowCells(center: string, grain: CalendarPrecision, count = 96
       primary = `${date.getUTCMonth() + 1}/${date.getUTCDate()}`
       secondary = ['日', '一', '二', '三', '四', '五', '六'][date.getUTCDay()]
     }
+    const weekend = grain === 'day' && (date.getUTCDay() === 0 || date.getUTCDay() === 6)
     cells.push({
       ...bounds,
       primary,
       secondary,
       current: today >= bounds.start && today <= bounds.end,
-      weekend: grain === 'day' && (date.getUTCDay() === 0 || date.getUTCDay() === 6),
+      weekend,
       boundary: grain === 'year' || (grain === 'month' ? date.getUTCMonth() === 0 : date.getUTCDate() === 1),
+      weight: workdaysOnly && weekend ? WEEKEND_WEIGHT : 1,
     })
   }
   return cells
 }
 
+export function axisLength(cells: CalendarCell[]): number {
+  return cells.reduce((length, cell) => length + cell.weight, 0)
+}
+
 export function dayPosition(value: string, cells: CalendarCell[]): number {
   if (!cells.length || value <= cells[0].start) return 0
-  const last = cells.at(-1)!
-  if (value > last.end) return cells.length
-  for (let index = 0; index < cells.length; index++) {
-    const cell = cells[index]
-    if (value > cell.end) continue
+  let position = 0
+  for (const cell of cells) {
+    if (value > cell.end) { position += cell.weight; continue }
     const cellStart = parseCalendarDate(cell.start).getTime()
     const span = ((parseCalendarDate(cell.end).getTime() + DAY) - cellStart) / DAY
     const offset = (parseCalendarDate(value).getTime() - cellStart) / DAY
-    return index + offset / span
+    return position + offset / span * cell.weight
   }
-  return cells.length
+  return position
 }
 
 export function dateAtPosition(position: number, cells: CalendarCell[]): string {
-  const index = Math.max(0, Math.min(cells.length - 1, Math.floor(position)))
-  const cell = cells[index]!
+  const cell = cells.find((cell, index) => {
+    if (position < cell.weight - 1e-9 || index === cells.length - 1) return true
+    position -= cell.weight
+    return false
+  }) ?? cells.at(-1)!
   const days = (parseCalendarDate(cell.end).getTime() - parseCalendarDate(cell.start).getTime()) / DAY + 1
-  return addDays(cell.start, Math.min(days - 1, Math.max(0, Math.floor((position - index) * days))))
+  return addDays(cell.start, Math.min(days - 1, Math.max(0, Math.floor(position / cell.weight * days))))
 }
 
 export function periodDays(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, workdaysOnly = false): number {
@@ -186,11 +195,12 @@ export const minPeriodWidth = 0.18
 
 export function periodGeometry(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, cells: CalendarCell[]): PeriodGeometry | null {
   if (!cells.length || period.endDate < cells[0].start || period.startDate > cells.at(-1)!.end) return null
+  const length = axisLength(cells)
   const start = dayPosition(period.startDate, cells)
-  const end = period.endDate >= cells.at(-1)!.end ? cells.length : dayPosition(addDays(period.endDate, 1), cells)
+  const end = period.endDate >= cells.at(-1)!.end ? length : dayPosition(addDays(period.endDate, 1), cells)
   return {
-    left: start / cells.length * 100,
-    width: Math.max(minPeriodWidth, (end - start) / cells.length * 100),
+    left: start / length * 100,
+    width: Math.max(minPeriodWidth, (end - start) / length * 100),
     clippedStart: period.startDate < cells[0].start,
     clippedEnd: period.endDate > cells.at(-1)!.end,
   }
@@ -198,10 +208,16 @@ export function periodGeometry(period: Pick<CalendarEntry, 'startDate' | 'endDat
 
 // Absolute position of a day's start (or end) in grain units, independent of the rendered cell
 // window, so pixel-based layout stays stable while the axis is recycled.
-function dayEdge(value: string, grain: CalendarPrecision, after: boolean): number {
+function dayEdge(value: string, grain: CalendarPrecision, after: boolean, workdaysOnly: boolean): number {
   const date = parseCalendarDate(value)
   const day = date.getTime() / DAY + (after ? 1 : 0)
-  if (grain === 'day') return day
+  if (grain === 'day') {
+    if (!workdaysOnly) return day
+    // Monday-based weeks also cover pre-epoch dates; retain a narrow, reversible weekend span.
+    const weeks = Math.floor((day + 3) / 7)
+    const weekday = day + 3 - weeks * 7
+    return weeks * (5 + 2 * WEEKEND_WEIGHT) + Math.min(weekday, 5) + Math.max(0, weekday - 5) * WEEKEND_WEIGHT
+  }
   const bounds = unitBounds(value, grain)
   const start = parseCalendarDate(bounds.start).getTime() / DAY
   const span = parseCalendarDate(bounds.end).getTime() / DAY + 1 - start
@@ -209,8 +225,8 @@ function dayEdge(value: string, grain: CalendarPrecision, after: boolean): numbe
   return unit + (day - start) / span
 }
 
-export function periodSpan(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, grain: CalendarPrecision): { start: number; end: number } {
-  return { start: dayEdge(period.startDate, grain, false), end: dayEdge(period.endDate, grain, true) }
+export function periodSpan(period: Pick<CalendarEntry, 'startDate' | 'endDate'>, grain: CalendarPrecision, workdaysOnly = false): { start: number; end: number } {
+  return { start: dayEdge(period.startDate, grain, false, workdaysOnly), end: dayEdge(period.endDate, grain, true, workdaysOnly) }
 }
 
 // Packs by occupied extent; the default is the date range itself, callers may widen the end
