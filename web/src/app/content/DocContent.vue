@@ -49,7 +49,7 @@ function prepareCopy(node: HTMLElement) {
 const complete = () => !reader || reader.complete()
 defineExpose({
   source: () => ({ root: root.value, elements: sourceElements.flat(), prepare: prepareCopy, html: complete() ? sourceHTML.join('') : undefined }),
-  show, loadAll, complete,
+  show, loadAll, complete, selectAll,
   ensureBlock: (block: number) => reader?.ensureBlock(block),
 })
 // The content is re-created from the HTML when it changes, and on a theme change to redraw
@@ -168,6 +168,18 @@ async function mark() {
     if (candidates.length) return
   }
   await showMatches(el, query)
+}
+
+async function selectAll() {
+  const el = root.value, run = runs, focus = document.activeElement
+  if (!el || (!complete() && !await loadAll())) return
+  if (run !== runs || root.value !== el || !el.isConnected || document.activeElement !== focus) return
+  const selection = window.getSelection()
+  if (!selection) return
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  selection.removeAllRanges()
+  selection.addRange(range)
 }
 
 // Finding in the page and printing need the whole document: printing waits for it, finding

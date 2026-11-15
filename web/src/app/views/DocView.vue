@@ -154,14 +154,21 @@ const empty = computed(() => !!view.value && view.value.chars === 0 && !/<(img|t
 // Titles shown on this page follow the tree, which stays current after renames elsewhere.
 const titleOf = (n: { id: number; title: string }) => locate(state.bookId, n.id)?.node.title ?? n.title
 
-function changeDoc(e: KeyboardEvent) {
-  if (!view.value || state.navigating || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !['ArrowUp', 'ArrowDown'].includes(e.key) || !pageShortcutAllowed(e)) return
+function onKey(e: KeyboardEvent) {
+  if (!view.value || state.navigating || !pageShortcutAllowed(e)) return
+  if (view.value.doc.kind === 'doc' && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    if (content.value) void content.value.selectAll()
+    else window.getSelection()?.removeAllRanges()
+    return
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !['ArrowUp', 'ArrowDown'].includes(e.key)) return
   e.preventDefault()
   const target = e.key === 'ArrowUp' ? view.value.prev : view.value.next
   if (target) void router.push(`/docs/${target.id}`)
 }
-onMounted(() => window.addEventListener('keydown', changeDoc))
-onBeforeUnmount(() => window.removeEventListener('keydown', changeDoc))
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 // An edit address of a heavy document opened directly arrives here with ?edit (DESIGN 26.6): the
 // document shows first, and entering the editor goes through the router, which asks.
