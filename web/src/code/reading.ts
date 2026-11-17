@@ -18,6 +18,7 @@ export async function readingCode(block: HTMLElement, source: string, language: 
   const placeholders = new Map<number, HTMLButtonElement>()
   const render = (save = true) => {
     const closed = ranges.filter(range => folded.has(range.from))
+    block.classList.toggle('has-code-folds', closed.length > 0)
     lines.forEach((line, index) => line.classList.toggle('yy-code-line-hidden', closed.some(range => index + 1 > range.first && index + 1 <= range.last)))
     for (const range of ranges) {
       const isFolded = folded.has(range.from), button = foldButtons.get(range.from)!, placeholder = placeholders.get(range.from)!
@@ -100,6 +101,6 @@ export async function readingCode(block: HTMLElement, source: string, language: 
       })
       if (action === 'find') code.find()
     },
-    destroy() { destroyed = true; closeExpanded?.(); stopDrag?.(); block.removeEventListener('mousedown', clearSelected); block.removeEventListener('yy-reveal-code', reveal); buttons.forEach(button => button.remove()) },
+    destroy() { destroyed = true; closeExpanded?.(); stopDrag?.(); block.removeEventListener('mousedown', clearSelected); block.removeEventListener('yy-reveal-code', reveal); block.classList.remove('has-code-folds'); buttons.forEach(button => button.remove()) },
   }
 }

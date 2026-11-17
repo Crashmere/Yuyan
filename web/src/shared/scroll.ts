@@ -14,11 +14,18 @@ export function scrollToPosition(scroller: HTMLElement, position: { top?: number
   scroller.scrollTo({ left, top, behavior: 'instant' })
 }
 
-// Content navigation moves the page only; nested code and table scrollers keep their positions.
-// Honour the heading margins in reading and editing modes, including the editor's toolbar.
+// A code-line target must be visible inside its block before positioning the page. Other nested
+// scrollers keep their positions. Honour heading margins, including the editor's toolbar.
 export function scrollToElement(target: Element, block: 'start' | 'center' = 'start', indicateHeading = false) {
   const scroller = document.scrollingElement as HTMLElement | null
   if (!scroller || !target.isConnected) return
+  const code = target.closest<HTMLElement>('pre[data-enhanced] > code')
+  if (code && code !== target && code.scrollHeight > code.clientHeight) {
+    const rect = target.getBoundingClientRect(), frame = code.getBoundingClientRect()
+    if (rect.top < frame.top || rect.bottom > frame.top + code.clientHeight) {
+      scrollToPosition(code, { top: code.scrollTop + rect.top - frame.top - Math.max(0, (code.clientHeight - rect.height) / 2) })
+    }
+  }
   const rect = target.getBoundingClientRect(), style = getComputedStyle(target)
   const margin = parseFloat(style.scrollMarginTop) || 0
   const offset = block === 'center' ? Math.max(margin, (innerHeight - rect.height) / 2) : margin

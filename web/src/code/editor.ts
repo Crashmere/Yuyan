@@ -127,6 +127,7 @@ export class CodeEditor {
       } })),
       Prec.highest(keymap.of(keys)),
       EditorView.updateListener.of(update => {
+        host.classList.toggle('has-code-folds', foldedRanges(update.state).size > 0)
         if (update.docChanged) this.version++
         if (!this.syncing && (update.docChanged || update.selectionSet || update.focusChanged)) options.onUpdate?.(update)
         if (update.docChanged || update.transactions.some(tr => tr.effects.some(e => e.is(foldEffect) || e.is(unfoldEffect)))) this.save()

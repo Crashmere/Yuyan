@@ -838,6 +838,7 @@ body.yy-row-dragging * {
 .yy-codeblock {
   position: relative;
   margin: 0.75em 0;
+  --yy-code-padding-top: 12px;
 }
 .yy-codeblock-bar {
   position: absolute;
@@ -850,8 +851,9 @@ body.yy-row-dragging * {
   gap: 8px;
 }
 .yy-codeblock-bar .yy-lang-trigger { margin-right: auto; }
+.yy-codeblock:not(.has-title) { --yy-code-padding-top: 38px; }
 .yy-codeblock:not(.has-title) .cm-content,
-.yy-codeblock:not(.has-title) .yy-code-static > * { padding-top: 38px; }
+.yy-codeblock:not(.has-title) .yy-code-static > * { padding-top: var(--yy-code-padding-top); }
 .yy-lang-trigger,
 .yy-codeblock-btn,
 .yy-callout-trigger {

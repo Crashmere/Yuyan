@@ -31,6 +31,7 @@
   --yy-codeblock-hover: #353b45;
   --yy-codeblock-line: #3a3f4b;
   --yy-codeblock-border: light-dark(#282c34, #3a3f4b);
+  --yy-code-max-lines: 80;
 
   --yy-border: light-dark(#e7e9e8, #313236);
   --yy-border-strong: light-dark(#d8dad9, #43454a);

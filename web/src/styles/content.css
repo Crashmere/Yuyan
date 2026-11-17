@@ -350,6 +350,14 @@ details.yy-fold-block[open] > .yy-fold-title::after { transform: rotate(90deg); 
   display: block;
   overflow-x: auto;
 }
+/* Fully open blocks scroll independently; previews and syntax folds keep their own layout. */
+@media screen {
+  .code-block:not(.has-code-folds) > pre[data-enhanced]:not(.is-folded) > code {
+    max-height: calc(var(--yy-code-max-lines) * 1lh);
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+  }
+}
 /* Reading pages split code into lines (enhance.ts). Numbers always show; wrapping is per block. */
 /* All rows share the longest width, so short rows cannot pull their sticky gutter out of view. */
 .yy-code-lines {

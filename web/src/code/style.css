@@ -1,6 +1,11 @@
 .yy-code-editor-host { min-width: 0; }
 .yy-code-editor-host .cm-editor { font: 13px/1.65 var(--yy-mono); background: var(--yy-codeblock-bg); color: var(--yy-codeblock-text); }
 .yy-code-editor-host .cm-scroller { overflow-x: auto; font-family: inherit; }
+@media screen {
+  .yy-code-editor-host:not(.has-code-folds) .cm-scroller,
+  .yy-code-static { max-height: calc(var(--yy-code-max-lines) * 1lh + var(--yy-code-padding-top, 12px) + 12px); overflow-y: auto; overscroll-behavior-y: auto; }
+}
+.yy-code-dialog .yy-code-dialog-body .cm-scroller { max-height: none; }
 .yy-code-editor-host .cm-content { padding: 12px 0; caret-color: #abb2bf; }
 .yy-code-editor-host .cm-line { padding: 0 16px 0 6px; }
 .yy-code-editor-host .cm-gutters { border: 0; border-right: 1px solid var(--yy-codeblock-line); background: var(--yy-codeblock-bg); color: var(--yy-codeblock-muted); user-select: none; }
