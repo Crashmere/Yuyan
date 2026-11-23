@@ -39,6 +39,7 @@ const expanded = ref(false)
 const collapsed = ref(!!props.model.collapsed)
 const workdaysOnly = ref(!!props.model.workdaysOnly)
 const displayRange = ref<CalendarDisplayRange | null>(props.model.displayRange ? { ...props.model.displayRange } : null)
+const timelineRange = computed(() => props.readonly ? displayRange.value : null)
 const rangeInspector = ref<HTMLElement | null>(null)
 const rangeButton = ref<HTMLButtonElement | null>(null)
 const rangeSide = ref('bottom')
@@ -140,20 +141,17 @@ function applyDisplayRange(unlimited = false): boolean {
     if (displayRangeError.value) toast(displayRangeError.value, 'error')
     return false
   }
-  const anchor = viewportDate()
   displayRange.value = unlimited ? null : { startDate: rangeDraft.value!.startDate, endDate: rangeDraft.value!.endDate }
   publish()
   closeDisplayRange()
-  if (displayRange.value) void startDisplayRange()
-  else void centerTimeline(anchor)
   return true
 }
 async function startDisplayRange() {
-  if (!displayRange.value) return
+  if (!timelineRange.value) return
   initialPositionPending = true
   await nextTick()
-  if (disposed || !displayRange.value) return
-  axisCenter.value = displayRange.value.startDate
+  if (disposed || !timelineRange.value) return
+  axisCenter.value = timelineRange.value.startDate
   await nextTick()
   if (disposed || !timelineScroll.value?.clientWidth) return
   timelineScroll.value.scrollLeft = 0
@@ -220,8 +218,7 @@ async function importCalendar() {
       periods.value = data.periods.map(p => ({ ...p }))
       draft.value = null
       emit('change', data)
-      if (displayRange.value) await startDisplayRange()
-      else await centerTimeline()
+      await centerTimeline()
       if (!disposed) toast(`已导入 ${data.periods.length} 个事件，可撤销恢复原日历`, 'success')
       return
     }
@@ -251,8 +248,10 @@ watch(() => props.model, () => {
   if (previousRange !== JSON.stringify(displayRange.value)) {
     rangeDraft.value = null
     displayRangeError.value = ''
-    if (displayRange.value) void startDisplayRange()
-    else void centerTimeline()
+    if (props.readonly) {
+      if (timelineRange.value) void startDisplayRange()
+      else void centerTimeline()
+    }
   } else if (workdaysAnchor && grain.value === 'day') void centerTimeline(workdaysAnchor)
 })
 
@@ -306,9 +305,9 @@ const zoomWidth = ref(savedCellWidth.value ?? calendarCellWidths[grain.value].de
 const unitWidth = computed(() => zoomWidth.value)
 const canZoomOut = computed(() => zoomWidth.value > calendarCellWidths[grain.value].min + .5)
 const canZoomIn = computed(() => zoomWidth.value < calendarCellWidths[grain.value].max - .5)
-const axisStart = computed(() => unitBounds(displayRange.value?.startDate ?? '1000-01-01', grain.value).start)
-const axisEnd = computed(() => unitBounds(displayRange.value?.endDate ?? '9999-12-31', grain.value).end)
-const cells = computed(() => windowCells(axisCenter.value, grain.value, 192, displayRange.value, workdaysOnly.value))
+const axisStart = computed(() => unitBounds(timelineRange.value?.startDate ?? '1000-01-01', grain.value).start)
+const axisEnd = computed(() => unitBounds(timelineRange.value?.endDate ?? '9999-12-31', grain.value).end)
+const cells = computed(() => windowCells(axisCenter.value, grain.value, 192, timelineRange.value, workdaysOnly.value))
 const axisUnits = computed(() => axisLength(cells.value))
 const cellWidth = computed(() => axisWidth.value / axisUnits.value || unitWidth.value)
 const rulerCells = computed(() => {
@@ -752,7 +751,7 @@ async function centerTimeline(date = center.value) {
 
 let initialPositionPending = true
 async function initializeTimeline() {
-  if (displayRange.value) { await startDisplayRange(); return }
+  if (timelineRange.value) { await startDisplayRange(); return }
   const latest = periods.value.reduce<CalendarEntry | null>((last, period) =>
     !last || period.endDate > last.endDate || (period.endDate === last.endDate && period.startDate > last.startDate) ? period : last, null)
   const date = latest?.endDate ?? center.value
