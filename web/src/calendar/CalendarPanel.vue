@@ -753,8 +753,8 @@ async function centerTimeline(date = center.value) {
 let initialPositionPending = true
 async function initializeTimeline() {
   if (displayRange.value) { await startDisplayRange(); return }
-  const latest = props.readonly ? periods.value.reduce<CalendarEntry | null>((last, period) =>
-    !last || period.endDate > last.endDate || (period.endDate === last.endDate && period.startDate > last.startDate) ? period : last, null) : null
+  const latest = periods.value.reduce<CalendarEntry | null>((last, period) =>
+    !last || period.endDate > last.endDate || (period.endDate === last.endDate && period.startDate > last.startDate) ? period : last, null)
   const date = latest?.endDate ?? center.value
   axisCenter.value = date
   await nextTick()
@@ -897,8 +897,8 @@ function beginBar(event: PointerEvent, period: CalendarEntry, mode: BarMode) {
   event.stopPropagation()
   if (period.id === -1) return
   if (props.readonly) { void selectPeriod(period); return }
+  if ((draftDirty.value || dateInputError.value) && rangeError.value) { void flush(); return }
   if (draftDirty.value && draft.value?.id !== period.id) {
-    if (rangeError.value) { void flush(); return }
     saveDraft(false)
   }
   if (event.pointerType === 'touch' || event.button !== 0) {
@@ -959,7 +959,7 @@ function endBar(event: PointerEvent) {
     if (draft.value?.id !== gesture.period.id) openPeriod(gesture.period)
     return
   }
-  if (draftDirty.value) toast('日期已调整，应用后生效', 'info', { key: 'calendar-dates' })
+  saveDraft()
 }
 
 function onKey(event: KeyboardEvent) {
