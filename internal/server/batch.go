@@ -26,6 +26,9 @@ func (s *Server) apiBatchDocs(w http.ResponseWriter, r *http.Request) error {
 	for _, id := range result.IDs {
 		s.forget(id)
 	}
+	if in.Action == "trash" {
+		s.notifySubscribedDeletes(r.Context(), r)
+	}
 	writeJSON(w, http.StatusOK, result)
 	return nil
 }

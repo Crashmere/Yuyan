@@ -45,6 +45,8 @@ See DESIGN.md 23.6 for foldable blocks and highlight blocks: collapsible heading
 
 Insert `日历` from the document insertion or slash menu to create an independent event calendar that saves with the document. Its compact title bar supports renaming, folding, and an optional saved display range. The timeline supports year/month/day scales, annotations, overlapping events, undo/history, portable HTML-in-Markdown export, and compact clipboard strings with direct undoable import. Saved range limits apply only to the reading timeline; editing always opens without them at the latest event's end, and every event remains in the searchable list. Reading supports interactive browsing. Calendars belong only to documents; the standalone page, APIs, and storage have been removed. See DESIGN.md section 27 and the corresponding VERIFICATION record.
 
+Open document tabs subscribe to server-pushed revision and deletion notifications over SSE (`GET /api/docs/{id}/events`). Reading pages refresh updated content, titles, recent-change markers, and directory labels in place while preserving the current reading position (or switch cleanly to `找不到内容` on deletion). Editing pages ignore their own saves via `X-Yuyan-Client`, offer an in-place `载入最新版本` banner when untouched, and surface the conflict banner immediately when local edits exist without overwriting content. See DESIGN.md section 28.
+
 <a id="yuyan-doc-同步维护"></a>
 
 ## yuyan-doc Synchronization Maintenance

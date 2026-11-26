@@ -41,6 +41,7 @@ func (s *Server) apiExtractGroup(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.forget(id)
+	s.notifySubscribedDeletes(r.Context(), r)
 	writeJSON(w, http.StatusCreated, result)
 	return nil
 }

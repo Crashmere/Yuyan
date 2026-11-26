@@ -5,7 +5,8 @@ import { getMarkRange, type JSONContent } from '@tiptap/core'
 import { Mapping } from '@tiptap/pm/transform'
 import { TableOfContents, X } from 'lucide-vue-next'
 import IconButton from '../ui/IconButton.vue'
-import { api, ApiError, base, errorMessage, type Doc } from '../shared/api'
+import { api, ApiError, base, clientId, errorMessage, type Doc } from '../shared/api'
+import { watchDocEvents, type DocEvent } from '../shared/docEvents'
 import { stopLoading } from '../shared/images'
 import { toast } from '../ui/toast'
 import { prefs } from '../app/prefs'
@@ -44,7 +45,7 @@ import '../styles/editor.css'
 export type SaveStatus = 'loading' | 'saved' | 'dirty' | 'saving' | 'offline' | 'error' | 'conflict'
 
 const props = defineProps<{ doc: Doc; readingPosition?: ReadingPosition }>()
-const emit = defineEmits<{ status: [SaveStatus, string]; words: [number]; saved: [string] }>()
+const emit = defineEmits<{ status: [SaveStatus, string]; words: [number]; saved: [string]; reload: [] }>()
 
 interface Draft {
   title: string
@@ -58,6 +59,8 @@ const tick = ref(0)
 const title = ref(props.doc.title)
 const revision = ref(props.doc.revision)
 const serverRevision = ref(0)
+const remoteUpdate = ref<number | null>(null)
+const remoteDeleted = ref(false)
 const status = ref<SaveStatus>('loading')
 const failure = ref('')
 const draftOffer = ref<Draft | null>(null)
@@ -130,6 +133,8 @@ let again = false
 let loaded = false
 let savedThisSession = false
 let discarded = false
+let pendingRemoteRevision = 0
+let stopEvents: (() => void) | undefined
 const positionMapping = new Mapping()
 
 function statusText(): string {
@@ -164,8 +169,58 @@ function readDraft(): Draft | null {
   }
 }
 
+function handleRemoteRevision(rev: number) {
+  if (discarded || remoteDeleted.value || rev === revision.value) return
+  if (inFlight) {
+    pendingRemoteRevision = rev
+    return
+  }
+  if (status.value === 'conflict') {
+    serverRevision.value = rev
+    return
+  }
+  if (!touched() && !draftOffer.value && status.value === 'saved') {
+    remoteUpdate.value = rev
+    serverRevision.value = rev
+    return
+  }
+  clearTimeout(saveTimer)
+  clearTimeout(retryTimer)
+  remoteUpdate.value = null
+  serverRevision.value = rev
+  status.value = 'conflict'
+  writeDraft()
+}
+
+function onDocEvent(ev: DocEvent) {
+  if (discarded) return
+  if (ev.source && ev.source === clientId) return
+  if (ev.kind === 'deleted') {
+    clearTimeout(saveTimer)
+    clearTimeout(retryTimer)
+    remoteUpdate.value = null
+    remoteDeleted.value = true
+    if (touched()) writeDraft()
+    return
+  }
+  if (ev.revision > 0 && ev.revision !== revision.value) {
+    handleRemoteRevision(ev.revision)
+  }
+}
+
 function changed() {
   if (!loaded || discarded) return
+  if (remoteDeleted.value) {
+    writeDraft()
+    return
+  }
+  if (remoteUpdate.value !== null && remoteUpdate.value !== revision.value) {
+    serverRevision.value = remoteUpdate.value
+    remoteUpdate.value = null
+    status.value = 'conflict'
+    writeDraft()
+    return
+  }
   if (inFlight) again = true
   if (status.value !== 'conflict') status.value = 'dirty'
   clearTimeout(saveTimer)
@@ -173,7 +228,7 @@ function changed() {
 }
 
 async function save() {
-  if (!editor.value || status.value === 'conflict' || discarded) return
+  if (!editor.value || status.value === 'conflict' || remoteDeleted.value || discarded) return
   if (inFlight) {
     again = true
     return
@@ -208,7 +263,12 @@ async function save() {
     }
   } finally {
     inFlight = false
-    if (again && status.value !== 'conflict') {
+    if (pendingRemoteRevision > 0 && pendingRemoteRevision !== revision.value) {
+      const rev = pendingRemoteRevision
+      pendingRemoteRevision = 0
+      handleRemoteRevision(rev)
+    }
+    if (again && status.value !== 'conflict' && !remoteDeleted.value) {
       again = false
       void save()
     }
@@ -219,12 +279,14 @@ async function save() {
 // uploading are waited for first, so they are part of what gets saved.
 async function flush(): Promise<boolean> {
   if (discarded) return true
+  if (remoteDeleted.value) return !touched()
   if (editor.value && !await flushPendingBlocks(editor.value)) return false
   if (editor.value) clearUnusedBlockSpaces(editor.value.view)
   while (editor.value && pendingUploads(editor.value) > 0) await new Promise((r) => setTimeout(r, 100))
   clearTimeout(saveTimer)
   for (let attempt = 0; attempt < 3; attempt++) {
     while (inFlight) await new Promise((r) => setTimeout(r, 50))
+    if (remoteDeleted.value) return !touched()
     if (status.value === 'saved' || status.value === 'loading') return true
     if (status.value === 'conflict') return false
     await save()
@@ -321,9 +383,7 @@ function overwrite() {
 }
 
 function reloadLatest() {
-  discarded = true
-  localStorage.removeItem(draftKey)
-  window.location.reload()
+  emit('reload')
 }
 
 function compareConflict() {
@@ -380,7 +440,7 @@ function focusBodyStart() {
 function beforeUnload(e: BeforeUnloadEvent) {
   if (discarded) return
   const uploading = !!editor.value && pendingUploads(editor.value) > 0
-  if ((editor.value && hasPendingBlocks(editor.value)) || uploading || ['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
+  if ((remoteDeleted.value && touched()) || (editor.value && hasPendingBlocks(editor.value)) || uploading || ['dirty', 'saving', 'offline', 'error', 'conflict'].includes(status.value)) {
     writeDraft()
     e.preventDefault()
   }
@@ -440,6 +500,7 @@ onMounted(async () => {
   await nextTick()
   loaded = true
   status.value = 'saved'
+  stopEvents = watchDocEvents(d.id, onDocEvent)
   autosizeTitle()
   const focusStart = () => {
     if (!d.content.content?.some((n) => n.content?.length)) titleInput.value?.focus()
@@ -459,6 +520,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopEvents?.()
+  stopEvents = undefined
   previewCleanup()
   window.removeEventListener('beforeunload', beforeUnload)
   window.removeEventListener('pagehide', snapshot)
@@ -480,11 +543,18 @@ onBeforeUnmount(() => {
       <button type="button" class="yy-btn small" @click="restoreDraft">恢复</button>
       <button type="button" class="yy-btn small" @click="discardDraft">丢弃</button>
     </div>
-    <div v-if="status === 'conflict'" class="yy-banner danger yy-editor-banner">
+    <div v-if="remoteDeleted" class="yy-banner danger yy-editor-banner">
+      这篇文档已在别处删除，自动保存已暂停，你的内容仍在当前页面。
+    </div>
+    <div v-else-if="status === 'conflict'" class="yy-banner danger yy-editor-banner">
       这篇文档已在别的标签页或设备上修改，自动保存已暂停，你的内容仍在当前页面。
       <button type="button" class="yy-btn small" @click="compareConflict">查看差异</button>
       <button type="button" class="yy-btn small" @click="reloadLatest">载入最新版本（放弃这里的修改）</button>
       <button type="button" class="yy-btn small" @click="overwrite">用这里的内容覆盖</button>
+    </div>
+    <div v-else-if="remoteUpdate !== null" class="yy-banner yy-editor-banner">
+      这篇文档已在别处更新，当前页面没有未保存的修改。
+      <button type="button" class="yy-btn small" @click="reloadLatest">载入最新版本</button>
     </div>
 
     <div class="yy-editor-body">

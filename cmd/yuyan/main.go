@@ -214,6 +214,7 @@ func serve(dir, listen, base string, withPrefix bool) error {
 		return err
 	case <-ctx.Done():
 	}
+	srv.CloseEvents()
 	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return httpServer.Shutdown(shutdown)

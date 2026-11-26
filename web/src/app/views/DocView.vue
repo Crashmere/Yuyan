@@ -2,7 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Ellipsis, FileDiff, FileText, Folder, GitCompareArrows, PencilLine, TableOfContents, X } from 'lucide-vue-next'
-import { api, ApiError, errorMessage, type DocView, type ImageSizes, type RecentChanges } from '../../shared/api'
+import { api, ApiError, clientId, errorMessage, type DocView, type ImageSizes, type RecentChanges } from '../../shared/api'
+import { watchDocEvents, type DocEvent } from '../../shared/docEvents'
 import ActionMenu from '../../ui/ActionMenu.vue'
 import IconButton from '../../ui/IconButton.vue'
 import { toast } from '../../ui/toast'
@@ -15,7 +16,7 @@ import Backlinks from '../content/Backlinks.vue'
 import Toc from '../content/Toc.vue'
 import { prefs, recordView } from '../prefs'
 import { setTitle } from '../router'
-import { loading, loadTree, locate, setPage, state } from '../store'
+import { invalidateTree, loading, loadTree, locate, setNodeTitle, setPage, state } from '../store'
 import { formatTime } from '../time'
 import NotFoundState from './NotFoundState.vue'
 
@@ -112,7 +113,15 @@ function nextChange(direction: number) { changeAt.value = markers?.go(direction)
 watch(() => [prefs.recentChanges, view.value], () => { void loadChanges() })
 onBeforeUnmount(() => { changeRequest++; clearMarkers() })
 let disposed = false
-onBeforeUnmount(() => { disposed = true })
+let stopEvents: (() => void) | undefined
+let liveTargetRevision = 0
+let liveNotifyToast = false
+let liveRefreshing = false
+onBeforeUnmount(() => {
+  disposed = true
+  stopEvents?.()
+  stopEvents = undefined
+})
 // Up to this width (the breakpoint in app.css) the outline is a drawer opened from the top bar;
 // wider, it sits beside the text (Toc.vue).
 const drawerQuery = matchMedia('(max-width: 1180px)')
@@ -181,15 +190,98 @@ async function editFromAddress(isDoc: boolean) {
   void router.push(`/docs/${id}/edit`)
 }
 
+function handleDeleted() {
+  const bookId = view.value?.doc.bookId ?? state.bookId
+  stopEvents?.()
+  stopEvents = undefined
+  view.value = null
+  missing.value = true
+  failure.value = ''
+  setTitle('找不到内容')
+  if (bookId !== null) {
+    invalidateTree(bookId)
+    void loadTree(bookId, true).catch(() => {})
+  }
+}
+
+function applyViewUpdate(v: DocView, prev: DocView) {
+  content.value?.preservePosition()
+  view.value = v
+  setPage(v.doc.bookId, v.doc.id)
+  setTitle(v.doc.title)
+  setNodeTitle(v.doc.bookId, v.doc.id, v.doc.title)
+  if (v.doc.bookId !== prev.doc.bookId) invalidateTree(prev.doc.bookId)
+  if (v.doc.title !== prev.doc.title || v.doc.bookId !== prev.doc.bookId || v.chars !== prev.chars) {
+    invalidateTree(v.doc.bookId)
+    void loadTree(v.doc.bookId, true).catch(() => {})
+  }
+  if (v.doc.kind === 'doc') recordView({ id: v.doc.id, title: v.doc.title, bookId: v.doc.bookId, bookName: v.doc.bookName })
+}
+
+async function applyLiveRefresh() {
+  if (liveRefreshing || disposed || !view.value) return
+  liveRefreshing = true
+  try {
+    while (!disposed && view.value && liveTargetRevision !== 0 && liveTargetRevision !== view.value.doc.revision) {
+      const prev = view.value
+      const target = liveTargetRevision
+      const shouldToast = liveNotifyToast
+      try {
+        const v = await api<DocView>(`docs/${id}/view?segments=1`)
+        if (disposed || !view.value) return
+        if (v.doc.revision === prev.doc.revision && v.doc.updatedAt === prev.doc.updatedAt) {
+          if (liveTargetRevision === target) liveTargetRevision = 0
+          return
+        }
+        applyViewUpdate(v, prev)
+        if (shouldToast) toast('文档已更新', 'info', { key: 'doc-live-update', ms: 2000 })
+        if (liveTargetRevision === target) {
+          liveTargetRevision = 0
+          liveNotifyToast = false
+        }
+      } catch (e) {
+        if (disposed) return
+        if (e instanceof ApiError && e.status === 404) {
+          handleDeleted()
+        } else {
+          toast(`自动更新失败：${errorMessage(e)}`, 'error', { key: 'doc-live-update' })
+          liveTargetRevision = 0
+          liveNotifyToast = false
+        }
+        return
+      }
+    }
+  } finally {
+    liveRefreshing = false
+  }
+}
+
+function onDocEvent(ev: DocEvent) {
+  if (disposed) return
+  if (ev.kind === 'deleted') {
+    handleDeleted()
+    return
+  }
+  if (!view.value) return
+  if (ev.revision !== view.value.doc.revision || (ev.updatedAt && ev.updatedAt !== view.value.doc.updatedAt)) {
+    liveTargetRevision = ev.revision
+    if (!ev.source || ev.source !== clientId) liveNotifyToast = true
+    void applyLiveRefresh()
+  }
+}
+
 // The document changed, or the server restarted, while a long one was being read in segments:
 // read it again, and the content returns to where the reader was.
 async function reload() {
+  const prev = view.value
   try {
     const v = await api<DocView>(`docs/${id}/view?segments=1`)
-    if (!disposed) view.value = v
+    if (disposed) return
+    if (prev) applyViewUpdate(v, prev)
+    else view.value = v
   } catch (e) {
     if (disposed) return
-    if (e instanceof ApiError && e.status === 404) missing.value = true
+    if (e instanceof ApiError && e.status === 404) handleDeleted()
     else toast(`重新载入失败：${errorMessage(e)}`, 'error')
   }
 }
@@ -203,6 +295,7 @@ onMounted(async () => {
     setTitle(v.doc.title)
     void loadTree(v.doc.bookId).catch(() => toast('目录更新失败，请刷新页面重试', 'error', { key: 'tree-refresh' }))
     if (v.doc.kind === 'doc') recordView({ id: v.doc.id, title: v.doc.title, bookId: v.doc.bookId, bookName: v.doc.bookName })
+    stopEvents = watchDocEvents(id, onDocEvent)
     if (route.query.edit !== undefined) void editFromAddress(v.doc.kind === 'doc')
   } catch (e) {
     if (disposed) return

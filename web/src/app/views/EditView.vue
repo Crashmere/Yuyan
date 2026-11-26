@@ -8,6 +8,7 @@ import ActionMenu from '../../ui/ActionMenu.vue'
 import { confirm } from '../../ui/dialog'
 import IconButton from '../../ui/IconButton.vue'
 import type { MenuEntry } from '../../ui/menu'
+import { toast } from '../../ui/toast'
 import { copyDocLink } from '../actions'
 import { setTitle } from '../router'
 import { editing, invalidateTree, loading, loadTree, setNodeTitle, setPage } from '../store'
@@ -21,6 +22,7 @@ const id = Number(route.params.id)
 const readingPosition = route.meta.readingPosition
 const doc = shallowRef<Doc | null>(null)
 const pane = ref<InstanceType<typeof EditorPane> | null>(null)
+const reloadKey = ref(0)
 const missing = ref(false)
 const failure = ref('')
 const status = ref<SaveStatus>('loading')
@@ -42,7 +44,7 @@ const menu: MenuEntry[] = [
   { label: '复制链接', icon: ClipboardCopy, run: () => copyDocLink(id) },
 ]
 
-async function load() {
+async function load(remount = false) {
   failure.value = ''
   try {
     const d = await loading(api<Doc>(`docs/${id}`))
@@ -50,17 +52,25 @@ async function load() {
       await router.replace(`/docs/${id}`)
       return
     }
+    if (remount) {
+      pane.value?.abandon()
+      reloadKey.value++
+    }
     doc.value = d
     setPage(d.bookId, d.id)
     setTitle(`编辑：${d.title}`)
-    void loadTree(d.bookId)
+    void loadTree(d.bookId, remount)
     editing.value = { docId: d.id, setTitle: (t) => pane.value?.setTitle(t), flush: saveBeforeReload }
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) missing.value = true
-    else failure.value = errorMessage(e)
+    if (e instanceof ApiError && e.status === 404) {
+      doc.value = null
+      missing.value = true
+    } else if (remount && doc.value) {
+      toast(`载入最新版本失败：${errorMessage(e)}`, 'error')
+    } else failure.value = errorMessage(e)
   }
 }
-onMounted(load)
+onMounted(() => void load())
 
 onBeforeUnmount(() => {
   if (moduleReloadGuard.value === saveBeforeReload) moduleReloadGuard.value = null
@@ -142,8 +152,8 @@ onBeforeRouteLeave(async (to) => {
     </template>
   </Teleport>
   <main v-if="missing" class="yy-page"><NotFoundState /></main>
-  <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }} <button type="button" class="yy-link-btn" @click="load">重试</button></p></main>
+  <main v-else-if="failure" class="yy-page"><p class="yy-page-error">加载失败：{{ failure }} <button type="button" class="yy-link-btn" @click="load()">重试</button></p></main>
   <main v-else-if="doc" class="yy-edit-page">
-    <EditorPane ref="pane" :doc="doc" :reading-position="readingPosition" @status="onStatus" @words="(n) => (words = n)" @saved="onSaved" />
+    <EditorPane :key="reloadKey" ref="pane" :doc="doc" :reading-position="reloadKey ? undefined : readingPosition" @status="onStatus" @words="(n) => (words = n)" @saved="onSaved" @reload="load(true)" />
   </main>
 </template>

@@ -28,6 +28,7 @@ func (s *Server) apiDissolveGroup(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 	s.forget(id)
+	s.notifySubscribedDeletes(r.Context(), r)
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }

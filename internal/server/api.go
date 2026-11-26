@@ -479,6 +479,7 @@ func (s *Server) apiSaveDoc(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.forget(id)
+	s.notifyDocUpdated(r, id, revision, updated)
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "updatedAt": updated})
 	return nil
 }
@@ -522,6 +523,7 @@ func (s *Server) apiDiscardEdits(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.forget(id)
+	s.notifyDocUpdated(r, id, revision, in.UpdatedAt)
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision})
 	return nil
 }
@@ -545,6 +547,7 @@ func (s *Server) apiRenameDoc(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	s.forget(id)
+	s.notifyDocUpdated(r, id, revision, "")
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision})
 	return nil
 }
@@ -579,6 +582,8 @@ func (s *Server) apiDeleteDoc(w http.ResponseWriter, r *http.Request) error {
 	if err := s.store.DeleteDoc(r.Context(), id); err != nil {
 		return err
 	}
+	s.forget(id)
+	s.notifySubscribedDeletes(r.Context(), r)
 	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
@@ -643,6 +648,7 @@ func (s *Server) apiRestoreVersion(w http.ResponseWriter, r *http.Request) error
 		return err
 	}
 	s.forget(v.DocID)
+	s.notifyDocUpdated(r, v.DocID, revision, "")
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "docId": v.DocID})
 	return nil
 }

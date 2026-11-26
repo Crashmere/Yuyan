@@ -40,7 +40,8 @@ type Server struct {
 	// rendering holds a channel for each document being rendered, closed when it is done.
 	rendering map[int64]chan struct{}
 	history   history
-	headings  headingCache
+	headings headingCache
+	events   *eventHub
 	// variants keeps the display versions of images; nil serves originals only.
 	variants *variants.Cache
 }
@@ -64,7 +65,7 @@ func New(st *store.Store, static fs.FS, base string) (*Server, error) {
 	if !strings.HasPrefix(base, "/") || !strings.HasSuffix(base, "/") {
 		return nil, fmt.Errorf("base path %q must start and end with /", base)
 	}
-	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedPage{}, rendering: map[int64]chan struct{}{}, origin: http.NewCrossOriginProtection()}
+	s := &Server{store: st, base: base, static: static, chromaCSS: render.ChromaCSS(), cache: map[int64]cachedPage{}, rendering: map[int64]chan struct{}{}, events: newEventHub(), origin: http.NewCrossOriginProtection()}
 	s.origin.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusForbidden, apiError{Error: "cross_origin", Message: "拒绝来自其他网站的修改请求"})
 	}))
@@ -202,6 +203,7 @@ func (s *Server) Handler(withPrefix bool) http.Handler {
 	mux.Handle("PATCH /api/docs/{id}", s.write(s.apiRenameDoc))
 	mux.Handle("DELETE /api/docs/{id}", s.write(s.apiDeleteDoc))
 	mux.Handle("GET /api/docs/{id}/view", s.get(s.docView))
+	mux.HandleFunc("GET /api/docs/{id}/events", s.apiDocEvents)
 	mux.Handle("GET /api/docs/{id}/segments", s.read(s.docSegments))
 	mux.Handle("GET /api/docs/{id}/segments/matches", s.get(s.docSegmentMatches))
 	mux.Handle("POST /api/docs/{id}/move", s.write(s.apiMoveDoc))

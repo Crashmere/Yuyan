@@ -2,6 +2,11 @@ import type { JSONContent } from '@tiptap/core'
 
 export const base = document.querySelector<HTMLMetaElement>('meta[name="yuyan-base"]')?.content ?? '/'
 
+export const clientId =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
 export interface BookGroup {
   id: string
   name: string
@@ -221,6 +226,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
   }
   const headers = new Headers(init.headers)
   headers.set('X-Yuyan-Features', 'drawing-v1,calendar-v1,calendar-display-range-v1')
+  if ((init.method ?? 'GET') !== 'GET') headers.set('X-Yuyan-Client', clientId)
   let body = init.body
   if (init.json !== undefined) {
     headers.set('Content-Type', 'application/json')

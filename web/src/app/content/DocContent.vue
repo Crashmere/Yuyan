@@ -49,7 +49,7 @@ function prepareCopy(node: HTMLElement) {
 const complete = () => !reader || reader.complete()
 defineExpose({
   source: () => ({ root: root.value, elements: sourceElements.flat(), prepare: prepareCopy, html: complete() ? sourceHTML.join('') : undefined }),
-  show, loadAll, complete, selectAll,
+  show, loadAll, complete, selectAll, preservePosition,
   ensureBlock: (block: number) => reader?.ensureBlock(block),
 })
 // The content is re-created from the HTML when it changes, and on a theme change to redraw
@@ -57,15 +57,23 @@ defineExpose({
 const generation = ref(0)
 let drawn: Promise<unknown> = Promise.resolve()
 let initialPosition = props.readingPosition
+let skipHashOnce = false
 let previewCleanup = () => {}
 let runs = 0
 let jumpSequence = 0
 const warn = (e: unknown) => console.warn('enhance', e)
 
+function preservePosition() {
+  initialPosition = captureReadingPosition()
+  skipHashOnce = true
+}
+
 async function run() {
   const token = ++runs
   const position = initialPosition
+  const skipHash = skipHashOnce
   initialPosition = undefined // Only on entry or a reload, not a later theme change or redraw.
+  skipHashOnce = false
   reader?.destroy()
   reader = undefined
   await nextTick()
@@ -96,12 +104,12 @@ async function run() {
         if (props.highlight) addMatches(nodes, props.highlight)
       },
       stale() {
-        initialPosition = captureReadingPosition()
+        preservePosition()
         emit('stale')
       },
     })
   }
-  if (location.hash) await scrollTo(decodeURIComponent(location.hash.slice(1)))
+  if (location.hash && !skipHash && !position) await scrollTo(decodeURIComponent(location.hash.slice(1)))
   if (token !== runs) return
   if (!position) reader?.start()
   await drawn
